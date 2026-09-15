@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Repo checks for the pre-commit hook: every plugin manifest validates, and the marketplace, the dead-skills
-# bundle and the setup scripts agree on the plugin list. Needs jq. Skips `claude plugin validate` when claude
+# bundle and INSTALL.md's opt-in table agree on the plugin list. Needs jq. Skips `claude plugin validate` when claude
 # isn't on PATH (nix flake check sandbox, CI).
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -39,23 +39,19 @@ for dir in plugins/*/; do
     fail "$dir is not listed in $MARKETPLACE"
 done
 
-# --- setup scripts: every marketplace plugin is either a bundle dependency or an opt-in ---
-read -ra sh_optins <<<"$(sed -n 's/^OPTINS=(\(.*\))$/\1/p' setup.sh)"
-mapfile -t ps_optins < <(
-  awk '/^[$]OptIns = [[]ordered[]]@[{]/ {f = 1; next} f && /^[}]/ {f = 0} f' setup.ps1 |
-    grep -oE "^ *'[a-z0-9-]+'" | tr -d " '" | sort
+# --- INSTALL.md: every marketplace plugin is either a bundle dependency or an opt-in in its table ---
+# shellcheck disable=SC2016  # the backticks are literal Markdown
+mapfile -t optins < <(
+  awk '/^## 2\. / {f = 1; next} f && /^## / {f = 0} f' INSTALL.md |
+    grep -oE '^\| `[a-z0-9-]+`' | tr -d '|` '
 )
 
-expected=$(printf '%s\n' dead-skills "${deps[@]}" "${sh_optins[@]}" | sort)
+expected=$(printf '%s\n' dead-skills "${deps[@]}" "${optins[@]}" | sort)
 actual=$(printf '%s\n' "${market[@]}")
 if [[ $expected != "$actual" ]]; then
-  fail "setup.sh OPTINS + $BUNDLE dependencies don't match $MARKETPLACE (< setup/bundle, > marketplace): $(
+  fail "INSTALL.md opt-ins + $BUNDLE dependencies don't match $MARKETPLACE (< install/bundle, > marketplace): $(
     diff <(printf '%s\n' "$expected") <(printf '%s\n' "$actual") | grep '^[<>]' | tr '\n' ' ' || true
   )"
-fi
-
-if [[ $(printf '%s\n' "${sh_optins[@]}" | sort) != "$(printf '%s\n' "${ps_optins[@]}")" ]]; then
-  fail "setup.ps1 \$OptIns (${ps_optins[*]}) differs from setup.sh OPTINS (${sh_optins[*]})"
 fi
 
 if ((${#problems[@]})); then

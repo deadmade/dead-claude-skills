@@ -1,4 +1,4 @@
-# External tools the dead-claude-skills plugins expect on PATH. The plugins themselves come from setup.sh
+# External tools the dead-claude-skills plugins expect on PATH. The plugins themselves come from INSTALL.md
 # or /plugin: this module deliberately leaves programs.claude-code.settings and .marketplaces alone, since
 # either turns ~/.claude/settings.json into a read-only store link and /plugin install can no longer save
 # enabledPlugins.

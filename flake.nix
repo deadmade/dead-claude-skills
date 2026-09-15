@@ -27,28 +27,6 @@
         runtimeInputs = with pkgs; [bash coreutils diffutils gawk gnugrep gnused jq];
         text = ''exec bash scripts/check-repo.sh'';
       };
-
-      parser = pkgs.writeText "parse.ps1" ''
-        param([string]$Path)
-        $errors = $null
-        [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $Path), [ref]$null, [ref]$errors)
-        foreach ($e in $errors) { Write-Host "$($Path):$($e.Extent.StartLineNumber): $($e.Message)" }
-        exit [int]($errors.Count -gt 0)
-      '';
-
-      ps1-parse = pkgs.writeShellApplication {
-        name = "ps1-parse";
-        runtimeInputs = [pkgs.powershell];
-        text = ''
-          HOME=$(mktemp -d)
-          export HOME POWERSHELL_TELEMETRY_OPTOUT=1 DOTNET_CLI_TELEMETRY_OPTOUT=1
-          status=0
-          for file in "$@"; do
-            pwsh -NoProfile -NonInteractive -File ${parser} "$file" || status=1
-          done
-          exit "$status"
-        '';
-      };
     in
       git-hooks.lib.${system}.run {
         src = ./.;
@@ -68,14 +46,8 @@
             enable = true;
             name = "claude plugin validate + marketplace consistency";
             entry = "${check-repo}/bin/check-repo";
-            files = "^(\\.claude-plugin/|plugins/|setup\\.(sh|ps1)$|scripts/check-repo\\.sh$)";
+            files = "^(\\.claude-plugin/|plugins/|INSTALL\\.md$|scripts/check-repo\\.sh$)";
             pass_filenames = false;
-          };
-          ps1-parse = {
-            enable = true;
-            name = "PowerShell parse";
-            entry = "${ps1-parse}/bin/ps1-parse";
-            files = "\\.ps1$";
           };
         };
       };

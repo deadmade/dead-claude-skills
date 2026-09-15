@@ -6,19 +6,18 @@ My Claude Code setup as a plugin marketplace, so every machine (Linux, Windows) 
 
 ### Quick setup
 
-Clone the repo and run the setup script. It adds the marketplace, installs `dead-skills`, asks about each
-opt-in plugin (and its PATs), sets the [recommended permission](#recommended-permission) and
-[auto-update](#auto-update), and checks the [language servers](#language-servers) and other CLIs:
+Paste this into Claude Code on the new machine (Linux, macOS, NixOS or Windows):
 
 ```
-./setup.sh                                               # Linux/macOS: missing tools are only reported (NixOS: a home.packages line)
-powershell -ExecutionPolicy Bypass -File .\setup.ps1     # Windows: missing tools are installed via winget/npm/rustup/dotnet/uv
+Fetch https://raw.githubusercontent.com/deadmade/dead-claude-skills/master/INSTALL.md and follow it.
 ```
 
-Flags: `--all`, `--work` (mcp-azure + mcp-github), `--with graphify,pstack-picks`, `--yes` (no prompts),
-`--no-tools`, `--dry-run`; PowerShell: `-All`, `-Work`, `-With`, `-Yes`, `-NoTools`, `-DryRun`. For `--yes`
-runs the PATs come from `GITHUB_PAT`, `ADO_ORG_URL`, `ADO_PAT`, `ADO_API_VERSION`, `ADO_DEFAULT_PROJECT`.
-Re-running is safe; `settings.json` is backed up to `settings.json.bak` before it's changed.
+(or, in a clone: `Follow ./INSTALL.md`). [INSTALL.md](INSTALL.md) is written for the agent: it adds the
+marketplace, installs `dead-skills`, asks which opt-in plugins you want (PATs are entered in Claude Code's own
+`/plugin install` prompt, never in the chat), warns about duplicates from other marketplaces, merges the
+[recommended permission](#recommended-permission) and [auto-update](#auto-update) into `settings.json`
+(backup: `settings.json.bak`), and installs the missing [language servers](#language-servers) and other CLIs
+after asking (NixOS: it proposes a home-manager change instead). Re-running is safe.
 
 ### Manual
 
@@ -90,8 +89,8 @@ symbols and trace call hierarchies instead of grepping.
 direnv also works). A missing one shows up as "Executable not found in $PATH" under `/plugin` →
 Errors; silence a server a machine doesn't need with `/plugin disable <name>@dead-claude-skills`.
 
-On NixOS the flake's home-manager module installs all of them (see [Nix](#nix)); `setup.ps1` installs them
-on Windows.
+On NixOS the flake's home-manager module installs all of them (see [Nix](#nix)); elsewhere the
+[INSTALL.md](INSTALL.md) agent installs them.
 
 | Server | NixOS (home-manager `home.packages`) | Windows |
 |---|---|---|
@@ -247,10 +246,10 @@ The flake provides a dev shell, pre-commit hooks and a home-manager module.
 
 - **Dev shell:** `nix develop` (or direnv: `.envrc` is `use flake`) gives git, gh, jq, perl and shellcheck
   for the sync scripts, and installs the pre-commit hooks on entry.
-- **Hooks:** alejandra, shellcheck, JSON syntax, merge markers, end-of-file (vendored trees excluded), a
-  PowerShell parse of `setup.ps1`, and `scripts/check-repo.sh`: `claude plugin validate` on the marketplace
-  and every plugin (skipped when `claude` isn't on `PATH`), bundle dependencies and local sources exist, and
-  every marketplace plugin is either a `dead-skills` dependency or an opt-in in both setup scripts. Run them
+- **Hooks:** alejandra, shellcheck, JSON syntax, merge markers, end-of-file (vendored trees excluded), and
+  `scripts/check-repo.sh`: `claude plugin validate` on the marketplace and every plugin (skipped when `claude`
+  isn't on `PATH`), bundle dependencies and local sources exist, and every marketplace plugin is either a
+  `dead-skills` dependency or listed in INSTALL.md's opt-in table. Run them
   all with `pre-commit run --all-files`; `nix flake check` runs them in the sandbox (without claude).
 - **home-manager module:** installs the plugins' external tools, not the plugins:
 
@@ -272,16 +271,16 @@ The flake provides a dev shell, pre-commit hooks and a home-manager module.
   ```
 
   It doesn't set `programs.claude-code.settings` or `marketplaces`: either makes `~/.claude/settings.json` a
-  read-only store link, so `/plugin install` could no longer save enabled plugins. Settings stay with the
-  setup script.
+  read-only store link, so `/plugin install` could no longer save enabled plugins. Settings stay with
+  INSTALL.md.
 
 ## Layout
 
 ```
-setup.sh, setup.ps1                 # one-shot machine setup (Linux/macOS, Windows)
+INSTALL.md                          # machine setup, followed by Claude Code
 flake.nix                           # dev shell, pre-commit hooks, home-manager module output
 nix/home-manager.nix                # programs.dead-claude-skills: language servers and other CLIs
-scripts/check-repo.sh               # pre-commit: plugin validate + marketplace/setup consistency
+scripts/check-repo.sh               # pre-commit: plugin validate + marketplace/INSTALL.md consistency
 .claude-plugin/marketplace.json     # marketplace + re-listed upstream plugins
 plugins/dead-skills/
   .claude-plugin/plugin.json        # bundle manifest (dependencies)
@@ -307,7 +306,7 @@ scripts/sync-graphify.sh            # vendors graphify's Claude skill + referenc
 ## Adding another upstream plugin
 
 Add an entry to `.claude-plugin/marketplace.json` and its name to `dependencies` in the bundle's
-`plugin.json`.
+`plugin.json` (or, for an opt-in, a row in INSTALL.md's opt-in table).
 
 ## Hallmark sync
 
