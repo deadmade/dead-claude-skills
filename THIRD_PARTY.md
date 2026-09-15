@@ -8,9 +8,10 @@ It is synced by `scripts/sync-hallmark.sh` (weekly via GitHub Actions); the only
 "WEB FRONTEND ONLY" prefix on the frontmatter `description`. The synced upstream commit is in
 `skills/hallmark/UPSTREAM`.
 
-## MCP servers (dead-mcp)
+## MCP servers (mcp-basic, mcp-github, mcp-azure)
 
 - **Context7**: hosted service by Upstash (https://context7.com), used over HTTP; nothing vendored.
+- **GitHub MCP server**: hosted by GitHub (https://github.com/github/github-mcp-server), used over HTTP; nothing vendored.
 - **@tiberriver256/mcp-server-azure-devops**: MIT, https://github.com/Tiberriver256/mcp-server-azure-devops.
   Fetched at runtime with `npx` at a pinned version; not vendored.
 

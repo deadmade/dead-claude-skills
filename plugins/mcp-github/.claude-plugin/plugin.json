@@ -1,0 +1,18 @@
+{
+  "name": "mcp-github",
+  "description": "GitHub's hosted MCP server (repos, issues, PRs, Actions, code search). Opt-in per machine; needs a GitHub PAT.",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "repository": "https://github.com/deadmade/dead-claude-skills",
+  "userConfig": {
+    "github_pat": {
+      "type": "string",
+      "title": "GitHub personal access token",
+      "description": "Fine-grained PAT from https://github.com/settings/personal-access-tokens/new with the repository permissions you want Claude to use.",
+      "sensitive": true,
+      "required": true
+    }
+  }
+}

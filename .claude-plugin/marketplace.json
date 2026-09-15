@@ -154,9 +154,21 @@
       "category": "development"
     },
     {
-      "name": "dead-mcp",
-      "description": "MCP servers: Context7 (library docs) and Azure DevOps Server (self-hosted, PAT). Configure per machine.",
-      "source": "./plugins/dead-mcp",
+      "name": "mcp-basic",
+      "description": "Basic MCP servers for every machine: Context7 (up-to-date library docs).",
+      "source": "./plugins/mcp-basic",
+      "category": "productivity"
+    },
+    {
+      "name": "mcp-github",
+      "description": "GitHub's hosted MCP server (repos, issues, PRs, Actions). Opt-in per machine.",
+      "source": "./plugins/mcp-github",
+      "category": "productivity"
+    },
+    {
+      "name": "mcp-azure",
+      "description": "Azure DevOps Server MCP server (self-hosted, PAT). Opt-in per machine, configure with /plugin configure.",
+      "source": "./plugins/mcp-azure",
       "category": "productivity"
     }
   ]

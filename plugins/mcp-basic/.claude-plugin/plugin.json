@@ -1,0 +1,9 @@
+{
+  "name": "mcp-basic",
+  "description": "Basic MCP servers for every machine: Context7 (up-to-date library docs).",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "repository": "https://github.com/deadmade/dead-claude-skills"
+}

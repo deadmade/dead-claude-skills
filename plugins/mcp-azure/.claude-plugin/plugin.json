@@ -1,6 +1,6 @@
 {
-  "name": "dead-mcp",
-  "description": "MCP servers: Context7 (up-to-date library docs) and Azure DevOps Server (self-hosted, PAT auth). Configure per machine with /plugin configure.",
+  "name": "mcp-azure",
+  "description": "Azure DevOps Server MCP server (self-hosted, PAT auth). Opt-in per machine; configure with /plugin configure.",
   "author": {
     "name": "deadmade",
     "url": "https://github.com/deadmade"
@@ -10,14 +10,15 @@
     "ado_org_url": {
       "type": "string",
       "title": "Azure DevOps Server collection URL",
-      "description": "Optional. e.g. https://tfs.company/tfs/DefaultCollection. Leave empty on machines without Azure DevOps.",
-      "default": ""
+      "description": "e.g. https://tfs.company/tfs/DefaultCollection",
+      "required": true
     },
     "ado_pat": {
       "type": "string",
       "title": "Azure DevOps personal access token",
-      "description": "Optional. PAT with Code (Read), Work Items (Read & Write), Build (Read), Wiki (Read).",
-      "sensitive": true
+      "description": "PAT with Code (Read), Work Items (Read & Write), Build (Read), Wiki (Read).",
+      "sensitive": true,
+      "required": true
     },
     "ado_default_project": {
       "type": "string",
