@@ -11,5 +11,6 @@ It is synced by `scripts/sync-hallmark.sh` (weekly via GitHub Actions); the only
 ## Re-listed plugins
 
 The marketplace entries for code-review, skill-creator, claude-code-setup, rust-analyzer-lsp,
-superpowers and ponytail only point at their upstream repositories; no code is vendored here. Each is
+csharp-lsp, typescript-lsp, pyright-lsp, superpowers and ponytail only point at their upstream
+repositories; no code is vendored here. Each is
 covered by its own upstream license.

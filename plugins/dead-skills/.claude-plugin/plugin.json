@@ -12,6 +12,10 @@
     "claude-code-setup",
     "rust-analyzer-lsp",
     "superpowers",
-    "ponytail"
+    "ponytail",
+    "csharp-lsp",
+    "typescript-lsp",
+    "pyright-lsp",
+    "nix-lsp"
   ]
 }

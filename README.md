@@ -12,7 +12,8 @@ My Claude Code setup as a plugin marketplace, so every machine (Linux, Windows) 
 `dead-skills` is the default bundle: it contains my own skills and declares every other plugin in
 this marketplace as a dependency, so that single install pulls in:
 
-code-review · skill-creator · claude-code-setup · rust-analyzer-lsp · superpowers · ponytail
+code-review · skill-creator · claude-code-setup · superpowers · ponytail ·
+rust-analyzer-lsp · csharp-lsp · typescript-lsp · pyright-lsp · nix-lsp (see [Language servers](#language-servers))
 
 Bundled skills:
 
@@ -45,6 +46,28 @@ Third-party marketplaces have auto-update **off** by default. Enable it once per
 `dead-skills` has no `version`, so every pushed commit is an update. Manual update:
 `claude plugin marketplace update dead-claude-skills`, then `claude plugin update dead-skills@dead-claude-skills`
 and restart (or `/reload-plugins`).
+
+## Language servers
+
+The `*-lsp` plugins connect Claude to language servers: after every edit Claude gets the server's
+errors/warnings in context, and it can jump to definitions, find references, get type info, search
+symbols and trace call hierarchies instead of grepping.
+
+**The plugins do not install the servers.** Each binary must be on `PATH` (a project dev shell via
+direnv also works). A missing one shows up as "Executable not found in $PATH" under `/plugin` →
+Errors; silence a server a machine doesn't need with `/plugin disable <name>@dead-claude-skills`.
+
+| Server | NixOS (home-manager `home.packages`) | Windows |
+|---|---|---|
+| rust-analyzer | `rust-analyzer` | `rustup component add rust-analyzer` |
+| csharp-ls | `csharp-ls` + `dotnet-sdk` | `dotnet tool install --global csharp-ls` (.NET SDK 6+) |
+| typescript-language-server | `typescript-language-server` + `typescript` | `npm i -g typescript typescript-language-server` |
+| pyright-langserver | `pyright` | `npm i -g pyright` |
+| nixd | `nixd` | not available natively (WSL only): `/plugin disable nix-lsp@dead-claude-skills` |
+
+Notes: diagnostics are asynchronous — they show up a step after the edit, and not at all while a
+server is still starting (the first edits of a session may get none); C# projects may need `dotnet restore` before csharp-ls resolves references; rust-analyzer and
+pyright can use a lot of memory on large repos; language servers don't run in cloud sessions.
 
 ## Layout
 
