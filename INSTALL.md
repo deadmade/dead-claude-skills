@@ -120,27 +120,8 @@ Rules of thumb:
   reporting "Executable not found in $PATH".
 - If `graphify` is installed but the CLI isn't on `PATH`, warn loudly: its hooks fail on every tool call.
 
-**NixOS:** don't install imperatively. Offer to add the tools to the user's home-manager config, either the
-module from this repo's flake:
-
-```nix
-# flake inputs
-dead-claude-skills = {
-  url = "github:deadmade/dead-claude-skills";
-  inputs.nixpkgs.follows = "nixpkgs";
-};
-
-# home-manager config
-imports = [inputs.dead-claude-skills.homeManagerModules.default];
-programs.dead-claude-skills = {
-  enable = true;              # all five language servers
-  # languageServers.csharp = false;
-  mcpAzure.enable = true;     # nodejs_20, only if mcp-azure
-  graphify.enable = true;     # uv, only if graphify
-};
-```
-
-or a plain `home.packages = with pkgs; [ ... ];` line with the packages from the table. Find their config
+**NixOS:** don't install imperatively. Offer to add the tools to the user's home-manager config as a
+`home.packages = with pkgs; [ ... ];` line with the packages from the table. Find their config
 (e.g. `~/.config/home-manager`, `/etc/nixos`, or ask), edit it only if they agree, and never run
 `home-manager switch` / `nixos-rebuild` without asking. Don't set `programs.claude-code.settings` or
 `.marketplaces`: that makes `settings.json` a read-only store link and `/plugin install` breaks. With graphify,

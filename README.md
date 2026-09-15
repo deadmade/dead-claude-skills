@@ -89,8 +89,8 @@ symbols and trace call hierarchies instead of grepping.
 direnv also works). A missing one shows up as "Executable not found in $PATH" under `/plugin` →
 Errors; silence a server a machine doesn't need with `/plugin disable <name>@dead-claude-skills`.
 
-On NixOS the flake's home-manager module installs all of them (see [Nix](#nix)); elsewhere the
-[INSTALL.md](INSTALL.md) agent installs them.
+On NixOS add the packages below to `home.packages`; elsewhere the [INSTALL.md](INSTALL.md) agent
+installs them.
 
 | Server | NixOS (home-manager `home.packages`) | Windows |
 |---|---|---|
@@ -242,7 +242,7 @@ reference file disappears. `.github/workflows/sync-graphify.yml` runs it every M
 
 ## Nix
 
-The flake provides a dev shell, pre-commit hooks and a home-manager module.
+The flake provides a dev shell and pre-commit hooks.
 
 - **Dev shell:** `nix develop` (or direnv: `.envrc` is `use flake`) gives git, gh, jq, perl and shellcheck
   for the sync scripts, and installs the pre-commit hooks on entry.
@@ -251,35 +251,12 @@ The flake provides a dev shell, pre-commit hooks and a home-manager module.
   isn't on `PATH`), bundle dependencies and local sources exist, and every marketplace plugin is either a
   `dead-skills` dependency or listed in INSTALL.md's opt-in table. Run them
   all with `pre-commit run --all-files`; `nix flake check` runs them in the sandbox (without claude).
-- **home-manager module:** installs the plugins' external tools, not the plugins:
-
-  ```nix
-  # flake inputs
-  dead-claude-skills = {
-    url = "github:deadmade/dead-claude-skills";
-    inputs.nixpkgs.follows = "nixpkgs";
-  };
-
-  # home-manager config
-  imports = [inputs.dead-claude-skills.homeManagerModules.default];
-  programs.dead-claude-skills = {
-    enable = true;             # all five language servers
-    # languageServers.csharp = false;
-    mcpAzure.enable = true;    # nodejs_20
-    graphify.enable = true;    # uv, then: uv tool install graphifyy
-  };
-  ```
-
-  It doesn't set `programs.claude-code.settings` or `marketplaces`: either makes `~/.claude/settings.json` a
-  read-only store link, so `/plugin install` could no longer save enabled plugins. Settings stay with
-  INSTALL.md.
 
 ## Layout
 
 ```
 INSTALL.md                          # machine setup, followed by Claude Code
-flake.nix                           # dev shell, pre-commit hooks, home-manager module output
-nix/home-manager.nix                # programs.dead-claude-skills: language servers and other CLIs
+flake.nix                           # dev shell, pre-commit hooks
 scripts/check-repo.sh               # pre-commit: plugin validate + marketplace/INSTALL.md consistency
 .claude-plugin/marketplace.json     # marketplace + re-listed upstream plugins
 plugins/dead-skills/

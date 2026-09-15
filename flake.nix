@@ -1,5 +1,5 @@
 {
-  description = "dead-claude-skills: dev shell, pre-commit checks and a home-manager module for the plugins' external tools";
+  description = "dead-claude-skills: dev shell and pre-commit checks";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -67,10 +67,5 @@
     });
 
     formatter = forAllSystems (system: nixpkgs.legacyPackages.${system}.alejandra);
-
-    homeManagerModules = {
-      default = import ./nix/home-manager.nix;
-      dead-claude-skills = self.homeManagerModules.default;
-    };
   };
 }
