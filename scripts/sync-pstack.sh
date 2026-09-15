@@ -78,6 +78,7 @@ find "$STAGE/skills" "$STAGE/agents" -name '*.md' -print0 | xargs -0 perl -0777 
 
 if leftovers="$(grep -rnE "$GUARD" "$STAGE/skills" "$STAGE/agents")"; then
   echo "error: Cursor-specific text survived the rewrite; add a rule to scripts/pstack-rewrites.pl:" >&2
+  # shellcheck disable=SC2001  # per-line prefix strip on multi-line grep output
   echo "$leftovers" | sed "s|$STAGE/||" >&2
   exit 1
 fi

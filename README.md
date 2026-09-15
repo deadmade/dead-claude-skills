@@ -4,6 +4,24 @@ My Claude Code setup as a plugin marketplace, so every machine (Linux, Windows) 
 
 ## Install
 
+### Quick setup
+
+Clone the repo and run the setup script. It adds the marketplace, installs `dead-skills`, asks about each
+opt-in plugin (and its PATs), sets the [recommended permission](#recommended-permission) and
+[auto-update](#auto-update), and checks the [language servers](#language-servers) and other CLIs:
+
+```
+./setup.sh                                               # Linux/macOS: missing tools are only reported (NixOS: a home.packages line)
+powershell -ExecutionPolicy Bypass -File .\setup.ps1     # Windows: missing tools are installed via winget/npm/rustup/dotnet/uv
+```
+
+Flags: `--all`, `--work` (mcp-azure + mcp-github), `--with graphify,pstack-picks`, `--yes` (no prompts),
+`--no-tools`, `--dry-run`; PowerShell: `-All`, `-Work`, `-With`, `-Yes`, `-NoTools`, `-DryRun`. For `--yes`
+runs the PATs come from `GITHUB_PAT`, `ADO_ORG_URL`, `ADO_PAT`, `ADO_API_VERSION`, `ADO_DEFAULT_PROJECT`.
+Re-running is safe; `settings.json` is backed up to `settings.json.bak` before it's changed.
+
+### Manual
+
 ```
 /plugin marketplace add deadmade/dead-claude-skills
 /plugin install dead-skills@dead-claude-skills
@@ -71,6 +89,9 @@ symbols and trace call hierarchies instead of grepping.
 **The plugins do not install the servers.** Each binary must be on `PATH` (a project dev shell via
 direnv also works). A missing one shows up as "Executable not found in $PATH" under `/plugin` →
 Errors; silence a server a machine doesn't need with `/plugin disable <name>@dead-claude-skills`.
+
+On NixOS the flake's home-manager module installs all of them (see [Nix](#nix)); `setup.ps1` installs them
+on Windows.
 
 | Server | NixOS (home-manager `home.packages`) | Windows |
 |---|---|---|
@@ -220,9 +241,47 @@ uv tool install graphifyy     # double y; `uv tool update-shell` if `graphify` i
 reference file disappears. `.github/workflows/sync-graphify.yml` runs it every Monday and opens a PR.
 `hooks/hooks.json` is maintained by hand (mirrors `_claude_pretooluse_hooks` in upstream's `install.py`).
 
+## Nix
+
+The flake provides a dev shell, pre-commit hooks and a home-manager module.
+
+- **Dev shell:** `nix develop` (or direnv: `.envrc` is `use flake`) gives git, gh, jq, perl and shellcheck
+  for the sync scripts, and installs the pre-commit hooks on entry.
+- **Hooks:** alejandra, shellcheck, JSON syntax, merge markers, end-of-file (vendored trees excluded), a
+  PowerShell parse of `setup.ps1`, and `scripts/check-repo.sh`: `claude plugin validate` on the marketplace
+  and every plugin (skipped when `claude` isn't on `PATH`), bundle dependencies and local sources exist, and
+  every marketplace plugin is either a `dead-skills` dependency or an opt-in in both setup scripts. Run them
+  all with `pre-commit run --all-files`; `nix flake check` runs them in the sandbox (without claude).
+- **home-manager module:** installs the plugins' external tools, not the plugins:
+
+  ```nix
+  # flake inputs
+  dead-claude-skills = {
+    url = "github:deadmade/dead-claude-skills";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
+
+  # home-manager config
+  imports = [inputs.dead-claude-skills.homeManagerModules.default];
+  programs.dead-claude-skills = {
+    enable = true;             # all five language servers
+    # languageServers.csharp = false;
+    mcpAzure.enable = true;    # nodejs_20
+    graphify.enable = true;    # uv, then: uv tool install graphifyy
+  };
+  ```
+
+  It doesn't set `programs.claude-code.settings` or `marketplaces`: either makes `~/.claude/settings.json` a
+  read-only store link, so `/plugin install` could no longer save enabled plugins. Settings stay with the
+  setup script.
+
 ## Layout
 
 ```
+setup.sh, setup.ps1                 # one-shot machine setup (Linux/macOS, Windows)
+flake.nix                           # dev shell, pre-commit hooks, home-manager module output
+nix/home-manager.nix                # programs.dead-claude-skills: language servers and other CLIs
+scripts/check-repo.sh               # pre-commit: plugin validate + marketplace/setup consistency
 .claude-plugin/marketplace.json     # marketplace + re-listed upstream plugins
 plugins/dead-skills/
   .claude-plugin/plugin.json        # bundle manifest (dependencies)
