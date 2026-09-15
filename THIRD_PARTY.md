@@ -8,6 +8,12 @@ It is synced by `scripts/sync-hallmark.sh` (weekly via GitHub Actions); the only
 "WEB FRONTEND ONLY" prefix on the frontmatter `description`. The synced upstream commit is in
 `skills/hallmark/UPSTREAM`.
 
+## MCP servers (dead-mcp)
+
+- **Context7**: hosted service by Upstash (https://context7.com), used over HTTP; nothing vendored.
+- **@tiberriver256/mcp-server-azure-devops**: MIT, https://github.com/Tiberriver256/mcp-server-azure-devops.
+  Fetched at runtime with `npx` at a pinned version; not vendored.
+
 ## Re-listed plugins
 
 The marketplace entries for code-review, skill-creator, claude-code-setup, rust-analyzer-lsp,

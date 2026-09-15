@@ -1,0 +1,18 @@
+{
+  "context7": {
+    "type": "http",
+    "url": "https://mcp.context7.com/mcp"
+  },
+  "azure-devops-server": {
+    "command": "npx",
+    "args": ["-y", "@tiberriver256/mcp-server-azure-devops@0.1.47"],
+    "env": {
+      "AZURE_DEVOPS_ORG_URL": "${user_config.ado_org_url}",
+      "AZURE_DEVOPS_AUTH_METHOD": "pat",
+      "AZURE_DEVOPS_PAT": "${user_config.ado_pat}",
+      "AZURE_DEVOPS_DEFAULT_PROJECT": "${user_config.ado_default_project}",
+      "AZURE_DEVOPS_API_VERSION": "${user_config.ado_api_version}",
+      "DOTENV_CONFIG_QUIET": "true"
+    }
+  }
+}

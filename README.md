@@ -69,6 +69,33 @@ Notes: diagnostics are asynchronous — they show up a step after the edit, and 
 server is still starting (the first edits of a session may get none); C# projects may need `dotnet restore` before csharp-ls resolves references; rust-analyzer and
 pyright can use a lot of memory on large repos; language servers don't run in cloud sessions.
 
+## MCP servers
+
+`dead-mcp` (installed with the bundle) ships two MCP servers:
+
+- **context7**: up-to-date library/framework docs (hosted at `mcp.context7.com`), used without an API
+  key (free tier rate limits). An empty `Authorization: Bearer` header is rejected by Context7, so the
+  key isn't a per-machine option; to use one, add the header in a local `.mcp.json` override.
+- **azure-devops-server**: self-hosted Azure DevOps Server (Git repos, work items, pipelines, wiki)
+  via the community package [`@tiberriver256/mcp-server-azure-devops`](https://github.com/Tiberriver256/mcp-server-azure-devops),
+  pinned to a version. Microsoft's own Azure DevOps MCP server only supports the cloud service.
+  Needs Node 20+ (`npx`).
+
+Values are set per machine and never committed; keys and PATs go to Claude Code's secure plugin storage:
+
+```
+/plugin configure dead-mcp@dead-claude-skills
+```
+
+or non-interactively:
+`claude plugin install dead-mcp@dead-claude-skills --config ado_org_url=https://tfs.company/tfs/DefaultCollection --config ado_pat=<PAT> --config ado_api_version=7.0`
+
+**Work machine:** create a PAT in your Azure DevOps Server profile with Code (Read), Work Items
+(Read & Write), Build (Read) and Wiki (Read). Set `ado_api_version` to your server's release:
+2022 → `7.0`, 2020 → `6.0`, 2019 → `5.0` (a higher version is rejected by the server).
+
+**Other machines:** leave the Azure DevOps values empty and switch `azure-devops-server` off in `/mcp`.
+
 ## Layout
 
 ```

@@ -152,6 +152,12 @@
       "description": "Nix language server (nixd) for code intelligence (requires nixd on PATH)",
       "source": "./plugins/nix-lsp",
       "category": "development"
+    },
+    {
+      "name": "dead-mcp",
+      "description": "MCP servers: Context7 (library docs) and Azure DevOps Server (self-hosted, PAT). Configure per machine.",
+      "source": "./plugins/dead-mcp",
+      "category": "productivity"
     }
   ]
 }

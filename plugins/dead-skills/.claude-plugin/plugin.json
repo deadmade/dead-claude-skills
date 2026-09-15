@@ -16,6 +16,7 @@
     "csharp-lsp",
     "typescript-lsp",
     "pyright-lsp",
-    "nix-lsp"
+    "nix-lsp",
+    "dead-mcp"
   ]
 }

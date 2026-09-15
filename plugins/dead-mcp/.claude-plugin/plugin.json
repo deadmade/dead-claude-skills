@@ -1,0 +1,36 @@
+{
+  "name": "dead-mcp",
+  "description": "MCP servers: Context7 (up-to-date library docs) and Azure DevOps Server (self-hosted, PAT auth). Configure per machine with /plugin configure.",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "repository": "https://github.com/deadmade/dead-claude-skills",
+  "userConfig": {
+    "ado_org_url": {
+      "type": "string",
+      "title": "Azure DevOps Server collection URL",
+      "description": "Optional. e.g. https://tfs.company/tfs/DefaultCollection. Leave empty on machines without Azure DevOps.",
+      "default": ""
+    },
+    "ado_pat": {
+      "type": "string",
+      "title": "Azure DevOps personal access token",
+      "description": "Optional. PAT with Code (Read), Work Items (Read & Write), Build (Read), Wiki (Read).",
+      "sensitive": true
+    },
+    "ado_default_project": {
+      "type": "string",
+      "title": "Azure DevOps default project",
+      "description": "Optional. Project used when a request doesn't name one.",
+      "default": ""
+    },
+    "ado_api_version": {
+      "type": "string",
+      "title": "Azure DevOps REST API version",
+      "description": "Highest version your server supports: Server 2022 = 7.0, 2020 = 6.0, 2019 = 5.0, Services = 7.1.",
+      "default": "7.0",
+      "options": ["7.1", "7.0", "6.0", "5.0"]
+    }
+  }
+}
