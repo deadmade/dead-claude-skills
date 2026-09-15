@@ -1,0 +1,94 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "dead-claude-skills",
+  "description": "deadmade's personal Claude Code setup: own skills plus the third-party plugins used on every machine.",
+  "owner": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "plugins": [
+    {
+      "name": "dead-skills",
+      "description": "Default bundle: personal skills and agents, and pulls in every other plugin in this marketplace as a dependency.",
+      "source": "./plugins/dead-skills",
+      "category": "productivity"
+    },
+    {
+      "name": "frontend-design",
+      "description": "Create distinctive, production-grade frontend interfaces with high design quality. Generates creative, polished code that avoids generic AI aesthetics.",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/anthropics/claude-plugins-official.git",
+        "path": "plugins/frontend-design"
+      },
+      "category": "development"
+    },
+    {
+      "name": "code-review",
+      "description": "Automated code review for pull requests using multiple specialized agents with confidence-based scoring to filter false positives",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/anthropics/claude-plugins-official.git",
+        "path": "plugins/code-review"
+      },
+      "category": "productivity"
+    },
+    {
+      "name": "skill-creator",
+      "description": "Create new skills, improve existing skills, and measure skill performance.",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/anthropics/claude-plugins-official.git",
+        "path": "plugins/skill-creator"
+      },
+      "category": "development"
+    },
+    {
+      "name": "claude-code-setup",
+      "description": "Analyze codebases and recommend tailored Claude Code automations such as hooks, skills, MCP servers, and subagents.",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/anthropics/claude-plugins-official.git",
+        "path": "plugins/claude-code-setup"
+      },
+      "category": "productivity"
+    },
+    {
+      "name": "rust-analyzer-lsp",
+      "description": "Rust language server for code intelligence and analysis (requires rust-analyzer on PATH)",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/anthropics/claude-plugins-official.git",
+        "path": "plugins/rust-analyzer-lsp"
+      },
+      "category": "development",
+      "strict": false,
+      "lspServers": {
+        "rust-analyzer": {
+          "command": "rust-analyzer",
+          "extensionToLanguage": {
+            ".rs": "rust"
+          }
+        }
+      }
+    },
+    {
+      "name": "superpowers",
+      "description": "Brainstorming, subagent driven development with built in code review, systematic debugging, and red/green TDD.",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/obra/superpowers.git"
+      },
+      "category": "development"
+    },
+    {
+      "name": "ponytail",
+      "description": "Forces the laziest solution that works. YAGNI, stdlib first, one line over fifty.",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/DietrichGebert/ponytail.git"
+      },
+      "category": "productivity"
+    }
+  ]
+}
