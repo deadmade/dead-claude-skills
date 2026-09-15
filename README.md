@@ -12,7 +12,7 @@ My Claude Code setup as a plugin marketplace, so every machine (Linux, Windows) 
 `dead-skills` is the default bundle: it contains my own skills and declares every other plugin in
 this marketplace as a dependency, so that single install pulls in:
 
-code-review · skill-creator · claude-code-setup · superpowers · ponytail ·
+code-review · skill-creator · claude-code-setup · superpowers · ponytail · mcp-basic ·
 rust-analyzer-lsp · csharp-lsp · typescript-lsp · pyright-lsp · nix-lsp (see [Language servers](#language-servers))
 
 Bundled skills:
@@ -24,6 +24,21 @@ Bundled skills:
 
 > If a machine already has any of these installed from `claude-plugins-official` or `ponytail`,
 > uninstall those copies so they don't load twice.
+
+## Recommended permission
+
+Several skills (pstack-picks, mattpocock-picks, hallmark) read their own reference files from the
+plugin cache, which lies outside your project, so Claude Code asks every time (and a non-interactive
+`claude -p` run just fails the read). Plugins can't ship permissions, so allow it once in your user
+`settings.json`:
+
+```json
+{
+  "permissions": {
+    "allow": ["Read(~/.claude/plugins/**)"]
+  }
+}
+```
 
 ## Auto-update
 
@@ -145,6 +160,41 @@ skill folder, the script fails loudly instead of syncing a partial set.
 ("New upstream skill in mattpocock/skills: <name>") with its description, once per skill. Close it by
 moving the skill into `SKILLS` or `SKIPPED`.
 
+## pstack picks
+
+`pstack-picks` (opt-in: `/plugin install pstack-picks@dead-claude-skills`) vendors 21 skills and one
+agent from [poteto's pstack](https://github.com/cursor/plugins/tree/main/pstack), a Cursor plugin,
+rewritten for Claude Code. Every skill is user-invoked (`/pstack-picks:<name>`).
+
+- **Understanding:** `how`, `why`, `recall`, `bro`
+- **Review & safety:** `interrogate`, `blast-radius`, `no-comments` (with the `comment-sicko` agent)
+- **Writing:** `unslop`, `technical-writing`
+- **Design & parallel:** `architect`, `arena`, `swarm`
+- **Long runs:** `show-me-your-work`
+- **Principles:** `type-system-discipline`, `boundary-discipline`, `model-the-domain`,
+  `make-operations-idempotent`, plus `separate-before-serializing-shared-state`,
+  `redesign-from-first-principles`, `prove-it-works` and `fix-root-causes` (used by `arena` and `no-comments`)
+
+**What the rewrite changes** (`scripts/pstack-rewrites.pl`):
+
+- Cursor's models become Claude's: explorers, investigators and swarm workers run on `sonnet`;
+  explainers and synthesizers on `fable`; review/runner panels on `fable`, `opus`, `sonnet`, `haiku`.
+  Upstream's panels mix vendors on purpose, so here they differ by capability, not by vendor.
+- `Task` → Agent tool, read-only subagents → `Explore`, Cursor cloud workers → local background agents
+  in worktrees, `~/.cursor` transcripts → `~/.claude/projects/<slug>/`, MCP discovery → `mcp__*` tools.
+- Skills call each other by reading the sibling `SKILL.md` via `${CLAUDE_SKILL_DIR}`: they're
+  user-invoked, so the Skill tool can't load them (a note is added under each skill's frontmatter).
+- `show-me-your-work` ships a bash helper; on Windows it needs Git Bash.
+
+**Left out:** `poteto-mode` (tied to Cursor cloud orchestration and sticky modes, overlaps superpowers),
+`tdd`, `figure-it-out`, `teach` (name clash with Matt's), `reflect`/`automate-me` (Cursor transcripts),
+`setup-pstack` (models are rewritten directly), and the remaining principles.
+
+**Sync:** `scripts/sync-pstack.sh` copies the subset, applies the rewrites, and fails if any Cursor-ism
+survives (a new upstream phrasing then needs a rule instead of shipping broken instructions).
+`.github/workflows/sync-pstack.yml` runs it every Monday, opens a PR, and opens an issue for each new
+upstream skill that's neither in `SKILLS` nor `SKIPPED`.
+
 ## Layout
 
 ```
@@ -157,6 +207,9 @@ scripts/sync-hallmark.sh            # vendors hallmark and re-applies the web-on
 .github/workflows/sync-hallmark.yml # weekly sync → pull request
 scripts/sync-mattpocock.sh          # vendors the curated mattpocock/skills subset
 .github/workflows/sync-mattpocock.yml # weekly sync → pull request
+scripts/sync-pstack.sh              # vendors + rewrites the pstack subset, guards against Cursor-isms
+scripts/pstack-rewrites.pl          # Cursor → Claude Code rewrite rules
+.github/workflows/sync-pstack.yml   # weekly sync → pull request
 ```
 
 ## Adding a skill

@@ -22,6 +22,14 @@ It is synced by `scripts/sync-hallmark.sh` (weekly via GitHub Actions); the only
 apart from flattening `engineering/` and `productivity/` into one folder. Synced by `scripts/sync-mattpocock.sh`
 (weekly via GitHub Actions); the synced upstream commit is in `plugins/mattpocock-picks/UPSTREAM`.
 
+## pstack-picks
+
+`plugins/pstack-picks/` vendors 21 skills and the `comment-sicko` agent from
+[pstack](https://github.com/cursor/plugins/tree/main/pstack) (MIT License, Copyright (c) 2026 Lauren Tan;
+full text in `plugins/pstack-picks/LICENSE`). Modified mechanically for Claude Code by
+`scripts/pstack-rewrites.pl` (tool names, subagent types, model names, paths, and an added port note
+under each file's frontmatter). The synced upstream commit is in `plugins/pstack-picks/UPSTREAM`.
+
 ## Re-listed plugins
 
 The marketplace entries for code-review, skill-creator, claude-code-setup, rust-analyzer-lsp,

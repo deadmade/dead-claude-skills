@@ -1,0 +1,10 @@
+{
+  "name": "pstack-picks",
+  "description": "Curated skills from poteto's pstack (Cursor), rewritten for Claude Code: how/why/recall, adversarial review, unslop, architect/arena/swarm, decision trails and engineering principles.",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "repository": "https://github.com/deadmade/dead-claude-skills",
+  "license": "MIT"
+}

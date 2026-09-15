@@ -1,0 +1,71 @@
+name: Sync pstack-picks
+
+on:
+  schedule:
+    - cron: "30 6 * * 1" # Mondays 06:30 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      NEW_SKILLS_FILE: /tmp/pstack-new-skills.tsv
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync and rewrite skills from upstream
+        run: bash scripts/sync-pstack.sh
+
+      - name: Open issues for new upstream skills
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ ! -s "$NEW_SKILLS_FILE" ]; then echo "No new upstream skills."; exit 0; fi
+          while IFS=$'\t' read -r skill desc; do
+            title="New upstream skill in cursor/plugins pstack: $skill"
+            if gh issue list --state all --limit 100 --search "$skill in:title" --json title --jq '.[].title' \
+              | grep -Fxq -- "$title"; then
+              echo "Already flagged: $skill"; continue
+            fi
+            body="$(printf '%s\n' \
+              "pstack now has \`$skill\`, which is neither vendored nor skipped." \
+              "" \
+              "> ${desc:-no description}" \
+              "" \
+              "Source: https://github.com/cursor/plugins/tree/main/pstack/skills/$skill" \
+              "" \
+              "Decide in \`scripts/sync-pstack.sh\`:" \
+              "- **Include:** add \`$skill\` to \`SKILLS\`, bump the skill count check in \`.github/workflows/sync-pstack.yml\`, run the script. If the guard reports Cursor-specific text, add a rule to \`scripts/pstack-rewrites.pl\`." \
+              "- **Skip:** add \`$skill\` to \`SKIPPED\`." \
+              "" \
+              "Check for overlap with superpowers and mattpocock-picks before including it.")"
+            gh issue create --title "$title" --body "$body"
+          done < "$NEW_SKILLS_FILE"
+
+      - name: Sanity checks
+        id: check
+        run: |
+          jq empty .claude-plugin/marketplace.json plugins/pstack-picks/.claude-plugin/plugin.json
+          test "$(find plugins/pstack-picks/skills -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l)" -eq 21
+          test -f plugins/pstack-picks/agents/comment-sicko.md
+          echo "sha=$(cat plugins/pstack-picks/UPSTREAM)" >> "$GITHUB_OUTPUT"
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: sync/pstack-picks
+          delete-branch: true
+          commit-message: "Sync pstack-picks to ${{ steps.check.outputs.sha }}"
+          title: "Sync pstack-picks to ${{ steps.check.outputs.sha }}"
+          body: |
+            Automated sync of the curated pstack skills from https://github.com/cursor/plugins at
+            https://github.com/cursor/plugins/commit/${{ steps.check.outputs.sha }}, with the Claude Code
+            rewrites from `scripts/pstack-rewrites.pl` applied and the Cursor-ism guard passing.
+
+            Review the diff before merging: merged changes reach every machine with pstack-picks installed.
+          add-paths: plugins/pstack-picks
