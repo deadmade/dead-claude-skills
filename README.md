@@ -105,6 +105,41 @@ or non-interactively:
 
 **Other machines:** just don't install `mcp-azure`.
 
+## Matt Pocock picks
+
+`mattpocock-picks` (opt-in: `/plugin install mattpocock-picks@dead-claude-skills`) vendors 14 skills
+from [mattpocock/skills](https://github.com/mattpocock/skills). superpowers
+drives the process automatically; these add alignment and design tools you mostly call yourself.
+
+- **Productivity (all 7):** `/grill-me`, `/handoff`, `/teach`, `/to-questionnaire`, `/wait-what`,
+  plus `grilling` and `writing-for-agents`, which Claude can pick automatically.
+- **Engineering (7):** `/grill-with-docs`, `/to-spec`, `/to-tickets`, `/improve-codebase-architecture`,
+  `/setup-matt-pocock-skills`, plus the automatic `domain-modeling` and `codebase-design` they call.
+- **Left out** because superpowers or the official plugins already cover them: `tdd`, `diagnosing-bugs`,
+  `code-review`, `implement`, `wayfinder`. Not included yet: `triage`, `prototype`, `research`, `wizard`,
+  `ask-matt`, `resolving-merge-conflicts` (add a line to `SKILLS` in `scripts/sync-mattpocock.sh`,
+  bump the count check in `.github/workflows/sync-mattpocock.yml`, re-run the script).
+- **Known overlap:** `writing-for-agents` and superpowers' `writing-skills` both trigger when writing skills.
+
+**Per repo:** run `/setup-matt-pocock-skills` once. It writes `docs/agents/*.md` and an `## Agent skills`
+section in `CLAUDE.md`; `CONTEXT.md` and `docs/adr/` follow as you use `/grill-with-docs`.
+
+**Suggested flow:** `/grill-with-docs` → `/to-spec` → `/to-tickets` → execute with superpowers
+(writing-plans / subagent-driven-development). Run `/improve-codebase-architecture` every few days.
+
+**Work (Azure DevOps Server):** there's no built-in tracker for it. In setup pick **Other** and describe
+the workflow (e.g. "create and link work items with the azure-devops-server MCP tools from mcp-azure"),
+or pick **Local markdown** (`.scratch/`).
+
+Don't also install the full `mattpocock-skills` from the official marketplace: you'd get every skill
+twice plus the clashing ones.
+
+**Why vendored:** a `strict: false` marketplace entry can't pick a subset of his plugin (Claude Code
+refuses to load it because his `plugin.json` already lists skills). `scripts/sync-mattpocock.sh`
+copies the 14 folders plus his LICENSE and records the upstream commit in `plugins/mattpocock-picks/UPSTREAM`;
+`.github/workflows/sync-mattpocock.yml` runs it every Monday and opens a PR. If upstream renames a
+skill folder, the script fails loudly instead of syncing a partial set.
+
 ## Layout
 
 ```
@@ -115,6 +150,8 @@ plugins/dead-skills/
   agents/<name>.md                  # own subagents
 scripts/sync-hallmark.sh            # vendors hallmark and re-applies the web-only scope
 .github/workflows/sync-hallmark.yml # weekly sync → pull request
+scripts/sync-mattpocock.sh          # vendors the curated mattpocock/skills subset
+.github/workflows/sync-mattpocock.yml # weekly sync → pull request
 ```
 
 ## Adding a skill

@@ -170,6 +170,12 @@
       "description": "Azure DevOps Server MCP server (self-hosted, PAT). Opt-in per machine, configure with /plugin configure.",
       "source": "./plugins/mcp-azure",
       "category": "productivity"
+    },
+    {
+      "name": "mattpocock-picks",
+      "description": "Curated Matt Pocock skills that complement superpowers: all productivity skills plus grilling with domain docs, spec → tickets and architecture deepening. Opt-in.",
+      "source": "./plugins/mattpocock-picks",
+      "category": "development"
     }
   ]
 }

@@ -1,0 +1,10 @@
+{
+  "name": "mattpocock-picks",
+  "description": "Curated Matt Pocock skills that complement superpowers: all productivity skills plus grilling with domain docs, spec → tickets and architecture deepening. Vendored from mattpocock/skills, synced weekly.",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "repository": "https://github.com/deadmade/dead-claude-skills",
+  "license": "MIT"
+}
