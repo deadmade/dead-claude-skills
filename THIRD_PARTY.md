@@ -30,6 +30,15 @@ full text in `plugins/pstack-picks/LICENSE`). Modified mechanically for Claude C
 `scripts/pstack-rewrites.pl` (tool names, subagent types, model names, paths, and an added port note
 under each file's frontmatter). The synced upstream commit is in `plugins/pstack-picks/UPSTREAM`.
 
+## graphify
+
+`plugins/graphify/skills/graphify/` vendors the Claude Code skill (`graphify/skill.md`) and its `references/`
+from [Graphify-Labs/graphify](https://github.com/Graphify-Labs/graphify) (Apache License 2.0, Copyright 2026
+Safi Shamsi and the Graphify contributors; `LICENSE`, `LICENSE-MIT` and `NOTICE` in `plugins/graphify/`),
+unmodified. `plugins/graphify/hooks/hooks.json` reproduces the hooks upstream's installer writes and calls the
+separately installed `graphifyy` CLI. Synced by `scripts/sync-graphify.sh` (weekly via GitHub Actions); the
+synced upstream commit is in `plugins/graphify/UPSTREAM`.
+
 ## Re-listed plugins
 
 The marketplace entries for code-review, skill-creator, claude-code-setup, rust-analyzer-lsp,

@@ -1,0 +1,42 @@
+name: Sync graphify
+
+on:
+  schedule:
+    - cron: "45 6 * * 1" # Mondays 06:45 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync skill from upstream
+        run: bash scripts/sync-graphify.sh
+
+      - name: Sanity checks
+        id: check
+        run: |
+          jq empty .claude-plugin/marketplace.json plugins/graphify/.claude-plugin/plugin.json plugins/graphify/hooks/hooks.json
+          test -f plugins/graphify/skills/graphify/SKILL.md
+          test "$(find plugins/graphify/skills/graphify/references -maxdepth 1 -name '*.md' | wc -l)" -eq 8
+          echo "sha=$(cat plugins/graphify/UPSTREAM)" >> "$GITHUB_OUTPUT"
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: sync/graphify
+          delete-branch: true
+          commit-message: "Sync graphify to ${{ steps.check.outputs.sha }}"
+          title: "Sync graphify to ${{ steps.check.outputs.sha }}"
+          body: |
+            Automated sync of the graphify Claude Code skill from https://github.com/Graphify-Labs/graphify at
+            https://github.com/Graphify-Labs/graphify/commit/${{ steps.check.outputs.sha }}.
+
+            Review the diff before merging: merged changes reach every machine with graphify installed.
+            If the skill now expects CLI features, machines need `uv tool upgrade graphifyy`.
+          add-paths: plugins/graphify

@@ -182,6 +182,12 @@
       "description": "Curated skills from poteto's pstack, rewritten for Claude Code: how/why, adversarial review, unslop, architect/arena/swarm, principles. Opt-in.",
       "source": "./plugins/pstack-picks",
       "category": "development"
+    },
+    {
+      "name": "graphify",
+      "description": "Graphify: turn a codebase into a queryable knowledge graph (/graphify). Needs the graphify CLI (uv tool install graphifyy). Opt-in.",
+      "source": "./plugins/graphify",
+      "category": "development"
     }
   ]
 }

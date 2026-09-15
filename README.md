@@ -27,7 +27,7 @@ Bundled skills:
 
 ## Recommended permission
 
-Several skills (pstack-picks, mattpocock-picks, hallmark) read their own reference files from the
+Several skills (pstack-picks, mattpocock-picks, graphify, hallmark) read their own reference files from the
 plugin cache, which lies outside your project, so Claude Code asks every time (and a non-interactive
 `claude -p` run just fails the read). Plugins can't ship permissions, so allow it once in your user
 `settings.json`:
@@ -195,6 +195,31 @@ survives (a new upstream phrasing then needs a rule instead of shipping broken i
 `.github/workflows/sync-pstack.yml` runs it every Monday, opens a PR, and opens an issue for each new
 upstream skill that's neither in `SKILLS` nor `SKIPPED`.
 
+## graphify
+
+`graphify` (opt-in: `/plugin install graphify@dead-claude-skills`) vendors the Claude Code skill from
+[Graphify-Labs/graphify](https://github.com/Graphify-Labs/graphify): `/graphify .` turns a repo (code, docs,
+SQL, PDFs) into a knowledge graph in `graphify-out/`, then `/graphify query "…"`, `path` and `explain` answer
+from the graph instead of grepping.
+
+**The plugin does not install the CLI.** Once per machine (Python 3.10+):
+
+```
+uv tool install graphifyy     # double y; `uv tool update-shell` if `graphify` isn't found
+```
+
+- **Hooks:** before Read/Glob/Grep/Bash, `graphify hook-guard` adds a note pointing Claude at the graph when a
+  fresh `graphify-out/` exists (soft nudge, never blocks). Without the CLI on `PATH` these hooks error on every
+  call, so only install the plugin where graphify is installed.
+- **Don't also run `graphify install`**: it copies the same skill to `~/.claude/skills` and the same hooks to
+  `settings.json`, so both would load twice. `graphify hook install` (git post-commit rebuild) is fine.
+- **Windows:** the vendored skill is upstream's bash variant, so it needs Git Bash.
+- **Upgrades:** the skill syncs weekly; keep the CLI in step with `uv tool upgrade graphifyy`.
+
+**Sync:** `scripts/sync-graphify.sh` copies `skill.md` and `skills/claude/references/` and fails if a
+reference file disappears. `.github/workflows/sync-graphify.yml` runs it every Monday and opens a PR.
+`hooks/hooks.json` is maintained by hand (mirrors `_claude_pretooluse_hooks` in upstream's `install.py`).
+
 ## Layout
 
 ```
@@ -210,6 +235,8 @@ scripts/sync-mattpocock.sh          # vendors the curated mattpocock/skills subs
 scripts/sync-pstack.sh              # vendors + rewrites the pstack subset, guards against Cursor-isms
 scripts/pstack-rewrites.pl          # Cursor → Claude Code rewrite rules
 .github/workflows/sync-pstack.yml   # weekly sync → pull request
+scripts/sync-graphify.sh            # vendors graphify's Claude skill + references
+.github/workflows/sync-graphify.yml # weekly sync → pull request
 ```
 
 ## Adding a skill

@@ -1,0 +1,15 @@
+{
+  "description": "graphify's soft-nudge PreToolUse guards (same as `graphify install`): add context pointing at graphify-out/ when a graph exists; always exit 0.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Grep",
+        "hooks": [{ "type": "command", "command": "graphify hook-guard search" }]
+      },
+      {
+        "matcher": "Read|Glob",
+        "hooks": [{ "type": "command", "command": "graphify hook-guard read" }]
+      }
+    ]
+  }
+}

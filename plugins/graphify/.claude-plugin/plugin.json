@@ -1,0 +1,10 @@
+{
+  "name": "graphify",
+  "description": "Graphify: turn a codebase, docs and papers into a queryable knowledge graph (/graphify), plus hooks that nudge Claude to query the graph before reading files. Needs the graphify CLI (uv tool install graphifyy). Vendored from Graphify-Labs/graphify, synced weekly.",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "repository": "https://github.com/deadmade/dead-claude-skills",
+  "license": "Apache-2.0"
+}
