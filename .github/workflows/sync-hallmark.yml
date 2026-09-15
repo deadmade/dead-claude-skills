@@ -1,0 +1,41 @@
+name: Sync hallmark
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync skill from upstream
+        run: bash scripts/sync-hallmark.sh
+
+      - name: Sanity checks
+        run: |
+          jq empty .claude-plugin/marketplace.json plugins/dead-skills/.claude-plugin/plugin.json
+          head -n 10 plugins/dead-skills/skills/hallmark/SKILL.md | grep -q '^description: "WEB FRONTEND ONLY:'
+          echo "sha=$(cat plugins/dead-skills/skills/hallmark/UPSTREAM)" >> "$GITHUB_OUTPUT"
+        id: check
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: sync/hallmark
+          delete-branch: true
+          commit-message: "Sync hallmark to ${{ steps.check.outputs.sha }}"
+          title: "Sync hallmark to ${{ steps.check.outputs.sha }}"
+          body: |
+            Automated sync of `skills/hallmark` from https://github.com/nutlope/hallmark at
+            https://github.com/nutlope/hallmark/commit/${{ steps.check.outputs.sha }}.
+
+            The web-frontend-only description prefix was re-applied by `scripts/sync-hallmark.sh`.
+            Review the diff before merging: merged changes reach every machine with this marketplace.
+          add-paths: plugins/dead-skills/skills/hallmark

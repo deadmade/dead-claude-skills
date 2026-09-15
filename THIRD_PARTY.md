@@ -1,12 +1,15 @@
 # Third-party content
 
-## avoid-ai-writing-de
+## Hallmark
 
-`plugins/dead-skills/skills/avoid-ai-writing-de/` — German adaptation by Jürgen Kraus of
-[avoid-ai-writing](https://github.com/conorbronsdon/avoid-ai-writing) v3.4 by Conor Bronsdon, MIT License.
+`plugins/dead-skills/skills/hallmark/` is vendored from [nutlope/hallmark](https://github.com/nutlope/hallmark)
+(MIT License, Copyright (c) 2026 Hallmark contributors; full text in `skills/hallmark/LICENSE`).
+It is synced by `scripts/sync-hallmark.sh` (weekly via GitHub Actions); the only local change is a
+"WEB FRONTEND ONLY" prefix on the frontmatter `description`. The synced upstream commit is in
+`skills/hallmark/UPSTREAM`.
 
 ## Re-listed plugins
 
-The marketplace entries for frontend-design, code-review, skill-creator, claude-code-setup,
-rust-analyzer-lsp, superpowers and ponytail only point at their upstream repositories; no code is
-vendored here. Each is covered by its own upstream license.
+The marketplace entries for code-review, skill-creator, claude-code-setup, rust-analyzer-lsp,
+superpowers and ponytail only point at their upstream repositories; no code is vendored here. Each is
+covered by its own upstream license.

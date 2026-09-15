@@ -1,14 +1,12 @@
 {
   "name": "dead-skills",
-  "version": "0.1.0",
-  "description": "Default bundle: personal skills and agents, plus every other plugin in the dead-claude-skills marketplace as a dependency.",
+  "description": "Default bundle: personal skills and agents (incl. Hallmark, scoped to web files), plus every other plugin in the dead-claude-skills marketplace as a dependency.",
   "author": {
     "name": "deadmade",
     "url": "https://github.com/deadmade"
   },
   "repository": "https://github.com/deadmade/dead-claude-skills",
   "dependencies": [
-    "frontend-design",
     "code-review",
     "skill-creator",
     "claude-code-setup",
