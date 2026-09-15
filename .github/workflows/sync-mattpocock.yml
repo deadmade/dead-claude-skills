@@ -8,15 +8,45 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+    env:
+      NEW_SKILLS_FILE: /tmp/mattpocock-new-skills.tsv
     steps:
       - uses: actions/checkout@v4
 
       - name: Sync skills from upstream
         run: bash scripts/sync-mattpocock.sh
+
+      - name: Open issues for new upstream skills
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ ! -s "$NEW_SKILLS_FILE" ]; then echo "No new upstream skills."; exit 0; fi
+          while IFS=$'\t' read -r skill desc; do
+            name="${skill##*/}"
+            title="New upstream skill in mattpocock/skills: $name"
+            if gh issue list --state all --limit 100 --search "$name in:title" --json title --jq '.[].title' \
+              | grep -Fxq -- "$title"; then
+              echo "Already flagged: $name"; continue
+            fi
+            body="$(printf '%s\n' \
+              "mattpocock/skills now publishes \`$skill\`, which is neither vendored nor skipped." \
+              "" \
+              "> ${desc:-no description}" \
+              "" \
+              "Source: https://github.com/mattpocock/skills/tree/main/skills/$skill" \
+              "" \
+              "Decide in \`scripts/sync-mattpocock.sh\`:" \
+              "- **Include:** add \`$skill\` to \`SKILLS\`, bump the skill count check in \`.github/workflows/sync-mattpocock.yml\`, run the script." \
+              "- **Skip:** add \`$skill\` to \`SKIPPED\`." \
+              "" \
+              "Check for overlap with superpowers before including it.")"
+            gh issue create --title "$title" --body "$body"
+          done < "$NEW_SKILLS_FILE"
 
       - name: Sanity checks
         id: check

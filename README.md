@@ -117,8 +117,8 @@ drives the process automatically; these add alignment and design tools you mostl
   `/setup-matt-pocock-skills`, plus the automatic `domain-modeling` and `codebase-design` they call.
 - **Left out** because superpowers or the official plugins already cover them: `tdd`, `diagnosing-bugs`,
   `code-review`, `implement`, `wayfinder`. Not included yet: `triage`, `prototype`, `research`, `wizard`,
-  `ask-matt`, `resolving-merge-conflicts` (add a line to `SKILLS` in `scripts/sync-mattpocock.sh`,
-  bump the count check in `.github/workflows/sync-mattpocock.yml`, re-run the script).
+  `ask-matt`, `resolving-merge-conflicts` (move the line from `SKIPPED` to `SKILLS` in
+  `scripts/sync-mattpocock.sh`, bump the count check in `.github/workflows/sync-mattpocock.yml`, re-run the script).
 - **Known overlap:** `writing-for-agents` and superpowers' `writing-skills` both trigger when writing skills.
 
 **Per repo:** run `/setup-matt-pocock-skills` once. It writes `docs/agents/*.md` and an `## Agent skills`
@@ -139,6 +139,11 @@ refuses to load it because his `plugin.json` already lists skills). `scripts/syn
 copies the 14 folders plus his LICENSE and records the upstream commit in `plugins/mattpocock-picks/UPSTREAM`;
 `.github/workflows/sync-mattpocock.yml` runs it every Monday and opens a PR. If upstream renames a
 skill folder, the script fails loudly instead of syncing a partial set.
+
+**New upstream skills:** the script compares upstream's published skill list against `SKILLS`
+(vendored) and `SKIPPED` (deliberately left out). Anything in neither gets a GitHub issue
+("New upstream skill in mattpocock/skills: <name>") with its description, once per skill. Close it by
+moving the skill into `SKILLS` or `SKIPPED`.
 
 ## Layout
 

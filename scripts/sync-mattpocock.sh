@@ -22,6 +22,21 @@ SKILLS=(
   productivity/wait-what
   productivity/writing-for-agents
 )
+# Upstream skills deliberately not vendored (overlap with superpowers or not wanted yet).
+# Anything upstream lists that is in neither array is reported as new (see NEW_SKILLS_FILE).
+SKIPPED=(
+  engineering/ask-matt
+  engineering/code-review
+  engineering/diagnosing-bugs
+  engineering/implement
+  engineering/prototype
+  engineering/research
+  engineering/resolving-merge-conflicts
+  engineering/tdd
+  engineering/triage
+  engineering/wayfinder
+  engineering/wizard
+)
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PLUGIN="$ROOT/plugins/mattpocock-picks"
@@ -30,11 +45,28 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 git clone --quiet --depth 1 --filter=blob:none --sparse "$UPSTREAM_URL" "$TMP/skills"
-git -C "$TMP/skills" sparse-checkout set "${SKILLS[@]/#/skills/}"
+git -C "$TMP/skills" sparse-checkout set .claude-plugin "${SKILLS[@]/#/skills/}"
 
 for s in "${SKILLS[@]}"; do
   [ -f "$TMP/skills/skills/$s/SKILL.md" ] || { echo "error: upstream skills/$s/SKILL.md not found (renamed or removed?)" >&2; exit 1; }
 done
+
+# Report skills upstream publishes (its plugin.json list) that are neither vendored nor skipped.
+# With NEW_SKILLS_FILE set, each one is appended as "<path>\t<description>" for the workflow.
+known=" ${SKILLS[*]} ${SKIPPED[*]} "
+NEW=()
+while IFS= read -r p; do
+  s="${p#./skills/}"
+  if [[ "$known" != *" $s "* ]]; then NEW+=("$s"); fi
+done < <(grep -oE '"\./skills/[^"]+"' "$TMP/skills/.claude-plugin/plugin.json" | tr -d '"')
+if [ ${#NEW[@]} -gt 0 ]; then
+  git -C "$TMP/skills" sparse-checkout add "${NEW[@]/#/skills/}"
+  for s in "${NEW[@]}"; do
+    desc="$(awk '/^description:/ { sub(/^description:[[:space:]]*/, ""); gsub(/^"|"$/, ""); print; exit }' "$TMP/skills/skills/$s/SKILL.md" 2>/dev/null || true)"
+    echo "new upstream skill (not in SKILLS or SKIPPED): $s: $desc"
+    if [ -n "${NEW_SKILLS_FILE:-}" ]; then printf '%s\t%s\n' "$s" "$desc" >> "$NEW_SKILLS_FILE"; fi
+  done
+fi
 
 rm -rf "$DEST"
 mkdir -p "$DEST"
