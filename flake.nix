@@ -27,6 +27,12 @@
         runtimeInputs = with pkgs; [bash coreutils diffutils gawk gnugrep gnused jq];
         text = ''exec bash scripts/check-repo.sh'';
       };
+
+      dev-feature-guard-test = pkgs.writeShellApplication {
+        name = "dev-feature-guard-test";
+        runtimeInputs = with pkgs; [bash coreutils gawk git gnugrep gnused jq];
+        text = ''exec bash scripts/test-dev-feature-guard.sh'';
+      };
     in
       git-hooks.lib.${system}.run {
         src = ./.;
@@ -47,6 +53,13 @@
             name = "claude plugin validate + marketplace consistency";
             entry = "${check-repo}/bin/check-repo";
             files = "^(\\.claude-plugin/|plugins/|INSTALL\\.md$|scripts/check-repo\\.sh$)";
+            pass_filenames = false;
+          };
+          dev-feature-guard = {
+            enable = true;
+            name = "dev-feature lock tests";
+            entry = "${dev-feature-guard-test}/bin/dev-feature-guard-test";
+            files = "^(plugins/dead-skills/hooks/|scripts/test-dev-feature-guard\\.sh$)";
             pass_filenames = false;
           };
         };

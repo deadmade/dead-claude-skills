@@ -108,6 +108,7 @@ before installing.
 | `nixd` | always, except Windows | `nixd` | not available: `/plugin disable nix-lsp@dead-claude-skills` | `brew install nixd` | see https://github.com/nix-community/nixd |
 | `uv` | `graphify` | `uv` | `winget install -e --id astral-sh.uv` | `brew install uv` | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
 | `graphify` | `graphify` | via uv | `uv tool install graphifyy` (double y) | same | same |
+| `jq` | always (the `/dev-feature` lock, only while a feature is active) | `jq` | `winget install -e --id jqlang.jq` | `brew install jq` | distro package |
 
 Rules of thumb:
 
