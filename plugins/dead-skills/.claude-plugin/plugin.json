@@ -8,7 +8,6 @@
   "repository": "https://github.com/deadmade/dead-claude-skills",
   "dependencies": [
     "code-review",
-    "skill-creator",
     "claude-code-setup",
     "claude-md-management",
     "security-guidance",
