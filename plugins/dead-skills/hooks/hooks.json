@@ -1,20 +1,9 @@
 {
-  "description": "dev-feature lock: while /dev-feature is active in a repo, code edits wait for the user's typed 'approve design'. No-op when no feature is active. Global instructions: rules.md is added to the context on session start.",
+  "description": "Global instructions: rules.md is added to the context on session start.",
   "hooks": {
     "SessionStart": [
       {
         "hooks": [{ "type": "command", "command": "node -e \"process.stdout.write(require('fs').readFileSync(process.argv[1], 'utf8'))\" \"${CLAUDE_PLUGIN_ROOT}/rules.md\"" }]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash",
-        "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/dev-feature-guard.mjs\" pre-tool" }]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/dev-feature-guard.mjs\" prompt" }]
       }
     ]
   }

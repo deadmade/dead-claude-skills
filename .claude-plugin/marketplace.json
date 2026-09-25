@@ -227,6 +227,12 @@
       "description": "Graphify: turn a codebase into a queryable knowledge graph (/graphify). Needs the graphify CLI (uv tool install graphifyy). Opt-in.",
       "source": "./plugins/graphify",
       "category": "development"
+    },
+    {
+      "name": "dev-feature",
+      "description": "/dev-feature: grills you on a feature, has you write the design, then implements against it behind a hook-enforced lock. Opt-in.",
+      "source": "./plugins/dev-feature",
+      "category": "development"
     }
   ]
 }

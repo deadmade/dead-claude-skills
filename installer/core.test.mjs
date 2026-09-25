@@ -10,7 +10,7 @@ const M = 'dead-claude-skills';
 
 test('opt-ins from the real manifests', () => {
   assert.deepEqual(optIns(marketplace, bundle).sort(),
-    ['atlassian', 'csharp-lsp', 'graphify', 'mattpocock-picks', 'mcp-azure', 'mcp-github', 'nix-lsp', 'pstack-picks',
+    ['atlassian', 'csharp-lsp', 'dev-feature', 'graphify', 'mattpocock-picks', 'mcp-azure', 'mcp-github', 'nix-lsp', 'pstack-picks',
      'pyright-lsp', 'rust-analyzer-lsp', 'typescript-lsp']);
 });
 

@@ -47,8 +47,6 @@ Bundled skills:
   Its description is prefixed with a "WEB FRONTEND ONLY" scope so Claude doesn't pull it into CLIs,
   backends or Rust/Python work. (`paths:` frontmatter would be the file-based equivalent of an LSP's
   extension list, but Claude Code currently ignores it for plugin skills.)
-- **dev-feature**: `/dev-feature <what to build>` grills you, refuses when you're not ready, has you write the
-  design, then implements against it behind a hook-enforced lock. See [dev-feature](#dev-feature).
 
 > If a machine already has any of these installed from `claude-plugins-official` or `ponytail`,
 > uninstall those copies so they don't load twice.
@@ -92,7 +90,8 @@ and restart (or `/reload-plugins`).
 
 ## dev-feature
 
-`/dev-feature <what to build>` is for features you want to understand without reading every line.
+`dev-feature` (opt-in: `/plugin install dev-feature@dead-claude-skills`): `/dev-feature <what to build>` is for
+features you want to understand without reading every line.
 
 1. **Grill, research, verdict:** Claude grills you on intent, reads the docs involved (fetched, cited by section)
    and the code this touches, then grills you on your understanding. Its questions come from those sources, and it
@@ -106,7 +105,7 @@ and restart (or `/reload-plugins`).
 4. **Release:** `feature done` or `feature abort` releases the lock. `design.md` and `notes.md` stay in the repo
    (commit them); `/dev-feature` with no argument resumes.
 
-**The lock** (`plugins/dead-skills/hooks/`): while a feature is active in a repo, Write/Edit anywhere outside
+**The lock** (`plugins/dev-feature/hooks/`): while a feature is active in a repo, Write/Edit anywhere outside
 `docs/features/` is denied, including in subagents. It opens only after you type `approve design` and `design.md`
 still matches what you approved; changing it locks code again. Approval and release come only from your own
 prompt, and the whole message must be the phrase. Approval is refused unless `notes.md` says `verdict: ready`.
@@ -303,7 +302,8 @@ plugins/dead-skills/
   .claude-plugin/plugin.json        # bundle manifest (dependencies)
   skills/<name>/SKILL.md            # own + vendored skills
   agents/<name>.md                  # own subagents
-  hooks/                            # dev-feature lock: hooks.json + dev-feature-guard.mjs
+  rules.md, hooks/                  # global instructions + the SessionStart hook that injects them
+plugins/dev-feature/                # opt-in: dev-feature skill + lock (hooks/dev-feature-guard.mjs)
 scripts/dev-feature-guard.test.mjs  # dev-feature lock tests (pre-commit)
 scripts/sync-lib.mjs                # shared clone/report helpers for scripts/sync-*.mjs
 scripts/sync-hallmark.mjs           # vendors hallmark and re-applies the web-only scope

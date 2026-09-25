@@ -1,4 +1,4 @@
-// Tests for plugins/dead-skills/hooks/dev-feature-guard.mjs: feeds hook JSON to it inside a throwaway git repo
+// Tests for plugins/dev-feature/hooks/dev-feature-guard.mjs: feeds hook JSON to it inside a throwaway git repo
 // with a throwaway state dir. Cases run in order and share state, like a real session.
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, test } from "node:test";
 
-const GUARD = join(import.meta.dirname, "..", "plugins", "dead-skills", "hooks", "dev-feature-guard.mjs");
+const GUARD = join(import.meta.dirname, "..", "plugins", "dev-feature", "hooks", "dev-feature-guard.mjs");
 const tmp = mkdtempSync(join(tmpdir(), "dev-feature-"));
 after(() => rmSync(tmp, { recursive: true, force: true }));
 const project = join(tmp, "project");

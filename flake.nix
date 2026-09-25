@@ -68,7 +68,7 @@
             enable = true;
             name = "dev-feature lock tests";
             entry = "${dev-feature-guard-test}/bin/dev-feature-guard-test";
-            files = "^(plugins/dead-skills/hooks/|scripts/dev-feature-guard\\.test\\.mjs$)";
+            files = "^(plugins/dev-feature/hooks/|scripts/dev-feature-guard\\.test\\.mjs$)";
             pass_filenames = false;
           };
         };

@@ -1,0 +1,16 @@
+{
+  "description": "dev-feature lock: while /dev-feature is active in a repo, code edits wait for the user's typed 'approve design'. No-op when no feature is active.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash",
+        "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/dev-feature-guard.mjs\" pre-tool" }]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/dev-feature-guard.mjs\" prompt" }]
+      }
+    ]
+  }
+}
