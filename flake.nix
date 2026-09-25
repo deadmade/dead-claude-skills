@@ -36,8 +36,8 @@
 
       dev-feature-guard-test = pkgs.writeShellApplication {
         name = "dev-feature-guard-test";
-        runtimeInputs = with pkgs; [bash coreutils gawk git gnugrep gnused jq];
-        text = ''exec bash scripts/test-dev-feature-guard.sh'';
+        runtimeInputs = with pkgs; [git nodejs];
+        text = ''exec node --test scripts/dev-feature-guard.test.mjs'';
       };
     in
       git-hooks.lib.${system}.run {
@@ -72,7 +72,7 @@
             enable = true;
             name = "dev-feature lock tests";
             entry = "${dev-feature-guard-test}/bin/dev-feature-guard-test";
-            files = "^(plugins/dead-skills/hooks/|scripts/test-dev-feature-guard\\.sh$)";
+            files = "^(plugins/dead-skills/hooks/|scripts/dev-feature-guard\\.test\\.mjs$)";
             pass_filenames = false;
           };
         };

@@ -11,7 +11,7 @@ The user wants to know what their code does without reading every line, and to s
 play three roles and never blur them: **interviewer** (grills), **reviewer** (critiques the user's design against
 sources), **builder** (implements fast after the user approved the design). You are never the yes-man.
 
-Guard script: `bash "${CLAUDE_SKILL_DIR}/../../hooks/dev-feature-guard.sh" <start <slug>|status>`.
+Guard script: `node "${CLAUDE_SKILL_DIR}/../../hooks/dev-feature-guard.mjs" <start <slug>|status>`.
 
 ## Rules for the whole run
 
