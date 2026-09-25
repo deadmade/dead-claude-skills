@@ -3,6 +3,14 @@ export const MARKETPLACE = 'dead-claude-skills';
 export const BUNDLE = 'dead-skills';
 const PERMISSION = 'Read(~/.claude/plugins/**)';
 const STATUS_LINE = { type: 'command', command: 'ccstatusline', padding: 0 };
+// Always denied, sandbox or not. With the sandbox on, Bash reads of these paths are blocked too.
+export const SECRET_DENIES = [
+  'Read(**/.env)', 'Read(**/.env.*)', 'Read(~/.ssh/**)', 'Read(~/.aws/**)', 'Read(~/.azure/**)',
+  'Read(~/.config/gh/**)', 'Read(~/.gnupg/**)',
+];
+// The sandbox keys we own; excludedCommands, network etc. stay the user's.
+const SANDBOX = { enabled: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: false };
+const DCG = 'https://raw.githubusercontent.com/Dicklesworthstone/destructive_command_guard/main';
 
 const nameOf = (id) => id.split('@')[0];
 const marketOf = (id) => id.split('@')[1];
@@ -29,17 +37,44 @@ export const duplicates = (installedIds, ourNames) =>
 
 export const isOurStatusLine = (s) => typeof s?.command === 'string' && s.command.includes('ccstatusline');
 
-export function mergeSettings(settings, { statusLine }) {
+export const isSandboxOn = (s) => s?.sandbox?.enabled === true;
+
+export const hasDcgHook = (s) =>
+  (s?.hooks?.PreToolUse ?? []).some((e) => e?.hooks?.some((h) => /dcg(\.exe)?"?$/i.test(h?.command ?? '')));
+
+export function mergeSettings(settings, { statusLine, sandbox }) {
   const out = structuredClone(settings);
   const allow = out.permissions?.allow ?? [];
-  out.permissions = { ...out.permissions, allow: allow.includes(PERMISSION) ? allow : [...allow, PERMISSION] };
+  const deny = out.permissions?.deny ?? [];
+  out.permissions = {
+    ...out.permissions,
+    allow: allow.includes(PERMISSION) ? allow : [...allow, PERMISSION],
+    deny: [...deny, ...SECRET_DENIES.filter((d) => !deny.includes(d))],
+  };
   out.extraKnownMarketplaces = {
     ...out.extraKnownMarketplaces,
     [MARKETPLACE]: { source: { source: 'github', repo: 'deadmade/dead-claude-skills' }, autoUpdate: true },
   };
   if (statusLine && !isOurStatusLine(out.statusLine)) out.statusLine = STATUS_LINE;
   if (!statusLine && isOurStatusLine(out.statusLine)) delete out.statusLine;
+  if (sandbox) out.sandbox = { ...out.sandbox, ...SANDBOX };
+  else if (out.sandbox) {
+    for (const k of Object.keys(SANDBOX)) delete out.sandbox[k];
+    if (!Object.keys(out.sandbox).length) delete out.sandbox;
+  }
   return out;
+}
+
+// dcg's own installer/uninstaller: they install the binary and write or remove its Claude Code hook.
+export function dcgCommand(platform, action) {
+  if (platform === 'win32') {
+    const script = action === 'install' ? 'install.ps1' : 'uninstall.ps1';
+    const flags = action === 'install' ? ' -EasyMode -Verify' : '';
+    return ['powershell', ['-NoProfile', '-Command', `& ([scriptblock]::Create((irm '${DCG}/${script}')))${flags}`]];
+  }
+  // No --easy-mode: it edits shell rc files, which home-manager owns on NixOS.
+  const [script, flags] = action === 'install' ? ['install.sh', '--verify'] : ['uninstall.sh', '--yes'];
+  return ['bash', ['-c', `curl -fsSL '${DCG}/${script}' | bash -s -- ${flags}`]];
 }
 
 export function safeArg(s) {
@@ -58,6 +93,8 @@ const BINARIES = [
   ['python3', BUNDLE, 'nix: python3', 'winget install -e --id Python.Python.3.13'],
   ['uv', 'graphify', 'nix: uv', 'winget install -e --id astral-sh.uv'],
   ['graphify', 'graphify', 'uv tool install graphifyy', 'uv tool install graphifyy'],
+  ['bwrap', 'sandbox', 'nix: bubblewrap', 'WSL2 only'],
+  ['socat', 'sandbox', 'nix: socat', 'WSL2 only'],
   ['ccstatusline', 'ccstatusline', 'nix: ccstatusline', 'npm i -g ccstatusline'],
 ];
 
