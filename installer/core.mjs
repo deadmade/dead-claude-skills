@@ -55,6 +55,7 @@ const BINARIES = [
   ['pyright-langserver', 'pyright-lsp', 'nix: pyright', 'npm i -g pyright'],
   ['nixd', 'nix-lsp', 'nix: nixd', 'not available on Windows, deselect nix-lsp'],
   ['jq', BUNDLE, 'nix: jq', 'winget install -e --id jqlang.jq'],
+  ['python3', BUNDLE, 'nix: python3', 'winget install -e --id Python.Python.3.13'],
   ['uv', 'graphify', 'nix: uv', 'winget install -e --id astral-sh.uv'],
   ['graphify', 'graphify', 'uv tool install graphifyy', 'uv tool install graphifyy'],
   ['ccstatusline', 'ccstatusline', 'nix: ccstatusline', 'npm i -g ccstatusline'],

@@ -44,6 +44,36 @@
       "category": "productivity"
     },
     {
+      "name": "claude-md-management",
+      "description": "Tools to maintain and improve CLAUDE.md files - audit quality, capture session learnings, and keep project memory current.",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/anthropics/claude-plugins-official.git",
+        "path": "plugins/claude-md-management"
+      },
+      "category": "productivity"
+    },
+    {
+      "name": "security-guidance",
+      "description": "Security review for Claude-generated code: pattern-based warnings on edits, LLM diff review on Stop, and a commit reviewer (needs Python 3.10+).",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/anthropics/claude-plugins-official.git",
+        "path": "plugins/security-guidance"
+      },
+      "category": "security"
+    },
+    {
+      "name": "claude-security",
+      "description": "Deep vulnerability scanning of your own code with verified findings and agent-verified patches (needs Python 3.9+).",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/anthropics/claude-plugins-official.git",
+        "path": "plugins/claude-security"
+      },
+      "category": "security"
+    },
+    {
       "name": "rust-analyzer-lsp",
       "description": "Rust language server for code intelligence and analysis (requires rust-analyzer on PATH)",
       "source": {

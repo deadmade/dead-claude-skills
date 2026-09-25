@@ -30,7 +30,11 @@ Code's own `/plugin install` prompt. No backups or logs are written; re-running 
 `dead-skills` is the default bundle: it contains my own skills and declares the core plugins as
 dependencies, so that single install pulls in:
 
-code-review · skill-creator · claude-code-setup · superpowers · ponytail · mcp-basic
+code-review · skill-creator · claude-code-setup · claude-md-management · security-guidance · claude-security ·
+superpowers · ponytail · mcp-basic
+
+The security plugins run Python hooks: security-guidance needs Python 3.10+ and installs the Agent SDK for its
+commit reviewer into a venv under `~/.claude/security/` on first session start, claude-security needs python3 3.9+. The installer prints `python3` if it's missing.
 
 The language servers are opt-in, install the ones a machine needs (see [Language servers](#language-servers)):
 `/plugin install <name>@dead-claude-skills` with rust-analyzer-lsp · csharp-lsp · typescript-lsp · pyright-lsp · nix-lsp
