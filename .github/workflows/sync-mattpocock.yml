@@ -67,4 +67,6 @@ jobs:
             https://github.com/mattpocock/skills/commit/${{ steps.check.outputs.sha }}.
 
             Review the diff before merging: merged changes reach every machine with mattpocock-picks installed.
+
+            cc @deadmade
           add-paths: plugins/mattpocock-picks

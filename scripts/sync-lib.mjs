@@ -3,7 +3,7 @@
 import { execFileSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 
 export const ROOT = join(import.meta.dirname, "..");
 
@@ -44,9 +44,12 @@ export function reportNew(entries) {
   }
 }
 
-// Record the upstream commit and say whether anything under `dir` changed.
+// Record the upstream commit, but only when something under `dir` besides `upstreamFile` changed; otherwise restore
+// `upstreamFile` so an upstream move that touches nothing we vendor gives no diff (and no sync PR).
 export function finish(label, sha, upstreamFile, dir) {
-  writeFileSync(upstreamFile, sha + "\n");
-  const changed = git("-C", ROOT, "status", "--porcelain", "--", dir) !== "";
-  console.log(changed ? `${label} synced to ${sha} (changed)` : `${label} already at ${sha} (no changes)`);
+  const rel = relative(ROOT, upstreamFile);
+  const changed = git("-C", ROOT, "status", "--porcelain", "--", dir, `:(exclude)${rel}`) !== "";
+  if (changed) writeFileSync(upstreamFile, sha + "\n");
+  else git("-C", ROOT, "checkout", "--", rel);
+  console.log(changed ? `${label} synced to ${sha} (changed)` : `${label} unchanged at ${sha} (no vendored changes)`);
 }

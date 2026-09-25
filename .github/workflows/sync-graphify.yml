@@ -39,4 +39,6 @@ jobs:
 
             Review the diff before merging: merged changes reach every machine with graphify installed.
             If the skill now expects CLI features, machines need `uv tool upgrade graphifyy`.
+
+            cc @deadmade
           add-paths: plugins/graphify
