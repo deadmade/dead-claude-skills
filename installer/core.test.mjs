@@ -10,7 +10,8 @@ const M = 'dead-claude-skills';
 
 test('opt-ins from the real manifests', () => {
   assert.deepEqual(optIns(marketplace, bundle).sort(),
-    ['graphify', 'mattpocock-picks', 'mcp-azure', 'mcp-github', 'pstack-picks']);
+    ['csharp-lsp', 'graphify', 'mattpocock-picks', 'mcp-azure', 'mcp-github', 'nix-lsp', 'pstack-picks',
+     'pyright-lsp', 'rust-analyzer-lsp', 'typescript-lsp']);
 });
 
 test('token plugins', () => {
@@ -63,10 +64,10 @@ test('safeArg rejects shell metacharacters', () => {
 
 test('missing binaries per OS', () => {
   const none = () => false;
-  const win = missingBinaries('win32', ['dead-skills'], none);
-  assert.ok(!win.some((r) => r.binary === 'nixd' && !/disable/.test(r.command)));
-  assert.ok(win.some((r) => r.binary === 'nixd' && /disable/.test(r.command)));
-  const nix = missingBinaries('linux', ['dead-skills', 'graphify'], none);
+  assert.ok(!missingBinaries('linux', ['dead-skills'], none).some((r) => r.binary === 'nixd'));
+  const win = missingBinaries('win32', ['nix-lsp'], none);
+  assert.ok(win.some((r) => r.binary === 'nixd' && /deselect/.test(r.command)));
+  const nix = missingBinaries('linux', ['nix-lsp', 'graphify'], none);
   assert.ok(nix.some((r) => r.binary === 'nixd' && /nixd/.test(r.command)));
   assert.ok(nix.some((r) => r.binary === 'graphify'));
   assert.deepEqual(missingBinaries('linux', ['dead-skills'], () => true), []);

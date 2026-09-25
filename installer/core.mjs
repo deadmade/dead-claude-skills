@@ -49,11 +49,11 @@ export function safeArg(s) {
 
 // [binary, needed for (plugin name), NixOS command, Windows command]
 const BINARIES = [
-  ['rust-analyzer', BUNDLE, 'nix: rust-analyzer', 'rustup component add rust-analyzer'],
-  ['csharp-ls', BUNDLE, 'nix: csharp-ls dotnet-sdk', 'dotnet tool install --global csharp-ls'],
-  ['typescript-language-server', BUNDLE, 'nix: typescript-language-server typescript', 'npm i -g typescript typescript-language-server'],
-  ['pyright-langserver', BUNDLE, 'nix: pyright', 'npm i -g pyright'],
-  ['nixd', BUNDLE, 'nix: nixd', `/plugin disable nix-lsp@${MARKETPLACE}   (nixd isn't available on Windows)`],
+  ['rust-analyzer', 'rust-analyzer-lsp', 'nix: rust-analyzer', 'rustup component add rust-analyzer'],
+  ['csharp-ls', 'csharp-lsp', 'nix: csharp-ls dotnet-sdk', 'dotnet tool install --global csharp-ls'],
+  ['typescript-language-server', 'typescript-lsp', 'nix: typescript-language-server typescript', 'npm i -g typescript typescript-language-server'],
+  ['pyright-langserver', 'pyright-lsp', 'nix: pyright', 'npm i -g pyright'],
+  ['nixd', 'nix-lsp', 'nix: nixd', 'not available on Windows, deselect nix-lsp'],
   ['jq', BUNDLE, 'nix: jq', 'winget install -e --id jqlang.jq'],
   ['uv', 'graphify', 'nix: uv', 'winget install -e --id astral-sh.uv'],
   ['graphify', 'graphify', 'uv tool install graphifyy', 'uv tool install graphifyy'],

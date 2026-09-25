@@ -223,6 +223,9 @@ if (dupes.length) {
 
 const selected = rows.filter((r) => r.checked && r.key !== 'ccstatusline' && r.key !== 'rules').map((r) => r.key);
 const plan = planPlugins(selected, ours.filter((id) => [BUNDLE, ...opts].includes(id.split('@')[0])), tokenPlugins);
+// Opt-ins that were once bundle dependencies are still marked auto and would be pruned; installing clears that.
+const installedJson = tryJson(join(CONFIG, 'plugins', 'installed_plugins.json'))?.plugins ?? {};
+plan.install.push(...selected.filter((n) => opts.includes(n) && installedJson[`${n}@${MARKETPLACE}`]?.some((e) => e.auto)));
 console.log('');
 for (const n of plan.install) {
   console.log(`installing ${n}…`);

@@ -1,6 +1,6 @@
 {
   "name": "dead-skills",
-  "description": "Default bundle: personal skills and agents (incl. Hallmark, scoped to web files), plus every other plugin in the dead-claude-skills marketplace as a dependency.",
+  "description": "Default bundle: personal skills and agents (incl. Hallmark, scoped to web files), plus the core plugins of the dead-claude-skills marketplace as dependencies.",
   "author": {
     "name": "deadmade",
     "url": "https://github.com/deadmade"
@@ -10,13 +10,8 @@
     "code-review",
     "skill-creator",
     "claude-code-setup",
-    "rust-analyzer-lsp",
     "superpowers",
     "ponytail",
-    "csharp-lsp",
-    "typescript-lsp",
-    "pyright-lsp",
-    "nix-lsp",
     "mcp-basic"
   ]
 }
