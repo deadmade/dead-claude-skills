@@ -16,7 +16,7 @@
   }: let
     forAllSystems = nixpkgs.lib.genAttrs ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
 
-    # Upstream files copied by scripts/sync-*.sh: fixing them here would churn every sync PR.
+    # Upstream files copied by scripts/sync-*.mjs: fixing them here would churn every sync PR.
     vendored = ["^plugins/(dead-skills/skills/hallmark|mattpocock-picks|pstack-picks|graphify)/"];
 
     preCommit = system: let
@@ -46,10 +46,6 @@
           alejandra.enable = true;
           check-merge-conflicts.enable = true;
           check-json.enable = true;
-          shellcheck = {
-            enable = true;
-            excludes = vendored ++ ["^\\.envrc$"];
-          };
           end-of-file-fixer = {
             enable = true;
             excludes = vendored;
@@ -87,8 +83,8 @@
       default = pkgs.mkShell {
         inherit (pre-commit) shellHook;
         buildInputs = pre-commit.enabledPackages;
-        # What scripts/sync-*.sh and the workflows use besides stdenv.
-        packages = with pkgs; [git gh jq perl shellcheck nodejs_24];
+        # What scripts/sync-*.mjs and the workflows use besides stdenv.
+        packages = with pkgs; [git gh nodejs_26];
       };
     });
 

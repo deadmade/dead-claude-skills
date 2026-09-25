@@ -105,8 +105,8 @@ prompt, and the whole message must be the phrase. Approval is refused unless `no
 State is in `~/.claude/dev-feature/`, one active feature per repo; with none active the hooks do nothing.
 
 **Limits:** it stops drift, not a model set on getting around it. File writes through Bash (`sed -i`, `cat >`)
-aren't inspected, and the readiness verdict is still Claude's judgment. It needs `jq` while a feature is active,
-and Git Bash on Windows. Tests: `bash scripts/test-dev-feature-guard.sh`, also run as a pre-commit hook.
+aren't inspected, and the readiness verdict is still Claude's judgment. It needs `node` on `PATH` (same as
+Claude Code). Tests: `node --test scripts/dev-feature-guard.test.mjs`, also run as a pre-commit hook.
 
 ## Language servers
 
@@ -181,7 +181,7 @@ drives the process automatically; these add alignment and design tools you mostl
 - **Left out** because superpowers or the official plugins already cover them: `tdd`, `diagnosing-bugs`,
   `code-review`, `implement`, `wayfinder`. Not included yet: `triage`, `prototype`, `research`, `wizard`,
   `ask-matt`, `resolving-merge-conflicts` (move the line from `SKIPPED` to `SKILLS` in
-  `scripts/sync-mattpocock.sh`, bump the count check in `.github/workflows/sync-mattpocock.yml`, re-run the script).
+  `scripts/sync-mattpocock.mjs`, bump the count check in `.github/workflows/sync-mattpocock.yml`, re-run the script).
 - **Known overlap:** `writing-for-agents` and superpowers' `writing-skills` both trigger when writing skills.
 
 **Per repo:** run `/setup-matt-pocock-skills` once. It writes `docs/agents/*.md` and an `## Agent skills`
@@ -198,7 +198,7 @@ Don't also install the full `mattpocock-skills` from the official marketplace: y
 twice plus the clashing ones.
 
 **Why vendored:** a `strict: false` marketplace entry can't pick a subset of his plugin (Claude Code
-refuses to load it because his `plugin.json` already lists skills). `scripts/sync-mattpocock.sh`
+refuses to load it because his `plugin.json` already lists skills). `scripts/sync-mattpocock.mjs`
 copies the 14 folders plus his LICENSE and records the upstream commit in `plugins/mattpocock-picks/UPSTREAM`;
 `.github/workflows/sync-mattpocock.yml` runs it every Monday and opens a PR. If upstream renames a
 skill folder, the script fails loudly instead of syncing a partial set.
@@ -223,7 +223,7 @@ rewritten for Claude Code. Every skill is user-invoked (`/pstack-picks:<name>`).
   `make-operations-idempotent`, plus `separate-before-serializing-shared-state`,
   `redesign-from-first-principles`, `prove-it-works` and `fix-root-causes` (used by `arena` and `no-comments`)
 
-**What the rewrite changes** (`scripts/pstack-rewrites.pl`):
+**What the rewrite changes** (`REWRITES` in `scripts/sync-pstack.mjs`):
 
 - Cursor's models become Claude's: explorers, investigators and swarm workers run on `sonnet`;
   explainers and synthesizers on `fable`; review/runner panels on `fable`, `opus`, `sonnet`, `haiku`.
@@ -238,7 +238,7 @@ rewritten for Claude Code. Every skill is user-invoked (`/pstack-picks:<name>`).
 `tdd`, `figure-it-out`, `teach` (name clash with Matt's), `reflect`/`automate-me` (Cursor transcripts),
 `setup-pstack` (models are rewritten directly), and the remaining principles.
 
-**Sync:** `scripts/sync-pstack.sh` copies the subset, applies the rewrites, and fails if any Cursor-ism
+**Sync:** `scripts/sync-pstack.mjs` copies the subset, applies the rewrites, and fails if any Cursor-ism
 survives (a new upstream phrasing then needs a rule instead of shipping broken instructions).
 `.github/workflows/sync-pstack.yml` runs it every Monday, opens a PR, and opens an issue for each new
 upstream skill that's neither in `SKILLS` nor `SKIPPED`.
@@ -264,7 +264,7 @@ uv tool install graphifyy     # double y; `uv tool update-shell` if `graphify` i
 - **Windows:** the vendored skill is upstream's bash variant, so it needs Git Bash.
 - **Upgrades:** the skill syncs weekly; keep the CLI in step with `uv tool upgrade graphifyy`.
 
-**Sync:** `scripts/sync-graphify.sh` copies `skill.md` and `skills/claude/references/` and fails if a
+**Sync:** `scripts/sync-graphify.mjs` copies `skill.md` and `skills/claude/references/` and fails if a
 reference file disappears. `.github/workflows/sync-graphify.yml` runs it every Monday and opens a PR.
 `hooks/hooks.json` is maintained by hand (mirrors `_claude_pretooluse_hooks` in upstream's `install.py`).
 
@@ -272,12 +272,13 @@ reference file disappears. `.github/workflows/sync-graphify.yml` runs it every M
 
 The flake provides a dev shell and pre-commit hooks.
 
-- **Dev shell:** `nix develop` (or direnv: `.envrc` is `use flake`) gives git, gh, jq, perl and shellcheck
-  for the sync scripts, and installs the pre-commit hooks on entry.
-- **Hooks:** alejandra, shellcheck, JSON syntax, merge markers, end-of-file (vendored trees excluded), and
-  `scripts/check-repo.sh`: `claude plugin validate` on the marketplace and every plugin (skipped when `claude`
-  isn't on `PATH`), bundle dependencies and local sources exist; plus `node --test` for the installer. Run them
-  all with `pre-commit run --all-files`; `nix flake check` runs them in the sandbox (without claude).
+- **Dev shell:** `nix develop` (or direnv: `.envrc` is `use flake`) gives git, gh and node for the sync
+  scripts, and installs the pre-commit hooks on entry.
+- **Hooks:** alejandra, JSON syntax, merge markers, end-of-file (vendored trees excluded), and
+  `scripts/check-repo.mjs`: `claude plugin validate` on the marketplace and every plugin (skipped when `claude`
+  isn't on `PATH`), bundle dependencies and local sources exist; plus `node --test` for the installer and the
+  dev-feature lock. Run them all with `pre-commit run --all-files`; `nix flake check` runs them in the sandbox
+  (without claude).
 
 ## Layout
 
@@ -285,22 +286,22 @@ The flake provides a dev shell and pre-commit hooks.
 package.json                        # npx entry point (bin: installer/install.mjs)
 installer/                          # interactive installer, zero dependencies
 flake.nix                           # dev shell, pre-commit hooks
-scripts/check-repo.sh               # pre-commit: plugin validate + marketplace/bundle consistency
+scripts/check-repo.mjs              # pre-commit: plugin validate + marketplace/bundle consistency
 .claude-plugin/marketplace.json     # marketplace + re-listed upstream plugins
 plugins/dead-skills/
   .claude-plugin/plugin.json        # bundle manifest (dependencies)
   skills/<name>/SKILL.md            # own + vendored skills
   agents/<name>.md                  # own subagents
-  hooks/                            # dev-feature lock: hooks.json + dev-feature-guard.sh
-scripts/test-dev-feature-guard.sh   # dev-feature lock tests (pre-commit)
-scripts/sync-hallmark.sh            # vendors hallmark and re-applies the web-only scope
+  hooks/                            # dev-feature lock: hooks.json + dev-feature-guard.mjs
+scripts/dev-feature-guard.test.mjs  # dev-feature lock tests (pre-commit)
+scripts/sync-lib.mjs                # shared clone/report helpers for scripts/sync-*.mjs
+scripts/sync-hallmark.mjs           # vendors hallmark and re-applies the web-only scope
 .github/workflows/sync-hallmark.yml # weekly sync → pull request
-scripts/sync-mattpocock.sh          # vendors the curated mattpocock/skills subset
+scripts/sync-mattpocock.mjs         # vendors the curated mattpocock/skills subset
 .github/workflows/sync-mattpocock.yml # weekly sync → pull request
-scripts/sync-pstack.sh              # vendors + rewrites the pstack subset, guards against Cursor-isms
-scripts/pstack-rewrites.pl          # Cursor → Claude Code rewrite rules
+scripts/sync-pstack.mjs             # vendors + rewrites the pstack subset (Cursor → Claude Code), guards against Cursor-isms
 .github/workflows/sync-pstack.yml   # weekly sync → pull request
-scripts/sync-graphify.sh            # vendors graphify's Claude skill + references
+scripts/sync-graphify.mjs           # vendors graphify's Claude skill + references
 .github/workflows/sync-graphify.yml # weekly sync → pull request
 ```
 
@@ -318,10 +319,10 @@ Add an entry to `.claude-plugin/marketplace.json` and its name to `dependencies`
 ## Hallmark sync
 
 `.github/workflows/sync-hallmark.yml` runs every Monday (or manually via
-`gh workflow run sync-hallmark.yml`). It runs `scripts/sync-hallmark.sh` and, if upstream changed,
+`gh workflow run sync-hallmark.yml`). It runs `scripts/sync-hallmark.mjs` and, if upstream changed,
 opens a PR on `sync/hallmark`. Merge it to roll the update out.
 
 One-time repo setting required: **Settings → Actions → General → Workflow permissions → Allow GitHub
 Actions to create and approve pull requests**.
 
-Run locally instead: `bash scripts/sync-hallmark.sh`.
+Run locally instead: `node scripts/sync-hallmark.mjs`.

@@ -4,7 +4,7 @@
 
 `plugins/dead-skills/skills/hallmark/` is vendored from [nutlope/hallmark](https://github.com/nutlope/hallmark)
 (MIT License, Copyright (c) 2026 Hallmark contributors; full text in `skills/hallmark/LICENSE`).
-It is synced by `scripts/sync-hallmark.sh` (weekly via GitHub Actions); the only local change is a
+It is synced by `scripts/sync-hallmark.mjs` (weekly via GitHub Actions); the only local change is a
 "WEB FRONTEND ONLY" prefix on the frontmatter `description`. The synced upstream commit is in
 `skills/hallmark/UPSTREAM`.
 
@@ -19,7 +19,7 @@ It is synced by `scripts/sync-hallmark.sh` (weekly via GitHub Actions); the only
 
 `plugins/mattpocock-picks/skills/` vendors 14 skills from [mattpocock/skills](https://github.com/mattpocock/skills)
 (MIT License, Copyright (c) 2026 Matt Pocock; full text in `plugins/mattpocock-picks/LICENSE`), unmodified
-apart from flattening `engineering/` and `productivity/` into one folder. Synced by `scripts/sync-mattpocock.sh`
+apart from flattening `engineering/` and `productivity/` into one folder. Synced by `scripts/sync-mattpocock.mjs`
 (weekly via GitHub Actions); the synced upstream commit is in `plugins/mattpocock-picks/UPSTREAM`.
 
 ## pstack-picks
@@ -27,7 +27,7 @@ apart from flattening `engineering/` and `productivity/` into one folder. Synced
 `plugins/pstack-picks/` vendors 21 skills and the `comment-sicko` agent from
 [pstack](https://github.com/cursor/plugins/tree/main/pstack) (MIT License, Copyright (c) 2026 Lauren Tan;
 full text in `plugins/pstack-picks/LICENSE`). Modified mechanically for Claude Code by
-`scripts/pstack-rewrites.pl` (tool names, subagent types, model names, paths, and an added port note
+`scripts/sync-pstack.mjs` (tool names, subagent types, model names, paths, and an added port note
 under each file's frontmatter). The synced upstream commit is in `plugins/pstack-picks/UPSTREAM`.
 
 ## graphify
@@ -36,7 +36,7 @@ under each file's frontmatter). The synced upstream commit is in `plugins/pstack
 from [Graphify-Labs/graphify](https://github.com/Graphify-Labs/graphify) (Apache License 2.0, Copyright 2026
 Safi Shamsi and the Graphify contributors; `LICENSE`, `LICENSE-MIT` and `NOTICE` in `plugins/graphify/`),
 unmodified. `plugins/graphify/hooks/hooks.json` reproduces the hooks upstream's installer writes and calls the
-separately installed `graphifyy` CLI. Synced by `scripts/sync-graphify.sh` (weekly via GitHub Actions); the
+separately installed `graphifyy` CLI. Synced by `scripts/sync-graphify.mjs` (weekly via GitHub Actions); the
 synced upstream commit is in `plugins/graphify/UPSTREAM`.
 
 ## Re-listed plugins
