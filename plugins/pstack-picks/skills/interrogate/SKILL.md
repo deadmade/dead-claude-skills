@@ -42,7 +42,6 @@ Launch all reviewers in a single message using the Agent tool. Use the table bel
 | Reviewer A | `fable` |
 | Reviewer B | `opus` |
 | Reviewer C | `sonnet` |
-| Reviewer D | `haiku` |
 
 For each reviewer:
 - `subagent_type`: `Explore`
