@@ -52,7 +52,7 @@ jobs:
         id: check
         run: |
           jq empty .claude-plugin/marketplace.json plugins/mattpocock-picks/.claude-plugin/plugin.json
-          test "$(find plugins/mattpocock-picks/skills -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l)" -eq 14
+          test "$(find plugins/mattpocock-picks/skills -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l)" -eq 13
           echo "sha=$(cat plugins/mattpocock-picks/UPSTREAM)" >> "$GITHUB_OUTPUT"
 
       - name: Open pull request

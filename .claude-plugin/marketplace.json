@@ -212,13 +212,13 @@
     },
     {
       "name": "mattpocock-picks",
-      "description": "Curated Matt Pocock skills that complement superpowers: all productivity skills plus grilling with domain docs, spec → tickets and architecture deepening. Opt-in.",
+      "description": "Curated Matt Pocock skills that complement superpowers: the productivity skills plus grilling with domain docs, spec → tickets and architecture deepening. Opt-in.",
       "source": "./plugins/mattpocock-picks",
       "category": "development"
     },
     {
       "name": "pstack-picks",
-      "description": "Curated skills from poteto's pstack, rewritten for Claude Code: how/why, adversarial review, unslop, architect/arena/swarm, principles. Opt-in.",
+      "description": "Curated skills from poteto's pstack, rewritten for Claude Code: how/why, adversarial review, unslop, architect/arena, principles. Opt-in.",
       "source": "./plugins/pstack-picks",
       "category": "development"
     },

@@ -6,8 +6,8 @@ import { homedir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { emitKeypressEvents } from 'node:readline';
 import {
-  BUNDLE, MARKETPLACE, duplicates, isOurStatusLine, mergeSettings, missingBinaries, needsToken, optIns,
-  planPlugins, safeArg,
+  BUNDLE, MARKETPLACE, dcgCommand, duplicates, hasDcgHook, isOurStatusLine, isSandboxOn, mergeSettings,
+  missingBinaries, needsToken, optIns, planPlugins, safeArg,
 } from './core.mjs';
 
 const PKG = join(import.meta.dirname, '..');
@@ -114,8 +114,8 @@ const remove = (file, label) => {
   done.push(`deleted ${label}`);
 };
 
-async function applySettings(statusLine) {
-  const snippet = () => console.log(JSON.stringify(mergeSettings({}, { statusLine }), null, 2));
+async function applySettings(toggles) {
+  const snippet = () => console.log(JSON.stringify(mergeSettings({}, toggles), null, 2));
   if (existsSync(SETTINGS) && lstatSync(SETTINGS).isSymbolicLink()) {
     console.log(`\n${SETTINGS} is a symlink, not writing it. Merge these keys where it's managed:`);
     return snippet();
@@ -127,8 +127,8 @@ async function applySettings(statusLine) {
     console.log(`\n${SETTINGS} is not valid JSON. Merge these keys by hand:`);
     return snippet();
   }
-  const after = mergeSettings(before, { statusLine });
-  const changed = ['permissions', 'extraKnownMarketplaces', 'statusLine']
+  const after = mergeSettings(before, toggles);
+  const changed = ['permissions', 'extraKnownMarketplaces', 'statusLine', 'sandbox']
     .filter((k) => JSON.stringify(before[k]) !== JSON.stringify(after[k]));
   if (!changed.length) return;
   console.log(`\nChanges to ${SETTINGS}:`);
@@ -157,6 +157,19 @@ async function applyCcstatusline(on) {
     writeAtomic(CCSL, shipped);
     done.push(`replaced ${CCSL}`);
   } else if (current) done.push(`kept your ${CCSL}`);
+}
+
+async function applyDcg(was, on) {
+  if (was === on) return;
+  const action = on ? 'install' : 'uninstall';
+  if (!(await ask(`\nRun dcg's official ${action}er? It ${on ? 'installs dcg and adds' : 'removes dcg and'} its Claude Code hook.`, true))) {
+    return done.push(`dcg: ${action} skipped by you`);
+  }
+  const [bin, args] = dcgCommand(process.platform, action);
+  const r = spawnSync(bin, args, { stdio: 'inherit' });
+  if (r.status !== 0) return failures.push(`dcg ${action} failed (${r.error?.code ?? `exit ${r.status}`})`);
+  done.push(`dcg: ${action}ed`);
+  if (on && !WIN && !onPath('dcg')) console.log('\n\x1b[33mdcg is not on PATH: add ~/.local/bin (NixOS: home.sessionPath).\x1b[0m');
 }
 
 function onPath(bin) {
@@ -203,7 +216,12 @@ const rows = await checklist([
   { key: BUNDLE, label: BUNDLE, checked: true, fixed: true, note: `always; brings ${bundle.dependencies.join(', ')}` },
   ...opts.map((n) => ({ key: n, label: n, checked: has(n), note: tokenPlugins.includes(n) ? 'token entered in Claude Code' : '' })),
   { key: 'ccstatusline', label: 'ccstatusline', checked: isOurStatusLine(settingsNow.statusLine), note: 'status line + its config' },
+  WIN
+    ? { key: 'sandbox', label: 'sandbox', checked: false, fixed: true, note: 'needs WSL2' }
+    : { key: 'sandbox', label: 'sandbox', checked: isSandboxOn(settingsNow), note: 'Bash sandbox, no unsandboxed fallback' },
+  { key: 'dcg', label: 'dcg', checked: hasDcgHook(settingsNow), note: 'destructive command guard, runs its own installer' },
 ]);
+const TOGGLES = ['ccstatusline', 'sandbox', 'dcg'];
 const on = (k) => rows.find((r) => r.key === k).checked;
 
 const dupes = duplicates(installedIds, manifest.plugins.map((p) => p.name));
@@ -212,7 +230,7 @@ if (dupes.length) {
   if (await ask('Uninstall them?', true)) for (const id of dupes) step(`uninstalled ${id}`, 'plugin', 'uninstall', id, '--json');
 }
 
-const selected = rows.filter((r) => r.checked && r.key !== 'ccstatusline').map((r) => r.key);
+const selected = rows.filter((r) => r.checked && !TOGGLES.includes(r.key)).map((r) => r.key);
 const plan = planPlugins(selected, ours.filter((id) => [BUNDLE, ...opts].includes(id.split('@')[0])), tokenPlugins);
 // Opt-ins that were once bundle dependencies are still marked auto and would be pruned; installing clears that.
 const installedJson = tryJson(join(CONFIG, 'plugins', 'installed_plugins.json'))?.plugins ?? {};
@@ -228,13 +246,14 @@ for (const id of plan.uninstall) {
 }
 if (plan.uninstall.length || dupes.length) step('pruned unused dependencies', 'plugin', 'prune', '-y');
 
-await applySettings(on('ccstatusline'));
+await applySettings({ statusLine: on('ccstatusline'), sandbox: on('sandbox') });
 const autoUpdate = tryJson(join(CONFIG, 'plugins', 'known_marketplaces.json'))?.[MARKETPLACE]?.autoUpdate;
 await applyCcstatusline(on('ccstatusline'));
+await applyDcg(hasDcgHook(settingsNow), on('dcg'));
 // The global instructions moved into a dead-skills SessionStart hook; the old file would duplicate them.
 remove(RULES, RULES);
 
-const wanted = [...selected, ...(on('ccstatusline') ? ['ccstatusline'] : [])];
+const wanted = [...selected, ...TOGGLES.filter(on)];
 const missing = missingBinaries(process.platform, wanted, onPath);
 
 console.log('\n── Summary ──');

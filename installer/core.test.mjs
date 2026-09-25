@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { optIns, needsToken, planPlugins, duplicates, mergeSettings, safeArg, missingBinaries } from './core.mjs';
+import {
+  optIns, needsToken, planPlugins, duplicates, mergeSettings, safeArg, missingBinaries, SECRET_DENIES, isSandboxOn,
+  hasDcgHook, dcgCommand,
+} from './core.mjs';
 
 const json = (p) => JSON.parse(readFileSync(new URL(`../${p}`, import.meta.url), 'utf8'));
 const marketplace = json('.claude-plugin/marketplace.json');
@@ -71,4 +74,45 @@ test('missing binaries per OS', () => {
   assert.ok(nix.some((r) => r.binary === 'nixd' && /nixd/.test(r.command)));
   assert.ok(nix.some((r) => r.binary === 'graphify'));
   assert.deepEqual(missingBinaries('linux', ['dead-skills'], () => true), []);
+});
+
+test('secret denies are added once and keep existing ones', () => {
+  const out = mergeSettings({ permissions: { deny: ['Bash(sudo:*)', 'Read(~/.ssh/**)'] } }, {});
+  assert.deepEqual(out.permissions.deny, ['Bash(sudo:*)', 'Read(~/.ssh/**)', ...SECRET_DENIES.filter((d) => d !== 'Read(~/.ssh/**)')]);
+  assert.deepEqual(mergeSettings(out, {}), out);
+});
+
+test('sandbox on merges our keys, off removes only ours', () => {
+  const on = mergeSettings({ sandbox: { excludedCommands: ['docker'] } }, { sandbox: true });
+  assert.deepEqual(on.sandbox, { excludedCommands: ['docker'], enabled: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: false });
+  assert.ok(isSandboxOn(on));
+  assert.deepEqual(mergeSettings(on, { sandbox: true }), on);
+  assert.deepEqual(mergeSettings(on, { sandbox: false }).sandbox, { excludedCommands: ['docker'] });
+  assert.equal(mergeSettings(mergeSettings({}, { sandbox: true }), { sandbox: false }).sandbox, undefined);
+  assert.ok(!isSandboxOn({}));
+});
+
+test('dcg hook detection', () => {
+  const hook = (command) => ({ hooks: { PreToolUse: [{ matcher: 'Bash|PowerShell', hooks: [{ type: 'command', command }] }] } });
+  assert.ok(hasDcgHook(hook('/home/me/.local/bin/dcg')));
+  assert.ok(hasDcgHook(hook('"C:\\Users\\me\\.local\\bin\\dcg.exe"')));
+  assert.ok(!hasDcgHook(hook('node guard.mjs')));
+  assert.ok(!hasDcgHook({}));
+});
+
+test('dcg runs its own installer per OS', () => {
+  const [win, winArgs] = dcgCommand('win32', 'install');
+  assert.equal(win, 'powershell');
+  assert.match(winArgs.at(-1), /install\.ps1'\)\)\) -EasyMode -Verify$/);
+  assert.match(dcgCommand('win32', 'uninstall')[1].at(-1), /uninstall\.ps1/);
+  const [sh, shArgs] = dcgCommand('linux', 'install');
+  assert.equal(sh, 'bash');
+  assert.match(shArgs[1], /install\.sh' \| bash -s -- --verify$/);
+  assert.match(dcgCommand('linux', 'uninstall')[1][1], /uninstall\.sh' \| bash -s -- --yes$/);
+});
+
+test('sandbox needs bubblewrap and socat', () => {
+  const rows = missingBinaries('linux', ['sandbox'], () => false);
+  assert.deepEqual(rows.map((r) => r.binary), ['bwrap', 'socat']);
+  assert.match(rows[0].command, /home\.packages: bubblewrap/);
 });
