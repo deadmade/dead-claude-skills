@@ -1,5 +1,3 @@
-# Global instructions (dead-claude-skills)
-
 - Commit messages are one sentence.
 - Never add co-author lines (`Co-Authored-By:` or similar) to commits.
 - After finishing a feature, check whether the project's CLAUDE.md is still accurate and update it with anything a future session needs (`/revise-claude-md` from claude-md-management helps).
