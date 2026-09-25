@@ -16,7 +16,7 @@ jobs:
     env:
       NEW_SKILLS_FILE: /tmp/mattpocock-new-skills.tsv
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Sync skills from upstream
         run: node scripts/sync-mattpocock.mjs
@@ -56,7 +56,7 @@ jobs:
           echo "sha=$(cat plugins/mattpocock-picks/UPSTREAM)" >> "$GITHUB_OUTPUT"
 
       - name: Open pull request
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           branch: sync/mattpocock-picks
           delete-branch: true
