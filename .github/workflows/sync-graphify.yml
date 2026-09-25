@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Sync skill from upstream
-        run: bash scripts/sync-graphify.sh
+        run: node scripts/sync-graphify.mjs
 
       - name: Sanity checks
         id: check

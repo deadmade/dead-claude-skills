@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Sync skills from upstream
-        run: bash scripts/sync-mattpocock.sh
+        run: node scripts/sync-mattpocock.mjs
 
       - name: Open issues for new upstream skills
         env:
@@ -40,7 +40,7 @@ jobs:
               "" \
               "Source: https://github.com/mattpocock/skills/tree/main/skills/$skill" \
               "" \
-              "Decide in \`scripts/sync-mattpocock.sh\`:" \
+              "Decide in \`scripts/sync-mattpocock.mjs\`:" \
               "- **Include:** add \`$skill\` to \`SKILLS\`, bump the skill count check in \`.github/workflows/sync-mattpocock.yml\`, run the script." \
               "- **Skip:** add \`$skill\` to \`SKIPPED\`." \
               "" \

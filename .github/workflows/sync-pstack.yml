@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Sync and rewrite skills from upstream
-        run: bash scripts/sync-pstack.sh
+        run: node scripts/sync-pstack.mjs
 
       - name: Open issues for new upstream skills
         env:
@@ -39,8 +39,8 @@ jobs:
               "" \
               "Source: https://github.com/cursor/plugins/tree/main/pstack/skills/$skill" \
               "" \
-              "Decide in \`scripts/sync-pstack.sh\`:" \
-              "- **Include:** add \`$skill\` to \`SKILLS\`, bump the skill count check in \`.github/workflows/sync-pstack.yml\`, run the script. If the guard reports Cursor-specific text, add a rule to \`scripts/pstack-rewrites.pl\`." \
+              "Decide in \`scripts/sync-pstack.mjs\`:" \
+              "- **Include:** add \`$skill\` to \`SKILLS\`, bump the skill count check in \`.github/workflows/sync-pstack.yml\`, run the script. If the guard reports Cursor-specific text, add a rule to \`REWRITES\` in the same script." \
               "- **Skip:** add \`$skill\` to \`SKIPPED\`." \
               "" \
               "Check for overlap with superpowers and mattpocock-picks before including it.")"
@@ -65,7 +65,7 @@ jobs:
           body: |
             Automated sync of the curated pstack skills from https://github.com/cursor/plugins at
             https://github.com/cursor/plugins/commit/${{ steps.check.outputs.sha }}, with the Claude Code
-            rewrites from `scripts/pstack-rewrites.pl` applied and the Cursor-ism guard passing.
+            rewrites from `scripts/sync-pstack.mjs` applied and the Cursor-ism guard passing.
 
             Review the diff before merging: merged changes reach every machine with pstack-picks installed.
           add-paths: plugins/pstack-picks
