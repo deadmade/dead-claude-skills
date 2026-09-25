@@ -24,8 +24,8 @@
 
       check-repo = pkgs.writeShellApplication {
         name = "check-repo";
-        runtimeInputs = with pkgs; [bash coreutils diffutils gawk gnugrep gnused jq];
-        text = ''exec bash scripts/check-repo.sh'';
+        runtimeInputs = [pkgs.nodejs];
+        text = ''exec node scripts/check-repo.mjs'';
       };
 
       installer-test = pkgs.writeShellApplication {
@@ -58,7 +58,7 @@
             enable = true;
             name = "claude plugin validate + marketplace consistency";
             entry = "${check-repo}/bin/check-repo";
-            files = "^(\\.claude-plugin/|plugins/|scripts/check-repo\\.sh$)";
+            files = "^(\\.claude-plugin/|plugins/|scripts/check-repo\\.mjs$)";
             pass_filenames = false;
           };
           installer-test = {
