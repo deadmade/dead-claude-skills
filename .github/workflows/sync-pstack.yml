@@ -51,7 +51,7 @@ jobs:
         id: check
         run: |
           jq empty .claude-plugin/marketplace.json plugins/pstack-picks/.claude-plugin/plugin.json
-          test "$(find plugins/pstack-picks/skills -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l)" -eq 21
+          test "$(find plugins/pstack-picks/skills -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l)" -eq 18
           test -f plugins/pstack-picks/agents/comment-sicko.md
           echo "sha=$(cat plugins/pstack-picks/UPSTREAM)" >> "$GITHUB_OUTPUT"
 

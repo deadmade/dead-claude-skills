@@ -8,12 +8,10 @@ import { ROOT, description, fail, finish, git, reportNew, sparseClone, tempDir }
 const UPSTREAM_URL = "https://github.com/cursor/plugins.git";
 const SKILLS = [
   "how", "why", "recall", "bro", "interrogate", "blast-radius", "no-comments", "unslop", "technical-writing", "architect",
-  "arena", "swarm",
+  "arena",
   "show-me-your-work",
   "principle-separate-before-serializing-shared-state",
   "principle-redesign-from-first-principles",
-  "principle-prove-it-works",
-  "principle-fix-root-causes",
   "principle-type-system-discipline",
   "principle-boundary-discipline",
   "principle-model-the-domain",
@@ -23,7 +21,8 @@ const AGENTS = ["comment-sicko"];
 // Upstream skills deliberately not vendored. Anything in neither list is reported as new.
 const SKIPPED = [
   "automate-me", "create-verification-skill", "figure-it-out", "maintain-verification-skill", "make-bot-ui", "poteto-mode",
-  "reflect", "setup-pstack", "tdd", "teach", "typescript-best-practices",
+  "reflect", "setup-pstack", "swarm", "tdd", "teach", "typescript-best-practices",
+  "principle-fix-root-causes", "principle-prove-it-works",
   "principle-attack-the-premise", "principle-build-the-lever", "principle-encode-lessons-in-structure",
   "principle-exhaust-the-design-space", "principle-experience-first", "principle-foundational-thinking",
   "principle-guard-the-context-window", "principle-laziness-protocol", "principle-migrate-callers-then-delete-legacy-apis",
@@ -64,15 +63,6 @@ const REWRITES = [
   [/\| Subagent \| Default model \|/g, "| Subagent | Model |"],
   [/- `model`: the configured `interrogate reviewers` entry[^\n]*/g, "- `model`: the reviewer's model from the table"],
   [/If the Task tool rejects a configured entry, run that reviewer[^\n]*\n/g, `Valid \`model\` values for the Agent tool are ${CLAUDE_MODELS}.\n`],
-
-  // --- swarm: Cursor cloud workers -> local background agents ---
-  [/Fan out N parallel cloud workers\./g, "Fan out N parallel background workers."],
-  [/N is total workers, not the cloud concurrency limit\./g, "N is total workers, not a concurrency limit."],
-  [/Pick the worker model from the `swarm workers` line[^\n]*?from its error message\./g, "Use `sonnet` as the worker model."],
-  [/Spawn all N workers in one message with `subagent_type: generalPurpose`, `environment: "cloud"`[^\n]*/g,
-    'Spawn all N workers in one message with the Agent tool: `subagent_type: general-purpose`, `run_in_background: true`, `isolation: "worktree"` for workers that write, and the chosen `model`.'],
-  [/When a worker must start from a non-default pushed branch, pass `cloud_base_branch`\./g,
-    "When a worker must start from a non-default branch, tell it to check that branch out in its worktree first."],
 
   // --- tool names ---
   [/Open a todolist/g, "Open a todo list (`TodoWrite`)"],

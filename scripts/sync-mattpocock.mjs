@@ -21,7 +21,6 @@ const SKILLS = [
   "productivity/teach",
   "productivity/to-questionnaire",
   "productivity/wait-what",
-  "productivity/writing-for-agents",
 ];
 // Upstream skills deliberately not vendored (overlap with superpowers or not wanted yet).
 // Anything upstream lists that is in neither array is reported as new (see NEW_SKILLS_FILE).
@@ -37,6 +36,7 @@ const SKIPPED = [
   "engineering/triage",
   "engineering/wayfinder",
   "engineering/wizard",
+  "productivity/writing-for-agents",
 ];
 
 const PLUGIN = join(ROOT, "plugins", "mattpocock-picks");
