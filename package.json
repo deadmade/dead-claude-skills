@@ -1,0 +1,18 @@
+{
+  "name": "dead-claude-skills",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Interactive installer for the dead-claude-skills Claude Code marketplace.",
+  "type": "module",
+  "bin": {
+    "dead-claude-skills": "installer/install.mjs"
+  },
+  "files": [
+    "installer/",
+    ".claude-plugin/marketplace.json",
+    "plugins/*/.claude-plugin/plugin.json"
+  ],
+  "engines": {
+    "node": ">=20"
+  }
+}

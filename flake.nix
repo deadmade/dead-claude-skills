@@ -28,6 +28,12 @@
         text = ''exec bash scripts/check-repo.sh'';
       };
 
+      installer-test = pkgs.writeShellApplication {
+        name = "installer-test";
+        runtimeInputs = [pkgs.nodejs];
+        text = ''exec node --test 'installer/*.test.mjs' '';
+      };
+
       dev-feature-guard-test = pkgs.writeShellApplication {
         name = "dev-feature-guard-test";
         runtimeInputs = with pkgs; [bash coreutils gawk git gnugrep gnused jq];
@@ -52,7 +58,14 @@
             enable = true;
             name = "claude plugin validate + marketplace consistency";
             entry = "${check-repo}/bin/check-repo";
-            files = "^(\\.claude-plugin/|plugins/|INSTALL\\.md$|scripts/check-repo\\.sh$)";
+            files = "^(\\.claude-plugin/|plugins/|scripts/check-repo\\.sh$)";
+            pass_filenames = false;
+          };
+          installer-test = {
+            enable = true;
+            name = "installer tests";
+            entry = "${installer-test}/bin/installer-test";
+            files = "^(installer/|package\\.json$)";
             pass_filenames = false;
           };
           dev-feature-guard = {
@@ -75,7 +88,7 @@
         inherit (pre-commit) shellHook;
         buildInputs = pre-commit.enabledPackages;
         # What scripts/sync-*.sh and the workflows use besides stdenv.
-        packages = with pkgs; [git gh jq perl shellcheck];
+        packages = with pkgs; [git gh jq perl shellcheck nodejs_24];
       };
     });
 

@@ -6,18 +6,19 @@ My Claude Code setup as a plugin marketplace, so every machine (Linux, Windows) 
 
 ### Quick setup
 
-Paste this into Claude Code on the new machine (Linux, macOS, NixOS or Windows):
+In a terminal on the new machine (NixOS or Windows; needs `git`, `node` 20+ and `claude` on `PATH`):
 
 ```
-Fetch https://raw.githubusercontent.com/deadmade/dead-claude-skills/master/INSTALL.md and follow it.
+npx github:deadmade/dead-claude-skills
 ```
 
-(or, in a clone: `Follow ./INSTALL.md`). [INSTALL.md](INSTALL.md) is written for the agent: it adds the
-marketplace, installs `dead-skills`, asks which opt-in plugins you want (PATs are entered in Claude Code's own
-`/plugin install` prompt, never in the chat), warns about duplicates from other marketplaces, merges the
-[recommended permission](#recommended-permission) and [auto-update](#auto-update) into `settings.json`
-(backup: `settings.json.bak`), and installs the missing [language servers](#language-servers) and other CLIs
-after asking (NixOS: it proposes a home-manager change instead). Re-running is safe.
+The installer ([installer/](installer/)) adds or updates the marketplace, keeps `dead-skills` installed and shows a
+checklist of the opt-in plugins, ccstatusline and the global instructions (`~/.claude/rules/dead-claude-skills.md`),
+pre-selected to what's already there: selecting installs, deselecting uninstalls. It removes same-named plugins from
+other marketplaces, merges the [recommended permission](#recommended-permission) and [auto-update](#auto-update)
+into `settings.json` after showing the diff, and prints the commands for missing [language servers](#language-servers)
+and CLIs without installing them. Plugins that need a PAT (`mcp-github`, `mcp-azure`) are handed off to Claude
+Code's own `/plugin install` prompt. No backups or logs are written; re-running is safe.
 
 ### Manual
 
@@ -117,8 +118,7 @@ symbols and trace call hierarchies instead of grepping.
 direnv also works). A missing one shows up as "Executable not found in $PATH" under `/plugin` →
 Errors; silence a server a machine doesn't need with `/plugin disable <name>@dead-claude-skills`.
 
-On NixOS add the packages below to `home.packages`; elsewhere the [INSTALL.md](INSTALL.md) agent
-installs them.
+On NixOS add the packages below to `home.packages`; the installer prints what's missing.
 
 | Server | NixOS (home-manager `home.packages`) | Windows |
 |---|---|---|
@@ -276,16 +276,16 @@ The flake provides a dev shell and pre-commit hooks.
   for the sync scripts, and installs the pre-commit hooks on entry.
 - **Hooks:** alejandra, shellcheck, JSON syntax, merge markers, end-of-file (vendored trees excluded), and
   `scripts/check-repo.sh`: `claude plugin validate` on the marketplace and every plugin (skipped when `claude`
-  isn't on `PATH`), bundle dependencies and local sources exist, and every marketplace plugin is either a
-  `dead-skills` dependency or listed in INSTALL.md's opt-in table. Run them
+  isn't on `PATH`), bundle dependencies and local sources exist; plus `node --test` for the installer. Run them
   all with `pre-commit run --all-files`; `nix flake check` runs them in the sandbox (without claude).
 
 ## Layout
 
 ```
-INSTALL.md                          # machine setup, followed by Claude Code
+package.json                        # npx entry point (bin: installer/install.mjs)
+installer/                          # interactive installer, zero dependencies
 flake.nix                           # dev shell, pre-commit hooks
-scripts/check-repo.sh               # pre-commit: plugin validate + marketplace/INSTALL.md consistency
+scripts/check-repo.sh               # pre-commit: plugin validate + marketplace/bundle consistency
 .claude-plugin/marketplace.json     # marketplace + re-listed upstream plugins
 plugins/dead-skills/
   .claude-plugin/plugin.json        # bundle manifest (dependencies)
@@ -313,7 +313,7 @@ scripts/sync-graphify.sh            # vendors graphify's Claude skill + referenc
 ## Adding another upstream plugin
 
 Add an entry to `.claude-plugin/marketplace.json` and its name to `dependencies` in the bundle's
-`plugin.json` (or, for an opt-in, a row in INSTALL.md's opt-in table).
+`plugin.json`, or leave it out of `dependencies` to make it an opt-in (the installer picks it up automatically).
 
 ## Hallmark sync
 
