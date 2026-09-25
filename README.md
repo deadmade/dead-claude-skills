@@ -13,8 +13,7 @@ npx github:deadmade/dead-claude-skills
 ```
 
 The installer ([installer/](installer/)) adds or updates the marketplace, keeps `dead-skills` installed and shows a
-checklist of the opt-in plugins, ccstatusline and the global instructions (`~/.claude/rules/dead-claude-skills.md`),
-pre-selected to what's already there: selecting installs, deselecting uninstalls. It removes same-named plugins from
+checklist of the opt-in plugins and ccstatusline, pre-selected to what's already there: selecting installs, deselecting uninstalls. It removes same-named plugins from
 other marketplaces, merges the [recommended permission](#recommended-permission) and [auto-update](#auto-update)
 into `settings.json` after showing the diff, and prints the commands for missing [language servers](#language-servers)
 and CLIs without installing them. Plugins that need a PAT (`mcp-github`, `mcp-azure`) are handed off to Claude
@@ -32,6 +31,9 @@ dependencies, so that single install pulls in:
 
 code-review · skill-creator · claude-code-setup · claude-md-management · security-guidance · claude-security ·
 superpowers · ponytail · mcp-basic
+
+It also carries my global instructions ([rules.md](plugins/dead-skills/rules.md)), which a SessionStart hook adds to
+every session's context (plugins can't ship `CLAUDE.md` or rules files).
 
 The security plugins run Python hooks: security-guidance needs Python 3.10+ and installs the Agent SDK for its
 commit reviewer into a venv under `~/.claude/security/` on first session start, claude-security needs python3 3.9+. The installer prints `python3` if it's missing.

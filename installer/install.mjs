@@ -159,14 +159,6 @@ async function applyCcstatusline(on) {
   } else if (current) done.push(`kept your ${CCSL}`);
 }
 
-function applyRules(on) {
-  if (!on) return remove(RULES, RULES);
-  const text = readFileSync(join(PKG, 'installer', 'rules.md'), 'utf8');
-  if (existsSync(RULES) && readFileSync(RULES, 'utf8') === text) return;
-  writeAtomic(RULES, text);
-  done.push(`wrote ${RULES}`);
-}
-
 function onPath(bin) {
   const exts = WIN ? (process.env.PATHEXT || '.EXE;.CMD;.BAT').split(';') : [''];
   return (process.env.PATH || '').split(delimiter).some((d) => exts.some((e) => existsSync(join(d, bin + e))));
@@ -211,7 +203,6 @@ const rows = await checklist([
   { key: BUNDLE, label: BUNDLE, checked: true, fixed: true, note: `always; brings ${bundle.dependencies.join(', ')}` },
   ...opts.map((n) => ({ key: n, label: n, checked: has(n), note: tokenPlugins.includes(n) ? 'token entered in Claude Code' : '' })),
   { key: 'ccstatusline', label: 'ccstatusline', checked: isOurStatusLine(settingsNow.statusLine), note: 'status line + its config' },
-  { key: 'rules', label: 'global instructions', checked: existsSync(RULES), note: RULES },
 ]);
 const on = (k) => rows.find((r) => r.key === k).checked;
 
@@ -221,7 +212,7 @@ if (dupes.length) {
   if (await ask('Uninstall them?', true)) for (const id of dupes) step(`uninstalled ${id}`, 'plugin', 'uninstall', id, '--json');
 }
 
-const selected = rows.filter((r) => r.checked && r.key !== 'ccstatusline' && r.key !== 'rules').map((r) => r.key);
+const selected = rows.filter((r) => r.checked && r.key !== 'ccstatusline').map((r) => r.key);
 const plan = planPlugins(selected, ours.filter((id) => [BUNDLE, ...opts].includes(id.split('@')[0])), tokenPlugins);
 // Opt-ins that were once bundle dependencies are still marked auto and would be pruned; installing clears that.
 const installedJson = tryJson(join(CONFIG, 'plugins', 'installed_plugins.json'))?.plugins ?? {};
@@ -240,7 +231,8 @@ if (plan.uninstall.length || dupes.length) step('pruned unused dependencies', 'p
 await applySettings(on('ccstatusline'));
 const autoUpdate = tryJson(join(CONFIG, 'plugins', 'known_marketplaces.json'))?.[MARKETPLACE]?.autoUpdate;
 await applyCcstatusline(on('ccstatusline'));
-applyRules(on('rules'));
+// The global instructions moved into a dead-skills SessionStart hook; the old file would duplicate them.
+remove(RULES, RULES);
 
 const wanted = [...selected, ...(on('ccstatusline') ? ['ccstatusline'] : [])];
 const missing = missingBinaries(process.platform, wanted, onPath);
