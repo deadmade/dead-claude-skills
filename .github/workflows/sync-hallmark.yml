@@ -36,8 +36,5 @@ jobs:
             Automated sync of `skills/hallmark` from https://github.com/nutlope/hallmark at
             https://github.com/nutlope/hallmark/commit/${{ steps.check.outputs.sha }}.
 
-            The web-frontend-only description prefix was re-applied by `scripts/sync-hallmark.mjs`.
-            Review the diff before merging: merged changes reach every machine with this marketplace.
-
             cc @deadmade
           add-paths: plugins/hallmark/skills/hallmark

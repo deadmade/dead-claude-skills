@@ -67,7 +67,5 @@ jobs:
             https://github.com/cursor/plugins/commit/${{ steps.check.outputs.sha }}, with the Claude Code
             rewrites from `scripts/sync-pstack.mjs` applied and the Cursor-ism guard passing.
 
-            Review the diff before merging: merged changes reach every machine with pstack-picks installed.
-
             cc @deadmade
           add-paths: plugins/pstack-picks

@@ -37,8 +37,5 @@ jobs:
             Automated sync of the graphify Claude Code skill from https://github.com/Graphify-Labs/graphify at
             https://github.com/Graphify-Labs/graphify/commit/${{ steps.check.outputs.sha }}.
 
-            Review the diff before merging: merged changes reach every machine with graphify installed.
-            If the skill now expects CLI features, machines need `uv tool upgrade graphifyy`.
-
             cc @deadmade
           add-paths: plugins/graphify
