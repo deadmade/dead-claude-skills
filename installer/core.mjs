@@ -3,9 +3,13 @@ export const MARKETPLACE = 'dead-claude-skills';
 export const BUNDLE = 'dead-skills';
 const PERMISSION = 'Read(~/.claude/plugins/**)';
 const STATUS_LINE = { type: 'command', command: 'ccstatusline', padding: 0 };
-// Always denied, sandbox or not. With the sandbox on, Bash reads of these paths are blocked too.
+// Always denied, sandbox or not. The sandbox also blocks Bash reads of these, except the ** globs it can't apply on
+// Linux; the ./ dotenv names cover the project root there.
 export const SECRET_DENIES = [
-  'Read(**/.env)', 'Read(**/.env.*)', 'Read(~/.ssh/**)', 'Read(~/.aws/**)', 'Read(~/.azure/**)',
+  'Read(**/.env)', 'Read(**/.env.*)',
+  ...['', '.local', '.development', '.development.local', '.production', '.production.local', '.test', '.test.local']
+    .map((s) => `Read(./.env${s})`),
+  'Read(~/.ssh/**)', 'Read(~/.aws/**)', 'Read(~/.azure/**)',
   'Read(~/.config/gh/**)', 'Read(~/.gnupg/**)',
 ];
 // The sandbox keys we own; excludedCommands, network etc. stay the user's.
