@@ -1,4 +1,4 @@
-// Vendor nutlope/hallmark's skill into dead-skills and scope it to web files via its description.
+// Vendor nutlope/hallmark's skill into its own plugin and scope it to web files via its description.
 // Idempotent: re-running against the same upstream commit produces no diff.
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -11,7 +11,7 @@ const UPSTREAM_URL = "https://github.com/nutlope/hallmark.git";
 const SCOPE =
   "WEB FRONTEND ONLY: use solely for browser UI work (HTML/CSS, React/Vue/Svelte/Astro pages and components); never for CLIs, backends, libraries, or non-web apps (e.g. Rust, Python, Go), even when asked for a new app.";
 
-const DEST = join(ROOT, "plugins", "dead-skills", "skills", "hallmark");
+const DEST = join(ROOT, "plugins", "hallmark", "skills", "hallmark");
 
 // In the first frontmatter block (which must name the skill `hallmark`): prefix the description with SCOPE.
 // Returns null when the frontmatter isn't shaped as expected.

@@ -20,9 +20,9 @@ jobs:
 
       - name: Sanity checks
         run: |
-          jq empty .claude-plugin/marketplace.json plugins/dead-skills/.claude-plugin/plugin.json
-          head -n 10 plugins/dead-skills/skills/hallmark/SKILL.md | grep -q '^description: "WEB FRONTEND ONLY:'
-          echo "sha=$(cat plugins/dead-skills/skills/hallmark/UPSTREAM)" >> "$GITHUB_OUTPUT"
+          jq empty .claude-plugin/marketplace.json plugins/hallmark/.claude-plugin/plugin.json
+          head -n 10 plugins/hallmark/skills/hallmark/SKILL.md | grep -q '^description: "WEB FRONTEND ONLY:'
+          echo "sha=$(cat plugins/hallmark/skills/hallmark/UPSTREAM)" >> "$GITHUB_OUTPUT"
         id: check
 
       - name: Open pull request
@@ -38,4 +38,4 @@ jobs:
 
             The web-frontend-only description prefix was re-applied by `scripts/sync-hallmark.mjs`.
             Review the diff before merging: merged changes reach every machine with this marketplace.
-          add-paths: plugins/dead-skills/skills/hallmark
+          add-paths: plugins/hallmark/skills/hallmark

@@ -1,6 +1,6 @@
 {
   "name": "dead-skills",
-  "description": "Default bundle: personal skills and agents (incl. Hallmark, scoped to web files), plus the core plugins of the dead-claude-skills marketplace as dependencies.",
+  "description": "Default bundle: global instructions and personal agents, plus the core plugins of the dead-claude-skills marketplace as dependencies.",
   "author": {
     "name": "deadmade",
     "url": "https://github.com/deadmade"

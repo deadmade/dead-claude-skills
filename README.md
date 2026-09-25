@@ -26,8 +26,8 @@ Code's own `/plugin install` prompt. No backups or logs are written; re-running 
 /plugin install dead-skills@dead-claude-skills
 ```
 
-`dead-skills` is the default bundle: it contains my own skills and declares the core plugins as
-dependencies, so that single install pulls in:
+`dead-skills` is the default bundle: it declares the core plugins as dependencies, so that single install
+pulls in:
 
 code-review · skill-creator · claude-code-setup · claude-md-management · security-guidance · claude-security ·
 superpowers · ponytail · mcp-basic
@@ -41,12 +41,10 @@ commit reviewer into a venv under `~/.claude/security/` on first session start, 
 The language servers are opt-in, install the ones a machine needs (see [Language servers](#language-servers)):
 `/plugin install <name>@dead-claude-skills` with rust-analyzer-lsp · csharp-lsp · typescript-lsp · pyright-lsp · nix-lsp
 
-Bundled skills:
-
-- **hallmark**: anti-AI-slop design skill from [nutlope/hallmark](https://github.com/nutlope/hallmark).
-  Its description is prefixed with a "WEB FRONTEND ONLY" scope so Claude doesn't pull it into CLIs,
-  backends or Rust/Python work. (`paths:` frontmatter would be the file-based equivalent of an LSP's
-  extension list, but Claude Code currently ignores it for plugin skills.)
+**hallmark** (opt-in: `/plugin install hallmark@dead-claude-skills`): anti-AI-slop design skill from
+[nutlope/hallmark](https://github.com/nutlope/hallmark). Its description is prefixed with a "WEB FRONTEND ONLY" scope so Claude doesn't pull it into CLIs,
+backends or Rust/Python work. (`paths:` frontmatter would be the file-based equivalent of an LSP's
+extension list, but Claude Code currently ignores it for plugin skills.)
 
 > If a machine already has any of these installed from `claude-plugins-official` or `ponytail`,
 > uninstall those copies so they don't load twice.
@@ -300,10 +298,10 @@ scripts/check-repo.mjs              # pre-commit: plugin validate + marketplace/
 .claude-plugin/marketplace.json     # marketplace + re-listed upstream plugins
 plugins/dead-skills/
   .claude-plugin/plugin.json        # bundle manifest (dependencies)
-  skills/<name>/SKILL.md            # own + vendored skills
   agents/<name>.md                  # own subagents
   rules.md, hooks/                  # global instructions + the SessionStart hook that injects them
 plugins/dev-feature/                # opt-in: dev-feature skill + lock (hooks/dev-feature-guard.mjs)
+plugins/hallmark/                   # opt-in: vendored hallmark skill (web-only scope)
 scripts/dev-feature-guard.test.mjs  # dev-feature lock tests (pre-commit)
 scripts/sync-lib.mjs                # shared clone/report helpers for scripts/sync-*.mjs
 scripts/sync-hallmark.mjs           # vendors hallmark and re-applies the web-only scope

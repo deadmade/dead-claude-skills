@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "dead-skills",
-      "description": "Default bundle: personal skills and agents, and pulls in every other plugin in this marketplace as a dependency.",
+      "description": "Default bundle: global instructions and personal agents, and pulls in the core plugins of this marketplace as dependencies.",
       "source": "./plugins/dead-skills",
       "category": "productivity"
     },
@@ -232,6 +232,12 @@
       "name": "dev-feature",
       "description": "/dev-feature: grills you on a feature, has you write the design, then implements against it behind a hook-enforced lock. Opt-in.",
       "source": "./plugins/dev-feature",
+      "category": "development"
+    },
+    {
+      "name": "hallmark",
+      "description": "Hallmark: anti-AI-slop design skill for web frontends, scoped to browser UI work. Vendored from nutlope/hallmark. Opt-in.",
+      "source": "./plugins/hallmark",
       "category": "development"
     }
   ]
