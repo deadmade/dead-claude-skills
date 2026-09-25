@@ -136,13 +136,14 @@ pyright can use a lot of memory on large repos; language servers don't run in cl
 
 ## MCP servers
 
-MCP servers are split into three plugins:
+MCP servers are split into four plugins:
 
 | Plugin | Servers | Installed |
 |---|---|---|
 | `mcp-basic` | context7 | automatically, with `dead-skills` |
 | `mcp-github` | github | opt-in: `/plugin install mcp-github@dead-claude-skills` |
 | `mcp-azure` | azure-devops-server | opt-in: `/plugin install mcp-azure@dead-claude-skills` |
+| `atlassian` | atlassian (Jira, Confluence) | opt-in: `/plugin install atlassian@dead-claude-skills` |
 
 - **context7**: up-to-date library/framework docs (hosted at `mcp.context7.com`), used without an API
   key (free tier rate limits). An empty `Authorization: Bearer` header is rejected by Context7, so the
@@ -150,6 +151,8 @@ MCP servers are split into three plugins:
 - **github**: GitHub's hosted MCP server (`api.githubcopilot.com/mcp`) for repos, issues, PRs, Actions
   and code search. Needs a [fine-grained PAT](https://github.com/settings/personal-access-tokens/new),
   asked for on install and stored securely: `/plugin configure mcp-github@dead-claude-skills`.
+- **atlassian**: Atlassian's official plugin ([atlassian-mcp-server](https://github.com/atlassian/atlassian-mcp-server)),
+  the hosted Rovo MCP server for Jira and Confluence plus its skills. No token: sign in via OAuth in `/mcp` on first use.
 - **azure-devops-server**: self-hosted Azure DevOps Server (Git repos, work items, pipelines, wiki)
   via the community package [`@tiberriver256/mcp-server-azure-devops`](https://github.com/Tiberriver256/mcp-server-azure-devops),
   pinned to a version. Microsoft's own Azure DevOps MCP server only supports the cloud service.

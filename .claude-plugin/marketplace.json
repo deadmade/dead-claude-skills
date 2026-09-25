@@ -172,6 +172,15 @@
       "category": "productivity"
     },
     {
+      "name": "atlassian",
+      "description": "Atlassian's official plugin: Rovo MCP server for Jira and Confluence (OAuth sign-in via /mcp) plus skills. Opt-in.",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/atlassian/atlassian-mcp-server.git"
+      },
+      "category": "productivity"
+    },
+    {
       "name": "mattpocock-picks",
       "description": "Curated Matt Pocock skills that complement superpowers: all productivity skills plus grilling with domain docs, spec → tickets and architecture deepening. Opt-in.",
       "source": "./plugins/mattpocock-picks",
