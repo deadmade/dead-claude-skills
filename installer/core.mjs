@@ -1,6 +1,9 @@
 // Pure decisions for the installer; install.mjs does all I/O.
 export const MARKETPLACE = 'dead-claude-skills';
 export const BUNDLE = 'dead-skills';
+// Anthropic's own plugins come straight from their marketplace: ours may not reuse their names.
+export const OFFICIAL = 'claude-plugins-official';
+const OFFICIAL_OPT_INS = ['skill-creator', 'rust-analyzer-lsp', 'csharp-lsp', 'typescript-lsp', 'pyright-lsp'];
 const PERMISSION = 'Read(~/.claude/plugins/**)';
 const STATUS_LINE = { type: 'command', command: 'ccstatusline', padding: 0 };
 // Always denied, sandbox or not. The sandbox also blocks Bash reads of these, except the ** globs it can't apply on
@@ -16,28 +19,34 @@ export const SECRET_DENIES = [
 const SANDBOX = { enabled: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: false };
 const DCG = 'https://raw.githubusercontent.com/Dicklesworthstone/destructive_command_guard/main';
 
-const nameOf = (id) => id.split('@')[0];
+export const nameOf = (id) => id.split('@')[0];
 const marketOf = (id) => id.split('@')[1];
+// Bare dependency names resolve against our marketplace, like Claude Code does.
+const idOf = (dep) => (dep.includes('@') ? dep : `${dep}@${MARKETPLACE}`);
 
-export const optIns = (marketplace, bundle) =>
-  marketplace.plugins.map((p) => p.name).filter((n) => n !== BUNDLE && !bundle.dependencies.includes(n));
+export const bundleIds = (bundle) => [idOf(BUNDLE), ...bundle.dependencies.map(idOf)];
+
+export const optIns = (marketplace, bundle) => [
+  ...marketplace.plugins.map((p) => idOf(p.name)).filter((id) => !bundleIds(bundle).includes(id)),
+  ...OFFICIAL_OPT_INS.map((n) => `${n}@${OFFICIAL}`),
+];
 
 export const needsToken = (pluginJson) =>
   Object.values(pluginJson.userConfig ?? {}).some((c) => c.sensitive === true);
 
-// installedIds: installed opt-ins from our marketplace only.
+// All plugin ids. installedIds: installed bundle and opt-ins only.
 export function planPlugins(selected, installedIds, tokenPlugins) {
-  const installed = installedIds.map(nameOf);
-  const missing = selected.filter((n) => !installed.includes(n));
+  const missing = selected.filter((id) => !installedIds.includes(id));
   return {
-    install: missing.filter((n) => !tokenPlugins.includes(n)),
-    handoff: missing.filter((n) => tokenPlugins.includes(n)),
-    uninstall: installedIds.filter((id) => !selected.includes(nameOf(id))),
+    install: missing.filter((id) => !tokenPlugins.includes(id)),
+    handoff: missing.filter((id) => tokenPlugins.includes(id)),
+    uninstall: installedIds.filter((id) => !selected.includes(id)),
   };
 }
 
-export const duplicates = (installedIds, ourNames) =>
-  installedIds.filter((id) => marketOf(id) !== MARKETPLACE && ourNames.includes(nameOf(id)));
+// A plugin we manage, installed from a marketplace we don't take it from (it'd load twice).
+export const duplicates = (installedIds, managedIds) =>
+  installedIds.filter((id) => !managedIds.includes(id) && managedIds.some((m) => nameOf(m) === nameOf(id)));
 
 export const isOurStatusLine = (s) => typeof s?.command === 'string' && s.command.includes('ccstatusline');
 
@@ -65,6 +74,48 @@ export function mergeSettings(settings, { statusLine, sandbox }) {
   else if (out.sandbox) {
     for (const k of Object.keys(SANDBOX)) delete out.sandbox[k];
     if (!Object.keys(out.sandbox).length) delete out.sandbox;
+  }
+  return out;
+}
+
+// Settings that switch off Anthropic's defaults: claude.ai connectors, synced skills/plugins and default-on builtin
+// plugins. Values are what Claude Code 2.1.289 reads.
+const STRIP = { disableClaudeAiConnectors: true, syncClaudeAiSkills: false, syncClaudeAiPlugins: false };
+const STRIP_PLUGINS = { 'agents-md@builtin': false, 'telemetry@builtin': false };
+
+// User-authored config under CLAUDE_CONFIG_DIR that a clean slate backs up and removes. Credentials, ~/.claude.json,
+// projects/, plugins/, history and other app state are never touched.
+export const CLEAN_TARGETS = ['CLAUDE.md', 'skills', 'agents', 'commands', 'rules', 'output-styles', 'workflows', 'hooks'];
+
+// Everything not from our marketplace, except the official plugins we use.
+export const foreignPlugins = (installedIds, managedIds) =>
+  installedIds.filter((id) => marketOf(id) !== MARKETPLACE && !managedIds.includes(id));
+
+export const foreignMarketplaces = (names) => names.filter((n) => n !== MARKETPLACE && n !== OFFICIAL);
+
+export const isStripped = (s) => Object.entries(STRIP).every(([k, v]) => s?.[k] === v);
+
+// One-way: unchecking it later changes nothing, since these keys are often set by hand too.
+export function stripDefaults(settings) {
+  const out = { ...structuredClone(settings), ...STRIP };
+  out.enabledPlugins = { ...out.enabledPlugins, ...STRIP_PLUGINS };
+  // Another marketplace listed here would be re-added on the next launch.
+  for (const name of foreignMarketplaces(Object.keys(out.extraKnownMarketplaces ?? {}))) delete out.extraKnownMarketplaces[name];
+  return out;
+}
+
+// Clean slate: only our settings survive, plus the official marketplace's entry and enabledPlugins entries from ours
+// and it (claude plugin install writes them; strip already uninstalled the official plugins we don't use)
+// and dcg's hook while dcg stays on (its installer only reruns on a toggle change, so dropping it would disable dcg).
+export function resetSettings(settings, { dcg, ...toggles }) {
+  const out = stripDefaults(mergeSettings({}, toggles));
+  for (const [id, v] of Object.entries(settings.enabledPlugins ?? {})) {
+    if ([MARKETPLACE, OFFICIAL].includes(marketOf(id))) out.enabledPlugins[id] = v;
+  }
+  const official = settings.extraKnownMarketplaces?.[OFFICIAL];
+  if (official) out.extraKnownMarketplaces[OFFICIAL] = official;
+  if (dcg && hasDcgHook(settings)) {
+    out.hooks = { PreToolUse: settings.hooks.PreToolUse.filter((e) => hasDcgHook({ hooks: { PreToolUse: [e] } })) };
   }
   return out;
 }

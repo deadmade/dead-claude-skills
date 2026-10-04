@@ -7,11 +7,11 @@
   },
   "repository": "https://github.com/deadmade/dead-claude-skills",
   "dependencies": [
-    "code-review",
-    "claude-code-setup",
-    "claude-md-management",
-    "security-guidance",
-    "claude-security",
+    "code-review@claude-plugins-official",
+    "claude-code-setup@claude-plugins-official",
+    "claude-md-management@claude-plugins-official",
+    "security-guidance@claude-plugins-official",
+    "claude-security@claude-plugins-official",
     "superpowers",
     "ponytail",
     "mcp-basic"

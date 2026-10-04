@@ -41,7 +41,7 @@ synced upstream commit is in `plugins/graphify/UPSTREAM`.
 
 ## Re-listed plugins
 
-The marketplace entries for code-review, skill-creator, claude-code-setup, rust-analyzer-lsp,
-csharp-lsp, typescript-lsp, pyright-lsp, superpowers and ponytail only point at their upstream
-repositories; no code is vendored here. Each is
-covered by its own upstream license.
+The marketplace entries for superpowers and ponytail only point at their upstream repositories; no code is
+vendored here. Anthropic's plugins (code-review, claude-code-setup, claude-md-management, security-guidance,
+claude-security, skill-creator and the LSPs) aren't listed here at all: they install from Anthropic's
+`claude-plugins-official` marketplace. Each is covered by its own upstream license.
