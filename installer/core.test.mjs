@@ -3,18 +3,26 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   optIns, needsToken, planPlugins, duplicates, mergeSettings, safeArg, missingBinaries, SECRET_DENIES, isSandboxOn,
-  hasDcgHook, dcgCommand,
+  hasDcgHook, dcgCommand, bundleIds, foreignPlugins, foreignMarketplaces, stripDefaults, isStripped, resetSettings, CLEAN_TARGETS,
 } from './core.mjs';
 
 const json = (p) => JSON.parse(readFileSync(new URL(`../${p}`, import.meta.url), 'utf8'));
 const marketplace = json('.claude-plugin/marketplace.json');
 const bundle = json('plugins/dead-skills/.claude-plugin/plugin.json');
 const M = 'dead-claude-skills';
+const O = 'claude-plugins-official';
 
 test('opt-ins from the real manifests', () => {
-  assert.deepEqual(optIns(marketplace, bundle).sort(),
-    ['atlassian', 'csharp-lsp', 'dev-feature', 'graphify', 'hallmark', 'mattpocock-picks', 'mcp-azure', 'mcp-github', 'nix-lsp', 'pstack-picks',
-     'pyright-lsp', 'rust-analyzer-lsp', 'typescript-lsp']);
+  assert.deepEqual(optIns(marketplace, bundle).sort(), [
+    ...['atlassian', 'dev-feature', 'graphify', 'hallmark', 'mattpocock-picks', 'mcp-azure', 'mcp-github', 'nix-lsp', 'pstack-picks']
+      .map((n) => `${n}@${M}`),
+    ...['csharp-lsp', 'pyright-lsp', 'rust-analyzer-lsp', 'skill-creator', 'typescript-lsp'].map((n) => `${n}@${O}`),
+  ].sort());
+});
+
+test('bundle ids resolve bare names to our marketplace', () => {
+  const ids = bundleIds(bundle);
+  assert.ok(ids.includes(`dead-skills@${M}`) && ids.includes(`superpowers@${M}`) && ids.includes(`code-review@${O}`));
 });
 
 test('token plugins', () => {
@@ -25,20 +33,20 @@ test('token plugins', () => {
 
 test('select installs, deselect uninstalls, token plugins hand off', () => {
   const plan = planPlugins(
-    ['graphify', 'mcp-github', 'pstack-picks'],
+    [`graphify@${M}`, `mcp-github@${M}`, `pstack-picks@${M}`, `pyright-lsp@${O}`],
     [`pstack-picks@${M}`, `mattpocock-picks@${M}`, `mcp-azure@${M}`],
-    ['mcp-github', 'mcp-azure'],
+    [`mcp-github@${M}`, `mcp-azure@${M}`],
   );
-  assert.deepEqual(plan.install, ['graphify']);
-  assert.deepEqual(plan.handoff, ['mcp-github']);
+  assert.deepEqual(plan.install, [`graphify@${M}`, `pyright-lsp@${O}`]);
+  assert.deepEqual(plan.handoff, [`mcp-github@${M}`]);
   assert.deepEqual(plan.uninstall.sort(), [`mattpocock-picks@${M}`, `mcp-azure@${M}`]);
 });
 
-test('duplicates are our names from another marketplace', () => {
+test('duplicates are managed names from the wrong marketplace', () => {
   assert.deepEqual(
-    duplicates(['ponytail@ponytail', `ponytail@${M}`, 'code-review@claude-plugins-official', 'other@x'],
-      ['ponytail', 'code-review']),
-    ['ponytail@ponytail', 'code-review@claude-plugins-official']);
+    duplicates(['ponytail@ponytail', `ponytail@${M}`, `code-review@${O}`, `code-review@${M}`, 'other@x'],
+      [`ponytail@${M}`, `code-review@${O}`]),
+    ['ponytail@ponytail', `code-review@${M}`]);
 });
 
 test('merge adds owned keys and keeps foreign ones', () => {
@@ -115,4 +123,53 @@ test('sandbox needs bubblewrap and socat', () => {
   const rows = missingBinaries('linux', ['sandbox'], () => false);
   assert.deepEqual(rows.map((r) => r.binary), ['bwrap', 'socat']);
   assert.match(rows[0].command, /home\.packages: bubblewrap/);
+});
+
+test('foreign plugins and marketplaces spare ours and the official plugins we use', () => {
+  assert.deepEqual(foreignPlugins([`ponytail@${M}`, `code-review@${O}`, `playwright@${O}`, 'x@y'], [`code-review@${O}`]),
+    [`playwright@${O}`, 'x@y']);
+  assert.deepEqual(foreignMarketplaces([M, O, 'other']), ['other']);
+});
+
+test('strip disables defaults, keeps foreign keys, drops other marketplaces', () => {
+  const before = {
+    model: 'x', env: { FOO: '1' }, enabledPlugins: { 'a@b': true },
+    extraKnownMarketplaces: { [M]: { autoUpdate: true }, [O]: { source: {} }, other: { source: {} } },
+  };
+  const out = stripDefaults(before);
+  assert.ok(isStripped(out) && !isStripped(before));
+  assert.equal(out.model, 'x');
+  assert.deepEqual(out.env, { FOO: '1' });
+  assert.equal(out.enabledPlugins['a@b'], true);
+  assert.equal(out.enabledPlugins['agents-md@builtin'], false);
+  assert.deepEqual(Object.keys(out.extraKnownMarketplaces), [M, O]);
+  assert.deepEqual(stripDefaults(out), out);
+  assert.equal(before.enabledPlugins['agents-md@builtin'], undefined);
+});
+
+test('reset keeps only our settings plus the dcg hook while dcg stays on', () => {
+  const dcgEntry = { matcher: 'Bash|PowerShell', hooks: [{ type: 'command', command: '/home/me/.local/bin/dcg' }] };
+  const other = { matcher: 'Edit', hooks: [{ type: 'command', command: 'fmt.sh' }] };
+  const before = {
+    model: 'x', permissions: { allow: ['Bash(ls)'] }, hooks: { PreToolUse: [other, dcgEntry], Stop: [other] },
+    enabledPlugins: { [`dead-skills@${M}`]: true, [`code-review@${O}`]: true, 'x@other': true },
+    extraKnownMarketplaces: { [O]: { source: { source: 'github', repo: 'anthropics/claude-plugins-official' } }, other: {} },
+  };
+  const out = resetSettings(before, { statusLine: true, sandbox: false, dcg: true });
+  assert.equal(out.model, undefined);
+  assert.deepEqual(out.permissions.allow, ['Read(~/.claude/plugins/**)']);
+  assert.deepEqual(out.hooks, { PreToolUse: [dcgEntry] });
+  assert.equal(out.enabledPlugins[`dead-skills@${M}`], true);
+  assert.equal(out.enabledPlugins[`code-review@${O}`], true);
+  assert.deepEqual(Object.keys(out.extraKnownMarketplaces), [M, O]);
+  assert.equal(out.enabledPlugins['x@other'], undefined);
+  assert.ok(isStripped(out));
+  assert.equal(resetSettings(before, { dcg: false }).hooks, undefined);
+  assert.deepEqual(resetSettings(out, { statusLine: true, sandbox: false, dcg: true }), out);
+});
+
+test('clean never targets credentials, plugins or project memory', () => {
+  for (const keep of ['.credentials.json', 'plugins', 'projects', 'settings.json', 'keybindings.json']) {
+    assert.ok(!CLEAN_TARGETS.includes(keep));
+  }
 });

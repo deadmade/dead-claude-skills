@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 // Interactive installer for the dead-claude-skills marketplace. Decisions live in core.mjs.
 import { spawnSync } from 'node:child_process';
-import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
-import { emitKeypressEvents } from 'node:readline';
+import { createInterface, emitKeypressEvents } from 'node:readline';
 import {
-  BUNDLE, MARKETPLACE, dcgCommand, duplicates, hasDcgHook, isOurStatusLine, isSandboxOn, mergeSettings,
-  missingBinaries, needsToken, optIns, planPlugins, safeArg,
+  BUNDLE, CLEAN_TARGETS, MARKETPLACE, OFFICIAL, bundleIds, dcgCommand, duplicates, foreignMarketplaces, foreignPlugins, hasDcgHook,
+  isOurStatusLine, isSandboxOn, isStripped, mergeSettings, missingBinaries, nameOf, needsToken, optIns, planPlugins,
+  resetSettings, safeArg, stripDefaults,
 } from './core.mjs';
 
 const PKG = join(import.meta.dirname, '..');
@@ -16,6 +17,7 @@ const SETTINGS = join(CONFIG, 'settings.json');
 const RULES = join(CONFIG, 'rules', 'dead-claude-skills.md');
 const CCSL = join(homedir(), '.config', 'ccstatusline', 'settings.json');
 const WIN = process.platform === 'win32';
+const FLAGS = process.argv.slice(2);
 
 const readJson = (p) => JSON.parse(readFileSync(p, 'utf8'));
 const tryJson = (p) => { try { return readJson(p); } catch { return undefined; } };
@@ -78,6 +80,13 @@ async function ask(question, def) {
   return answer;
 }
 
+async function typed(question, word) {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const answer = await new Promise((resolve) => rl.question(`${question} Type "${word}" to continue: `, resolve));
+  rl.close();
+  return answer.trim() === word;
+}
+
 async function checklist(rows) {
   let cursor = rows.findIndex((r) => !r.fixed);
   let drawn = 0;
@@ -114,8 +123,10 @@ const remove = (file, label) => {
   done.push(`deleted ${label}`);
 };
 
-async function applySettings(toggles) {
-  const snippet = () => console.log(JSON.stringify(mergeSettings({}, toggles), null, 2));
+// strip: add the default-disabling keys. reset: clean slate, replace instead of merge.
+async function applySettings(toggles, { strip, reset }) {
+  const build = (s) => (reset ? resetSettings(s, toggles) : strip ? stripDefaults(mergeSettings(s, toggles)) : mergeSettings(s, toggles));
+  const snippet = () => console.log(JSON.stringify(build({}), null, 2));
   if (existsSync(SETTINGS) && lstatSync(SETTINGS).isSymbolicLink()) {
     console.log(`\n${SETTINGS} is a symlink, not writing it. Merge these keys where it's managed:`);
     return snippet();
@@ -127,8 +138,8 @@ async function applySettings(toggles) {
     console.log(`\n${SETTINGS} is not valid JSON. Merge these keys by hand:`);
     return snippet();
   }
-  const after = mergeSettings(before, toggles);
-  const changed = ['permissions', 'extraKnownMarketplaces', 'statusLine', 'sandbox']
+  const after = build(before);
+  const changed = [...new Set([...Object.keys(before), ...Object.keys(after)])]
     .filter((k) => JSON.stringify(before[k]) !== JSON.stringify(after[k]));
   if (!changed.length) return;
   console.log(`\nChanges to ${SETTINGS}:`);
@@ -172,6 +183,28 @@ async function applyDcg(was, on) {
   if (on && !WIN && !onPath('dcg')) console.log('\n\x1b[33mdcg is not on PATH: add ~/.local/bin (NixOS: home.sessionPath).\x1b[0m');
 }
 
+// Copies every clean target that exists; any failure aborts the clean slate before something is deleted.
+function backup(dir) {
+  for (const t of [...CLEAN_TARGETS, 'settings.json']) {
+    const src = join(CONFIG, t);
+    if (existsSync(src)) cpSync(src, join(dir, t), { recursive: true, verbatimSymlinks: true });
+  }
+}
+
+function clearTargets() {
+  for (const t of CLEAN_TARGETS) {
+    const p = join(CONFIG, t);
+    if (!existsSync(p)) continue;
+    // Managed elsewhere (e.g. home-manager): deleting through the link would hit the source.
+    if (lstatSync(p).isSymbolicLink()) {
+      done.push(`kept ${p}: symlink, remove it where it's managed`);
+      continue;
+    }
+    rmSync(p, { recursive: true });
+    done.push(`deleted ${p}`);
+  }
+}
+
 function onPath(bin) {
   const exts = WIN ? (process.env.PATHEXT || '.EXE;.CMD;.BAT').split(';') : [''];
   return (process.env.PATH || '').split(delimiter).some((d) => exts.some((e) => existsSync(join(d, bin + e))));
@@ -199,70 +232,110 @@ if (!market.ok) {
   console.error(`Marketplace ${hasMarket ? 'update' : 'add'} failed:\n${market.err}`);
   process.exit(1);
 }
+// The bundle's core plugins and some opt-ins install from Anthropic's marketplace.
+if (!marketplaces.some((m) => m.name === OFFICIAL)) step(`added marketplace ${OFFICIAL}`, 'plugin', 'marketplace', 'add', `anthropics/${OFFICIAL}`);
 
 const manifest = readJson(join(PKG, '.claude-plugin', 'marketplace.json'));
 const bundle = readJson(join(PKG, 'plugins', BUNDLE, '.claude-plugin', 'plugin.json'));
 const opts = optIns(manifest, bundle);
-const tokenPlugins = opts.filter((n) => needsToken(tryJson(join(PKG, 'plugins', n, '.claude-plugin', 'plugin.json')) ?? {}));
+const tokenPlugins = opts.filter((id) => needsToken(tryJson(join(PKG, 'plugins', nameOf(id), '.claude-plugin', 'plugin.json')) ?? {}));
+const BUNDLE_ID = `${BUNDLE}@${MARKETPLACE}`;
+const managed = [...bundleIds(bundle), ...opts];
 
 const listed = JSON.parse(claude('plugin', 'list', '--json').out || '[]');
 const installedIds = (Array.isArray(listed) ? listed : listed.installed ?? []).map((p) => p.id);
-const ours = installedIds.filter((id) => id.endsWith(`@${MARKETPLACE}`));
-const has = (n) => ours.includes(`${n}@${MARKETPLACE}`);
+// By name, so a plugin that moved marketplaces stays selected; its old copy is removed as a duplicate.
+const has = (id) => installedIds.some((i) => nameOf(i) === nameOf(id));
 const settingsNow = tryJson(SETTINGS) ?? {};
 
 console.log('\ndead-claude-skills installer\n');
 const rows = await checklist([
-  { key: BUNDLE, label: BUNDLE, checked: true, fixed: true, note: `always; brings ${bundle.dependencies.join(', ')}` },
-  ...opts.map((n) => ({ key: n, label: n, checked: has(n), note: tokenPlugins.includes(n) ? 'token entered in Claude Code' : '' })),
+  { key: BUNDLE_ID, label: BUNDLE, checked: true, fixed: true, note: `always; brings ${bundle.dependencies.map(nameOf).join(', ')}` },
+  ...opts.map((id) => ({
+    key: id, label: nameOf(id), checked: has(id),
+    note: tokenPlugins.includes(id) ? 'token entered in Claude Code' : id.endsWith(`@${OFFICIAL}`) ? `from ${OFFICIAL}` : '',
+  })),
   { key: 'ccstatusline', label: 'ccstatusline', checked: isOurStatusLine(settingsNow.statusLine), note: 'status line + its config' },
   WIN
     ? { key: 'sandbox', label: 'sandbox', checked: false, fixed: true, note: 'needs WSL2' }
     : { key: 'sandbox', label: 'sandbox', checked: isSandboxOn(settingsNow), note: 'Bash sandbox, no unsandboxed fallback' },
   { key: 'dcg', label: 'dcg', checked: hasDcgHook(settingsNow), note: 'destructive command guard, runs its own installer' },
+  { key: 'strip-defaults', label: 'strip-defaults', checked: FLAGS.includes('--strip-defaults') || isStripped(settingsNow),
+    note: `remove other marketplaces + plugins (keeps the ${OFFICIAL} ones used here), claude.ai connectors, synced skills/plugins, builtins` },
+  { key: 'clean', label: 'clean', checked: FLAGS.includes('--clean'),
+    note: `clean slate: back up, then reset settings.json and delete ${CLEAN_TARGETS.join(', ')}` },
 ]);
-const TOGGLES = ['ccstatusline', 'sandbox', 'dcg'];
+const TOGGLES = ['ccstatusline', 'sandbox', 'dcg', 'strip-defaults', 'clean'];
 const on = (k) => rows.find((r) => r.key === k).checked;
 
-const dupes = duplicates(installedIds, manifest.plugins.map((p) => p.name));
-if (dupes.length) {
+let clean = on('clean');
+let backupDir;
+if (clean) {
+  console.log(`\n\x1b[31mClean slate: ${SETTINGS} is replaced with only this installer's settings, and these are deleted:`);
+  CLEAN_TARGETS.map((t) => join(CONFIG, t)).filter(existsSync).forEach((p) => console.log(`  ${p}`));
+  console.log(`Every plugin and marketplace not from dead-claude-skills is removed too, except the ${OFFICIAL} plugins used here.\x1b[0m`);
+  backupDir = `${CONFIG}.dead-backup-${new Date().toISOString().replace(/[:.]/g, '-')}`;
+  console.log(`A backup goes to ${backupDir} first.`);
+  clean = await typed('\nReally wipe your Claude Code config?', 'clean');
+  if (!clean) done.push('clean slate: skipped by you');
+  else {
+    try { backup(backupDir); } catch (e) {
+      console.error(`Backup failed, nothing was deleted: ${e.message}`);
+      process.exit(1);
+    }
+    done.push(`backed up your config to ${backupDir}`);
+  }
+}
+const strip = clean || on('strip-defaults');
+
+const dupes = duplicates(installedIds, managed);
+const foreign = strip ? [...new Set([...foreignPlugins(installedIds, managed), ...dupes])] : [];
+if (foreign.length) {
+  console.log(`\nRemoving plugins this setup doesn't use:\n  ${foreign.join('\n  ')}`);
+  for (const id of foreign) step(`uninstalled ${id}`, 'plugin', 'uninstall', id, '--json');
+} else if (dupes.length) {
   console.log(`\nSame plugins installed from another marketplace (they'd load twice):\n  ${dupes.join('\n  ')}`);
   if (await ask('Uninstall them?', true)) for (const id of dupes) step(`uninstalled ${id}`, 'plugin', 'uninstall', id, '--json');
 }
+// After their plugins are gone, so nothing is left pointing at a removed marketplace.
+const foreignMarkets = strip ? foreignMarketplaces(marketplaces.map((m) => m.name)) : [];
+for (const name of foreignMarkets) step(`removed marketplace ${name}`, 'plugin', 'marketplace', 'remove', name);
 
 const selected = rows.filter((r) => r.checked && !TOGGLES.includes(r.key)).map((r) => r.key);
-const plan = planPlugins(selected, ours.filter((id) => [BUNDLE, ...opts].includes(id.split('@')[0])), tokenPlugins);
+const plan = planPlugins(selected, installedIds.filter((id) => [BUNDLE_ID, ...opts].includes(id)), tokenPlugins);
 // Opt-ins that were once bundle dependencies are still marked auto and would be pruned; installing clears that.
 const installedJson = tryJson(join(CONFIG, 'plugins', 'installed_plugins.json'))?.plugins ?? {};
-plan.install.push(...selected.filter((n) => opts.includes(n) && installedJson[`${n}@${MARKETPLACE}`]?.some((e) => e.auto)));
+plan.install.push(...selected.filter((id) => opts.includes(id) && installedJson[id]?.some((e) => e.auto)));
 console.log('');
-for (const n of plan.install) {
-  console.log(`installing ${n}…`);
-  step(`installed ${n}`, 'plugin', 'install', `${n}@${MARKETPLACE}`, '--scope', 'user', '--json');
+for (const id of plan.install) {
+  console.log(`installing ${nameOf(id)}…`);
+  step(`installed ${id}`, 'plugin', 'install', id, '--scope', 'user', '--json');
 }
 for (const id of plan.uninstall) {
   console.log(`uninstalling ${id}…`);
   step(`uninstalled ${id}`, 'plugin', 'uninstall', id, '--json');
 }
-if (plan.uninstall.length || dupes.length) step('pruned unused dependencies', 'plugin', 'prune', '-y');
+if (plan.uninstall.length || dupes.length || foreign.length) step('pruned unused dependencies', 'plugin', 'prune', '-y');
 
-await applySettings({ statusLine: on('ccstatusline'), sandbox: on('sandbox') });
+await applySettings({ statusLine: on('ccstatusline'), sandbox: on('sandbox'), dcg: on('dcg') }, { strip, reset: clean });
 const autoUpdate = tryJson(join(CONFIG, 'plugins', 'known_marketplaces.json'))?.[MARKETPLACE]?.autoUpdate;
 await applyCcstatusline(on('ccstatusline'));
 await applyDcg(hasDcgHook(settingsNow), on('dcg'));
+if (clean) clearTargets();
 // The global instructions moved into a dead-skills SessionStart hook; the old file would duplicate them.
 remove(RULES, RULES);
 
-const wanted = [...selected, ...TOGGLES.filter(on)];
+const wanted = [...selected.map(nameOf), ...TOGGLES.filter(on)];
 const missing = missingBinaries(process.platform, wanted, onPath);
 
 console.log('\n── Summary ──');
 done.forEach((d) => console.log(`✓ ${d}`));
 if (!done.length) console.log('✓ nothing to change');
 console.log(`  marketplace autoUpdate (known_marketplaces.json): ${autoUpdate ?? 'not set'}`);
-for (const n of plan.handoff) {
-  console.log(`\n→ ${n}: run this in Claude Code, it asks for the token:\n  /plugin install ${n}@${MARKETPLACE}`);
-  (HANDOFF[n] ?? []).forEach((l) => console.log(`  ${l}`));
+if (clean) console.log(`  restore the backup: cp -a ${backupDir}/. ${CONFIG}/`);
+for (const id of plan.handoff) {
+  console.log(`\n→ ${nameOf(id)}: run this in Claude Code, it asks for the token:\n  /plugin install ${id}`);
+  (HANDOFF[nameOf(id)] ?? []).forEach((l) => console.log(`  ${l}`));
 }
 if (missing.length) {
   console.log('\nMissing on PATH (nothing was installed, copy what you need):');

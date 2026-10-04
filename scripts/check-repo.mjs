@@ -23,11 +23,15 @@ for (const target of [".", ...pluginDirs.map((d) => d + "/")]) {
 }
 
 // --- marketplace <-> bundle <-> plugins/ ---
-const market = JSON.parse(readFileSync(MARKETPLACE, "utf8")).plugins;
+const { plugins: market, allowCrossMarketplaceDependenciesOn: crossAllowed = [] } = JSON.parse(readFileSync(MARKETPLACE, "utf8"));
 const deps = JSON.parse(readFileSync(BUNDLE, "utf8")).dependencies;
 
 for (const dep of deps) {
-  if (!market.some((p) => p.name === dep)) problems.push(`${BUNDLE}: dependency ${dep} is not in ${MARKETPLACE}`);
+  const [name, from] = dep.split("@");
+  if (from) {
+    // Anthropic's own plugins come straight from their marketplace, which must be allowlisted to auto-install.
+    if (!crossAllowed.includes(from)) problems.push(`${BUNDLE}: dependency ${dep} needs ${from} in allowCrossMarketplaceDependenciesOn`);
+  } else if (!market.some((p) => p.name === name)) problems.push(`${BUNDLE}: dependency ${dep} is not in ${MARKETPLACE}`);
 }
 for (const { source } of market) {
   if (typeof source === "string" && !existsSync(join(source, ".claude-plugin", "plugin.json"))) {
