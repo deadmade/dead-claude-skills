@@ -132,14 +132,14 @@ export function dcgCommand(platform, action) {
   return ['bash', ['-c', `curl -fsSL '${DCG}/${script}' | bash -s -- ${flags}`]];
 }
 
-// cswap.exe: claude-swap built by .github/workflows/build-cswap.yml, attached to this repo's releases as
-// cswap-<upstream tag>. Windows only; Linux gets cswap from uv or nix.
+// cswap.exe: claude-swap built by .github/workflows/build-cswap.yml and attached to this repo's release
+// v<package.json version> by release.yml. Windows only; Linux gets cswap from uv or nix.
 const RELEASES = 'https://github.com/deadmade/dead-claude-skills/releases/download';
 
-export function cswapDownload(platform, env, version) {
+export function cswapDownload(platform, env, release) {
   if (platform !== 'win32' || !env.LOCALAPPDATA) return null;
   const dir = `${env.LOCALAPPDATA}\\Programs\\cswap`;
-  const url = `${RELEASES}/cswap-${version}/cswap.exe`;
+  const url = `${RELEASES}/v${release}/cswap.exe`;
   return { url, sha256Url: `${url}.sha256`, dir, exe: `${dir}\\cswap.exe` };
 }
 
@@ -186,7 +186,8 @@ export function missingBinaries(platform, wanted, onPath) {
     });
 }
 
-// brv, the tui-review plugin's binary, built per platform by .github/workflows/brv-release.yml.
+// brv, the tui-review plugin's binary, built per platform by .github/workflows/build-brv.yml and attached to the
+// vX.Y.Z release by release.yml.
 const BRV_TARGETS = {
   'win32-x64': 'x86_64-pc-windows-msvc',
   'linux-x64': 'x86_64-unknown-linux-musl',
@@ -200,7 +201,7 @@ export function brvAsset(platform, arch, version) {
   const target = BRV_TARGETS[`${platform}-${arch}`];
   if (!target) return undefined;
   const file = `brv-${target}.${platform === 'win32' ? 'zip' : 'tar.gz'}`;
-  const url = `${RELEASES}/brv-v${version}/${file}`;
+  const url = `${RELEASES}/v${version}/${file}`;
   return { file, url, sha256: `${url}.sha256`, exe: platform === 'win32' ? 'brv.exe' : 'brv' };
 }
 

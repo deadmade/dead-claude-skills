@@ -176,13 +176,13 @@ test('clean never targets credentials, plugins or project memory', () => {
   }
 });
 
-test('cswap.exe download: Windows only, pinned release asset under LOCALAPPDATA', () => {
-  const dl = cswapDownload('win32', { LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' }, 'v0.26.0');
-  assert.equal(dl.url, 'https://github.com/deadmade/dead-claude-skills/releases/download/cswap-v0.26.0/cswap.exe');
+test('cswap.exe download: Windows only, release asset of this version under LOCALAPPDATA', () => {
+  const dl = cswapDownload('win32', { LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' }, '1.2.3');
+  assert.equal(dl.url, 'https://github.com/deadmade/dead-claude-skills/releases/download/v1.2.3/cswap.exe');
   assert.equal(dl.sha256Url, `${dl.url}.sha256`);
   assert.equal(dl.exe, 'C:\\Users\\me\\AppData\\Local\\Programs\\cswap\\cswap.exe');
-  assert.equal(cswapDownload('linux', { LOCALAPPDATA: '/x' }, 'v0.26.0'), null);
-  assert.equal(cswapDownload('win32', {}, 'v0.26.0'), null);
+  assert.equal(cswapDownload('linux', { LOCALAPPDATA: '/x' }, '1.2.3'), null);
+  assert.equal(cswapDownload('win32', {}, '1.2.3'), null);
 });
 
 test('cswap pin matches --version output and is a stable tag', () => {
@@ -204,8 +204,8 @@ test('cswap missing on Linux points at uv', () => {
 });
 
 test('brv downloads the release archive built for this machine', () => {
-  const win = brvAsset('win32', 'x64', '0.2.0');
-  assert.equal(win.url, 'https://github.com/deadmade/dead-claude-skills/releases/download/brv-v0.2.0/brv-x86_64-pc-windows-msvc.zip');
+  const win = brvAsset('win32', 'x64', '1.2.3');
+  assert.equal(win.url, 'https://github.com/deadmade/dead-claude-skills/releases/download/v1.2.3/brv-x86_64-pc-windows-msvc.zip');
   assert.equal(win.sha256, `${win.url}.sha256`);
   assert.equal(win.exe, 'brv.exe');
   assert.equal(brvAsset('linux', 'x64', '1.0.0').file, 'brv-x86_64-unknown-linux-musl.tar.gz');

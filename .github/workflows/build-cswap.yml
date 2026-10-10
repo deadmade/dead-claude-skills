@@ -1,15 +1,17 @@
 name: Build cswap
 
 # cswap.exe: claude-swap (https://github.com/realiti4/claude-swap) at the tag pinned in installer/cswap.json,
-# compiled with Nuitka into one Windows exe. The installer downloads it from the cswap-<tag> release.
-# Any branch builds and smoke-tests; only the default branch publishes the release.
+# compiled with Nuitka into one Windows exe. Pushes that touch the pin build and smoke-test it; release.yml calls
+# this workflow and attaches the exe to the vX.Y.Z release the installer downloads from.
 on:
   push:
+    branches: ["**"] # not tags: release.yml builds those
     paths: [installer/cswap.json, .github/workflows/build-cswap.yml]
   workflow_dispatch:
+  workflow_call:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -63,12 +65,3 @@ jobs:
             cswap.exe
             cswap.exe.sha256
 
-      - name: Publish release
-        if: github.ref_name == github.event.repository.default_branch
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          rel='cswap-${{ steps.pin.outputs.tag }}'
-          gh release view "$rel" > /dev/null 2>&1 || gh release create "$rel" --title "cswap ${{ steps.pin.outputs.tag }}" \
-            --notes "claude-swap ${{ steps.pin.outputs.tag }} (https://github.com/realiti4/claude-swap, MIT) compiled with Nuitka for Windows. Installed by \`npx github:deadmade/dead-claude-skills\` with cswap ticked."
-          gh release upload "$rel" cswap.exe cswap.exe.sha256 --clobber

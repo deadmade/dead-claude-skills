@@ -21,9 +21,10 @@ It's built for me; use it if it fits, but expect it to change without notice.
 
 ## Install
 
-    npx github:deadmade/dead-claude-skills
+    npx github:deadmade/dead-claude-skills#semver:*
 
-or `/plugin marketplace add deadmade/dead-claude-skills` (plus `anthropics/claude-plugins-official` if you removed it)
+(`#semver:*` runs the installer from the newest release; without it you get master) or
+`/plugin marketplace add deadmade/dead-claude-skills` (plus `anthropics/claude-plugins-official` if you removed it)
 then `/plugin install dead-skills@dead-claude-skills`.
 
 The installer has two optional rows (also `--strip-defaults` / `--clean`) that take over the whole machine:
@@ -47,6 +48,22 @@ Multi-account switching with [claude-swap](https://github.com/realiti4/claude-sw
   every 2 minutes; the threshold and strategy are cswap's own (`cswap config set autoswitch.threshold 80`).
 - Accounts are still added in a terminal: log in with Claude Code, then `cswap add`, once per account.
 
-On Windows the installer downloads `cswap.exe` (claude-swap compiled with Nuitka by `build-cswap.yml`, pinned in
-`installer/cswap.json`) to `%LOCALAPPDATA%\Programs\cswap` and puts it on your user PATH. On Linux, install it
-with `uv tool install claude-swap` (or nix).
+On Windows the installer downloads `cswap.exe` (claude-swap at the tag pinned in `installer/cswap.json`, compiled
+with Nuitka by `build-cswap.yml` and attached to every release) to `%LOCALAPPDATA%\Programs\cswap` and puts it on
+your user PATH. On Linux, install it with `uv tool install claude-swap` (or nix).
+
+## Releases
+
+Everything here ships as one version: `package.json`, the marketplace's `metadata.version`, every plugin under
+`plugins/` and tui-review's `brv` crate carry the same number, and the pre-commit checks fail if they drift. Claude Code
+only offers `/plugin update` when that number changes, so sync PRs and other commits on master reach machines with
+the next release.
+
+    npm run release -- patch    # or minor, major, X.Y.Z
+    git push --follow-tags origin master
+
+The script (master, clean tree only) bumps every version, runs the repo checks and installer tests, commits
+`Release vX.Y.Z` and tags it. The tag runs `release.yml`: checks again, builds cswap.exe (`build-cswap.yml`) and brv
+for every platform (`build-brv.yml`), and publishes the GitHub release `vX.Y.Z` with all of them attached. Pushes to
+branches only build and smoke-test, and only when those workflows or the cswap pin change; nothing is published
+without a tag. Superpowers, ponytail and atlassian come from their own repos and keep their own versions.

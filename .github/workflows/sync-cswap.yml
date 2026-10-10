@@ -33,7 +33,7 @@ jobs:
           title: "Pin cswap to claude-swap ${{ steps.pin.outputs.tag }}"
           body: |
             Bumps installer/cswap.json to https://github.com/realiti4/claude-swap/releases/tag/${{ steps.pin.outputs.tag }}.
-            Merging it runs build-cswap.yml, which publishes the cswap-${{ steps.pin.outputs.tag }} release the installer downloads.
+            The new cswap.exe ships with the next release (`npm run release -- patch`).
 
             cc @deadmade
           add-paths: installer/cswap.json
