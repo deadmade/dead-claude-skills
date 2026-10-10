@@ -28,7 +28,9 @@ The status line shows `load · paint · chunks` for the last frame.
 
 Build it and put it on PATH, or set its path with `/plugin configure tui-review`:
 
-    cargo build --release --manifest-path plugins/tui-review/brv/Cargo.toml
+    cargo build --release --manifest-path plugins/tui-review/brv/Cargo.toml   # or: nix build .#brv
+
+`nix develop` (or direnv) gives the Rust toolchain: cargo, clippy, rustfmt and rust-analyzer.
 
 `brv gen [--lines N] [--out DIR]` writes a synthetic review cache (what `/tui-review demo` runs).
 
