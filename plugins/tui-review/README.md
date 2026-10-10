@@ -8,9 +8,9 @@ binary chunk files `brv` writes to disk, so a 100k-line PR costs the same memory
 
     /plugin install tui-review --marketplace deadmade/dead-claude-skills
 
-It needs `brv`. The installer (`npx github:deadmade/dead-claude-skills`) downloads the release built for your machine
-into `~/.claude/bin` and sets the plugin's `brvPath`, unless a `brv` is already on PATH. By hand: unpack the archive for
-your platform from the [releases](https://github.com/deadmade/dead-claude-skills/releases) (tags `brv-v*`), or build it,
+It needs `brv`. The installer (`npx github:deadmade/dead-claude-skills#semver:*`) downloads the build for your machine
+into `~/.claude/bin` and sets the plugin's `brvPath`, unless a `brv` is already on PATH. By hand: unpack the `brv-*`
+archive for your platform from the [releases](https://github.com/deadmade/dead-claude-skills/releases), or build it,
 and put it on PATH or set its path with `/plugin configure tui-review`:
 
     cargo build --release --manifest-path plugins/tui-review/brv/Cargo.toml   # or: nix build .#brv
@@ -96,6 +96,7 @@ Plugin tests have no file system, so `tests/make-fixture.mjs` turns `brv gen` ou
 (not committed). The tests read the real Rust output, so they also hold the TypeScript reader to the Rust writer.
 The cache layout is documented in `brv/src/format.rs`.
 
-A release: bump `version` in `brv/Cargo.toml` and `.claude-plugin/plugin.json` together (a test checks they match),
-then push a `brv-v<version>` tag. `.github/workflows/brv-release.yml` builds Windows, Linux (static, x64 and arm64) and
-macOS (arm64 and x64) and publishes them; run it by hand to build without publishing.
+brv ships with the repo's releases (see the main README): `npm run release` bumps `brv/Cargo.toml`, `Cargo.lock` and
+`.claude-plugin/plugin.json` with everything else (a test checks they match), and the tag's `release.yml` runs
+`.github/workflows/build-brv.yml`, which builds Windows, Linux (static, x64 and arm64) and macOS (arm64 and x64). Run
+`build-brv.yml` by hand to build without releasing.

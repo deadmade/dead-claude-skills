@@ -42,7 +42,7 @@ for (const dir of pluginDirs) {
   if (!market.some((p) => p.source === `./${dir}`)) problems.push(`${dir} is not listed in ${MARKETPLACE}`);
 }
 
-// --- one version: package.json, marketplace metadata.version and every local plugin.json (scripts/release.mjs) ---
+// --- one version: package.json, marketplace metadata.version, every local plugin.json and brv (scripts/release.mjs) ---
 const { version } = JSON.parse(readFileSync("package.json", "utf8"));
 const marketVersion = JSON.parse(readFileSync(MARKETPLACE, "utf8")).metadata?.version;
 if (marketVersion !== version) problems.push(`${MARKETPLACE}: metadata.version is ${marketVersion}, package.json has ${version}`);
@@ -51,6 +51,9 @@ for (const dir of pluginDirs) {
   const v = existsSync(manifest) && JSON.parse(readFileSync(manifest, "utf8")).version;
   if (v !== version) problems.push(`${manifest}: version is ${v}, package.json has ${version}`);
 }
+const CARGO = "plugins/tui-review/brv/Cargo.toml";
+const brv = /^version = "(.*)"/m.exec(readFileSync(CARGO, "utf8"))?.[1];
+if (brv !== version) problems.push(`${CARGO}: version is ${brv}, package.json has ${version}`);
 
 if (problems.length) {
   console.error(problems.map((p) => `✗ ${p}`).join("\n"));

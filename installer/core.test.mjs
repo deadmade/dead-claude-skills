@@ -204,8 +204,8 @@ test('cswap missing on Linux points at uv', () => {
 });
 
 test('brv downloads the release archive built for this machine', () => {
-  const win = brvAsset('win32', 'x64', '0.2.0');
-  assert.equal(win.url, 'https://github.com/deadmade/dead-claude-skills/releases/download/brv-v0.2.0/brv-x86_64-pc-windows-msvc.zip');
+  const win = brvAsset('win32', 'x64', '1.2.3');
+  assert.equal(win.url, 'https://github.com/deadmade/dead-claude-skills/releases/download/v1.2.3/brv-x86_64-pc-windows-msvc.zip');
   assert.equal(win.sha256, `${win.url}.sha256`);
   assert.equal(win.exe, 'brv.exe');
   assert.equal(brvAsset('linux', 'x64', '1.0.0').file, 'brv-x86_64-unknown-linux-musl.tar.gz');

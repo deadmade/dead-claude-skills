@@ -186,7 +186,8 @@ export function missingBinaries(platform, wanted, onPath) {
     });
 }
 
-// brv, the tui-review plugin's binary, built per platform by .github/workflows/brv-release.yml.
+// brv, the tui-review plugin's binary, built per platform by .github/workflows/build-brv.yml and attached to the
+// vX.Y.Z release by release.yml.
 const BRV_TARGETS = {
   'win32-x64': 'x86_64-pc-windows-msvc',
   'linux-x64': 'x86_64-unknown-linux-musl',
@@ -200,7 +201,7 @@ export function brvAsset(platform, arch, version) {
   const target = BRV_TARGETS[`${platform}-${arch}`];
   if (!target) return undefined;
   const file = `brv-${target}.${platform === 'win32' ? 'zip' : 'tar.gz'}`;
-  const url = `${RELEASES}/brv-v${version}/${file}`;
+  const url = `${RELEASES}/v${version}/${file}`;
   return { file, url, sha256: `${url}.sha256`, exe: platform === 'win32' ? 'brv.exe' : 'brv' };
 }
 

@@ -1,5 +1,5 @@
-// Cuts a release: one version for package.json, the marketplace and every local plugin, committed and tagged
-// vX.Y.Z on master. Pushing the tag runs .github/workflows/release.yml, which builds cswap.exe and publishes the
+// Cuts a release: one version for package.json, the marketplace, every local plugin and brv, committed and tagged
+// vX.Y.Z on master. Pushing the tag runs .github/workflows/release.yml, which builds cswap.exe and brv and publishes the
 // GitHub release. Claude Code only offers plugin updates when this version changes.
 // Usage: npm run release -- patch|minor|major|X.Y.Z
 import { spawnSync } from "node:child_process";
@@ -30,16 +30,20 @@ if (branch !== "master") die(`releases are cut from master, you are on ${branch}
 if (git("status", "--porcelain")) die("working tree is not clean");
 if (git("tag", "--list", `v${next}`)) die(`tag v${next} already exists`);
 
-// Top-level "version" only (two-space indent), edited in place so the rest of each file keeps its formatting.
-const files = [
-  "package.json",
-  ".claude-plugin/marketplace.json",
-  ...readdirSync("plugins").map((p) => `plugins/${p}/.claude-plugin/plugin.json`),
+// Each file's own version line, edited in place so the rest of the file keeps its formatting. JSON: the top-level
+// (or marketplace metadata) "version". brv: its crate version, and its entry in Cargo.lock so --locked builds pass.
+const json = /^( {2,4}"version": )"[^"]*"/m;
+const bumps = [
+  ["package.json", json],
+  [".claude-plugin/marketplace.json", json],
+  ...readdirSync("plugins").map((p) => [`plugins/${p}/.claude-plugin/plugin.json`, json]),
+  ["plugins/tui-review/brv/Cargo.toml", /^(version = )"[^"]*"/m],
+  ["plugins/tui-review/brv/Cargo.lock", /^(name = "brv"\nversion = )"[^"]*"/m],
 ];
-for (const f of files) {
+const files = bumps.map(([f]) => f);
+for (const [f, version] of bumps) {
   const text = readFileSync(f, "utf8");
-  const version = /^( {2,4}"version": )"[^"]*"/m;
-  if (!version.test(text)) die(`${f} has no "version" to bump`);
+  if (!version.test(text)) die(`${f} has no version to bump`);
   writeFileSync(f, text.replace(version, `$1"${next}"`));
 }
 

@@ -54,8 +54,8 @@ your user PATH. On Linux, install it with `uv tool install claude-swap` (or nix)
 
 ## Releases
 
-Everything here ships as one version: `package.json`, the marketplace's `metadata.version` and every plugin under
-`plugins/` carry the same number, and `scripts/check-repo.mjs` fails the pre-commit hook if they drift. Claude Code
+Everything here ships as one version: `package.json`, the marketplace's `metadata.version`, every plugin under
+`plugins/` and tui-review's `brv` crate carry the same number, and the pre-commit checks fail if they drift. Claude Code
 only offers `/plugin update` when that number changes, so sync PRs and other commits on master reach machines with
 the next release.
 
@@ -63,6 +63,7 @@ the next release.
     git push --follow-tags origin master
 
 The script (master, clean tree only) bumps every version, runs the repo checks and installer tests, commits
-`Release vX.Y.Z` and tags it. The tag runs `release.yml`: checks again, builds cswap.exe and publishes the GitHub
-release `vX.Y.Z` with it attached. Superpowers, ponytail and atlassian come from their own repos and keep their own
-versions.
+`Release vX.Y.Z` and tags it. The tag runs `release.yml`: checks again, builds cswap.exe (`build-cswap.yml`) and brv
+for every platform (`build-brv.yml`), and publishes the GitHub release `vX.Y.Z` with all of them attached. Pushes to
+branches only build and smoke-test, and only when those workflows or the cswap pin change; nothing is published
+without a tag. Superpowers, ponytail and atlassian come from their own repos and keep their own versions.

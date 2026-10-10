@@ -1,7 +1,7 @@
 name: Release
 
 # One release for the whole repo: scripts/release.mjs bumps package.json, the marketplace and every plugin to the
-# same version and tags vX.Y.Z; pushing that tag checks the repo, builds cswap.exe and publishes the release.
+# same version and tags vX.Y.Z; pushing that tag checks the repo, builds cswap.exe and brv and publishes the release.
 on:
   push:
     tags: ["v*"]
@@ -27,17 +27,21 @@ jobs:
   cswap:
     uses: ./.github/workflows/build-cswap.yml
 
+  brv:
+    uses: ./.github/workflows/build-brv.yml
+
   publish:
-    needs: [check, cswap]
+    needs: [check, cswap, brv]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v7
 
+      # Every artifact of this run: cswap.exe and the brv archives, each with its .sha256.
       - uses: actions/download-artifact@v5
         with:
-          pattern: cswap-*
+          path: dist
           merge-multiple: true
 
       - name: Publish release
@@ -45,7 +49,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cswap=$(jq -r .upstream installer/cswap.json)
-          gh release create "$GITHUB_REF_NAME" cswap.exe cswap.exe.sha256 --title "$GITHUB_REF_NAME" --generate-notes \
+          gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes \
             --notes "Install or update with \`npx github:deadmade/dead-claude-skills#$GITHUB_REF_NAME\`, or \`/plugin update\` in Claude Code.
 
+          brv-*: the binary behind tui-review, for each platform; the installer downloads yours.
           cswap.exe is claude-swap $cswap (https://github.com/realiti4/claude-swap, MIT) compiled with Nuitka for Windows."
