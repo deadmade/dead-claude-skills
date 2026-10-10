@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import {
   optIns, needsToken, planPlugins, duplicates, mergeSettings, safeArg, missingBinaries, SECRET_DENIES, isSandboxOn,
   hasDcgHook, dcgCommand, bundleIds, foreignPlugins, foreignMarketplaces, stripDefaults, isStripped, resetSettings, CLEAN_TARGETS,
-  cswapDownload, cswapCurrent, pathWith,
+  cswapDownload, cswapCurrent, pathWith, brvAsset, sha256Of, brvAction,
 } from './core.mjs';
 
 const json = (p) => JSON.parse(readFileSync(new URL(`../${p}`, import.meta.url), 'utf8'));
@@ -15,7 +15,8 @@ const O = 'claude-plugins-official';
 
 test('opt-ins from the real manifests', () => {
   assert.deepEqual(optIns(marketplace, bundle).sort(), [
-    ...['atlassian', 'cswap', 'dev-feature', 'graphify', 'hallmark', 'mattpocock-picks', 'mcp-azure', 'mcp-github', 'nix-lsp', 'pstack-picks']
+    ...['atlassian', 'cswap', 'dev-feature', 'graphify', 'hallmark', 'mattpocock-picks', 'mcp-azure', 'mcp-github', 'nix-lsp',
+      'pstack-picks', 'tui-review']
       .map((n) => `${n}@${M}`),
     ...['csharp-lsp', 'pyright-lsp', 'rust-analyzer-lsp', 'skill-creator', 'typescript-lsp'].map((n) => `${n}@${O}`),
   ].sort());
@@ -200,4 +201,35 @@ test('user PATH gains the cswap folder once', () => {
 
 test('cswap missing on Linux points at uv', () => {
   assert.deepEqual(missingBinaries('linux', ['cswap'], () => false), [{ binary: 'cswap', command: 'uv tool install claude-swap' }]);
+});
+
+test('brv downloads the release archive built for this machine', () => {
+  const win = brvAsset('win32', 'x64', '0.2.0');
+  assert.equal(win.url, 'https://github.com/deadmade/dead-claude-skills/releases/download/brv-v0.2.0/brv-x86_64-pc-windows-msvc.zip');
+  assert.equal(win.sha256, `${win.url}.sha256`);
+  assert.equal(win.exe, 'brv.exe');
+  assert.equal(brvAsset('linux', 'x64', '1.0.0').file, 'brv-x86_64-unknown-linux-musl.tar.gz');
+  assert.equal(brvAsset('linux', 'arm64', '1.0.0').file, 'brv-aarch64-unknown-linux-musl.tar.gz');
+  assert.equal(brvAsset('darwin', 'arm64', '1.0.0').exe, 'brv');
+  assert.equal(brvAsset('win32', 'arm64', '1.0.0'), undefined);
+  assert.equal(brvAsset('freebsd', 'x64', '1.0.0'), undefined);
+});
+
+test('brv versions match the release the installer fetches', () => {
+  const cargo = readFileSync(new URL('../plugins/tui-review/brv/Cargo.toml', import.meta.url), 'utf8');
+  assert.equal(/^version = "(.+)"/m.exec(cargo)[1], json('plugins/tui-review/.claude-plugin/plugin.json').version);
+});
+
+test('brv checksum lines and what to do about brv', () => {
+  const hex = 'AB'.repeat(32);
+  assert.equal(sha256Of(`${hex}  brv-x.tar.gz\n`), hex.toLowerCase());
+  assert.equal(sha256Of(`${hex}`), hex.toLowerCase());
+  assert.equal(sha256Of('Not Found'), undefined);
+  assert.equal(sha256Of(`${hex}ff  x`), undefined);
+  const at = (o) => brvAction({ onPath: false, installed: undefined, version: '0.2.0', supported: true, ...o });
+  assert.equal(at({ onPath: true }), 'skip');
+  assert.equal(at({ installed: '0.2.0' }), 'configure');
+  assert.equal(at({ installed: '0.1.0' }), 'download');
+  assert.equal(at({}), 'download');
+  assert.equal(at({ supported: false }), 'unsupported');
 });

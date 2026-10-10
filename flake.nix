@@ -76,6 +76,25 @@
   in {
     checks = forAllSystems (system: {pre-commit = preCommit system;});
 
+    # brv, the tui-review plugin's Rust binary: `nix build .#brv`, or `nix run .#brv -- gen`. Its tests run in the build.
+    packages = forAllSystems (system: let
+      pkgs = nixpkgs.legacyPackages.${system};
+      manifest = (pkgs.lib.importTOML ./plugins/tui-review/brv/Cargo.toml).package;
+    in {
+      brv = pkgs.rustPlatform.buildRustPackage {
+        pname = manifest.name;
+        inherit (manifest) version;
+        src = ./plugins/tui-review/brv;
+        cargoLock.lockFile = ./plugins/tui-review/brv/Cargo.lock;
+        # tests/review.rs builds its fixture repositories with git.
+        nativeCheckInputs = [pkgs.git];
+        meta = {
+          inherit (manifest) description;
+          mainProgram = "brv";
+        };
+      };
+    });
+
     devShells = forAllSystems (system: let
       pkgs = nixpkgs.legacyPackages.${system};
       pre-commit = self.checks.${system}.pre-commit;
@@ -83,8 +102,9 @@
       default = pkgs.mkShell {
         inherit (pre-commit) shellHook;
         buildInputs = pre-commit.enabledPackages;
-        # What scripts/sync-*.mjs and the workflows use besides stdenv.
-        packages = with pkgs; [git gh nodejs_26];
+        # What scripts/sync-*.mjs and the workflows use besides stdenv, and the Rust toolchain for tui-review's brv.
+        packages = with pkgs; [git gh nodejs_26 cargo rustc clippy rustfmt rust-analyzer];
+        RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
       };
     });
 

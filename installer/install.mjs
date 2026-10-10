@@ -2,14 +2,16 @@
 // Interactive installer for the dead-claude-skills marketplace. Decisions live in core.mjs.
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
+import {
+  chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync,
+} from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { createInterface, emitKeypressEvents } from 'node:readline';
 import {
-  BUNDLE, CLEAN_TARGETS, MARKETPLACE, OFFICIAL, bundleIds, cswapCurrent, cswapDownload, dcgCommand, duplicates, foreignMarketplaces, foreignPlugins, hasDcgHook,
-  isOurStatusLine, isSandboxOn, isStripped, mergeSettings, missingBinaries, nameOf, needsToken, optIns, pathWith, planPlugins,
-  resetSettings, safeArg, stripDefaults,
+  BUNDLE, CLEAN_TARGETS, MARKETPLACE, OFFICIAL, brvAction, brvAsset, bundleIds, cswapCurrent, cswapDownload, dcgCommand,
+  duplicates, foreignMarketplaces, foreignPlugins, hasDcgHook, isOurStatusLine, isSandboxOn, isStripped, mergeSettings,
+  missingBinaries, nameOf, needsToken, optIns, pathWith, planPlugins, resetSettings, safeArg, sha256Of, stripDefaults,
 } from './core.mjs';
 
 const PKG = join(import.meta.dirname, '..');
@@ -31,12 +33,15 @@ if (!process.stdin.isTTY || !process.stdout.isTTY) {
 }
 
 // --- claude CLI -------------------------------------------------------------------------------------------------
-function claude(...args) {
+const claude = (...args) => claudeWith(undefined, ...args);
+
+// input: what the command reads on stdin, or undefined.
+function claudeWith(input, ...args) {
   args.forEach(safeArg);
   // Windows: one string through the shell so both claude.cmd and claude.exe resolve; args are safeArg-checked.
   const r = WIN
-    ? spawnSync(['claude', ...args].join(' '), { shell: true, encoding: 'utf8' })
-    : spawnSync('claude', args, { encoding: 'utf8' });
+    ? spawnSync(['claude', ...args].join(' '), { shell: true, encoding: 'utf8', input })
+    : spawnSync('claude', args, { encoding: 'utf8', input });
   if (r.error) {
     console.error(`Can't run claude (${r.error.code}). Install Claude Code and make sure it's on PATH.`);
     process.exit(1);
@@ -251,6 +256,73 @@ function clearTargets() {
   }
 }
 
+// --- brv, tui-review's binary --------------------------------------------------------------------------------------
+const TUI_REVIEW = `tui-review@${MARKETPLACE}`;
+const BRV_DIR = join(CONFIG, 'bin');
+
+// The version a brv binary reports, or undefined when there is none or it does not run.
+function brvVersionAt(path) {
+  if (!existsSync(path)) return undefined;
+  const r = spawnSync(path, ['--version'], { encoding: 'utf8' });
+  return /^brv (\S+)/.exec(r.stdout ?? '')?.[1];
+}
+
+async function fetchOk(url) {
+  const res = await fetch(url);
+  if (res.status === 404) throw new Error(`no release at ${url} yet`);
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${url}`);
+  return res;
+}
+
+// Downloads the release archive, checks it against its .sha256, and puts the binary at `bin` in one rename.
+async function downloadBrv(asset, bin) {
+  const [archive, sum] = await Promise.all([
+    fetchOk(asset.url).then((r) => r.arrayBuffer()),
+    fetchOk(asset.sha256).then((r) => r.text()),
+  ]);
+  const bytes = Buffer.from(archive);
+  if (sha256Of(sum) !== createHash('sha256').update(bytes).digest('hex')) throw new Error(`${asset.file}: checksum mismatch`);
+  const tmp = mkdtempSync(join(tmpdir(), 'brv-'));
+  try {
+    const file = join(tmp, asset.file);
+    writeFileSync(file, bytes);
+    // GNU tar on Linux, bsdtar on macOS and Windows 10+, which reads the zip too.
+    const r = spawnSync('tar', ['-xf', file, '-C', tmp], { encoding: 'utf8' });
+    if (r.status !== 0) throw new Error(`could not unpack ${asset.file}: ${(r.stderr || r.error?.message || '').trim()}`);
+    mkdirSync(BRV_DIR, { recursive: true });
+    const staged = `${bin}.tmp-${process.pid}`;
+    cpSync(join(tmp, asset.exe), staged);
+    chmodSync(staged, 0o755);
+    renameSync(staged, bin);
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+// tui-review needs brv: a brv on PATH is used as is; otherwise the release for this version goes to ~/.claude/bin
+// and the plugin's brvPath points at it.
+async function applyBrv() {
+  const version = readJson(join(PKG, 'plugins', 'tui-review', '.claude-plugin', 'plugin.json')).version;
+  const asset = brvAsset(process.platform, process.arch, version);
+  const bin = join(BRV_DIR, asset?.exe ?? (WIN ? 'brv.exe' : 'brv'));
+  const action = brvAction({ onPath: onPath('brv'), installed: brvVersionAt(bin), version, supported: asset !== undefined });
+  const build = 'build it with `cargo build --release` in plugins/tui-review/brv and set its path with /plugin configure tui-review';
+  if (action === 'skip') return done.push('brv: using the one on PATH');
+  if (action === 'unsupported') return failures.push(`brv: no release build for ${process.platform}-${process.arch}; ${build}`);
+  if (action === 'download') {
+    console.log(`downloading brv ${version}…`);
+    try {
+      await downloadBrv(asset, bin);
+    } catch (e) {
+      return failures.push(`brv ${version}: ${e.message}; ${build}`);
+    }
+    done.push(`installed brv ${version} to ${bin}`);
+  }
+  const r = claudeWith(JSON.stringify({ brvPath: bin }), 'plugin', 'configure', TUI_REVIEW, '--values-stdin');
+  if (r.ok) done.push(`tui-review: brvPath is ${bin}`);
+  else failures.push(`tui-review: could not set brvPath (${r.err}); set it to ${bin} with /plugin configure tui-review`);
+}
+
 function onPath(bin) {
   const exts = WIN ? (process.env.PATHEXT || '.EXE;.CMD;.BAT').split(';') : [''];
   return (process.env.PATH || '').split(delimiter).some((d) => exts.some((e) => existsSync(join(d, bin + e))));
@@ -362,6 +434,7 @@ for (const id of plan.uninstall) {
   step(`uninstalled ${id}`, 'plugin', 'uninstall', id, '--json');
 }
 if (plan.uninstall.length || dupes.length || foreign.length) step('pruned unused dependencies', 'plugin', 'prune', '-y');
+if (selected.includes(TUI_REVIEW)) await applyBrv();
 
 await applySettings({ statusLine: on('ccstatusline'), sandbox: on('sandbox'), dcg: on('dcg') }, { strip, reset: clean });
 const autoUpdate = tryJson(join(CONFIG, 'plugins', 'known_marketplaces.json'))?.[MARKETPLACE]?.autoUpdate;
