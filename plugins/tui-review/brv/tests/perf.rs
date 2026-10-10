@@ -217,8 +217,11 @@ fn review_budgets() {
     // Git-bound: a cold first open on a Windows runner took 74 ms where Linux takes 19.
     check(&mut over, "base detection (600 branches)", detect, Duration::from_millis(150));
     check(&mut over, "manifest + first chunk", out.first_text.unwrap(), Duration::from_millis(300));
-    check(&mut over, "plain pass", summary.resolve + summary.text, Duration::from_millis(300));
-    check(&mut over, "highlight pass", summary.colour, Duration::from_secs(8));
+    // Windows pays for each chunk file's create and rename (a GitHub runner: 1 s for the plain pass, 6.3 s for colours,
+    // where Linux takes 60 ms and 2.7 s); the first chunk, what the pane waits for, stays fast on both.
+    let (plain, colour) = if cfg!(windows) { (2500, 12) } else { (300, 8) };
+    check(&mut over, "plain pass", summary.resolve + summary.text, Duration::from_millis(plain));
+    check(&mut over, "highlight pass", summary.colour, Duration::from_secs(colour));
     check(&mut over, "reopen with a complete cache", reopen, Duration::from_millis(150));
     eprintln!("{:<38} {:>7} MB   budget 100 MB", "peak heap", peak / 1_000_000);
     if peak >= 100_000_000 {
