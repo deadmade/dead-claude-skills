@@ -100,6 +100,10 @@ export class Manifest {
     return this.records[index * FILE_U32 + 7]!
   }
 
+  lineCount(index: number): number {
+    return this.records[index * FILE_U32 + 8]!
+  }
+
   /** The file a global line belongs to: binary search over the files' first lines. */
   fileAt(line: number): number {
     let lo = 0

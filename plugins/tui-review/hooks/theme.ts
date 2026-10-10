@@ -35,4 +35,6 @@ export const theme = {
   addSign: 0x98c379,
   delSign: 0xe06c75,
   dimFg: 0x7f848e,
+  cursorBg: 0x3e4451,
+  commentFg: 0xe5c07b,
 } as const

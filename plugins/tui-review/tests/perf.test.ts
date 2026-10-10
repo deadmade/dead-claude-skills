@@ -5,6 +5,7 @@ import { expect, test } from 'claude-code/testing'
 
 import { Highlights, Lines, Manifest, fromBase64, toBase64 } from '../hooks/chunks'
 import { paint } from '../hooks/paint'
+import { View } from '../hooks/view'
 import * as fixture from './fixture.gen'
 import { DIR, engine, pane, residentOf } from './harness'
 
@@ -52,10 +53,14 @@ test('a 200×60 frame paints and encodes in under 2 ms', async () => {
   }))
   const cols = 200
   const rows = 60
+  // Every third file collapsed, so rows map through the view as they do with files marked viewed.
+  const collapsed = new Uint8Array(manifest.files)
+  for (let i = 0; i < manifest.files; i += 3) collapsed[i] = 1
+  const view = new View(manifest, collapsed)
   let top = 0
   const cells = new Uint32Array(cols * rows * 3)
   const ms = typical(200, () => {
-    paint(cells, cols, rows, top, { manifest, chunk: c => chunks[c % chunks.length] })
+    paint(cells, cols, rows, top, { view, cursor: top, chunk: c => chunks[c % chunks.length] })
     toBase64(new Uint8Array(cells.buffer))
     top = (top + 37) % 3000
   })
@@ -74,23 +79,23 @@ test('the first frame is drawn in under 150 ms after the manifest', async ($, on
   expect(ms).toBeLessThan(150)
 })
 
-test('paging through a 100k-line review keeps at most 3 chunks resident', { timeoutMs: 60_000 }, async ($, on) => {
+test('walking every file of a 100k-line review keeps at most 3 chunks resident', { timeoutMs: 60_000 }, async ($, on) => {
   const recorded = engine(on, PROGRESS)
   await $.command.run(run)
   await recorded.opened
   const rows = 60
   const ui = await $.ui.mount(pane(200, rows))
   const manifest = new Manifest(fromBase64(fixture.manifest))
-  const pages = Math.ceil(manifest.totalLines / (rows - 3))
+  const pages = manifest.files - 1
   const started = performance.now()
   let most = 0
   for (let page = 0; page < pages; page++) {
-    await ui.press({ key: 'd' })
+    await ui.press({ key: 'n' })
     most = Math.max(most, residentOf(recorded.status.at(-1) ?? ''))
   }
   const perPage = (performance.now() - started) / pages
   const reads = recorded.reads.filter(p => p.endsWith('.lines')).length
-  report(`${pages} pages: ${perPage.toFixed(2)} ms/page, ${reads} chunk reads for ${manifest.chunks} chunks, ≤ ${most} resident`)
+  report(`${pages} files: ${perPage.toFixed(2)} ms/file, ${reads} chunk reads for ${manifest.chunks} chunks, ≤ ${most} resident`)
   expect(most).toBeLessThanOrEqual(3)
   expect(reads).toBeLessThanOrEqual(manifest.chunks + 2)
 })

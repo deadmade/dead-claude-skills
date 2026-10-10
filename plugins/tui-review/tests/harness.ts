@@ -15,6 +15,9 @@ export type Recorded = {
   blits: string[]
   status: string[]
   reads: string[]
+  /** The prompts the plugin submitted, as Claude would get them. */
+  prompts: string[]
+  toasts: string[]
   opened: Promise<void>
 }
 
@@ -30,6 +33,12 @@ export function rowText(cellsBase64: string, cols: number, row: number): string 
   return text.trimEnd()
 }
 
+/** The background colour of cell `col` in row `row` of a painted frame. */
+export function cellBg(cellsBase64: string, cols: number, row: number, col = 0): number {
+  const bytes = fromBase64(cellsBase64)
+  return new Uint32Array(bytes.buffer, (row * cols + col) * 12, 3)[2]!
+}
+
 export function engine(on: On, progress: string[], store: Record<string, unknown> = {}): Recorded {
   let markOpened = () => {}
   const recorded: Recorded = {
@@ -37,6 +46,8 @@ export function engine(on: On, progress: string[], store: Record<string, unknown
     blits: [],
     status: [],
     reads: [],
+    prompts: [],
+    toasts: [],
     opened: new Promise(resolve => (markOpened = resolve)),
   }
   const fileOf = (path: string) => {
@@ -71,7 +82,14 @@ export function engine(on: On, progress: string[], store: Record<string, unknown
     if (e.text !== undefined) recorded.status.push(e.text)
     return { value: undefined }
   })
-  on('ui.toast', async () => ({ value: undefined }))
+  on('ui.toast', async (_$, e) => {
+    recorded.toasts.push(e.text)
+    return { value: undefined }
+  })
+  on('prompt.submit', async (_$, e) => {
+    recorded.prompts.push(e.text)
+    return { text: e.text }
+  })
   on('store.get', async (_$, e) => ({ value: structuredClone(recorded.store.get(e.key)) }))
   on('store.set', async (_$, e) => {
     recorded.store.set(e.key, structuredClone(e.value))

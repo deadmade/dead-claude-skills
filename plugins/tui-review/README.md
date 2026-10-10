@@ -5,7 +5,7 @@ same session. The diff, highlighting and git work happen in `brv`, a Rust binary
 binary chunk files `brv` writes to disk, so a 100k-line PR costs the same memory and frame time as a 100-line one.
 
 **Status: step 1 of 4 (spike).** `/tui-review demo` opens a generated 100k-line review. Real branches (`/tui-review [base]`),
-tree-sitter highlighting and quoting hunks into the prompt come next.
+tree-sitter highlighting come next.
 
 ## Use
 
@@ -17,13 +17,23 @@ the pane.
 
 | Key | |
 | --- | --- |
-| `j` / `k`, mouse wheel | line down / up |
-| `d` / `u` | page down / up |
-| `n` / `p` | next / previous file |
-| `v` | mark the file viewed and go to the next unviewed one; on a viewed file, clear the mark |
+| `j` / `k` | cursor down / up; the window follows it |
+| mouse wheel | scroll the window; the cursor stays in it |
+| `n` / `p` | cursor to the next / previous file (`p` inside a file goes to its own header first) |
+| `r` | mark the cursor's file viewed and collapse it to its header; on a viewed file, clear the mark and open it |
+| `c` | comment on the cursor's line, or on the whole file from its header; on a commented line, edit the comment |
+| `s` | send every comment to Claude as one message, then clear them |
 
-"Viewed" marks persist across sessions, by the file's content: a rebase that leaves a file alone keeps its mark, a
-change to it clears it. The header bar counts them.
+"Viewed" marks persist across sessions, by the file's content: a rebase that leaves a file alone keeps its mark (and
+the file opens collapsed), a change to it clears it. The header bar counts them.
+
+### Comments
+
+Claude doesn't see the pane, so comments are how you point at code. `c` opens a field under the diff: Enter saves the
+comment, an empty one cancels it (or deletes the comment you were editing). Commented lines get a `●` in the gutter, and
+the header bar and the `send` button count the comments waiting. `s` sends them all as one prompt, in your name: for
+each, `path:line` (or the file, for a comment on its header), the commented line with up to two lines before it from its
+hunk, and your text. Then they are cleared. Comments live in the session, so a reload of the mod keeps them.
 
 The arrow keys don't scroll yet: the engine only forwards them while a pane has rows of its own to scroll.
 

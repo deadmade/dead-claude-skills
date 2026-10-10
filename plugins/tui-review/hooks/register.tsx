@@ -1,23 +1,33 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { TuiReviewOpen } from '../types'
-import { Highlights, Lines, Manifest, chunkName, fromBase64, toBase64 } from './chunks'
+import type { ReviewComment, TuiReviewOpen } from '../types'
+import { Highlights, Kind, Lines, Manifest, chunkName, fromBase64, toBase64 } from './chunks'
+import { message, upsert } from './comments'
 import { type Loaded, paint } from './paint'
+import { View } from './view'
 import { VIEWED_KEY, Viewed } from './viewed'
 
 const PANE = 'review'
 const RASTER = 'diff'
 /** Chunks kept in memory: the one or two the window spans plus one ahead. */
 const RESIDENT = 3
+/** Diff lines quoted with a comment: the commented line and up to this many before it in its hunk. */
+const QUOTE_BEFORE = 2
 
 const reviewAtom = atom({ plugin: 'tui-review', key: 'review' } as const, null as TuiReviewOpen | null)
+const commentsAtom = atom({ plugin: 'tui-review', key: 'comments' } as const, [] as ReviewComment[])
+const composingAtom = atom({ plugin: 'tui-review', key: 'composing' } as const, null as ReviewComment | null)
 
 // What the pane draws from. Module memory, not $.state: it changes on every scroll, and a reload just reads it again.
 let manifest: { dir: string; value: Manifest } | undefined
+/** Viewed files are the collapsed ones: `files` is the view's `collapsed`. */
 let viewed: { marks: Viewed; files: Uint8Array; count: number } | undefined
+let view: View | undefined
 const resident = new Map<number, Loaded>()
+/** The view row drawn first, and the cursor's row. */
 let top = 0
+let cursor = 0
 let mounted: { cols: number; rows: number } | undefined
 /** The frame's cells, reused while the size holds, so a scroll allocates nothing. */
 let cells = new Uint32Array(0)
@@ -46,17 +56,28 @@ async function loadManifest($: $, dir: string): Promise<Manifest> {
     }
     manifest = { dir, value }
     viewed = { marks, files, count }
+    view = new View(value, files)
     resident.clear()
   }
   return manifest.value
 }
 
-/** Loads the chunks lines `[from, to)` need, plus the next, and evicts the rest down to RESIDENT. */
-async function ensureChunks($: $, dir: string, m: Manifest, from: number, to: number) {
-  const first = Math.floor(from / m.chunkLines)
-  const last = Math.min(m.chunks - 1, Math.floor(Math.max(from, to - 1) / m.chunkLines) + 1)
+/** The chunks the window's rows show, in order, plus the next one. A collapsed file's row needs none. */
+function windowChunks(v: View, from: number, count: number): number[] {
+  const m = v.manifest
   const wanted: number[] = []
-  for (let c = first; c <= last; c++) wanted.push(c)
+  for (let row = from, end = Math.min(v.rows, from + count); row < end; row++) {
+    if (v.collapsed[v.fileOfRow(row)] === 1) continue
+    const c = Math.floor(v.lineOfRow(row) / m.chunkLines)
+    if (wanted.at(-1) !== c) wanted.push(c)
+  }
+  const ahead = (wanted.at(-1) ?? -1) + 1
+  if (ahead > 0 && ahead < m.chunks) wanted.push(ahead)
+  return wanted
+}
+
+/** Loads the chunks the window needs, plus the next, and evicts the rest down to RESIDENT. */
+async function ensureChunks($: $, dir: string, wanted: number[]) {
   await Promise.all(
     wanted.map(async c => {
       const have = resident.get(c)
@@ -83,12 +104,22 @@ async function frame($: $): Promise<string | undefined> {
   const review = await $.state.get({ plugin: 'tui-review', key: 'review' })
   if (mounted === undefined || !review.value) return undefined
   const started = performance.now()
-  const m = await loadManifest($, review.value.dir)
+  await loadManifest($, review.value.dir)
+  const v = view!
   const { cols, rows } = mounted
-  await ensureChunks($, review.value.dir, m, top, top + rows)
+  await ensureChunks($, review.value.dir, windowChunks(v, top, rows - 1))
   const loadedAt = performance.now()
+  const drafts = (await $.state.get({ plugin: 'tui-review', key: 'comments' })).value ?? []
+  const here = new Set<number>()
+  for (const c of drafts) if (c.dir === review.value.dir) here.add(c.line)
   if (cells.length !== cols * rows * 3) cells = new Uint32Array(cols * rows * 3)
-  paint(cells, cols, rows, top, { manifest: m, viewed, chunk: c => resident.get(c) })
+  paint(cells, cols, rows, top, {
+    view: v,
+    cursor,
+    viewed,
+    comments: { lines: here, count: drafts.length },
+    chunk: c => resident.get(c),
+  })
   const encoded = toBase64(new Uint8Array(cells.buffer))
   const done = performance.now()
   $.ui.status(
@@ -120,50 +151,116 @@ function repaint($: $): Promise<void> {
   return painting
 }
 
+/** Rows of diff the window shows, below the header bar. */
+const bodyRows = () => Math.max(1, (mounted?.rows ?? 2) - 1)
+
 function maxTop(): number {
-  const total = manifest?.value.totalLines ?? 0
-  return Math.max(0, total - Math.max(1, (mounted?.rows ?? 2) - 1))
+  return Math.max(0, (view?.rows ?? 0) - bodyRows())
 }
 
-function scrollTo($: $, line: number) {
-  const next = Math.min(maxTop(), Math.max(0, Math.round(line)))
-  if (next === top) return
-  top = next
+/** Keeps `top` in range and the cursor inside the window, moving the window to it. */
+function follow() {
+  const last = Math.max(0, (view?.rows ?? 0) - 1)
+  cursor = Math.min(last, Math.max(0, cursor))
+  if (cursor < top) top = cursor
+  if (cursor >= top + bodyRows()) top = cursor - bodyRows() + 1
+  top = Math.min(maxTop(), Math.max(0, top))
+}
+
+function moveCursor($: $, row: number) {
+  const before = { top, cursor }
+  cursor = Math.round(row)
+  follow()
+  if (top !== before.top || cursor !== before.cursor) void repaint($)
+}
+
+/** The mouse wheel moves the window; the cursor stays on its row while that row stays in view. */
+function scrollTo($: $, row: number) {
+  const before = { top, cursor }
+  top = Math.min(maxTop(), Math.max(0, Math.round(row)))
+  cursor = Math.min(top + bodyRows() - 1, Math.max(top, cursor))
+  follow()
+  if (top !== before.top || cursor !== before.cursor) void repaint($)
+}
+
+/** The cursor to the next or previous file's header, shown at the top of the window. */
+function fileJump($: $, by: 1 | -1) {
+  const v = view
+  if (v === undefined || v.manifest.files === 0) return
+  const at = v.fileOfRow(cursor)
+  // Back from inside a file goes to its own header first.
+  const target = by < 0 && v.headerRow(at) < cursor ? at : Math.min(v.manifest.files - 1, Math.max(0, at + by))
+  cursor = v.headerRow(target)
+  top = cursor
+  follow()
   void repaint($)
 }
 
-function fileJump($: $, by: 1 | -1) {
-  const m = manifest?.value
-  if (m === undefined || m.files === 0) return
-  const at = m.fileAt(top)
-  // Back from inside a file goes to its own header first.
-  const target = by < 0 && m.firstLine(at) < top ? at : Math.min(m.files - 1, Math.max(0, at + by))
-  scrollTo($, m.firstLine(target))
-}
-
-/** Marks the file at the top viewed and moves to the next unviewed one, or clears the mark and stays. */
+/** Marks the cursor's file viewed, collapsing it to its header, or clears the mark and opens it again. */
 async function toggleViewed($: $) {
-  const m = manifest?.value
-  if (m === undefined || viewed === undefined || m.files === 0) return
-  const index = m.fileAt(top)
-  const isViewed = viewed.marks.toggle(m.blob(index))
+  const v = view
+  if (v === undefined || viewed === undefined || v.manifest.files === 0) return
+  const index = v.fileOfRow(cursor)
+  const isViewed = viewed.marks.toggle(v.manifest.blob(index))
   await $.store.set(VIEWED_KEY, viewed.marks.stored())
   viewed.files[index] = isViewed ? 1 : 0
   viewed.count += isViewed ? 1 : -1
-  let next = index
-  if (isViewed) {
-    for (let i = index + 1; i < m.files; i++) {
-      if (viewed.files[i] === 0) {
-        next = i
-        break
-      }
-    }
+  v.rebuild()
+  cursor = v.headerRow(index)
+  follow()
+  await repaint($)
+}
+
+/** The comment the cursor's line would get: where it is and the diff lines it quotes; text still empty. */
+function commentAtCursor(dir: string): ReviewComment | string {
+  const v = view
+  if (v === undefined || v.manifest.files === 0) return 'nothing to comment on'
+  const m = v.manifest
+  const file = v.fileOfRow(cursor)
+  const line = v.lineOfRow(cursor)
+  const path = m.file(file).path
+  const whole = { dir, line, path, lineNo: null, side: null, quote: [], text: '' }
+  if (v.collapsed[file] === 1) return whole
+  const at = (l: number) => {
+    const chunk = resident.get(Math.floor(l / m.chunkLines))
+    return chunk && { lines: chunk.lines, i: l % m.chunkLines }
   }
-  if (next !== index) scrollTo($, m.firstLine(next))
-  else {
-    top = m.firstLine(index)
-    await repaint($)
+  const here = at(line)
+  if (here === undefined) return 'that line is still loading'
+  const kind = here.lines.kind[here.i]!
+  if (kind === Kind.File) return whole
+  if (kind !== Kind.Context && kind !== Kind.Add && kind !== Kind.Del) return 'put the cursor on a line of code or a file header'
+  const quote: string[] = []
+  for (let l = line; l >= Math.max(0, line - QUOTE_BEFORE); l--) {
+    const q = at(l)
+    const k = q?.lines.kind[q.i]
+    if (q === undefined || (k !== Kind.Context && k !== Kind.Add && k !== Kind.Del)) break
+    quote.unshift(`${k === Kind.Add ? '+' : k === Kind.Del ? '-' : ' '}${q.lines.line(q.i)}`)
   }
+  const isDel = kind === Kind.Del
+  return {
+    ...whole,
+    lineNo: isDel ? here.lines.oldNo[here.i]! : here.lines.newNo[here.i]!,
+    side: isDel ? 'old' : 'new',
+    quote,
+  }
+}
+
+/** Sends every comment to Claude as one prompt, then clears them. */
+async function sendComments($: $) {
+  const comments = await read($, commentsAtom)
+  if (comments.length === 0) {
+    $.ui.toast('review: no comments to send; c on a line writes one')
+    return
+  }
+  const review = await read($, reviewAtom)
+  const sent = await $.prompt.submit({ text: message(review?.title, comments), asUser: true })
+  if (sent.drop !== undefined) {
+    $.ui.toast(`review: comments not sent: ${sent.drop}`)
+    return
+  }
+  await update($, commentsAtom, () => [])
+  $.ui.toast(`review: sent ${comments.length} comment${comments.length === 1 ? '' : 's'} to Claude`)
 }
 
 /** Reads brv's progress lines and acts on them; one run at a time, a new one ends the old. */
@@ -201,6 +298,8 @@ async function onLine($: $, line: string) {
     case 'cached': {
       manifest = undefined
       top = 0
+      cursor = 0
+      await update($, composingAtom, () => null)
       const m = await loadManifest($, rest)
       const title = `${m.headName} ← ${m.baseName}`
       await update($, reviewAtom, () => ({ dir: rest, title }))
@@ -211,11 +310,8 @@ async function onLine($: $, line: string) {
     case 'text':
     case 'hl': {
       const index = Number(rest)
-      const m = manifest?.value
-      if (m === undefined || mounted === undefined) return
-      const first = Math.floor(top / m.chunkLines)
-      const last = Math.floor((top + mounted.rows) / m.chunkLines)
-      if (index < first || index > last) return
+      if (view === undefined || mounted === undefined) return
+      if (!windowChunks(view, top, mounted.rows - 1).includes(index)) return
       if (word === 'hl') resident.delete(index)
       void repaint($)
       return
@@ -256,29 +352,60 @@ export const register: Register = (on, options) => {
       const { Text } = $.ui.resolve(e)
       return <Text dimColor>The review pane draws in the terminal for now.</Text>
     }
-    const { Box, Text, Raster, Button } = $.ui.resolve(e)
+    const { Box, Text, Raster, Button, Input } = $.ui.resolve(e)
     if (review === null) return <Text dimColor>No review open. Run /tui-review.</Text>
+    const comments = await read($, commentsAtom)
+    const composing = await read($, composingAtom)
 
     const cols = Math.max(20, Math.min(512, e.props.bodyColumns))
     const rows = Math.max(3, Math.min(256, e.props.scroll.bodyRows - 1))
     mounted = { cols, rows }
-    top = Math.min(top, maxTop())
+    follow()
     const drawn = (await frame($)) ?? ''
+    const raster = <Raster key={RASTER} columns={cols} rows={rows} cells={drawn} />
+
+    if (composing !== null) {
+      return (
+        <Box flexDirection="column">
+          {raster}
+          <Input
+            key="comment"
+            label={`${composing.lineNo === null ? composing.path : `${composing.path}:${composing.lineNo}`} `}
+            placeholder="your comment; Enter saves, empty Enter cancels or deletes"
+            value={composing.text}
+            submitLabel="save"
+            autoFocus
+            onSubmit={text => {
+              void (async () => {
+                await update($, commentsAtom, list => upsert(list, { ...composing, text }))
+                await update($, composingAtom, () => null)
+              })()
+            }}
+          />
+        </Box>
+      )
+    }
 
     const key = (hotkey: string, label: string, act: () => void) => (
       <Button key={hotkey} plain hotkey={hotkey} label={label} onPress={act} />
     )
+    const startComment = () => {
+      const at = commentAtCursor(review.dir)
+      if (typeof at === 'string') $.ui.toast(`review: ${at}`)
+      // On a line that has a comment already, edit that one.
+      else void update($, composingAtom, () => comments.find(c => c.dir === at.dir && c.line === at.line) ?? at)
+    }
     return (
       <Box flexDirection="column">
-        <Raster key={RASTER} columns={cols} rows={rows} cells={drawn} />
+        {raster}
         <Box flexDirection="row" gap={1}>
-          {key('j', '↓', () => scrollTo($, top + 1))}
-          {key('k', '↑', () => scrollTo($, top - 1))}
-          {key('d', 'page↓', () => scrollTo($, top + rows - 2))}
-          {key('u', 'page↑', () => scrollTo($, top - rows + 2))}
+          {key('j', '↓', () => moveCursor($, cursor + 1))}
+          {key('k', '↑', () => moveCursor($, cursor - 1))}
           {key('n', 'file↓', () => fileJump($, 1))}
           {key('p', 'file↑', () => fileJump($, -1))}
-          {key('v', 'viewed', () => void toggleViewed($))}
+          {key('r', 'viewed', () => void toggleViewed($))}
+          {key('c', 'comment', startComment)}
+          {key('s', comments.length === 0 ? 'send' : `send ${comments.length}`, () => void sendComments($))}
         </Box>
       </Box>
     )
