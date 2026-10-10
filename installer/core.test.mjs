@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import {
   optIns, needsToken, planPlugins, duplicates, mergeSettings, safeArg, missingBinaries, SECRET_DENIES, isSandboxOn,
   hasDcgHook, dcgCommand, bundleIds, foreignPlugins, foreignMarketplaces, stripDefaults, isStripped, resetSettings, CLEAN_TARGETS,
-  brvAsset, sha256Of, brvAction,
+  cswapDownload, cswapCurrent, pathWith, brvAsset, sha256Of, brvAction,
 } from './core.mjs';
 
 const json = (p) => JSON.parse(readFileSync(new URL(`../${p}`, import.meta.url), 'utf8'));
@@ -15,8 +15,8 @@ const O = 'claude-plugins-official';
 
 test('opt-ins from the real manifests', () => {
   assert.deepEqual(optIns(marketplace, bundle).sort(), [
-    ...['atlassian', 'dev-feature', 'graphify', 'hallmark', 'mattpocock-picks', 'mcp-azure', 'mcp-github', 'nix-lsp', 'pstack-picks',
-      'tui-review']
+    ...['atlassian', 'cswap', 'dev-feature', 'graphify', 'hallmark', 'mattpocock-picks', 'mcp-azure', 'mcp-github', 'nix-lsp',
+      'pstack-picks', 'tui-review']
       .map((n) => `${n}@${M}`),
     ...['csharp-lsp', 'pyright-lsp', 'rust-analyzer-lsp', 'skill-creator', 'typescript-lsp'].map((n) => `${n}@${O}`),
   ].sort());
@@ -176,6 +176,33 @@ test('clean never targets credentials, plugins or project memory', () => {
   }
 });
 
+test('cswap.exe download: Windows only, pinned release asset under LOCALAPPDATA', () => {
+  const dl = cswapDownload('win32', { LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' }, 'v0.26.0');
+  assert.equal(dl.url, 'https://github.com/deadmade/dead-claude-skills/releases/download/cswap-v0.26.0/cswap.exe');
+  assert.equal(dl.sha256Url, `${dl.url}.sha256`);
+  assert.equal(dl.exe, 'C:\\Users\\me\\AppData\\Local\\Programs\\cswap\\cswap.exe');
+  assert.equal(cswapDownload('linux', { LOCALAPPDATA: '/x' }, 'v0.26.0'), null);
+  assert.equal(cswapDownload('win32', {}, 'v0.26.0'), null);
+});
+
+test('cswap pin matches --version output and is a stable tag', () => {
+  assert.equal(cswapCurrent('cswap 0.26.0\r\n', 'v0.26.0'), true);
+  assert.equal(cswapCurrent('cswap 0.25.0', 'v0.26.0'), false);
+  assert.match(json('installer/cswap.json').upstream, /^v\d+\.\d+\.\d+$/);
+});
+
+test('user PATH gains the cswap folder once', () => {
+  const dir = 'C:\\Users\\me\\AppData\\Local\\Programs\\cswap';
+  assert.equal(pathWith('C:\\a;C:\\b', dir), `C:\\a;C:\\b;${dir}`);
+  assert.equal(pathWith(`C:\\a;${dir.toUpperCase()}\\`, dir), null);
+  assert.equal(pathWith('', dir), dir);
+  assert.equal(pathWith(undefined, dir), dir);
+});
+
+test('cswap missing on Linux points at uv', () => {
+  assert.deepEqual(missingBinaries('linux', ['cswap'], () => false), [{ binary: 'cswap', command: 'uv tool install claude-swap' }]);
+});
+
 test('brv downloads the release archive built for this machine', () => {
   const win = brvAsset('win32', 'x64', '0.2.0');
   assert.equal(win.url, 'https://github.com/deadmade/dead-claude-skills/releases/download/brv-v0.2.0/brv-x86_64-pc-windows-msvc.zip');
@@ -206,4 +233,3 @@ test('brv checksum lines and what to do about brv', () => {
   assert.equal(at({}), 'download');
   assert.equal(at({ supported: false }), 'unsupported');
 });
-

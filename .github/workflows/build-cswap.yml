@@ -1,0 +1,74 @@
+name: Build cswap
+
+# cswap.exe: claude-swap (https://github.com/realiti4/claude-swap) at the tag pinned in installer/cswap.json,
+# compiled with Nuitka into one Windows exe. The installer downloads it from the cswap-<tag> release.
+# Any branch builds and smoke-tests; only the default branch publishes the release.
+on:
+  push:
+    paths: [installer/cswap.json, .github/workflows/build-cswap.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Read pin
+        id: pin
+        run: echo "tag=$(jq -r .upstream installer/cswap.json)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v7
+        with:
+          repository: realiti4/claude-swap
+          ref: ${{ steps.pin.outputs.tag }}
+          path: upstream
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install claude-swap and Nuitka
+        run: pip install ./upstream nuitka==4.3 zstandard
+
+      - name: Compile
+        run: |
+          printf 'from claude_swap.cli import main\nraise SystemExit(main())\n' > entry.py
+          python -m nuitka --onefile --assume-yes-for-downloads --output-filename=cswap.exe \
+            --include-package=claude_swap --include-package-data=claude_swap --include-package-data=textual \
+            --include-distribution-metadata=claude-swap entry.py
+
+      - name: Smoke test
+        run: |
+          home="$RUNNER_TEMP/cswap-home"
+          mkdir -p "$home"
+          export USERPROFILE="$home" HOME="$home" APPDATA="$home/AppData/Roaming" LOCALAPPDATA="$home/AppData/Local"
+          tag='${{ steps.pin.outputs.tag }}'
+          test "$(./cswap.exe --version | tr -d '\r')" = "cswap ${tag#v}"
+          ./cswap.exe help > /dev/null
+          ./cswap.exe list --json | python -c "import json, sys; assert json.load(sys.stdin)['accounts'] == []"
+          sha256sum cswap.exe > cswap.exe.sha256
+          cat cswap.exe.sha256
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: cswap-${{ steps.pin.outputs.tag }}
+          path: |
+            cswap.exe
+            cswap.exe.sha256
+
+      - name: Publish release
+        if: github.ref_name == github.event.repository.default_branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          rel='cswap-${{ steps.pin.outputs.tag }}'
+          gh release view "$rel" > /dev/null 2>&1 || gh release create "$rel" --title "cswap ${{ steps.pin.outputs.tag }}" \
+            --notes "claude-swap ${{ steps.pin.outputs.tag }} (https://github.com/realiti4/claude-swap, MIT) compiled with Nuitka for Windows. Installed by \`npx github:deadmade/dead-claude-skills\` with cswap ticked."
+          gh release upload "$rel" cswap.exe cswap.exe.sha256 --clobber
