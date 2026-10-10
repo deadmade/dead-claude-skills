@@ -98,9 +98,9 @@
       "category": "development"
     },
     {
-      "name": "branch-review",
-      "description": "/brv: a fast, stacked-branch-aware diff pane beside the chat, so you can ask Claude about what you read. Needs the brv binary; early (demo mode only). Opt-in.",
-      "source": "./plugins/branch-review",
+      "name": "tui-review",
+      "description": "/tui-review: a fast, stacked-branch-aware diff pane beside the chat, so you can ask Claude about what you read. Needs the brv binary; early (demo mode only). Opt-in.",
+      "source": "./plugins/tui-review",
       "category": "development"
     }
   ]

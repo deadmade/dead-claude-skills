@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { BranchReviewOpen } from '../types'
+import type { TuiReviewOpen } from '../types'
 import { Highlights, Lines, Manifest, chunkName, fromBase64, toBase64 } from './chunks'
 import { type Loaded, paint } from './paint'
 
@@ -10,7 +10,7 @@ const RASTER = 'diff'
 /** Chunks kept in memory: the one or two the window spans plus one ahead. */
 const RESIDENT = 3
 
-const reviewAtom = atom({ plugin: 'branch-review', key: 'review' } as const, null as BranchReviewOpen | null)
+const reviewAtom = atom({ plugin: 'tui-review', key: 'review' } as const, null as TuiReviewOpen | null)
 
 // What the pane draws from. Module memory, not $.state: it changes on every scroll, and a reload just reads it again.
 let manifest: { dir: string; value: Manifest } | undefined
@@ -67,7 +67,7 @@ async function readOptional($: $, path: string) {
 
 /** Paints the frame for the mounted size; undefined until the pane has drawn once. */
 async function frame($: $): Promise<string | undefined> {
-  const review = await $.state.get({ plugin: 'branch-review', key: 'review' })
+  const review = await $.state.get({ plugin: 'tui-review', key: 'review' })
   if (mounted === undefined || !review.value) return undefined
   const started = performance.now()
   const m = await loadManifest($, review.value.dir)
@@ -193,14 +193,14 @@ export const register: Register = (on, options) => {
 
   on('session.start', async ($, e, next) => {
     await $.command.register({
-      name: 'brv',
+      name: 'tui-review',
       description: 'Review this branch against the one it is based on, in a pane beside the chat',
       argumentHint: '[base] | demo',
     })
     return next(e)
   })
 
-  on('command.run', { command: 'brv' }, async ($, e) => {
+  on('command.run', { command: 'tui-review' }, async ($, e) => {
     const arg = e.args.trim()
     const argv = arg === 'demo' ? [brv, 'gen', '--lines', '100000'] : [brv, 'review', ...(arg ? ['--base', arg] : [])]
     void run($, argv)
@@ -219,7 +219,7 @@ export const register: Register = (on, options) => {
       return <Text dimColor>The review pane draws in the terminal for now.</Text>
     }
     const { Box, Text, Raster, Button } = $.ui.resolve(e)
-    if (review === null) return <Text dimColor>No review open. Run /brv.</Text>
+    if (review === null) return <Text dimColor>No review open. Run /tui-review.</Text>
 
     const cols = Math.max(20, Math.min(512, e.props.bodyColumns))
     const rows = Math.max(3, Math.min(256, e.props.scroll.bodyRows - 1))

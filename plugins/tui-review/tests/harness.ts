@@ -62,7 +62,7 @@ export function engine(on: On, progress: string[]): Recorded {
 
 export const pane = (columns: number, rows: number) =>
   ({
-    plugin: 'branch-review',
+    plugin: 'tui-review',
     surface: 'terminal',
     component: 'Pane',
     requestId: 'review',

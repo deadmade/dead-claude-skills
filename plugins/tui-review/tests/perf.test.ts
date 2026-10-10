@@ -9,7 +9,7 @@ import * as fixture from './fixture.gen'
 import { DIR, engine, pane, residentOf } from './harness'
 
 const PROGRESS = [`manifest ${DIR}`, 'text 0', 'hl 0', 'done']
-const run = { command: 'brv', args: 'demo', origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 200 } } as const
+const run = { command: 'tui-review', args: 'demo', origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 200 } } as const
 
 /** Timings go to the test output where the runner has a console. */
 const report = (line: string) => (globalThis as { console?: { log(s: string): void } }).console?.log(`  perf: ${line}`)

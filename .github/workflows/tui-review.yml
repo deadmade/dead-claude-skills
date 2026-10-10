@@ -1,14 +1,14 @@
-name: branch-review
+name: tui-review
 
 on:
   push:
     paths:
-      - "plugins/branch-review/**"
-      - ".github/workflows/branch-review.yml"
+      - "plugins/tui-review/**"
+      - ".github/workflows/tui-review.yml"
   pull_request:
     paths:
-      - "plugins/branch-review/**"
-      - ".github/workflows/branch-review.yml"
+      - "plugins/tui-review/**"
+      - ".github/workflows/tui-review.yml"
   workflow_dispatch:
 
 permissions:
@@ -24,7 +24,7 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: plugins/branch-review/brv
+        working-directory: plugins/tui-review/brv
     steps:
       - uses: actions/checkout@v7
 
@@ -33,7 +33,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: plugins/branch-review/brv
+          workspaces: plugins/tui-review/brv
 
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
@@ -50,7 +50,7 @@ jobs:
           node ../tests/make-fixture.mjs "$RUNNER_TEMP/brv-fixture"
 
       - name: Mod tests and speed budgets
-        working-directory: plugins/branch-review
+        working-directory: plugins/tui-review
         run: |
           npm install -g @anthropic-ai/claude-code
           claude plugin validate .

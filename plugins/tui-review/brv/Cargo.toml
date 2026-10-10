@@ -3,7 +3,7 @@ name = "brv"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.97"
-description = "Computes a branch's review diff and writes the cache the branch-review mod paints from."
+description = "Computes a branch's review diff and writes the cache the tui-review mod paints from."
 license = "MIT"
 publish = false
 

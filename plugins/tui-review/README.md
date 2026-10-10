@@ -1,15 +1,15 @@
-# branch-review
+# tui-review
 
-`/brv` opens a diff pane beside the chat, so you can read a branch's changes and ask Claude about them in the
+`/tui-review` opens a diff pane beside the chat, so you can read a branch's changes and ask Claude about them in the
 same session. The diff, highlighting and git work happen in `brv`, a Rust binary. The mod only paints, from small
 binary chunk files `brv` writes to disk, so a 100k-line PR costs the same memory and frame time as a 100-line one.
 
-**Status: step 1 of 4 (spike).** `/brv demo` opens a generated 100k-line review. Real branches (`/brv [base]`),
+**Status: step 1 of 4 (spike).** `/tui-review demo` opens a generated 100k-line review. Real branches (`/tui-review [base]`),
 tree-sitter highlighting, quoting hunks into the prompt and "viewed" marks come next.
 
 ## Use
 
-    /brv demo
+    /tui-review demo
 
 The pane takes the keyboard when it opens. Esc goes back to the prompt to type a question; ctrl+x tab goes back to
 the pane.
@@ -26,17 +26,17 @@ The status line shows `load · paint · chunks` for the last frame.
 
 ## brv
 
-Build it and put it on PATH, or set its path with `/plugin configure branch-review`:
+Build it and put it on PATH, or set its path with `/plugin configure tui-review`:
 
-    cargo build --release --manifest-path plugins/branch-review/brv/Cargo.toml
+    cargo build --release --manifest-path plugins/tui-review/brv/Cargo.toml
 
-`brv gen [--lines N] [--out DIR]` writes a synthetic review cache (what `/brv demo` runs).
+`brv gen [--lines N] [--out DIR]` writes a synthetic review cache (what `/tui-review demo` runs).
 
 ## Develop
 
-    claude --plugin-dir plugins/branch-review        # hot-reloads on save
+    claude --plugin-dir plugins/tui-review        # hot-reloads on save
 
-    cd plugins/branch-review/brv
+    cd plugins/tui-review/brv
     cargo clippy --all-targets && cargo test && cargo bench
     cargo run --release -- gen --out /tmp/brv-fixture && node ../tests/make-fixture.mjs /tmp/brv-fixture
     cd .. && claude plugin test .                    # format contract, pane, speed budgets
