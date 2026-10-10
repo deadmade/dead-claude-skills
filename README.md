@@ -11,7 +11,7 @@ It's built for me; use it if it fits, but expect it to change without notice.
   and the rust/csharp/typescript/pyright LSPs) install from `claude-plugins-official`; the installer adds that
   marketplace if it's missing.
 - **Opt-in:** language servers (rust, csharp, typescript, pyright, nix), mcp-github, mcp-azure, atlassian,
-  hallmark, dev-feature, mattpocock-picks, pstack-picks, graphify, skill-creator.
+  hallmark, dev-feature, mattpocock-picks, pstack-picks, graphify, cswap, skill-creator.
 - **Installer toggles:** ccstatusline, sandbox (Linux/macOS/WSL2, needs bubblewrap and socat), and
   [dcg](https://github.com/Dicklesworthstone/destructive_command_guard) (runs dcg's own installer). The installer
   always denies reading `.env` files and credential dirs (`~/.ssh`, `~/.aws`, `~/.azure`, `~/.config/gh`, `~/.gnupg`).
@@ -35,3 +35,17 @@ The installer has two optional rows (also `--strip-defaults` / `--clean`) that t
   with only this installer's keys (plus enabled plugins and dcg's hook if dcg stays on), and deletes `CLAUDE.md`, `skills`, `agents`,
   `commands`, `rules`, `output-styles`, `workflows` and `hooks`. Credentials, `~/.claude.json`, `projects/`,
   `plugins/` and history are left alone, and symlinked paths (home-manager) are skipped. Asks you to type `clean`.
+
+## cswap
+
+Multi-account switching with [claude-swap](https://github.com/realiti4/claude-swap), from inside Claude Code:
+
+- `/swap` opens the accounts pane (5h/7d usage, a Switch button per account); `/swap next`, `/swap best` or
+  `/swap <num|email|alias>` switches. The status line shows the active account's usage.
+- Auto-switch is off by default: turn on `auto_switch` with `/plugin configure cswap`. It runs `cswap auto --once`
+  every 2 minutes; the threshold and strategy are cswap's own (`cswap config set autoswitch.threshold 80`).
+- Accounts are still added in a terminal: log in with Claude Code, then `cswap add`, once per account.
+
+On Windows the installer downloads `cswap.exe` (claude-swap compiled with Nuitka by `build-cswap.yml`, pinned in
+`installer/cswap.json`) to `%LOCALAPPDATA%\Programs\cswap` and puts it on your user PATH. On Linux, install it
+with `uv tool install claude-swap` (or nix).

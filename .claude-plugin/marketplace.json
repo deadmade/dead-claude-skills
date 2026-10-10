@@ -96,6 +96,12 @@
       "description": "Hallmark: anti-AI-slop design skill for web frontends, scoped to browser UI work. Vendored from nutlope/hallmark. Opt-in.",
       "source": "./plugins/hallmark",
       "category": "development"
+    },
+    {
+      "name": "cswap",
+      "description": "claude-swap in Claude Code: accounts pane, /swap, usage status line, opt-in auto-switch. The installer downloads cswap.exe on Windows. Opt-in.",
+      "source": "./plugins/cswap",
+      "category": "productivity"
     }
   ]
 }

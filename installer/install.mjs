@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 // Interactive installer for the dead-claude-skills marketplace. Decisions live in core.mjs.
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { createInterface, emitKeypressEvents } from 'node:readline';
 import {
-  BUNDLE, CLEAN_TARGETS, MARKETPLACE, OFFICIAL, bundleIds, dcgCommand, duplicates, foreignMarketplaces, foreignPlugins, hasDcgHook,
-  isOurStatusLine, isSandboxOn, isStripped, mergeSettings, missingBinaries, nameOf, needsToken, optIns, planPlugins,
+  BUNDLE, CLEAN_TARGETS, MARKETPLACE, OFFICIAL, bundleIds, cswapCurrent, cswapDownload, dcgCommand, duplicates, foreignMarketplaces, foreignPlugins, hasDcgHook,
+  isOurStatusLine, isSandboxOn, isStripped, mergeSettings, missingBinaries, nameOf, needsToken, optIns, pathWith, planPlugins,
   resetSettings, safeArg, stripDefaults,
 } from './core.mjs';
 
@@ -183,6 +184,51 @@ async function applyDcg(was, on) {
   if (on && !WIN && !onPath('dcg')) console.log('\n\x1b[33mdcg is not on PATH: add ~/.local/bin (NixOS: home.sessionPath).\x1b[0m');
 }
 
+// Windows: download the pinned cswap.exe (checked against its .sha256) and put its folder on the user PATH.
+async function applyCswap(on) {
+  const version = readJson(join(PKG, 'installer', 'cswap.json')).upstream;
+  const dl = cswapDownload(process.platform, process.env, version);
+  if (!on || !dl) return;
+  const have = existsSync(dl.exe) ? spawnSync(dl.exe, ['--version'], { encoding: 'utf8' }) : undefined;
+  if (!(have?.status === 0 && cswapCurrent(have.stdout, version))) {
+    if (!(await ask(`\nDownload cswap.exe ${version} (claude-swap, built by this repo's CI) to ${dl.dir}?`, true))) {
+      return done.push('cswap: download skipped by you');
+    }
+    try {
+      const get = async (url) => {
+        const r = await fetch(url);
+        if (!r.ok) throw new Error(`${url}: HTTP ${r.status}`);
+        return r;
+      };
+      const [exe, sum] = await Promise.all([get(dl.url).then((r) => r.arrayBuffer()), get(dl.sha256Url).then((r) => r.text())]);
+      const bytes = Buffer.from(exe);
+      const want = sum.trim().split(/\s+/)[0].toLowerCase();
+      const got = createHash('sha256').update(bytes).digest('hex');
+      if (got !== want) return failures.push(`cswap: checksum mismatch (got ${got}, want ${want}), nothing written`);
+      mkdirSync(dl.dir, { recursive: true });
+      const tmp = `${dl.exe}.tmp-${process.pid}`;
+      writeFileSync(tmp, bytes);
+      // A running cswap.exe (the plugin polls it) can be renamed but not replaced: move it aside first.
+      const old = `${dl.exe}.old-${process.pid}`;
+      if (existsSync(dl.exe)) renameSync(dl.exe, old);
+      renameSync(tmp, dl.exe);
+      try { rmSync(old, { force: true }); } catch { /* still running: left beside it */ }
+      done.push(`cswap: installed ${version} to ${dl.exe}`);
+    } catch (e) {
+      return failures.push(`cswap download failed: ${e.message}`);
+    }
+  }
+  if (!process.env.PATH?.toLowerCase().includes(dl.dir.toLowerCase())) process.env.PATH = `${process.env.PATH};${dl.dir}`;
+  const ps = (cmd, env) => spawnSync('powershell', ['-NoProfile', '-Command', cmd], { encoding: 'utf8', env: { ...process.env, ...env } });
+  const userPath = ps("[Environment]::GetEnvironmentVariable('Path', 'User')").stdout?.trim();
+  const next = pathWith(userPath, dl.dir);
+  if (!next) return;
+  // The new PATH goes through the environment, never into the command text.
+  const r = ps("[Environment]::SetEnvironmentVariable('Path', $env:DCS_PATH, 'User')", { DCS_PATH: next });
+  if (r.status === 0) done.push(`cswap: added ${dl.dir} to your user PATH (new terminals see it)`);
+  else failures.push(`cswap: couldn't add ${dl.dir} to PATH; add it by hand`);
+}
+
 // Copies every clean target that exists; any failure aborts the clean slate before something is deleted.
 function backup(dir) {
   for (const t of [...CLEAN_TARGETS, 'settings.json']) {
@@ -321,6 +367,7 @@ await applySettings({ statusLine: on('ccstatusline'), sandbox: on('sandbox'), dc
 const autoUpdate = tryJson(join(CONFIG, 'plugins', 'known_marketplaces.json'))?.[MARKETPLACE]?.autoUpdate;
 await applyCcstatusline(on('ccstatusline'));
 await applyDcg(hasDcgHook(settingsNow), on('dcg'));
+await applyCswap(selected.some((id) => nameOf(id) === 'cswap'));
 if (clean) clearTargets();
 // The global instructions moved into a dead-skills SessionStart hook; the old file would duplicate them.
 remove(RULES, RULES);
