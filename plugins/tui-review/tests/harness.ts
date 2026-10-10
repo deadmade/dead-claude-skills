@@ -17,11 +17,23 @@ export type Recorded = {
   reads: string[]
   /** The prompts the plugin submitted, as Claude would get them. */
   prompts: string[]
+  /** The hidden context each prompt carried, in the same order. */
+  contexts: (readonly string[])[]
   toasts: string[]
   /** The ids of the panes closed. */
   closed: string[]
+  /** Each process started, by its argv. */
+  spawns: string[][]
+  /** The ids of the panes opened, and whether each took the keyboard. */
+  opens: { id: string; focus: boolean }[]
   opened: Promise<void>
 }
+
+/** The session directory the plugin sees. */
+export const CWD = '/work/repo'
+
+/** brv's progress lines per run: the same for every run, or chosen by its argv. */
+export type Script = readonly string[] | ((argv: readonly string[]) => readonly string[])
 
 /** Chunks read from "disk" per scroll, and how many are resident, read off the plugin's status line. */
 export const residentOf = (status: string) => Number(/(\d+) chunks/.exec(status)?.[1] ?? NaN)
@@ -41,7 +53,7 @@ export function cellBg(cellsBase64: string, cols: number, row: number, col = 0):
   return new Uint32Array(bytes.buffer, (row * cols + col) * 12, 3)[2]!
 }
 
-export function engine(on: On, progress: string[], store: Record<string, unknown> = {}): Recorded {
+export function engine(on: On, progress: Script, store: Record<string, unknown> = {}): Recorded {
   let markOpened = () => {}
   const recorded: Recorded = {
     store: new Map(Object.entries(store)),
@@ -49,8 +61,11 @@ export function engine(on: On, progress: string[], store: Record<string, unknown
     status: [],
     reads: [],
     prompts: [],
+    contexts: [],
     toasts: [],
     closed: [],
+    spawns: [],
+    opens: [],
     opened: new Promise(resolve => (markOpened = resolve)),
   }
   const fileOf = (path: string) => {
@@ -69,11 +84,16 @@ export function engine(on: On, progress: string[], store: Record<string, unknown
     if (base64 === undefined) throw new Error(`ENOENT ${e.path}`)
     return { value: { base64 } }
   })
-  on('process.spawn', async function* () {
-    for (const line of progress) yield { stream: 'stdout' as const, text: `${line}\n` }
+  on('process.spawn', async function* (_$, e) {
+    recorded.spawns.push([...e.argv])
+    const lines = typeof progress === 'function' ? progress(e.argv) : progress
+    for (const line of lines) yield { stream: 'stdout' as const, text: `${line}\n` }
     return { value: { code: 0, signal: null } }
   })
-  on('ui.open', async () => {
+  on('session.cwd', async () => ({ value: CWD }))
+  on('tool.call', async () => ({ result: 'ok' }) as never)
+  on('ui.open', async (_$, e) => {
+    recorded.opens.push({ id: e.id, focus: e.focus === true })
     markOpened()
     return { value: { isPlaced: true as const } }
   })
@@ -96,6 +116,7 @@ export function engine(on: On, progress: string[], store: Record<string, unknown
   })
   on('prompt.submit', async (_$, e) => {
     recorded.prompts.push(e.text)
+    recorded.contexts.push(e.context ?? [])
     return { text: e.text }
   })
   on('store.get', async (_$, e) => ({ value: structuredClone(recorded.store.get(e.key)) }))

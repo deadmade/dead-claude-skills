@@ -4,6 +4,7 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { ReviewComment, TuiReviewOpen } from '../types'
 import { Highlights, Kind, Lines, Manifest, chunkName, fromBase64, toBase64 } from './chunks'
 import { message, upsert, wrap } from './comments'
+import { reviewContext } from './context'
 import { type Loaded, NOTE_TEXT, paint } from './paint'
 import { View } from './view'
 import { VIEWED_KEY, Viewed } from './viewed'
@@ -36,6 +37,19 @@ let cells = new Uint32Array(0)
 let painting: Promise<void> | undefined
 let paintAgain = false
 let stopRun: (() => void) | undefined
+/** A brv run is reading; a refresh asked for meanwhile waits for it and runs once after. */
+let running = false
+/** Bumped per run, so a run ended by a newer one does not mark the newer one finished. */
+let runId = 0
+let refreshAgain = false
+/** A new review whose comments from the last one still need moving onto it, once its chunks are written. */
+let relocateTo: string | undefined
+/** Focus moves within the pane come in bursts; one refresh per this many ms is enough. */
+const FOCUS_REFRESH_MS = 2000
+let focusRefreshAt = 0
+
+/** How the running brv was started: what kind of review, and the base it was asked for. */
+type Origin = { kind: TuiReviewOpen['kind']; base?: string }
 
 type $ = EngineInterface
 
@@ -280,9 +294,31 @@ async function sendComments($: $) {
   $.ui.toast(`review: sent ${comments.length} comment${comments.length === 1 ? '' : 's'} to Claude`)
 }
 
+/** The command line of a branch review in the session's directory. */
+async function reviewArgv($: $, brv: string, base: string | undefined): Promise<string[]> {
+  const argv = [brv, 'review', '--repo', await $.session.cwd()]
+  return base === undefined ? argv : [...argv, '--base', base]
+}
+
+/**
+ * Runs the open branch review again: brv answers `cached` at once when HEAD has not moved, and writes the new review
+ * when it has. Skipped while a comment is being written, so its text is not lost; the next refresh catches up.
+ */
+async function refresh($: $) {
+  const review = await read($, reviewAtom)
+  if (review === null || review.kind !== 'branch' || (await read($, composingAtom)) !== null) return
+  if (running) {
+    refreshAgain = true
+    return
+  }
+  await run($, await reviewArgv($, brvPath, review.base), { kind: 'branch', base: review.base })
+}
+
 /** Reads brv's progress lines and acts on them; one run at a time, a new one ends the old. */
-async function run($: $, argv: string[]) {
+async function run($: $, argv: string[], origin: Origin) {
   stopRun?.()
+  const id = ++runId
+  running = true
   const stream = $.process.spawn({ argv })
   let isStopped = false
   stopRun = () => {
@@ -304,12 +340,22 @@ async function run($: $, argv: string[]) {
         const line = pending.slice(0, nl).trimEnd()
         pending = pending.slice(nl + 1)
         isAnswered ||= /^(manifest|cached|error) /.test(line)
-        await onLine($, line)
+        try {
+          await onLine($, line, origin)
+        } catch (err) {
+          $.ui.toast(`review: ${err instanceof Error ? err.message : String(err)}`)
+        }
       }
     }
   } catch (err) {
     $.ui.toast(`review: could not run ${argv[0]}: ${String(err)}`)
     return
+  } finally {
+    if (id === runId) running = false
+    if (id === runId && refreshAgain) {
+      refreshAgain = false
+      void refresh($)
+    }
   }
   // brv says what went wrong on stdout; a run that ends with nothing said gets its stderr shown instead.
   if (!isStopped && !isAnswered) {
@@ -328,6 +374,8 @@ async function close($: $) {
 async function closed($: $) {
   stopRun?.()
   stopRun = undefined
+  relocateTo = undefined
+  refreshAgain = false
   manifest = undefined
   viewed = undefined
   view = undefined
@@ -340,24 +388,96 @@ async function closed($: $) {
   $.ui.status(undefined)
 }
 
-async function onLine($: $, line: string) {
+/**
+ * Moves comments written on an earlier review of this branch onto `dir`'s review: onto the same line of the same file
+ * when it is still in the diff, else onto that file's header. A comment whose file left the review stays as it was;
+ * it is not drawn, but `s` still sends it.
+ */
+async function relocate($: $, dir: string) {
+  relocateTo = undefined
+  const m = view?.manifest
+  const comments = await read($, commentsAtom)
+  if (m === undefined || comments.every(c => c.dir === dir)) return
+  const taken = new Set(comments.filter(c => c.dir === dir).map(c => c.line))
+  const moved: ReviewComment[] = []
+  for (const c of comments) {
+    const file = c.dir === dir ? -1 : m.findFile(c.path)
+    if (file < 0) {
+      moved.push(c)
+      continue
+    }
+    const line = (c.lineNo === null ? undefined : await findLine($, dir, m, file, c)) ?? m.firstLine(file)
+    // Two comments cannot share a line; the later one keeps its old place.
+    if (taken.has(line)) {
+      moved.push(c)
+      continue
+    }
+    taken.add(line)
+    moved.push({ ...c, dir, line })
+  }
+  await update($, commentsAtom, () => moved)
+  void repaint($)
+}
+
+/** The global line in `file` of `dir`'s review showing `c`'s line on `c`'s side, read from its chunks. */
+async function findLine($: $, dir: string, m: Manifest, file: number, c: ReviewComment): Promise<number | undefined> {
+  const first = m.firstLine(file)
+  const end = first + m.lineCount(file)
+  for (let chunk = Math.floor(first / m.chunkLines); chunk * m.chunkLines < end; chunk++) {
+    const bytes = await readOptional($, `${dir}/${chunkName(chunk, 'lines')}`)
+    if (bytes === undefined) return undefined
+    const lines = new Lines(bytes)
+    const base = chunk * m.chunkLines
+    for (let i = Math.max(0, first - base); i < lines.n && base + i < end; i++) {
+      const kind = lines.kind[i]
+      const isOld = kind === Kind.Del || kind === Kind.Context
+      const isNew = kind === Kind.Add || kind === Kind.Context
+      const no = c.side === 'old' ? (isOld ? lines.oldNo[i] : 0) : isNew ? lines.newNo[i] : 0
+      if (no === c.lineNo) return base + i
+    }
+  }
+  return undefined
+}
+
+async function onLine($: $, line: string, origin: Origin) {
   const space = line.indexOf(' ')
   const word = space < 0 ? line : line.slice(0, space)
   const rest = space < 0 ? '' : line.slice(space + 1)
   switch (word) {
     case 'manifest':
     case 'cached': {
+      const shown = await read($, reviewAtom)
+      // The same review again (a refresh with HEAD where it was): keep the cursor, the chunks, everything.
+      if (shown?.dir === rest) return
+      // A refresh landing while a comment is written waits: the comment points into the review on screen.
+      if (shown !== null && (await read($, composingAtom)) !== null) return
+      const keep = view !== undefined && shown !== null ? view.manifest.file(view.fileOfRow(cursor)).path : undefined
       manifest = undefined
       top = 0
       cursor = 0
       await update($, composingAtom, () => null)
-      const m = await loadManifest($, rest)
+      let m: Manifest
+      try {
+        m = await loadManifest($, rest)
+      } catch (err) {
+        $.ui.toast(`review: ${err instanceof Error ? err.message : String(err)}`)
+        return
+      }
+      // Back to the file the cursor was in, when the new review still has it.
+      const file = keep === undefined ? -1 : m.findFile(keep)
+      if (file >= 0 && view !== undefined) cursor = top = view.headerRow(file)
       const title = `${m.headName} ← ${m.baseName}`
-      await update($, reviewAtom, () => ({ dir: rest, title }))
-      await $.ui.open({ id: PANE, title: `Review ${title}`, focus: true })
+      await update($, reviewAtom, () => ({ dir: rest, title, kind: origin.kind, base: origin.base }))
+      // Opened by the person, it takes the keyboard; a refresh only retitles it.
+      await $.ui.open({ id: PANE, title: `Review ${title}`, ...(shown === null ? { focus: true as const } : {}) })
+      relocateTo = rest
+      if (word === 'cached') await relocate($, rest)
       void repaint($)
       return
     }
+    case 'done':
+      if (relocateTo !== undefined) await relocate($, relocateTo)
+      return
     case 'text':
     case 'hl': {
       const index = Number(rest)
@@ -373,14 +493,17 @@ async function onLine($: $, line: string) {
   }
 }
 
+/** The brv binary: the plugin's `brvPath` option, or brv on PATH. */
+let brvPath = 'brv'
+
 export const register: Register = (on, options) => {
-  const brv = typeof options.brvPath === 'string' && options.brvPath !== '' ? options.brvPath : 'brv'
+  brvPath = typeof options.brvPath === 'string' && options.brvPath !== '' ? options.brvPath : 'brv'
 
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'tui-review',
-      description: 'A diff pane beside the chat; for now a generated demo review (/tui-review demo)',
-      argumentHint: 'demo',
+      description: 'A diff pane of this branch beside the chat, against the branch it is stacked on (or the one given)',
+      argumentHint: '[base | demo]',
     })
     return next(e)
   })
@@ -402,13 +525,45 @@ export const register: Register = (on, options) => {
 
   on('command.run', { command: 'tui-review' }, async ($, e) => {
     const arg = e.args.trim()
-    if (arg !== 'demo') {
-      return {
-        text: 'Reviewing real branches is not built yet: brv has no `review` command so far. /tui-review demo opens a generated review.',
-      }
+    if (arg === 'demo') {
+      void run($, [brvPath, 'gen', '--lines', '100000'], { kind: 'demo' })
+      return { text: 'Opening a 100k-line demo review.' }
     }
-    void run($, [brv, 'gen', '--lines', '100000'])
-    return { text: 'Opening a 100k-line demo review.' }
+    const base = arg === '' ? undefined : arg
+    void run($, await reviewArgv($, brvPath, base), { kind: 'branch', base })
+    return {
+      text:
+        base === undefined
+          ? 'Opening a review of this branch against the branch it is stacked on.'
+          : `Opening a review of this branch against ${base}; brv remembers it for this branch.`,
+    }
+  })
+
+  // Claude never sees the pane: each prompt carries which diff is open and where the cursor is.
+  on('prompt.submit', async ($, e, next) => {
+    const review = await read($, reviewAtom)
+    const m = view?.manifest
+    if (review === null || review.kind !== 'branch' || m === undefined || m.files === 0) return next(e)
+    const note = reviewContext(m, commentAtCursor(review.dir))
+    return next({ ...e, context: [...(e.context ?? []), note] })
+  })
+
+  // A Bash call may have committed, checked out or rebased: show the branch as it is now.
+  on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
+    const result = await next(e)
+    void refresh($)
+    return result
+  })
+
+  // Coming back to the pane, it shows the branch as it is now.
+  on('ui.focus', { requestId: PANE }, async ($, e, next) => {
+    const result = await next(e)
+    const now = Date.now()
+    if (now - focusRefreshAt >= FOCUS_REFRESH_MS) {
+      focusRefreshAt = now
+      void refresh($)
+    }
+    return result
   })
 
   on('ui.scroll', { requestId: PANE }, async ($, e) => {

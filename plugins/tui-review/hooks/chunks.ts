@@ -57,6 +57,9 @@ export class Manifest {
   readonly chunkLines: number
   readonly baseName: string
   readonly headName: string
+  readonly baseSha: string
+  readonly headSha: string
+  readonly mergeBaseSha: string
   private readonly records: Uint32Array
   private readonly strings: Uint16Array
 
@@ -70,6 +73,9 @@ export class Manifest {
     this.chunkLines = meta[1]!
     this.baseName = this.str(meta, 2)
     this.headName = this.str(meta, 4)
+    this.baseSha = this.str(meta, 6)
+    this.headSha = this.str(meta, 8)
+    this.mergeBaseSha = this.str(meta, 10)
   }
 
   private str(from: Uint32Array, at: number): string {
@@ -102,6 +108,12 @@ export class Manifest {
 
   lineCount(index: number): number {
     return this.records[index * FILE_U32 + 8]!
+  }
+
+  /** The index of the file at `path`, or -1 when the review has none. */
+  findFile(path: string): number {
+    for (let i = 0; i < this.files; i++) if (this.file(i).path === path) return i
+    return -1
   }
 
   /** The file a global line belongs to: binary search over the files' first lines. */

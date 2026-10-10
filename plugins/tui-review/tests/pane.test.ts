@@ -88,9 +88,3 @@ test('a new conversation closes the pane and drops the old comments', async ($, 
   expect(labels).toContain('send')
   expect(labels).not.toContain('send 1')
 })
-
-test('/tui-review without demo says real branches are not built yet', async ($, on) => {
-  engine(on, PROGRESS)
-  const answer = await $.command.run({ ...run, args: '' })
-  expect(JSON.stringify(answer)).toContain('not built yet')
-})
