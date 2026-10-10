@@ -42,7 +42,7 @@ jobs:
         run: cargo test
 
       - name: Benchmarks
-        run: cargo bench -- --sample-count 50 | tee "$RUNNER_TEMP/brv-bench.txt"
+        run: cargo bench --bench format -- --sample-count 50 | tee "$RUNNER_TEMP/brv-bench.txt"
 
       - name: Mod fixture from brv gen
         run: |
