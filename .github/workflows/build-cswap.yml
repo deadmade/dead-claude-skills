@@ -2,9 +2,9 @@ name: Build cswap
 
 # cswap.exe: claude-swap (https://github.com/realiti4/claude-swap) at the tag pinned in installer/cswap.json,
 # compiled with Nuitka into one Windows exe. The installer downloads it from the cswap-<tag> release.
+# Any branch builds and smoke-tests; only main publishes the release.
 on:
   push:
-    branches: [main]
     paths: [installer/cswap.json, .github/workflows/build-cswap.yml]
   workflow_dispatch:
 
