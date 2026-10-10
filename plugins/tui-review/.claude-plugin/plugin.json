@@ -1,6 +1,6 @@
 {
   "name": "tui-review",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "/tui-review: a fast diff pane for the current branch, next to the chat, so you can ask Claude about what you read. Needs the brv binary.",
   "author": {
     "name": "deadmade",

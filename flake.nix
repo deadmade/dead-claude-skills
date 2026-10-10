@@ -86,6 +86,8 @@
         inherit (manifest) version;
         src = ./plugins/tui-review/brv;
         cargoLock.lockFile = ./plugins/tui-review/brv/Cargo.lock;
+        # tests/review.rs builds its fixture repositories with git.
+        nativeCheckInputs = [pkgs.git];
         meta = {
           inherit (manifest) description;
           mainProgram = "brv";

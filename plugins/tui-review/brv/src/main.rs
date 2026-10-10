@@ -1,6 +1,10 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+#[cfg(target_env = "musl")]
+#[global_allocator]
+static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 const USAGE: &str = "\
 usage: brv review [--base REF] [--repo DIR] [--cache DIR]   review HEAD against the branch it is stacked on
        brv gen [--lines N] [--seed N] [--out DIR]           write a synthetic review cache (default 100000 lines)
@@ -9,6 +13,17 @@ usage: brv review [--base REF] [--repo DIR] [--cache DIR]   review HEAD against 
 ";
 
 fn main() -> ExitCode {
+    #[cfg(target_env = "musl")]
+    // SAFETY: before any tree-sitter call, on one thread, with one allocator family's four functions.
+    unsafe {
+        use libmimalloc_sys::{mi_calloc, mi_free, mi_malloc, mi_realloc};
+        tree_sitter::set_allocator(Some(tree_sitter::Allocator {
+            malloc: mi_malloc,
+            calloc: mi_calloc,
+            realloc: mi_realloc,
+            free: mi_free,
+        }));
+    }
     let args: Vec<String> = std::env::args().skip(1).collect();
     let result = match args.first().map(String::as_str) {
         Some("review") => review_command(&args[1..]),

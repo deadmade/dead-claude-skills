@@ -99,7 +99,7 @@
     },
     {
       "name": "tui-review",
-      "description": "/tui-review: a fast, stacked-branch-aware diff pane beside the chat, so you can ask Claude about what you read. Needs the brv binary; early (demo mode only). Opt-in.",
+      "description": "/tui-review: a fast, stacked-branch-aware diff pane beside the chat, so you can ask Claude about what you read. Needs the brv binary, which the installer downloads. Opt-in.",
       "source": "./plugins/tui-review",
       "category": "development"
     }

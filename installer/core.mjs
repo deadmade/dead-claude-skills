@@ -162,3 +162,35 @@ export function missingBinaries(platform, wanted, onPath) {
       return { binary, command: cmd.startsWith('nix: ') ? `add to home.packages: ${cmd.slice(5)}` : cmd };
     });
 }
+
+// brv, the tui-review plugin's binary, built per platform by .github/workflows/brv-release.yml.
+const BRV_TARGETS = {
+  'win32-x64': 'x86_64-pc-windows-msvc',
+  'linux-x64': 'x86_64-unknown-linux-musl',
+  'linux-arm64': 'aarch64-unknown-linux-musl',
+  'darwin-arm64': 'aarch64-apple-darwin',
+  'darwin-x64': 'x86_64-apple-darwin',
+};
+const RELEASES = 'https://github.com/deadmade/dead-claude-skills/releases/download';
+
+// The release archive of brv `version` for this machine, or undefined where none is built.
+export function brvAsset(platform, arch, version) {
+  const target = BRV_TARGETS[`${platform}-${arch}`];
+  if (!target) return undefined;
+  const file = `brv-${target}.${platform === 'win32' ? 'zip' : 'tar.gz'}`;
+  const url = `${RELEASES}/brv-v${version}/${file}`;
+  return { file, url, sha256: `${url}.sha256`, exe: platform === 'win32' ? 'brv.exe' : 'brv' };
+}
+
+// The checksum a `sha256sum` line starts with, lowercased; undefined when the text is not one.
+export const sha256Of = (text) => /^[0-9a-f]{64}(?=\s|$)/i.exec(text.trim())?.[0].toLowerCase();
+
+// What to do about brv: `skip` (a brv on PATH is the user's own), `configure` (ours is current, point the plugin at
+// it), `download` (none, or an older one), or `unsupported` (no build for this machine).
+// installed: the version our copy reports, or undefined when there is none.
+export function brvAction({ onPath, installed, version, supported }) {
+  if (onPath) return 'skip';
+  if (installed === version) return 'configure';
+  return supported ? 'download' : 'unsupported';
+}
+
