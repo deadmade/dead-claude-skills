@@ -2,7 +2,7 @@ name: Build cswap
 
 # cswap.exe: claude-swap (https://github.com/realiti4/claude-swap) at the tag pinned in installer/cswap.json,
 # compiled with Nuitka into one Windows exe. The installer downloads it from the cswap-<tag> release.
-# Any branch builds and smoke-tests; only main publishes the release.
+# Any branch builds and smoke-tests; only the default branch publishes the release.
 on:
   push:
     paths: [installer/cswap.json, .github/workflows/build-cswap.yml]
@@ -64,7 +64,7 @@ jobs:
             cswap.exe.sha256
 
       - name: Publish release
-        if: github.ref == 'refs/heads/main'
+        if: github.ref_name == github.event.repository.default_branch
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
