@@ -1,0 +1,60 @@
+// Vendor the review passes /self-review runs into plugins/self-review/, so none of the same-named upstream plugins
+// (code-review, pr-review-toolkit, mattpocock's code-review) has to be installed:
+// - claude-plugins-official code-review's command → references/upstream/code-review.md (the bug pass)
+// - mattpocock/skills engineering/code-review → references/upstream/spec-standards-review.md (spec + standards)
+// - pr-review-toolkit's specialist agents → agents/, with the description rewritten so they don't fire on their own
+// Idempotent: re-running against the same upstream commits produces no diff.
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { ROOT, fail, finish, git, sparseClone } from "./sync-lib.mjs";
+
+const OFFICIAL_URL = "https://github.com/anthropics/claude-plugins-official.git";
+const MATT_URL = "https://github.com/mattpocock/skills.git";
+// pr-review-toolkit's code-reviewer is left out: the bug pass and the standards pass cover it.
+const AGENTS = ["silent-failure-hunter", "pr-test-analyzer", "type-design-analyzer", "comment-analyzer", "code-simplifier"];
+
+const PLUGIN = join(ROOT, "plugins", "self-review");
+const AGENTS_DEST = join(PLUGIN, "agents");
+const REFS_DEST = join(PLUGIN, "skills", "self-review", "references", "upstream");
+
+const official = sparseClone(OFFICIAL_URL, ["plugins/code-review/commands", "plugins/pr-review-toolkit"]);
+const matt = sparseClone(MATT_URL, ["skills/engineering/code-review"]);
+
+const need = (path) => existsSync(path) || fail(`upstream ${path} not found (renamed or removed?)`);
+const bugPass = join(official, "plugins", "code-review", "commands", "code-review.md");
+const specPass = join(matt, "skills", "engineering", "code-review", "SKILL.md");
+const toolkit = join(official, "plugins", "pr-review-toolkit");
+for (const p of [bugPass, specPass, join(toolkit, "LICENSE"), join(matt, "LICENSE")]) need(p);
+for (const a of AGENTS) need(join(toolkit, "agents", `${a}.md`));
+
+// "Use this agent when ... proactively ... <example>…" → one sentence that names /self-review as the caller.
+// The description is either one line (with literal \n escapes) or a YAML block scalar (`|` plus indented lines).
+function retarget(agentMd, name) {
+  const lines = readFileSync(agentMd, "utf8").split("\n");
+  const start = lines.findIndex((l) => l.startsWith("description:"));
+  if (start < 0) fail(`${name}: no description`);
+  let end = start + 1;
+  let value = lines[start].replace(/^description:\s*/, "");
+  if (/^[|>][-+]?$/.test(value)) {
+    while (end < lines.length && (lines[end] === "" || /^\s/.test(lines[end]))) end++;
+    value = lines.slice(start + 1, end).join("\n");
+  }
+  const first = value.replace(/^"|"$/g, "").trim().split(/\\n|\n|(?<=\.)\s/)[0].trim();
+  if (!first) fail(`${name}: empty description`);
+  lines.splice(start, end - start, `description: ${JSON.stringify(`Used by /self-review: ${first}`)}`);
+  return lines.join("\n");
+}
+
+rmSync(AGENTS_DEST, { recursive: true, force: true });
+rmSync(REFS_DEST, { recursive: true, force: true });
+mkdirSync(AGENTS_DEST, { recursive: true });
+mkdirSync(REFS_DEST, { recursive: true });
+for (const a of AGENTS) writeFileSync(join(AGENTS_DEST, `${a}.md`), retarget(join(toolkit, "agents", `${a}.md`), a));
+cpSync(bugPass, join(REFS_DEST, "code-review.md"));
+cpSync(specPass, join(REFS_DEST, "spec-standards-review.md"));
+cpSync(join(toolkit, "LICENSE"), join(PLUGIN, "LICENSE"));
+cpSync(join(matt, "LICENSE"), join(PLUGIN, "LICENSE-MIT"));
+
+const sha = (dir) => git("-C", dir, "rev-parse", "HEAD");
+const shas = `anthropics/claude-plugins-official ${sha(official)}\nmattpocock/skills ${sha(matt)}`;
+finish("self-review", shas, join(PLUGIN, "UPSTREAM"), PLUGIN);
