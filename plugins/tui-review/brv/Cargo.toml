@@ -1,0 +1,54 @@
+[package]
+name = "brv"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.97"
+description = "Computes a branch's review diff and writes the cache the tui-review mod paints from."
+license = "MIT"
+publish = false
+
+[dependencies]
+anyhow = "1.0.104"
+gix = { version = "0.87", default-features = false, features = ["revision", "blob-diff", "max-performance-safe", "sha1"] }
+imara-diff = "0.2"
+rayon = "1.12"
+tree-sitter = "0.27"
+tree-sitter-bash = "0.25.1"
+tree-sitter-c-sharp = "0.23.5"
+tree-sitter-highlight = "0.27"
+tree-sitter-javascript = "0.25.0"
+tree-sitter-json = "0.24.8"
+tree-sitter-nix = "0.3.0"
+tree-sitter-python = "0.25.0"
+tree-sitter-rust = "0.24.2"
+tree-sitter-toml-ng = "0.7.0"
+tree-sitter-typescript = "0.23.2"
+tree-sitter-yaml = "0.7.2"
+unicode-width = "0.2.2"
+zerocopy = { version = "0.8.62", features = ["derive"] }
+
+# musl's malloc is slow under threads: colouring took 2.7x as long in the static Linux build. mimalloc serves both
+# Rust and tree-sitter's C code there.
+[target.'cfg(target_env = "musl")'.dependencies]
+libmimalloc-sys = { version = "0.1.49", features = ["extended"] }
+mimalloc = "0.1.52"
+
+[dev-dependencies]
+divan = "0.1.21"
+tempfile = "3.27.0"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+
+[[bench]]
+name = "format"
+harness = false
+
+[[bench]]
+name = "review"
+harness = false

@@ -105,6 +105,12 @@
       "description": "claude-swap in Claude Code: accounts pane, /swap, usage status line, opt-in auto-switch. The installer downloads cswap.exe on Windows. Opt-in.",
       "source": "./plugins/cswap",
       "category": "productivity"
+    },
+    {
+      "name": "tui-review",
+      "description": "/tui-review: a fast, stacked-branch-aware diff pane beside the chat, so you can ask Claude about what you read. Needs the brv binary, which the installer downloads. Opt-in.",
+      "source": "./plugins/tui-review",
+      "category": "development"
     }
   ]
 }
