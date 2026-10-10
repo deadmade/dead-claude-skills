@@ -15,7 +15,7 @@ const O = 'claude-plugins-official';
 
 test('opt-ins from the real manifests', () => {
   assert.deepEqual(optIns(marketplace, bundle).sort(), [
-    ...['atlassian', 'cswap', 'dev-feature', 'graphify', 'hallmark', 'mattpocock-picks', 'mcp-azure', 'mcp-github', 'nix-lsp',
+    ...['atlassian', 'cswap', 'dev-feature', 'feature-flow', 'graphify', 'hallmark', 'mattpocock-picks', 'mcp-azure', 'mcp-github', 'nix-lsp',
       'pstack-picks', 'tui-review']
       .map((n) => `${n}@${M}`),
     ...['csharp-lsp', 'pyright-lsp', 'rust-analyzer-lsp', 'skill-creator', 'typescript-lsp'].map((n) => `${n}@${O}`),
