@@ -5,7 +5,7 @@ import { DIR, engine, pane, residentOf } from './harness'
 const PROGRESS = [`manifest ${DIR}`, 'text 0', 'hl 0', 'done']
 const run = { command: 'tui-review', args: 'demo', origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 200 } } as const
 
-test('/review demo opens the pane and draws the diff', async ($, on) => {
+test('/tui-review demo opens the pane and draws the diff', async ($, on) => {
   const recorded = engine(on, PROGRESS)
   await $.command.run(run)
   await recorded.opened
@@ -14,7 +14,7 @@ test('/review demo opens the pane and draws the diff', async ($, on) => {
   expect(raster?.props.columns).toBe(120)
   expect(raster?.props.rows).toBe(39)
   expect(String(raster?.props.cells).length).toBeGreaterThan(0)
-  expect(await ui.findAll({ type: 'Button' })).toHaveLength(6)
+  expect(await ui.findAll({ type: 'Button' })).toHaveLength(7)
 })
 
 test('scrolling repaints in place without a render pass', async ($, on) => {

@@ -4,6 +4,7 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { TuiReviewOpen } from '../types'
 import { Highlights, Lines, Manifest, chunkName, fromBase64, toBase64 } from './chunks'
 import { type Loaded, paint } from './paint'
+import { VIEWED_KEY, Viewed } from './viewed'
 
 const PANE = 'review'
 const RASTER = 'diff'
@@ -14,6 +15,7 @@ const reviewAtom = atom({ plugin: 'tui-review', key: 'review' } as const, null a
 
 // What the pane draws from. Module memory, not $.state: it changes on every scroll, and a reload just reads it again.
 let manifest: { dir: string; value: Manifest } | undefined
+let viewed: { marks: Viewed; files: Uint8Array; count: number } | undefined
 const resident = new Map<number, Loaded>()
 let top = 0
 let mounted: { cols: number; rows: number } | undefined
@@ -32,7 +34,18 @@ async function readBytes($: $, path: string) {
 
 async function loadManifest($: $, dir: string): Promise<Manifest> {
   if (manifest?.dir !== dir) {
-    manifest = { dir, value: new Manifest(await readBytes($, `${dir}/manifest.brv`)) }
+    const value = new Manifest(await readBytes($, `${dir}/manifest.brv`))
+    const marks = Viewed.from(await $.store.get(VIEWED_KEY))
+    const files = new Uint8Array(value.files)
+    let count = 0
+    for (let i = 0; i < value.files; i++) {
+      if (marks.has(value.blob(i))) {
+        files[i] = 1
+        count++
+      }
+    }
+    manifest = { dir, value }
+    viewed = { marks, files, count }
     resident.clear()
   }
   return manifest.value
@@ -75,7 +88,7 @@ async function frame($: $): Promise<string | undefined> {
   await ensureChunks($, review.value.dir, m, top, top + rows)
   const loadedAt = performance.now()
   if (cells.length !== cols * rows * 3) cells = new Uint32Array(cols * rows * 3)
-  paint(cells, cols, rows, top, { manifest: m, chunk: c => resident.get(c) })
+  paint(cells, cols, rows, top, { manifest: m, viewed, chunk: c => resident.get(c) })
   const encoded = toBase64(new Uint8Array(cells.buffer))
   const done = performance.now()
   $.ui.status(
@@ -126,6 +139,31 @@ function fileJump($: $, by: 1 | -1) {
   // Back from inside a file goes to its own header first.
   const target = by < 0 && m.firstLine(at) < top ? at : Math.min(m.files - 1, Math.max(0, at + by))
   scrollTo($, m.firstLine(target))
+}
+
+/** Marks the file at the top viewed and moves to the next unviewed one, or clears the mark and stays. */
+async function toggleViewed($: $) {
+  const m = manifest?.value
+  if (m === undefined || viewed === undefined || m.files === 0) return
+  const index = m.fileAt(top)
+  const isViewed = viewed.marks.toggle(m.blob(index))
+  await $.store.set(VIEWED_KEY, viewed.marks.stored())
+  viewed.files[index] = isViewed ? 1 : 0
+  viewed.count += isViewed ? 1 : -1
+  let next = index
+  if (isViewed) {
+    for (let i = index + 1; i < m.files; i++) {
+      if (viewed.files[i] === 0) {
+        next = i
+        break
+      }
+    }
+  }
+  if (next !== index) scrollTo($, m.firstLine(next))
+  else {
+    top = m.firstLine(index)
+    await repaint($)
+  }
 }
 
 /** Reads brv's progress lines and acts on them; one run at a time, a new one ends the old. */
@@ -240,6 +278,7 @@ export const register: Register = (on, options) => {
           {key('u', 'page↑', () => scrollTo($, top - rows + 2))}
           {key('n', 'file↓', () => fileJump($, 1))}
           {key('p', 'file↑', () => fileJump($, -1))}
+          {key('v', 'viewed', () => void toggleViewed($))}
         </Box>
       </Box>
     )

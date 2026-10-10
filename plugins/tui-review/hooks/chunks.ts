@@ -91,6 +91,11 @@ export class Manifest {
     }
   }
 
+  /** The file's new blob id, what "viewed" marks are kept under. */
+  blob(index: number): string {
+    return this.str(this.records.subarray(index * FILE_U32, (index + 1) * FILE_U32), 2)
+  }
+
   firstLine(index: number): number {
     return this.records[index * FILE_U32 + 7]!
   }

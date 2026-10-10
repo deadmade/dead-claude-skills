@@ -5,13 +5,14 @@ same session. The diff, highlighting and git work happen in `brv`, a Rust binary
 binary chunk files `brv` writes to disk, so a 100k-line PR costs the same memory and frame time as a 100-line one.
 
 **Status: step 1 of 4 (spike).** `/tui-review demo` opens a generated 100k-line review. Real branches (`/tui-review [base]`),
-tree-sitter highlighting, quoting hunks into the prompt and "viewed" marks come next.
+tree-sitter highlighting and quoting hunks into the prompt come next.
 
 ## Use
 
     /tui-review demo
 
-The pane takes the keyboard when it opens. Esc goes back to the prompt to type a question; ctrl+x tab goes back to
+The pane docks beside the chat under Claude Code's fullscreen renderer (`/tui fullscreen`, once) in a terminal at least
+110 columns wide; otherwise it opens above the prompt. It takes the keyboard when it opens. Esc goes back to the prompt to type a question; ctrl+x tab goes back to
 the pane.
 
 | Key | |
@@ -19,6 +20,10 @@ the pane.
 | `j` / `k`, mouse wheel | line down / up |
 | `d` / `u` | page down / up |
 | `n` / `p` | next / previous file |
+| `v` | mark the file viewed and go to the next unviewed one; on a viewed file, clear the mark |
+
+"Viewed" marks persist across sessions, by the file's content: a rebase that leaves a file alone keeps its mark, a
+change to it clears it. The header bar counts them.
 
 The arrow keys don't scroll yet: the engine only forwards them while a pane has rows of its own to scroll.
 

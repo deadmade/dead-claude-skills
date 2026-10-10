@@ -3,11 +3,15 @@
 
 import type { On } from 'claude-code'
 
+import { fromBase64 } from '../hooks/chunks'
+
 import { hl, lines, manifest } from './fixture.gen'
 
 export const DIR = '/fixture'
 
 export type Recorded = {
+  /** The plugin's $.store, in memory, readable by the test. */
+  store: Map<string, unknown>
   blits: string[]
   status: string[]
   reads: string[]
@@ -17,9 +21,19 @@ export type Recorded = {
 /** Chunks read from "disk" per scroll, and how many are resident, read off the plugin's status line. */
 export const residentOf = (status: string) => Number(/(\d+) chunks/.exec(status)?.[1] ?? NaN)
 
-export function engine(on: On, progress: string[]): Recorded {
+/** Row `row` of a painted frame as text, read back from the Raster's cells. */
+export function rowText(cellsBase64: string, cols: number, row: number): string {
+  const bytes = fromBase64(cellsBase64)
+  const cells = new Uint32Array(bytes.buffer, row * cols * 12, cols * 3)
+  let text = ''
+  for (let i = 0; i < cells.length; i += 3) text += String.fromCharCode(cells[i]!)
+  return text.trimEnd()
+}
+
+export function engine(on: On, progress: string[], store: Record<string, unknown> = {}): Recorded {
   let markOpened = () => {}
   const recorded: Recorded = {
+    store: new Map(Object.entries(store)),
     blits: [],
     status: [],
     reads: [],
@@ -58,6 +72,11 @@ export function engine(on: On, progress: string[]): Recorded {
     return { value: undefined }
   })
   on('ui.toast', async () => ({ value: undefined }))
+  on('store.get', async (_$, e) => ({ value: structuredClone(recorded.store.get(e.key)) }))
+  on('store.set', async (_$, e) => {
+    recorded.store.set(e.key, structuredClone(e.value))
+    return { value: undefined }
+  })
   return recorded
 }
 

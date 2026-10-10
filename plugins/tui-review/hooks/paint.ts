@@ -8,6 +8,8 @@ export type Loaded = { lines: Lines; hl?: Highlights }
 
 export type Source = {
   manifest: Manifest
+  /** 1 per file index marked viewed, and how many are. */
+  viewed?: { files: Uint8Array; count: number }
   /** A chunk already in memory, or undefined while it is not (drawn as a placeholder, never awaited). */
   chunk(index: number): Loaded | undefined
 }
@@ -79,12 +81,14 @@ class Canvas {
 }
 
 /** The header bar's text for the window starting at `top`. */
-export function title(manifest: Manifest, top: number): string {
+export function title(manifest: Manifest, top: number, viewed?: Source['viewed']): string {
   if (manifest.files === 0) return ` ${manifest.headName} ← ${manifest.baseName} │ no changes`
   const index = manifest.fileAt(top)
   const file = manifest.file(index)
   const at = manifest.totalLines > 0 ? Math.floor(((top + 1) / manifest.totalLines) * 100) : 100
-  return ` ${manifest.headName} ← ${manifest.baseName} │ ${index + 1}/${manifest.files} ${file.path} +${file.added} −${file.removed} │ ${at}%`
+  const mark = viewed?.files[index] === 1 ? '✓ ' : ''
+  const count = viewed === undefined ? '' : ` │ ✓ ${viewed.count}/${manifest.files} viewed`
+  return ` ${manifest.headName} ← ${manifest.baseName} │ ${index + 1}/${manifest.files} ${mark}${file.path} +${file.added} −${file.removed} │ ${at}%${count}`
 }
 
 /**
@@ -95,7 +99,7 @@ export function paint(cells: Uint32Array, cols: number, rows: number, top: numbe
   const canvas = new Canvas(cells, cols)
   const { manifest } = src
   canvas.fill(0, theme.barFg, theme.barBg)
-  canvas.text(0, 0, title(manifest, top), theme.barFg)
+  canvas.text(0, 0, title(manifest, top, src.viewed), theme.barFg)
 
   let missing = 0
   for (let row = 1; row < rows; row++) {
@@ -119,9 +123,15 @@ export function paint(cells: Uint32Array, cols: number, rows: number, top: numbe
 
     switch (kind) {
       case Kind.File:
-        canvas.fill(row, theme.fileFg, theme.fileBg)
-        canvas.text(row, 0, ' ▍', theme.hunkFg)
-        canvas.units(row, 3, lines.text, start, end, theme.fileFg)
+        if (src.viewed?.files[manifest.fileAt(line)] === 1) {
+          canvas.fill(row, theme.dimFg, theme.viewedBg)
+          canvas.text(row, 0, ' ✓', theme.viewedFg)
+          canvas.units(row, 3, lines.text, start, end, theme.dimFg)
+        } else {
+          canvas.fill(row, theme.fileFg, theme.fileBg)
+          canvas.text(row, 0, ' ▍', theme.hunkFg)
+          canvas.units(row, 3, lines.text, start, end, theme.fileFg)
+        }
         continue
       case Kind.Hunk:
         canvas.fill(row, DEFAULT, DEFAULT)

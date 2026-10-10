@@ -26,6 +26,8 @@ export const theme = {
   barBg: 0x2c313c,
   fileFg: 0xffffff,
   fileBg: 0x3b4252,
+  viewedFg: 0x98c379,
+  viewedBg: 0x2a2f38,
   hunkFg: 0x56b6c2,
   gutterFg: 0x636d83,
   addBg: 0x1e3a2a,
