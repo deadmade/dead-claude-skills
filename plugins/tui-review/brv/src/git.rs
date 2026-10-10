@@ -2,7 +2,8 @@
 //!
 //! For `main → b1 → b2`, reviewing `b2` shows only `b2`'s own commits. The base is, in order: the `--base` the person
 //! gave (remembered as `branch.<name>.brvBase`), that remembered pick, or the branch whose merge-base with HEAD is
-//! nearest to HEAD. The diff is always `merge_base(base, HEAD)..HEAD`, so a base that moved on after this branch was
+//! nearest to HEAD, counting steps over all of HEAD's parents (so a branch that merged main in still picks main).
+//! The diff is always `merge_base(base, HEAD)..HEAD`, so a base that moved on after this branch was
 //! cut never leaks its new commits into the review.
 
 use std::collections::HashMap;
@@ -27,8 +28,9 @@ pub struct Range {
 /// Git config key under `branch.<name>` that remembers a base picked with `--base`.
 pub const BASE_KEY: &str = "brvBase";
 
-/// How far back along HEAD's first parents a merge-base still counts as "near"; past this, candidates tie.
-const DEPTH_LIMIT: usize = 100_000;
+/// Commits walked back from HEAD to measure how near each merge-base is. A merge-base past this counts as far, and
+/// only wins when no branch has one nearer. About 10 ms with a commit-graph.
+const WALK_LIMIT: usize = 50_000;
 
 /// Finds the review range for HEAD of `repo`.
 ///
@@ -37,11 +39,9 @@ const DEPTH_LIMIT: usize = 100_000;
 pub fn resolve(repo: &gix::Repository, base: Option<&str>) -> Result<Range> {
     let head = repo.head_id().context("HEAD has no commit yet")?.detach();
     let head_ref = repo.head_name()?;
-    let head_branch = head_ref.as_ref().and_then(|name| {
-        name.as_bstr()
-            .strip_prefix(b"refs/heads/")
-            .map(|short| short.to_str_lossy().into_owned())
-    });
+    let head_branch = head_ref
+        .as_ref()
+        .and_then(|name| name.as_bstr().strip_prefix(b"refs/heads/").map(|short| short.to_str_lossy().into_owned()));
     let head_name = head_branch.clone().unwrap_or_else(|| "HEAD".to_owned());
 
     let picked = match base {
@@ -62,31 +62,19 @@ pub fn resolve(repo: &gix::Repository, base: Option<&str>) -> Result<Range> {
         Some(found) => found,
         None => detect(repo, head, head_branch.as_deref())?,
     };
-    let merge_base = repo
-        .merge_base(base, head)
-        .with_context(|| format!("{base_name} and {head_name} share no history"))?
-        .detach();
-    Ok(Range {
-        head,
-        head_name,
-        base,
-        base_name,
-        merge_base,
-    })
+    let merge_base =
+        repo.merge_base(base, head).with_context(|| format!("{base_name} and {head_name} share no history"))?.detach();
+    Ok(Range { head, head_name, base, base_name, merge_base })
 }
 
 fn peel(repo: &gix::Repository, spec: &str) -> Result<ObjectId> {
-    let id = repo
-        .rev_parse_single(spec)
-        .with_context(|| format!("no branch or commit named {spec}"))?;
+    let id = repo.rev_parse_single(spec).with_context(|| format!("no branch or commit named {spec}"))?;
     Ok(id.object()?.peel_to_commit()?.id)
 }
 
 fn remembered(repo: &gix::Repository, branch: &str) -> Option<String> {
     let key = format!("branch.{branch}.{BASE_KEY}");
-    repo.config_snapshot()
-        .string(key.as_str())
-        .map(|v| v.to_str_lossy().into_owned())
+    repo.config_snapshot().string(key.as_str()).map(|v| v.to_str_lossy().into_owned())
 }
 
 /// Saves `base` as `branch.<branch>.brvBase` in the repository's own config, so the pick sticks.
@@ -95,8 +83,7 @@ fn remember(repo: &gix::Repository, branch: &str, base: &str) -> Result<()> {
         return Ok(());
     }
     let path = repo.common_dir().join("config");
-    let mut config =
-        gix::config::File::from_path_no_includes(path.clone(), gix::config::Source::Local)?;
+    let mut config = gix::config::File::from_path_no_includes(path.clone(), gix::config::Source::Local)?;
     config.set_raw_value_by("branch", Some(branch.as_bytes().as_bstr()), BASE_KEY, base)?;
     let mut bytes = Vec::new();
     config.write_to(&mut bytes)?;
@@ -113,53 +100,92 @@ struct Candidate {
     tip: ObjectId,
     is_default: bool,
     is_local: bool,
+    /// The tip's commit time, to skip branches older than everything walked.
+    time: i64,
 }
 
-/// The candidate whose merge-base with HEAD is nearest to HEAD along its first parents. On a tie: one whose tip is
-/// that merge-base (it has not moved on), then the default branch, then a local branch, then the name.
-fn detect(
-    repo: &gix::Repository,
-    head: ObjectId,
-    head_branch: Option<&str>,
-) -> Result<(String, ObjectId)> {
+/// The candidate whose merge-base with HEAD is nearest to HEAD. On a tie: one whose tip is that merge-base (it has not
+/// moved on), then the default branch, then a local branch, then the name.
+fn detect(repo: &gix::Repository, head: ObjectId, head_branch: Option<&str>) -> Result<(String, ObjectId)> {
     let candidates = candidates(repo, head, head_branch)?;
     if candidates.is_empty() {
         bail!("no other branch to review against; pass a base: /tui-review <branch>");
     }
-    let depth = first_parent_depths(repo, head)?;
+    let near = Ancestry::walk(repo, head)?;
+    let cache = repo.commit_graph_if_enabled()?;
+    let mut graph = repo.revision_graph(cache.as_ref());
     let mut merge_bases: HashMap<ObjectId, Option<ObjectId>> = HashMap::new();
-    let mut best: Option<(Rank<'_>, &Candidate)> = None;
-    for c in &candidates {
-        let mb = *merge_bases.entry(c.tip).or_insert_with(|| {
-            // A tip on HEAD's own line is its own merge-base: no walk needed.
-            if depth.contains_key(&c.tip) {
-                Some(c.tip)
-            } else {
-                repo.merge_base(c.tip, head).ok().map(gix::Id::detach)
-            }
+    let mut ranked = |c| {
+        let rank = rank(c, head, &near, &mut merge_bases, |tip| {
+            repo.merge_base_with_graph(tip, head, &mut graph).ok().map(gix::Id::detach)
         });
-        // No shared history, or the candidate contains HEAD (stacked on top of it, or the same commit).
-        let Some(mb) = mb else { continue };
-        if mb == head {
-            continue;
+        rank.map(|rank| (rank, c))
+    };
+    // A tip older than every walked commit cannot have a near merge-base: those are only looked at when no branch
+    // had one nearer.
+    let (near_ones, far): (Vec<_>, Vec<_>) =
+        candidates.iter().partition(|c| near.dist.contains_key(&c.tip) || c.time >= near.oldest);
+    let best = near_ones
+        .into_iter()
+        .filter_map(&mut ranked)
+        .min_by(|a, b| a.0.cmp(&b.0))
+        .or_else(|| far.into_iter().filter_map(&mut ranked).min_by(|a, b| a.0.cmp(&b.0)));
+    best.map(|(_, c)| (c.name.clone(), c.tip))
+        .ok_or_else(|| anyhow!("no branch shares history with HEAD; pass a base: /tui-review <branch>"))
+}
+
+/// How `c` ranks as the base, or `None` when it shares no history with HEAD or contains it (stacked on top).
+fn rank<'a>(
+    c: &'a Candidate,
+    head: ObjectId,
+    near: &Ancestry,
+    merge_bases: &mut HashMap<ObjectId, Option<ObjectId>>,
+    merge_base: impl FnOnce(ObjectId) -> Option<ObjectId>,
+) -> Option<Rank<'a>> {
+    // A tip HEAD descends from is its own merge-base: no walk needed.
+    let mb = *merge_bases
+        .entry(c.tip)
+        .or_insert_with(|| if near.dist.contains_key(&c.tip) { Some(c.tip) } else { merge_base(c.tip) });
+    let mb = mb.filter(|mb| *mb != head)?;
+    let d = near.dist.get(&mb).copied().unwrap_or(usize::MAX);
+    Some((d, c.tip != mb, !c.is_default, !c.is_local, c.name.as_str()))
+}
+
+/// HEAD's ancestors near it: how many parent steps back each is (HEAD is 0), breadth first over all parents.
+struct Ancestry {
+    dist: HashMap<ObjectId, usize>,
+    /// Commit time of the last commit walked when the walk stopped short; `i64::MIN` when it saw all history.
+    oldest: i64,
+}
+
+impl Ancestry {
+    fn walk(repo: &gix::Repository, head: ObjectId) -> Result<Ancestry> {
+        let mut dist = HashMap::from([(head, 0)]);
+        let mut walked = 0;
+        let mut last = None;
+        let walk = repo.rev_walk([head]).sorting(gix::revision::walk::Sorting::BreadthFirst).all()?;
+        for info in walk {
+            if walked == WALK_LIMIT {
+                break;
+            }
+            let info = info?;
+            let d = dist.get(&info.id).copied().unwrap_or(0);
+            for parent in &info.parent_ids {
+                dist.entry(*parent).or_insert(d + 1);
+            }
+            walked += 1;
+            last = Some(info.id);
         }
-        let d = depth.get(&mb).copied().unwrap_or(DEPTH_LIMIT);
-        let key = (d, c.tip != mb, !c.is_default, !c.is_local, c.name.as_str());
-        if best.as_ref().is_none_or(|(k, _)| key < *k) {
-            best = Some((key, c));
-        }
+        let oldest = match last {
+            Some(last) if walked == WALK_LIMIT => repo.find_commit(last)?.time()?.seconds,
+            _ => i64::MIN,
+        };
+        Ok(Ancestry { dist, oldest })
     }
-    best.map(|(_, c)| (c.name.clone(), c.tip)).ok_or_else(|| {
-        anyhow!("no branch shares history with HEAD; pass a base: /tui-review <branch>")
-    })
 }
 
 /// Local and remote-tracking branches, minus HEAD's own branch and its remote copies.
-fn candidates(
-    repo: &gix::Repository,
-    head: ObjectId,
-    head_branch: Option<&str>,
-) -> Result<Vec<Candidate>> {
+fn candidates(repo: &gix::Repository, head: ObjectId, head_branch: Option<&str>) -> Result<Vec<Candidate>> {
     let upstream = head_branch.and_then(|b| upstream(repo, b));
     let defaults = default_branches(repo);
     let mut out = Vec::new();
@@ -181,27 +207,19 @@ fn candidates(
         if !is_local {
             // `origin/HEAD` points at a branch listed anyway; `origin/<this branch>` is this branch.
             let branch = name.split_once('/').map_or(name.as_str(), |(_, b)| b);
-            if branch == "HEAD"
-                || Some(branch) == head_branch
-                || upstream.as_deref() == Some(name.as_str())
-            {
+            if branch == "HEAD" || Some(branch) == head_branch || upstream.as_deref() == Some(name.as_str()) {
                 continue;
             }
         }
-        let Ok(tip) = reference.peel_to_commit() else {
+        let Ok(commit) = reference.peel_to_commit() else {
             continue;
         };
-        let tip = tip.id;
-        if tip == head {
+        if commit.id == head {
             continue;
         }
+        let time = commit.time().map_or(i64::MAX, |t| t.seconds);
         let is_default = defaults.iter().any(|d| d == &name);
-        out.push(Candidate {
-            name,
-            tip,
-            is_default,
-            is_local,
-        });
+        out.push(Candidate { name, tip: commit.id, is_default, is_local, time });
     }
     Ok(out)
 }
@@ -212,11 +230,7 @@ fn upstream(repo: &gix::Repository, branch: &str) -> Option<String> {
     let remote = config.string(format!("branch.{branch}.remote").as_str())?;
     let merge = config.string(format!("branch.{branch}.merge").as_str())?;
     let merge = merge.to_str_lossy();
-    Some(format!(
-        "{}/{}",
-        remote.to_str_lossy(),
-        merge.strip_prefix("refs/heads/").unwrap_or(&merge)
-    ))
+    Some(format!("{}/{}", remote.to_str_lossy(), merge.strip_prefix("refs/heads/").unwrap_or(&merge)))
 }
 
 /// What counts as the default branch: `main`, `master`, and whatever each remote's `HEAD` points at.
@@ -227,10 +241,7 @@ fn default_branches(repo: &gix::Repository) -> Vec<String> {
         let name = format!("refs/remotes/{remote}/HEAD");
         if let Ok(Some(r)) = repo.try_find_reference(name.as_str())
             && let Some(target) = r.target().try_name()
-            && let Some(short) = target
-                .as_bstr()
-                .to_str_lossy()
-                .strip_prefix("refs/remotes/")
+            && let Some(short) = target.as_bstr().to_str_lossy().strip_prefix("refs/remotes/")
         {
             out.push(short.to_owned());
             if let Some((_, branch)) = short.split_once('/') {
@@ -243,30 +254,12 @@ fn default_branches(repo: &gix::Repository) -> Vec<String> {
     out
 }
 
-/// How many first-parent steps back from HEAD each commit on that line is (HEAD is 0).
-fn first_parent_depths(repo: &gix::Repository, head: ObjectId) -> Result<HashMap<ObjectId, usize>> {
-    let mut depth = HashMap::new();
-    let mut at = Some(head);
-    while let Some(id) = at
-        && depth.len() < DEPTH_LIMIT
-    {
-        depth.insert(id, depth.len());
-        at = repo
-            .find_commit(id)?
-            .parent_ids()
-            .next()
-            .map(gix::Id::detach);
-    }
-    Ok(depth)
-}
-
 /// Opens the repository that holds `dir`, searching upward like git does.
 ///
 /// # Errors
 /// When `dir` is not inside a git repository.
 pub fn open(dir: &Path) -> Result<gix::Repository> {
-    let mut repo = gix::discover(dir)
-        .with_context(|| format!("{} is not in a git repository", dir.display()))?;
+    let mut repo = gix::discover(dir).with_context(|| format!("{} is not in a git repository", dir.display()))?;
     repo.object_cache_size_if_unset(64 * 1024 * 1024);
     Ok(repo)
 }

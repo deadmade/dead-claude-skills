@@ -41,8 +41,11 @@ jobs:
       - name: Rust tests
         run: cargo test
 
+      - name: Speed and memory budgets
+        run: cargo test --release --test perf -- --ignored --nocapture 2>&1 | tee "$RUNNER_TEMP/brv-budgets.txt"
+
       - name: Benchmarks
-        run: cargo bench --bench format -- --sample-count 50 | tee "$RUNNER_TEMP/brv-bench.txt"
+        run: cargo bench --bench format --bench review -- --sample-count 50 | tee "$RUNNER_TEMP/brv-bench.txt"
 
       - name: Mod fixture from brv gen
         run: |
@@ -60,4 +63,6 @@ jobs:
         if: always()
         with:
           name: brv-bench-${{ matrix.os }}
-          path: ${{ runner.temp }}/brv-bench.txt
+          path: |
+            ${{ runner.temp }}/brv-bench.txt
+            ${{ runner.temp }}/brv-budgets.txt

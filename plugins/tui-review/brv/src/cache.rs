@@ -24,11 +24,7 @@ impl<W: Write> Progress<W> {
 ///
 /// # Errors
 /// When the file cannot be written or stdout is closed.
-pub fn write_manifest<W: Write>(
-    dir: &Path,
-    manifest: &Manifest,
-    progress: &mut Progress<W>,
-) -> io::Result<()> {
+pub fn write_manifest<W: Write>(dir: &Path, manifest: &Manifest, progress: &mut Progress<W>) -> io::Result<()> {
     write_atomic(&dir.join("manifest.brv"), &manifest.encode())?;
     progress.say(format_args!("manifest {}", dir.display()))
 }
@@ -54,25 +50,12 @@ pub struct LinesWriter<'a, W: Write> {
 
 impl<'a, W: Write> LinesWriter<'a, W> {
     pub fn new(dir: &'a Path, progress: &'a mut Progress<W>, with_hl: bool) -> Self {
-        Self {
-            dir,
-            progress,
-            lines: LinesChunk::default(),
-            hl: with_hl.then(HlChunk::default),
-            index: 0,
-        }
+        Self { dir, progress, lines: LinesChunk::default(), hl: with_hl.then(HlChunk::default), index: 0 }
     }
 
     /// # Errors
     /// When a chunk cannot be written or stdout is closed.
-    pub fn push(
-        &mut self,
-        kind: Kind,
-        old: u32,
-        new: u32,
-        text: &str,
-        spans: &[u32],
-    ) -> io::Result<()> {
+    pub fn push(&mut self, kind: Kind, old: u32, new: u32, text: &str, spans: &[u32]) -> io::Result<()> {
         self.lines.push(kind, old, new, text);
         if let Some(hl) = &mut self.hl {
             hl.push_line(spans.iter().copied());
@@ -96,11 +79,7 @@ impl<'a, W: Write> LinesWriter<'a, W> {
     }
 
     fn flush_if_full(&mut self) -> io::Result<()> {
-        if self.lines.len() == CHUNK_LINES {
-            self.flush()
-        } else {
-            Ok(())
-        }
+        if self.lines.len() == CHUNK_LINES { self.flush() } else { Ok(()) }
     }
 
     /// Writes the last, partly filled chunk.
@@ -111,10 +90,7 @@ impl<'a, W: Write> LinesWriter<'a, W> {
         if self.lines.is_empty() {
             return Ok(());
         }
-        write_atomic(
-            &self.dir.join(chunk_name(self.index, "lines")),
-            &self.lines.encode(),
-        )?;
+        write_atomic(&self.dir.join(chunk_name(self.index, "lines")), &self.lines.encode())?;
         self.progress.say(format_args!("text {}", self.index))?;
         if let Some(hl) = &mut self.hl {
             write_atomic(&self.dir.join(chunk_name(self.index, "hl")), &hl.encode())?;
@@ -138,13 +114,7 @@ pub struct HlWriter<'a, W: Write> {
 
 impl<'a, W: Write> HlWriter<'a, W> {
     pub fn new(dir: &'a Path, progress: &'a mut Progress<W>) -> Self {
-        Self {
-            dir,
-            progress,
-            hl: HlChunk::default(),
-            lines: 0,
-            index: 0,
-        }
+        Self { dir, progress, hl: HlChunk::default(), lines: 0, index: 0 }
     }
 
     /// # Errors
@@ -152,11 +122,7 @@ impl<'a, W: Write> HlWriter<'a, W> {
     pub fn push_line(&mut self, spans: impl IntoIterator<Item = u32>) -> io::Result<()> {
         self.hl.push_line(spans);
         self.lines += 1;
-        if self.lines == CHUNK_LINES {
-            self.flush()
-        } else {
-            Ok(())
-        }
+        if self.lines == CHUNK_LINES { self.flush() } else { Ok(()) }
     }
 
     /// Writes the last, partly filled chunk.
@@ -167,10 +133,7 @@ impl<'a, W: Write> HlWriter<'a, W> {
         if self.lines == 0 {
             return Ok(());
         }
-        write_atomic(
-            &self.dir.join(chunk_name(self.index, "hl")),
-            &self.hl.encode(),
-        )?;
+        write_atomic(&self.dir.join(chunk_name(self.index, "hl")), &self.hl.encode())?;
         self.progress.say(format_args!("hl {}", self.index))?;
         self.index += 1;
         self.lines = 0;

@@ -9,9 +9,7 @@ use std::time::Instant;
 use anyhow::Result;
 
 use crate::cache::{LinesWriter, Progress, finish, write_manifest};
-use crate::format::{
-    CHUNK_LINES, FileRecord, Kind, MAX_COLS, Manifest, Meta, Strings, count, file_flags, span,
-};
+use crate::format::{CHUNK_LINES, FileRecord, Kind, MAX_COLS, Manifest, Meta, Strings, count, file_flags, span};
 use crate::styles::Style;
 
 /// Small, fast, deterministic: the same `--seed` gives the same cache.
@@ -35,25 +33,13 @@ impl Rng {
     }
 }
 
-const KEYWORDS: &[&str] = &[
-    "let", "fn", "pub", "if", "else", "match", "return", "for", "in", "async", "await", "impl",
-];
+const KEYWORDS: &[&str] = &["let", "fn", "pub", "if", "else", "match", "return", "for", "in", "async", "await", "impl"];
 const IDENTS: &[&str] = &[
-    "review", "chunk", "offset", "cells", "manifest", "base", "head", "frame", "span", "style",
-    "cursor", "width", "height", "buffer", "result", "context", "options", "index", "value",
-    "parent",
+    "review", "chunk", "offset", "cells", "manifest", "base", "head", "frame", "span", "style", "cursor", "width",
+    "height", "buffer", "result", "context", "options", "index", "value", "parent",
 ];
-const TYPES: &[&str] = &[
-    "Vec<u8>",
-    "String",
-    "Option<usize>",
-    "Result<()>",
-    "HashMap<String, u32>",
-    "Path",
-];
-const EXTS: &[&str] = &[
-    "rs", "ts", "tsx", "cs", "py", "nix", "json", "yaml", "toml", "sh",
-];
+const TYPES: &[&str] = &["Vec<u8>", "String", "Option<usize>", "Result<()>", "HashMap<String, u32>", "Path"];
+const EXTS: &[&str] = &["rs", "ts", "tsx", "cs", "py", "nix", "json", "yaml", "toml", "sh"];
 
 /// One generated line and the spans a highlighter would give it.
 fn code_line(rng: &mut Rng, text: &mut String, spans: &mut Vec<u32>) {
@@ -69,22 +55,13 @@ fn code_line(rng: &mut Rng, text: &mut String, spans: &mut Vec<u32>) {
         {
             let len = s.chars().count().min(MAX_COLS - col);
             // Both are under MAX_COLS (512).
-            spans.push(span(
-                u16::try_from(col).unwrap_or(0),
-                u16::try_from(len).unwrap_or(0),
-                style as u8,
-            ));
+            spans.push(span(u16::try_from(col).unwrap_or(0), u16::try_from(len).unwrap_or(0), style as u8));
         }
     };
     match rng.below(10) {
         0 => push(
             text,
-            &format!(
-                "// {} the {} before {}",
-                rng.pick(IDENTS),
-                rng.pick(IDENTS),
-                rng.pick(IDENTS)
-            ),
+            &format!("// {} the {} before {}", rng.pick(IDENTS), rng.pick(IDENTS), rng.pick(IDENTS)),
             Some(Style::Comment),
         ),
         1 => {}
@@ -98,11 +75,7 @@ fn code_line(rng: &mut Rng, text: &mut String, spans: &mut Vec<u32>) {
             push(text, rng.pick(IDENTS), Some(Style::Function));
             push(text, "(", Some(Style::Punctuation));
             if rng.below(2) == 0 {
-                push(
-                    text,
-                    &format!("\"{}\"", rng.pick(IDENTS)),
-                    Some(Style::String),
-                );
+                push(text, &format!("\"{}\"", rng.pick(IDENTS)), Some(Style::String));
             } else {
                 push(text, &rng.below(4096).to_string(), Some(Style::Number));
             }
@@ -125,11 +98,7 @@ struct Planned {
 impl Planned {
     /// The file header, then per hunk its header, 3 + 3 lines of context and the changed lines.
     fn line_count(&self) -> usize {
-        1 + self
-            .hunks
-            .iter()
-            .map(|(del, add)| 1 + 6 + del + add)
-            .sum::<usize>()
+        1 + self.hunks.iter().map(|(del, add)| 1 + 6 + del + add).sum::<usize>()
     }
 }
 
@@ -139,15 +108,8 @@ fn plan(rng: &mut Rng, lines: usize) -> Vec<Planned> {
     let mut total = 0;
     while total < lines {
         let ext = rng.pick(EXTS);
-        let path = format!(
-            "src/{}/{}_{}.{ext}",
-            rng.pick(IDENTS),
-            rng.pick(IDENTS),
-            planned.len()
-        );
-        let hunks = (0..=rng.below(4))
-            .map(|_| (rng.below(12), rng.below(16)))
-            .collect();
+        let path = format!("src/{}/{}_{}.{ext}", rng.pick(IDENTS), rng.pick(IDENTS), planned.len());
+        let hunks = (0..=rng.below(4)).map(|_| (rng.below(12), rng.below(16))).collect();
         let file = Planned { path, hunks };
         total += file.line_count();
         planned.push(file);
@@ -161,11 +123,7 @@ fn manifest(rng: &mut Rng, planned: &[Planned]) -> Manifest {
     let mut first_line = 0;
     for (i, p) in planned.iter().enumerate() {
         let line_count = count(p.line_count());
-        let flags = if i % 97 == 96 {
-            file_flags::COLLAPSED
-        } else {
-            0
-        };
+        let flags = if i % 97 == 96 { file_flags::COLLAPSED } else { 0 };
         files.push(FileRecord {
             path: strings.add(&p.path),
             blob: strings.add(&format!("{:040x}", rng.next())),
@@ -186,11 +144,7 @@ fn manifest(rng: &mut Rng, planned: &[Planned]) -> Manifest {
         head_sha: strings.add(&"d".repeat(40)),
         merge_base_sha: strings.add(&"b".repeat(40)),
     };
-    Manifest {
-        meta,
-        files,
-        strings,
-    }
+    Manifest { meta, files, strings }
 }
 
 fn write_file<W: Write>(rng: &mut Rng, out: &mut LinesWriter<W>, file: &Planned) -> Result<()> {
@@ -200,13 +154,7 @@ fn write_file<W: Write>(rng: &mut Rng, out: &mut LinesWriter<W>, file: &Planned)
     let mut new = old;
     for &(del, add) in &file.hunks {
         let mut header = String::new();
-        write!(
-            header,
-            "@@ -{old},{} +{new},{} @@ fn {}()",
-            6 + del,
-            6 + add,
-            rng.pick(IDENTS)
-        )?;
+        write!(header, "@@ -{old},{} +{new},{} @@ fn {}()", 6 + del, 6 + add, rng.pick(IDENTS))?;
         out.push(Kind::Hunk, 0, 0, &header, &[])?;
         for i in 0..3 + del + add + 3 {
             code_line(rng, &mut text, &mut spans);

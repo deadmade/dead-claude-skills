@@ -133,51 +133,22 @@ fn build(lang: Lang) -> Option<HighlightConfiguration> {
     use tree_sitter_typescript as ts;
     let js_jsx = || format!("{}\n{}", js::JSX_HIGHLIGHT_QUERY, js::HIGHLIGHT_QUERY);
     let (language, query): (tree_sitter::Language, String) = match lang {
-        Lang::Rust => (
-            tree_sitter_rust::LANGUAGE.into(),
-            tree_sitter_rust::HIGHLIGHTS_QUERY.into(),
-        ),
-        Lang::CSharp => (
-            tree_sitter_c_sharp::LANGUAGE.into(),
-            tree_sitter_c_sharp::HIGHLIGHTS_QUERY.into(),
-        ),
+        Lang::Rust => (tree_sitter_rust::LANGUAGE.into(), tree_sitter_rust::HIGHLIGHTS_QUERY.into()),
+        Lang::CSharp => (tree_sitter_c_sharp::LANGUAGE.into(), tree_sitter_c_sharp::HIGHLIGHTS_QUERY.into()),
         // TypeScript's query only adds to JavaScript's; its own patterns go first so they win.
-        Lang::TypeScript => (
-            ts::LANGUAGE_TYPESCRIPT.into(),
-            format!("{}\n{}", ts::HIGHLIGHTS_QUERY, js::HIGHLIGHT_QUERY),
-        ),
-        Lang::Tsx => (
-            ts::LANGUAGE_TSX.into(),
-            format!("{}\n{}", ts::HIGHLIGHTS_QUERY, js_jsx()),
-        ),
+        Lang::TypeScript => {
+            (ts::LANGUAGE_TYPESCRIPT.into(), format!("{}\n{}", ts::HIGHLIGHTS_QUERY, js::HIGHLIGHT_QUERY))
+        }
+        Lang::Tsx => (ts::LANGUAGE_TSX.into(), format!("{}\n{}", ts::HIGHLIGHTS_QUERY, js_jsx())),
         Lang::JavaScript => (js::LANGUAGE.into(), js_jsx()),
-        Lang::Python => (
-            tree_sitter_python::LANGUAGE.into(),
-            tree_sitter_python::HIGHLIGHTS_QUERY.into(),
-        ),
-        Lang::Nix => (
-            tree_sitter_nix::LANGUAGE.into(),
-            tree_sitter_nix::HIGHLIGHTS_QUERY.into(),
-        ),
-        Lang::Json => (
-            tree_sitter_json::LANGUAGE.into(),
-            tree_sitter_json::HIGHLIGHTS_QUERY.into(),
-        ),
-        Lang::Yaml => (
-            tree_sitter_yaml::LANGUAGE.into(),
-            tree_sitter_yaml::HIGHLIGHTS_QUERY.into(),
-        ),
-        Lang::Toml => (
-            tree_sitter_toml_ng::LANGUAGE.into(),
-            tree_sitter_toml_ng::HIGHLIGHTS_QUERY.into(),
-        ),
-        Lang::Bash => (
-            tree_sitter_bash::LANGUAGE.into(),
-            tree_sitter_bash::HIGHLIGHT_QUERY.into(),
-        ),
+        Lang::Python => (tree_sitter_python::LANGUAGE.into(), tree_sitter_python::HIGHLIGHTS_QUERY.into()),
+        Lang::Nix => (tree_sitter_nix::LANGUAGE.into(), tree_sitter_nix::HIGHLIGHTS_QUERY.into()),
+        Lang::Json => (tree_sitter_json::LANGUAGE.into(), tree_sitter_json::HIGHLIGHTS_QUERY.into()),
+        Lang::Yaml => (tree_sitter_yaml::LANGUAGE.into(), tree_sitter_yaml::HIGHLIGHTS_QUERY.into()),
+        Lang::Toml => (tree_sitter_toml_ng::LANGUAGE.into(), tree_sitter_toml_ng::HIGHLIGHTS_QUERY.into()),
+        Lang::Bash => (tree_sitter_bash::LANGUAGE.into(), tree_sitter_bash::HIGHLIGHT_QUERY.into()),
     };
-    let mut config =
-        HighlightConfiguration::new(language, format!("{lang:?}"), &query, "", "").ok()?;
+    let mut config = HighlightConfiguration::new(language, format!("{lang:?}"), &query, "", "").ok()?;
     let names: Vec<&str> = NAMES.iter().map(|(name, _)| *name).collect();
     config.configure(&names);
     Some(config)
@@ -199,26 +170,21 @@ struct Source<'a> {
 }
 
 impl<'a> Source<'a> {
-    fn new(text: &'a str, lang: Option<Lang>, highlighter: &mut Highlighter) -> Self {
-        let starts = std::iter::once(0)
-            .chain(text.match_indices('\n').map(|(i, _)| i + 1))
-            .collect();
-        let mut source = Source {
-            text,
-            starts,
-            spans: Vec::new(),
-        };
+    /// Highlights `text` up to the end of line `last` (0-based); nothing after it is shown, so it is not coloured.
+    fn new(text: &'a str, lang: Option<Lang>, last: usize, highlighter: &mut Highlighter) -> Self {
+        let starts = std::iter::once(0).chain(text.match_indices('\n').map(|(i, _)| i + 1)).collect();
+        let mut source = Source { text, starts, spans: Vec::new() };
         if let Some(config) = lang.and_then(Lang::config)
             && text.len() <= MAX_SOURCE
         {
-            source.highlight(config, highlighter);
+            let stop = source.starts.get(last + 1).copied().unwrap_or(text.len());
+            source.highlight(config, stop, highlighter);
         }
         source
     }
 
-    fn highlight(&mut self, config: &HighlightConfiguration, highlighter: &mut Highlighter) {
-        let Ok(events) = highlighter.highlight(config, self.text.as_bytes(), None, None, |_| None)
-        else {
+    fn highlight(&mut self, config: &HighlightConfiguration, stop: usize, highlighter: &mut Highlighter) {
+        let Ok(events) = highlighter.highlight(config, self.text.as_bytes(), None, None, |_| None) else {
             return;
         };
         let mut stack: Vec<u8> = Vec::new();
@@ -229,6 +195,8 @@ impl<'a> Source<'a> {
                 Ok(HighlightEvent::HighlightEnd) => {
                     stack.pop();
                 }
+                // The parse covers the whole file, so what is coloured is right; the query just stops early.
+                Ok(HighlightEvent::Source { start, .. }) if start >= stop => return,
                 Ok(HighlightEvent::Source { start, end }) => {
                     let Some(&style) = stack.last() else { continue };
                     self.push(&mut line, start, end, style);
@@ -247,20 +215,11 @@ impl<'a> Source<'a> {
                 *line += 1;
             }
             let from = self.starts[*line];
-            let next = self
-                .starts
-                .get(*line + 1)
-                .copied()
-                .unwrap_or(self.text.len() + 1);
+            let next = self.starts.get(*line + 1).copied().unwrap_or(self.text.len() + 1);
             let line_end = next - 1;
             let e = end.min(line_end);
             if e > s {
-                self.spans.push((
-                    crate::format::count(*line),
-                    offset(s - from),
-                    offset(e - from),
-                    style,
-                ));
+                self.spans.push((crate::format::count(*line), offset(s - from), offset(e - from), style));
             }
             if end <= line_end {
                 break;
@@ -280,20 +239,14 @@ impl<'a> Source<'a> {
         out.clear();
         let n32 = crate::format::count(n);
         let first = self.spans.partition_point(|s| s.0 < n32);
-        let mut iter = self.spans[first..]
-            .iter()
-            .take_while(|s| s.0 == n32)
-            .peekable();
+        let mut iter = self.spans[first..].iter().take_while(|s| s.0 == n32).peekable();
         if iter.peek().is_none() {
             return;
         }
         let text = self.line(n);
         cell_cols(text, cols);
         for &(_, from, to, style) in iter {
-            let (from, to) = (
-                (from as usize).min(text.len()),
-                (to as usize).min(text.len()),
-            );
+            let (from, to) = ((from as usize).min(text.len()), (to as usize).min(text.len()));
             let (c0, c1) = (cols[from], cols[to]);
             if c1 > c0 && usize::from(c0) < MAX_COLS {
                 out.push(span(c0, c1 - c0, style));
@@ -308,22 +261,28 @@ fn offset(n: usize) -> u32 {
 }
 
 /// Per diff line of `file`, its packed highlight spans; `old` and `new` are the file's whole old and new text.
-pub fn row_spans(
-    file: &FileDiff,
-    old: &str,
-    new: &str,
-    highlighter: &mut Highlighter,
-) -> Vec<Vec<u32>> {
+pub fn row_spans(file: &FileDiff, old: &str, new: &str, highlighter: &mut Highlighter) -> Vec<Vec<u32>> {
     let lines: &LinesChunk = &file.lines;
     let mut out = vec![Vec::new(); lines.len()];
     let lang = Lang::of(&file.path);
     if !file.has_code() || lang.is_none() {
         return out;
     }
-    let has = |kind: Kind| (0..lines.len()).any(|i| lines.kind(i) == kind as u8);
-    let old_src = has(Kind::Del).then(|| Source::new(old, lang, highlighter));
-    let new_src =
-        (has(Kind::Add) || has(Kind::Context)).then(|| Source::new(new, lang, highlighter));
+    // The last line each side shows, 1-based; 0 when that side shows none.
+    let (mut old_last, mut new_last) = (0, 0);
+    for i in 0..lines.len() {
+        let kind = lines.kind(i);
+        if kind == Kind::Del as u8 {
+            old_last = old_last.max(lines.old_no(i));
+        } else if kind == Kind::Add as u8 || kind == Kind::Context as u8 {
+            new_last = new_last.max(lines.new_no(i));
+        }
+    }
+    let side = |text, last: u32, highlighter: &mut Highlighter| {
+        (last > 0).then(|| Source::new(text, lang, last as usize - 1, highlighter))
+    };
+    let old_src = side(old, old_last, highlighter);
+    let new_src = side(new, new_last, highlighter);
     let mut cols = Vec::new();
     for (i, row) in out.iter_mut().enumerate() {
         let kind = lines.kind(i);
@@ -351,16 +310,13 @@ mod tests {
     #[test]
     fn every_grammar_loads() {
         for lang in Lang::ALL {
-            assert!(
-                loads(lang),
-                "{lang:?} query does not compile against its grammar"
-            );
+            assert!(loads(lang), "{lang:?} query does not compile against its grammar");
         }
     }
 
     fn styles_of(source: &str, lang: Lang, line: usize) -> Vec<(String, Style)> {
         let mut h = Highlighter::new();
-        let src = Source::new(source, Some(lang), &mut h);
+        let src = Source::new(source, Some(lang), usize::MAX - 1, &mut h);
         let mut cols = Vec::new();
         let mut packed = Vec::new();
         src.packed(line, &mut cols, &mut packed);
@@ -370,16 +326,9 @@ mod tests {
         packed
             .iter()
             .map(|&s| {
-                let (col, len, style) = (
-                    (s & 0x1ff) as usize,
-                    ((s >> 9) & 0x3ff) as usize,
-                    u8::try_from(s >> 19).unwrap(),
-                );
-                let style = NAMES
-                    .iter()
-                    .map(|n| n.1)
-                    .find(|st| *st as u8 == style)
-                    .unwrap_or(Style::Plain);
+                let (col, len, style) =
+                    ((s & 0x1ff) as usize, ((s >> 9) & 0x3ff) as usize, u8::try_from(s >> 19).unwrap());
+                let style = NAMES.iter().map(|n| n.1).find(|st| *st as u8 == style).unwrap_or(Style::Plain);
                 (text[col..col + len].iter().collect(), style)
             })
             .collect()
@@ -390,18 +339,20 @@ mod tests {
         let src = "fn main() {\n    /* one\n    two */ let s = \"x\";\n}\n";
         let line0 = styles_of(src, Lang::Rust, 0);
         assert!(line0.contains(&("fn".into(), Style::Keyword)), "{line0:?}");
-        assert!(
-            line0.contains(&("main".into(), Style::Function)),
-            "{line0:?}"
-        );
+        assert!(line0.contains(&("main".into(), Style::Function)), "{line0:?}");
         // The middle of a block comment, highlighted on its own line.
         let line2 = styles_of(src, Lang::Rust, 2);
         assert_eq!(line2[0], ("    two */".into(), Style::Comment), "{line2:?}");
         assert!(line2.contains(&("let".into(), Style::Keyword)), "{line2:?}");
-        assert!(
-            line2.contains(&("\"x\"".into(), Style::String)),
-            "{line2:?}"
-        );
+        assert!(line2.contains(&("\"x\"".into(), Style::String)), "{line2:?}");
+    }
+
+    #[test]
+    fn colouring_stops_after_the_last_line_shown() {
+        let mut h = Highlighter::new();
+        let src = Source::new("let a = 1;\nlet b = 2;\nlet c = 3;\n", Some(Lang::Rust), 1, &mut h);
+        assert!(src.spans.iter().any(|s| s.0 == 1));
+        assert!(!src.spans.iter().any(|s| s.0 == 2), "{:?}", src.spans);
     }
 
     #[test]
@@ -421,35 +372,15 @@ mod tests {
         lines.push(Kind::File, 0, 0, "a.rs");
         let (added, removed) = crate::diff::hunk_lines(old, new, &mut lines);
         assert_eq!((added, removed), (1, 1));
-        let file = FileDiff {
-            path: "a.rs".into(),
-            status: b'M',
-            old: None,
-            new: None,
-            added,
-            removed,
-            flags: 0,
-            lines,
-        };
+        let file =
+            FileDiff { path: "a.rs".into(), status: b'M', old: None, new: None, added, removed, flags: 0, lines };
         let rows = row_spans(&file, old, new, &mut Highlighter::new());
         // File, hunk header, `/* a`, `b */`, -let, +fn.
         assert_eq!(rows.len(), 6);
         assert!(rows[0].is_empty() && rows[1].is_empty());
         let style = |s: u32| u8::try_from(s >> 19).unwrap();
-        assert_eq!(
-            style(rows[3][0]),
-            Style::Comment as u8,
-            "context line in the middle of a comment"
-        );
-        assert!(
-            rows[4]
-                .iter()
-                .any(|&s| style(s) == Style::Keyword as u8 && (s >> 9) & 0x3ff == 3)
-        );
-        assert!(
-            rows[5]
-                .iter()
-                .any(|&s| style(s) == Style::Keyword as u8 && (s >> 9) & 0x3ff == 2)
-        );
+        assert_eq!(style(rows[3][0]), Style::Comment as u8, "context line in the middle of a comment");
+        assert!(rows[4].iter().any(|&s| style(s) == Style::Keyword as u8 && (s >> 9) & 0x3ff == 3));
+        assert!(rows[5].iter().any(|&s| style(s) == Style::Keyword as u8 && (s >> 9) & 0x3ff == 2));
     }
 }

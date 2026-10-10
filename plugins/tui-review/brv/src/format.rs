@@ -182,10 +182,7 @@ fn walk_cells(line: &str, mut cell: impl FnMut(usize, u16)) {
 
 /// A count or offset as stored. Chunks hold at most [`CHUNK_LINES`] lines of at most [`MAX_COLS`] cells, and the
 /// manifest's strings are paths, so nothing stored comes near `u32::MAX`.
-#[expect(
-    clippy::cast_possible_truncation,
-    reason = "bounded by CHUNK_LINES × MAX_COLS; checked in debug builds"
-)]
+#[expect(clippy::cast_possible_truncation, reason = "bounded by CHUNK_LINES × MAX_COLS; checked in debug builds")]
 pub(crate) fn count(n: usize) -> u32 {
     debug_assert!(u32::try_from(n).is_ok());
     n as u32
@@ -196,13 +193,7 @@ fn pad4(buf: &mut Vec<u8>) {
 }
 
 fn header(magic: [u8; 4], n: usize, m: usize) -> Header {
-    Header {
-        magic,
-        version: VERSION,
-        flags: 0,
-        n: count(n),
-        m: count(m),
-    }
+    Header { magic, version: VERSION, flags: 0, n: count(n), m: count(m) }
 }
 
 /// Writes `bytes` to `path` through a temporary name, so a reader never sees half a file.
@@ -240,14 +231,9 @@ impl Manifest {
     #[must_use]
     pub fn encode(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(
-            16 + size_of::<Meta>()
-                + self.files.len() * size_of::<FileRecord>()
-                + self.strings.0.len() * 2
-                + 4,
+            16 + size_of::<Meta>() + self.files.len() * size_of::<FileRecord>() + self.strings.0.len() * 2 + 4,
         );
-        buf.extend_from_slice(
-            header(MAGIC_MANIFEST, self.files.len(), self.strings.0.len()).as_bytes(),
-        );
+        buf.extend_from_slice(header(MAGIC_MANIFEST, self.files.len(), self.strings.0.len()).as_bytes());
         buf.extend_from_slice(self.meta.as_bytes());
         buf.extend_from_slice(self.files.as_bytes());
         buf.extend_from_slice(self.strings.0.as_bytes());
@@ -282,21 +268,14 @@ impl LinesChunk {
         self.old_no.push(from.old_no[i]);
         self.new_no.push(from.new_no[i]);
         self.start.push(count(self.text.len()));
-        let end = from
-            .start
-            .get(i + 1)
-            .map_or(from.text.len(), |&e| e as usize);
-        self.text
-            .extend_from_slice(&from.text[from.start[i] as usize..end]);
+        let end = from.start.get(i + 1).map_or(from.text.len(), |&e| e as usize);
+        self.text.extend_from_slice(&from.text[from.start[i] as usize..end]);
     }
 
     /// Line `i`'s cells as text.
     #[must_use]
     pub fn text(&self, i: usize) -> String {
-        let end = self
-            .start
-            .get(i + 1)
-            .map_or(self.text.len(), |&e| e as usize);
+        let end = self.start.get(i + 1).map_or(self.text.len(), |&e| e as usize);
         char::decode_utf16(self.text[self.start[i] as usize..end].iter().copied())
             .map(|c| c.unwrap_or(char::REPLACEMENT_CHARACTER))
             .collect()
@@ -386,9 +365,7 @@ mod tests {
     fn cells_expand_tabs_cut_and_replace() {
         let mut out = Vec::new();
         to_cells("\tab\u{4e2d}\u{301}x\u{1f600}", &mut out);
-        let s: String = char::decode_utf16(out.iter().copied())
-            .map(Result::unwrap)
-            .collect();
+        let s: String = char::decode_utf16(out.iter().copied()).map(Result::unwrap).collect();
         assert_eq!(s, "    ab·x·");
 
         out.clear();
@@ -428,12 +405,7 @@ mod tests {
     fn cell_cols_follow_to_cells() {
         let mut cells = Vec::new();
         let mut cols = Vec::new();
-        for line in [
-            "let x = 1;",
-            "\tab\u{4e2d}\u{301}x\u{1f600}",
-            "a\tb",
-            &"y".repeat(MAX_COLS + 9),
-        ] {
+        for line in ["let x = 1;", "\tab\u{4e2d}\u{301}x\u{1f600}", "a\tb", &"y".repeat(MAX_COLS + 9)] {
             cells.clear();
             to_cells(line, &mut cells);
             cell_cols(line, &mut cols);

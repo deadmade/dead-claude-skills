@@ -4,6 +4,7 @@ use std::process::ExitCode;
 const USAGE: &str = "\
 usage: brv review [--base REF] [--repo DIR] [--cache DIR]   review HEAD against the branch it is stacked on
        brv gen [--lines N] [--seed N] [--out DIR]           write a synthetic review cache (default 100000 lines)
+       brv bench [--base REF] [--repo DIR]                  time a review of a real repository, cold and cached
        brv --version
 ";
 
@@ -12,6 +13,7 @@ fn main() -> ExitCode {
     let result = match args.first().map(String::as_str) {
         Some("review") => review_command(&args[1..]),
         Some("gen") => gen_command(&args[1..]),
+        Some("bench") => bench_command(&args[1..]),
         Some("--version" | "-V") => {
             println!("brv {}", env!("CARGO_PKG_VERSION"));
             return ExitCode::SUCCESS;
@@ -43,20 +45,14 @@ fn flags<'a>(args: &'a [String], known: &[&str]) -> anyhow::Result<Vec<(&'a str,
         if !known.contains(&flag.as_str()) {
             anyhow::bail!("unknown flag {flag}\n{USAGE}");
         }
-        let value = it
-            .next()
-            .ok_or_else(|| anyhow::anyhow!("{flag} needs a value"))?;
+        let value = it.next().ok_or_else(|| anyhow::anyhow!("{flag} needs a value"))?;
         out.push((flag.as_str(), value.as_str()));
     }
     Ok(out)
 }
 
 fn review_command(args: &[String]) -> anyhow::Result<()> {
-    let mut options = brv::review::Options {
-        repo: PathBuf::from("."),
-        base: None,
-        cache: None,
-    };
+    let mut options = brv::review::Options { repo: PathBuf::from("."), base: None, cache: None };
     for (flag, value) in flags(args, &["--base", "--repo", "--cache"])? {
         match flag {
             "--base" => options.base = Some(value.to_owned()).filter(|b| !b.is_empty()),
@@ -70,14 +66,40 @@ fn review_command(args: &[String]) -> anyhow::Result<()> {
     } else {
         eprintln!(
             "brv review: {} files, {} lines against {}; base {:?}, text {:?}, colour {:?}",
-            summary.files,
-            summary.lines,
-            summary.base,
-            summary.resolve,
-            summary.text,
-            summary.colour
+            summary.files, summary.lines, summary.base, summary.resolve, summary.text, summary.colour
         );
     }
+    Ok(())
+}
+
+/// Reviews a real repository into a throwaway cache twice, cold then cached, and prints how long each part took.
+fn bench_command(args: &[String]) -> anyhow::Result<()> {
+    let cache = std::env::temp_dir().join(format!("brv-bench-{}", std::process::id()));
+    let mut options = brv::review::Options { repo: PathBuf::from("."), base: None, cache: Some(cache.clone()) };
+    for (flag, value) in flags(args, &["--base", "--repo"])? {
+        match flag {
+            "--base" => options.base = Some(value.to_owned()),
+            _ => options.repo = PathBuf::from(value),
+        }
+    }
+    let cold = brv::review::run(&options, std::io::sink());
+    let started = std::time::Instant::now();
+    let warm = brv::review::run(&options, std::io::sink());
+    let reopen = started.elapsed();
+    let _ = std::fs::remove_dir_all(&cache);
+    let (cold, warm) = (cold?, warm?);
+    let threads = std::thread::available_parallelism().map_or(1, std::num::NonZero::get);
+    println!(
+        "brv {} · {} files, {} diff lines against {} · {threads} threads",
+        env!("CARGO_PKG_VERSION"),
+        cold.files,
+        cold.lines,
+        cold.base
+    );
+    println!("  base detection      {:>10.1?}", cold.resolve);
+    println!("  text (pass 1)       {:>10.1?}", cold.text);
+    println!("  colours (pass 2)    {:>10.1?}", cold.colour);
+    println!("  reopen, cached      {:>10.1?}{}", reopen, if warm.cached { "" } else { "  (not cached!)" });
     Ok(())
 }
 

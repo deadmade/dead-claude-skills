@@ -22,23 +22,12 @@ impl Repo {
 
     fn git(&self, args: &[&str]) -> String {
         let out = Command::new("git")
-            .args([
-                "-c",
-                "user.name=t",
-                "-c",
-                "user.email=t@t",
-                "-c",
-                "commit.gpgsign=false",
-            ])
+            .args(["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"])
             .args(args)
             .current_dir(self.path())
             .output()
             .unwrap();
-        assert!(
-            out.status.success(),
-            "git {args:?}: {}",
-            String::from_utf8_lossy(&out.stderr)
-        );
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
         String::from_utf8(out.stdout).unwrap().trim().to_owned()
     }
 
@@ -119,6 +108,23 @@ fn main_that_moved_on_is_still_the_base() {
 }
 
 #[test]
+fn a_branch_that_merged_main_in_is_reviewed_against_main() {
+    let repo = Repo::new();
+    repo.commit("a.txt", "a\n");
+    repo.git(&["branch", "old"]);
+    repo.git(&["checkout", "-q", "-b", "feature"]);
+    repo.commit("f.txt", "f\n");
+    repo.git(&["checkout", "-q", "main"]);
+    repo.commit("main-later.txt", "later\n");
+    repo.git(&["checkout", "-q", "feature"]);
+    repo.git(&["-c", "user.name=t", "merge", "-q", "--no-edit", "main"]);
+    repo.commit("f2.txt", "f2\n");
+    // `old` sits on feature's first-parent line, but main was merged in more recently.
+    assert_eq!(repo.base(None), "main");
+    assert_eq!(paths(&repo.files()), ["f.txt", "f2.txt"]);
+}
+
+#[test]
 fn branches_stacked_on_top_and_this_branchs_remote_copy_are_not_bases() {
     let repo = stack();
     let pushed = repo.git(&["rev-parse", "HEAD"]);
@@ -157,10 +163,7 @@ fn files_are_listed_by_kind() {
     let repo = Repo::new();
     repo.write("keep.rs", "fn a() {}\n");
     repo.write("gone.txt", "bye\n");
-    repo.write(
-        "old/name.txt",
-        "same content for a rename\nline two\nline three\n",
-    );
+    repo.write("old/name.txt", "same content for a rename\nline two\nline three\n");
     repo.write("Cargo.lock", "[[package]]\nname = \"a\"\n");
     repo.write("pic.png", b"\x89PNG\0\x01\x02");
     repo.git(&["add", "-A"]);
@@ -176,23 +179,8 @@ fn files_are_listed_by_kind() {
     repo.git(&["commit", "-q", "-m", "change"]);
 
     let files = repo.files();
-    let by = |p: &str| {
-        files
-            .iter()
-            .find(|f| f.path == p)
-            .unwrap_or_else(|| panic!("{p} missing: {:?}", paths(&files)))
-    };
-    assert_eq!(
-        paths(&files),
-        [
-            "Cargo.lock",
-            "added.py",
-            "gone.txt",
-            "keep.rs",
-            "new/name.txt",
-            "pic.png"
-        ]
-    );
+    let by = |p: &str| files.iter().find(|f| f.path == p).unwrap_or_else(|| panic!("{p} missing: {:?}", paths(&files)));
+    assert_eq!(paths(&files), ["Cargo.lock", "added.py", "gone.txt", "keep.rs", "new/name.txt", "pic.png"]);
 
     let keep = by("keep.rs");
     assert_eq!((keep.status, keep.added, keep.removed), (b'M', 1, 0));
@@ -204,11 +192,7 @@ fn files_are_listed_by_kind() {
 
     let gone = by("gone.txt");
     assert_eq!((gone.status, gone.removed), (b'D', 1));
-    assert_eq!(
-        gone.blob(),
-        gone.old.unwrap(),
-        "a deleted file's viewed mark goes by its old blob"
-    );
+    assert_eq!(gone.blob(), gone.old.unwrap(), "a deleted file's viewed mark goes by its old blob");
 
     let moved = by("new/name.txt");
     assert_eq!(moved.status, b'R');
@@ -233,11 +217,7 @@ fn a_run_announces_every_chunk_and_the_next_one_is_cached() {
     let big = (0..3000).map(|i| format!("let x{i} = {i};\n")).collect::<Vec<_>>().concat();
     repo.commit("big.rs", &big);
     let cache = tempfile::tempdir().unwrap();
-    let options = Options {
-        repo: repo.path().to_owned(),
-        base: None,
-        cache: Some(cache.path().to_owned()),
-    };
+    let options = Options { repo: repo.path().to_owned(), base: None, cache: Some(cache.path().to_owned()) };
 
     let mut out = Vec::new();
     let summary = run(&options, &mut out).unwrap();
@@ -248,33 +228,13 @@ fn a_run_announces_every_chunk_and_the_next_one_is_cached() {
     assert_eq!(summary.lines, 3005);
     assert_eq!(
         lines,
-        [
-            format!("manifest {dir}").as_str(),
-            "text 0",
-            "text 1",
-            "text 2",
-            "hl 0",
-            "hl 1",
-            "hl 2",
-            "done"
-        ]
+        [format!("manifest {dir}").as_str(), "text 0", "text 1", "text 2", "hl 0", "hl 1", "hl 2", "done"]
     );
-    for name in [
-        "manifest.brv",
-        "0000.lines",
-        "0002.lines",
-        "0000.hl",
-        "0002.hl",
-        "done",
-    ] {
+    for name in ["manifest.brv", "0000.lines", "0002.lines", "0000.hl", "0002.hl", "done"] {
         assert!(summary.dir.join(name).exists(), "{name}");
     }
     assert!(
-        !std::fs::read_dir(&summary.dir).unwrap().any(|e| e
-            .unwrap()
-            .path()
-            .extension()
-            .is_some_and(|x| x == "tmp"))
+        !std::fs::read_dir(&summary.dir).unwrap().any(|e| e.unwrap().path().extension().is_some_and(|x| x == "tmp"))
     );
 
     let mut again = Vec::new();

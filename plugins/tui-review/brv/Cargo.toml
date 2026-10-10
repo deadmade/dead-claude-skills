@@ -41,3 +41,7 @@ codegen-units = 1
 [[bench]]
 name = "format"
 harness = false
+
+[[bench]]
+name = "review"
+harness = false

@@ -47,9 +47,7 @@ impl FileDiff {
     /// The new blob's id, or the old one's for a deletion: what "viewed" marks are kept under.
     #[must_use]
     pub fn blob(&self) -> ObjectId {
-        self.new
-            .or(self.old)
-            .unwrap_or_else(|| ObjectId::null(gix::hash::Kind::Sha1))
+        self.new.or(self.old).unwrap_or_else(|| ObjectId::null(gix::hash::Kind::Sha1))
     }
 }
 
@@ -70,13 +68,7 @@ struct Changed {
 pub fn review(repo: &gix::Repository, range: &Range) -> Result<Vec<FileDiff>> {
     let changed = changed_files(repo, range)?;
     let sync = repo.clone().into_sync();
-    changed
-        .into_par_iter()
-        .map_init(
-            || sync.to_thread_local(),
-            |repo, file| diff_file(repo, &file),
-        )
-        .collect()
+    changed.into_par_iter().map_init(|| sync.to_thread_local(), |repo, file| diff_file(repo, &file)).collect()
 }
 
 fn changed_files(repo: &gix::Repository, range: &Range) -> Result<Vec<Changed>> {
@@ -89,12 +81,7 @@ fn changed_files(repo: &gix::Repository, range: &Range) -> Result<Vec<Changed>> 
     let mut out = Vec::new();
     for change in repo.diff_tree_to_tree(&old_tree, &new_tree, options)? {
         let file = match change {
-            Change::Addition {
-                location,
-                entry_mode,
-                id,
-                ..
-            } if entry_mode.is_blob_or_symlink() => Changed {
+            Change::Addition { location, entry_mode, id, .. } if entry_mode.is_blob_or_symlink() => Changed {
                 path: path(&location),
                 old_path: None,
                 status: b'A',
@@ -102,12 +89,7 @@ fn changed_files(repo: &gix::Repository, range: &Range) -> Result<Vec<Changed>> 
                 new: Some(id),
                 mode_only: false,
             },
-            Change::Deletion {
-                location,
-                entry_mode,
-                id,
-                ..
-            } if entry_mode.is_blob_or_symlink() => Changed {
+            Change::Deletion { location, entry_mode, id, .. } if entry_mode.is_blob_or_symlink() => Changed {
                 path: path(&location),
                 old_path: None,
                 status: b'D',
@@ -115,13 +97,9 @@ fn changed_files(repo: &gix::Repository, range: &Range) -> Result<Vec<Changed>> 
                 new: None,
                 mode_only: false,
             },
-            Change::Modification {
-                location,
-                previous_entry_mode,
-                previous_id,
-                entry_mode,
-                id,
-            } if entry_mode.is_blob_or_symlink() && previous_entry_mode.is_blob_or_symlink() => {
+            Change::Modification { location, previous_entry_mode, previous_id, entry_mode, id }
+                if entry_mode.is_blob_or_symlink() && previous_entry_mode.is_blob_or_symlink() =>
+            {
                 Changed {
                     path: path(&location),
                     old_path: None,
@@ -131,22 +109,18 @@ fn changed_files(repo: &gix::Repository, range: &Range) -> Result<Vec<Changed>> 
                     mode_only: previous_id == id,
                 }
             }
-            Change::Rewrite {
-                source_location,
-                source_id,
-                location,
-                id,
-                entry_mode,
-                copy,
-                ..
-            } if entry_mode.is_blob_or_symlink() => Changed {
-                path: path(&location),
-                old_path: Some(path(&source_location)),
-                status: if copy { b'C' } else { b'R' },
-                old: Some(source_id),
-                new: Some(id),
-                mode_only: false,
-            },
+            Change::Rewrite { source_location, source_id, location, id, entry_mode, copy, .. }
+                if entry_mode.is_blob_or_symlink() =>
+            {
+                Changed {
+                    path: path(&location),
+                    old_path: Some(path(&source_location)),
+                    status: if copy { b'C' } else { b'R' },
+                    old: Some(source_id),
+                    new: Some(id),
+                    mode_only: false,
+                }
+            }
             // Trees and submodules: their files are listed one by one, and a submodule's commits are not ours.
             _ => continue,
         };
@@ -156,11 +130,7 @@ fn changed_files(repo: &gix::Repository, range: &Range) -> Result<Vec<Changed>> 
     Ok(out)
 }
 
-fn blob<'a>(
-    repo: &gix::Repository,
-    id: Option<ObjectId>,
-    buf: &'a mut Vec<u8>,
-) -> Result<&'a [u8]> {
+fn blob<'a>(repo: &gix::Repository, id: Option<ObjectId>, buf: &'a mut Vec<u8>) -> Result<&'a [u8]> {
     buf.clear();
     if let Some(id) = id {
         let object = repo.find_object(id)?;
@@ -187,8 +157,7 @@ fn diff_file(repo: &mut gix::Repository, file: &Changed) -> Result<FileDiff> {
         lines,
     };
     if file.mode_only {
-        out.lines
-            .push(Kind::Note, 0, 0, "mode changed, content unchanged");
+        out.lines.push(Kind::Note, 0, 0, "mode changed, content unchanged");
         return Ok(out);
     }
     if file.old.is_some() && file.old == file.new {
@@ -214,12 +183,7 @@ fn diff_file(repo: &mut gix::Repository, file: &Changed) -> Result<FileDiff> {
     out.removed = removed;
     if is_collapsed(&file.path) {
         out.flags |= file_flags::COLLAPSED;
-        out.lines.push(
-            Kind::Note,
-            0,
-            0,
-            &format!("+{added} −{removed}, not shown: lockfile or generated"),
-        );
+        out.lines.push(Kind::Note, 0, 0, &format!("+{added} −{removed}, not shown: lockfile or generated"));
     } else {
         for i in 0..hunks.len() {
             out.lines.push_from(&hunks, i);
@@ -265,9 +229,7 @@ pub fn is_collapsed(path: &str) -> bool {
 }
 
 fn has_ext(name: &str, ext: &str) -> bool {
-    Path::new(name)
-        .extension()
-        .is_some_and(|e| e.eq_ignore_ascii_case(ext))
+    Path::new(name).extension().is_some_and(|e| e.eq_ignore_ascii_case(ext))
 }
 
 /// Appends the hunks turning `old` into `new`, with [`CONTEXT`] lines around each change; returns (added, removed).
@@ -285,9 +247,7 @@ pub fn hunk_lines(old: &str, new: &str, out: &mut LinesChunk) -> (u32, u32) {
     while start < hunks.len() {
         // Hunks closer than two contexts apart share one header, as in `git diff`.
         let mut end = start;
-        while end + 1 < hunks.len()
-            && hunks[end + 1].before.start - hunks[end].before.end <= 2 * CONTEXT
-        {
+        while end + 1 < hunks.len() && hunks[end + 1].before.start - hunks[end].before.end <= 2 * CONTEXT {
             end += 1;
         }
         let first = &hunks[start];
@@ -295,15 +255,9 @@ pub fn hunk_lines(old: &str, new: &str, out: &mut LinesChunk) -> (u32, u32) {
         let lead = CONTEXT.min(first.before.start - prev_end);
         let trail = CONTEXT.min(old_len - last.before.end);
         let (old_from, new_from) = (first.before.start - lead, first.after.start - lead);
-        let (old_to, new_to) = (
-            last.before.end + trail,
-            (last.after.end + trail).min(new_len),
-        );
-        let header = format!(
-            "@@ -{} +{} @@",
-            span_label(old_from, old_to - old_from),
-            span_label(new_from, new_to - new_from)
-        );
+        let (old_to, new_to) = (last.before.end + trail, (last.after.end + trail).min(new_len));
+        let header =
+            format!("@@ -{} +{} @@", span_label(old_from, old_to - old_from), span_label(new_from, new_to - new_from));
         out.push(Kind::Hunk, 0, 0, &header);
 
         // Unchanged lines sit at a fixed offset between the sides; `shift` is new minus old, wrapping when negative.
@@ -322,16 +276,8 @@ pub fn hunk_lines(old: &str, new: &str, out: &mut LinesChunk) -> (u32, u32) {
             for n in h.after.clone() {
                 out.push(Kind::Add, 0, n + 1, &after(n));
             }
-            let next_start = hunks
-                .get(start + k + 1)
-                .filter(|_| start + k < end)
-                .map_or(old_to, |n| n.before.start);
-            context(
-                out,
-                h.before.end,
-                next_start,
-                h.after.end.wrapping_sub(h.before.end),
-            );
+            let next_start = hunks.get(start + k + 1).filter(|_| start + k < end).map_or(old_to, |n| n.before.start);
+            context(out, h.before.end, next_start, h.after.end.wrapping_sub(h.before.end));
         }
         prev_end = last.before.end;
         start = end + 1;
@@ -366,26 +312,15 @@ mod tests {
                     k if k == Kind::Context as u8 => " ",
                     _ => "",
                 };
-                format!(
-                    "{sign}{}|{}|{}",
-                    chunk.text(i),
-                    chunk.old_no(i),
-                    chunk.new_no(i)
-                )
+                format!("{sign}{}|{}|{}", chunk.text(i), chunk.old_no(i), chunk.new_no(i))
             })
             .collect()
     }
 
     #[test]
     fn hunks_have_context_numbers_and_merge_when_close() {
-        let old: String = (1..=20)
-            .map(|i| format!("l{i}\n"))
-            .collect::<Vec<_>>()
-            .concat();
-        let new = old
-            .replace("l5\n", "L5\n")
-            .replace("l8\n", "")
-            .replace("l19\n", "l19\nnew\n");
+        let old: String = (1..=20).map(|i| format!("l{i}\n")).collect::<Vec<_>>().concat();
+        let new = old.replace("l5\n", "L5\n").replace("l8\n", "").replace("l19\n", "l19\nnew\n");
         let mut out = LinesChunk::default();
         let (added, removed) = hunk_lines(&old, &new, &mut out);
         assert_eq!((added, removed), (2, 2));
