@@ -1,10 +1,6 @@
 name: tui-review
 
 on:
-  push:
-    paths:
-      - "plugins/tui-review/**"
-      - ".github/workflows/tui-review.yml"
   pull_request:
     paths:
       - "plugins/tui-review/**"
