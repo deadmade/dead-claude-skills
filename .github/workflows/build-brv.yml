@@ -1,10 +1,9 @@
 name: Build brv
 
 # brv, tui-review's binary, for each platform: archives plus their checksums. release.yml calls this and attaches
-# them to the vX.Y.Z release the installer downloads from. A change to this file, or a run by hand, builds only.
+# them to the vX.Y.Z release the installer downloads from. A PR that changes this file, or a run by hand, builds only.
 on:
-  push:
-    branches: ["**"] # not tags: release.yml builds those
+  pull_request:
     paths: [".github/workflows/build-brv.yml"]
   workflow_dispatch:
   workflow_call:

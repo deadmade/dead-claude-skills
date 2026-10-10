@@ -1,11 +1,10 @@
 name: Build cswap
 
 # cswap.exe: claude-swap (https://github.com/realiti4/claude-swap) at the tag pinned in installer/cswap.json,
-# compiled with Nuitka into one Windows exe. Pushes that touch the pin build and smoke-test it; release.yml calls
+# compiled with Nuitka into one Windows exe. PRs that touch the pin build and smoke-test it; release.yml calls
 # this workflow and attaches the exe to the vX.Y.Z release the installer downloads from.
 on:
-  push:
-    branches: ["**"] # not tags: release.yml builds those
+  pull_request:
     paths: [installer/cswap.json, .github/workflows/build-cswap.yml]
   workflow_dispatch:
   workflow_call:

@@ -64,6 +64,6 @@ the next release.
 
 The script (master, clean tree only) bumps every version, runs the repo checks and installer tests, commits
 `Release vX.Y.Z` and tags it. The tag runs `release.yml`: checks again, builds cswap.exe (`build-cswap.yml`) and brv
-for every platform (`build-brv.yml`), and publishes the GitHub release `vX.Y.Z` with all of them attached. Pushes to
-branches only build and smoke-test, and only when those workflows or the cswap pin change; nothing is published
-without a tag. Superpowers, ponytail and atlassian come from their own repos and keep their own versions.
+for every platform (`build-brv.yml`), and publishes the GitHub release `vX.Y.Z` with all of them attached. Pull
+requests that touch those workflows or the cswap pin build and smoke-test; merges to master run nothing, and only a
+`v*` tag publishes. Superpowers, ponytail and atlassian come from their own repos and keep their own versions.
