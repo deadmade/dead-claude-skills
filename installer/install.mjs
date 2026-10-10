@@ -184,10 +184,10 @@ async function applyDcg(was, on) {
   if (on && !WIN && !onPath('dcg')) console.log('\n\x1b[33mdcg is not on PATH: add ~/.local/bin (NixOS: home.sessionPath).\x1b[0m');
 }
 
-// Windows: download the pinned cswap.exe (checked against its .sha256) and put its folder on the user PATH.
+// Windows: download cswap.exe from this version's release (checked against its .sha256), put its folder on PATH.
 async function applyCswap(on) {
   const version = readJson(join(PKG, 'installer', 'cswap.json')).upstream;
-  const dl = cswapDownload(process.platform, process.env, version);
+  const dl = cswapDownload(process.platform, process.env, readJson(join(PKG, 'package.json')).version);
   if (!on || !dl) return;
   const have = existsSync(dl.exe) ? spawnSync(dl.exe, ['--version'], { encoding: 'utf8' }) : undefined;
   if (!(have?.status === 0 && cswapCurrent(have.stdout, version))) {

@@ -1,5 +1,5 @@
-// Repo checks for the pre-commit hook: every plugin manifest validates, and the marketplace and the dead-skills
-// bundle agree on the plugin list. Skips `claude plugin validate` when claude isn't on PATH
+// Repo checks for the pre-commit hook: every plugin manifest validates, the marketplace and the dead-skills
+// bundle agree on the plugin list, and everything carries package.json's version. Skips `claude plugin validate` when claude isn't on PATH
 // (nix flake check sandbox, CI).
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -12,7 +12,7 @@ const BUNDLE = "plugins/dead-skills/.claude-plugin/plugin.json";
 const problems = [];
 const pluginDirs = readdirSync("plugins", { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => `plugins/${d.name}`);
 
-// --- claude plugin validate (warnings such as a missing version are fine) ---
+// --- claude plugin validate ---
 for (const target of [".", ...pluginDirs.map((d) => d + "/")]) {
   const r = spawnSync("claude", ["plugin", "validate", target], { encoding: "utf8" });
   if (r.error?.code === "ENOENT") {
@@ -40,6 +40,16 @@ for (const { source } of market) {
 }
 for (const dir of pluginDirs) {
   if (!market.some((p) => p.source === `./${dir}`)) problems.push(`${dir} is not listed in ${MARKETPLACE}`);
+}
+
+// --- one version: package.json, marketplace metadata.version and every local plugin.json (scripts/release.mjs) ---
+const { version } = JSON.parse(readFileSync("package.json", "utf8"));
+const marketVersion = JSON.parse(readFileSync(MARKETPLACE, "utf8")).metadata?.version;
+if (marketVersion !== version) problems.push(`${MARKETPLACE}: metadata.version is ${marketVersion}, package.json has ${version}`);
+for (const dir of pluginDirs) {
+  const manifest = join(dir, ".claude-plugin", "plugin.json");
+  const v = existsSync(manifest) && JSON.parse(readFileSync(manifest, "utf8")).version;
+  if (v !== version) problems.push(`${manifest}: version is ${v}, package.json has ${version}`);
 }
 
 if (problems.length) {

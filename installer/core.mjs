@@ -132,14 +132,14 @@ export function dcgCommand(platform, action) {
   return ['bash', ['-c', `curl -fsSL '${DCG}/${script}' | bash -s -- ${flags}`]];
 }
 
-// cswap.exe: claude-swap built by .github/workflows/build-cswap.yml, attached to this repo's releases as
-// cswap-<upstream tag>. Windows only; Linux gets cswap from uv or nix.
+// cswap.exe: claude-swap built by .github/workflows/build-cswap.yml and attached to this repo's release
+// v<package.json version> by release.yml. Windows only; Linux gets cswap from uv or nix.
 const RELEASES = 'https://github.com/deadmade/dead-claude-skills/releases/download';
 
-export function cswapDownload(platform, env, version) {
+export function cswapDownload(platform, env, release) {
   if (platform !== 'win32' || !env.LOCALAPPDATA) return null;
   const dir = `${env.LOCALAPPDATA}\\Programs\\cswap`;
-  const url = `${RELEASES}/cswap-${version}/cswap.exe`;
+  const url = `${RELEASES}/v${release}/cswap.exe`;
   return { url, sha256Url: `${url}.sha256`, dir, exe: `${dir}\\cswap.exe` };
 }
 
