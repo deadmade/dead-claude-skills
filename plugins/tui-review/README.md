@@ -30,8 +30,8 @@ the file opens collapsed), a change to it clears it. The header bar counts them.
 ### Comments
 
 Claude doesn't see the pane, so comments are how you point at code. `c` opens a field under the diff: Enter saves the
-comment, an empty one cancels it (or deletes the comment you were editing). Commented lines get a `●` in the gutter, and
-the header bar and the `send` button count the comments waiting. `s` sends them all as one prompt, in your name: for
+comment, an empty one cancels it (or deletes the comment you were editing). A saved comment shows under its line,
+wrapped to the pane, with a `●` in the line's gutter; the header bar and the `send` button count the comments waiting. `s` sends them all as one prompt, in your name: for
 each, `path:line` (or the file, for a comment on its header), the commented line with up to two lines before it from its
 hunk, and your text. Then they are cleared. Comments live in the session, so a reload of the mod keeps them.
 

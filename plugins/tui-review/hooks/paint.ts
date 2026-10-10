@@ -122,9 +122,13 @@ export function paint(cells: Uint32Array, cols: number, rows: number, top: numbe
       canvas.fill(row, DEFAULT, DEFAULT)
       continue
     }
-    const markCol = drawRow(canvas, row, at, src)
-    if (markCol < 0) missing++
-    else if (src.comments?.lines.has(view.lineOfRow(at))) canvas.text(row, markCol, '●', theme.commentFg)
+    const { file, line, note } = view.locate(at)
+    if (note > 0) drawNote(canvas, row, view.notes.get(line)?.[note - 1] ?? '', note === 1)
+    else {
+      const markCol = drawRow(canvas, row, file, line, src)
+      if (markCol < 0) missing++
+      else if (src.comments?.lines.has(line)) canvas.text(row, markCol, '●', theme.commentFg)
+    }
     if (at === src.cursor) canvas.background(row, theme.cursorBg)
   }
   return missing
@@ -134,14 +138,23 @@ export function paint(cells: Uint32Array, cols: number, rows: number, top: numbe
 const MARK = 6
 const HEADER_MARK = 1
 
+/** Columns of a note row before its text: the gutter, then the pen on its first row. */
+export const NOTE_TEXT = GUTTER + 2
+
+/** One row of a note (a comment) under its line: a pen on the first row, the text in the comment colour. */
+function drawNote(canvas: Canvas, row: number, text: string, isFirst: boolean) {
+  canvas.fill(row, theme.commentFg, theme.noteBg)
+  if (isFirst) canvas.text(row, GUTTER, '✎', theme.commentFg)
+  canvas.text(row, NOTE_TEXT, text, theme.noteFg)
+}
+
 /**
- * Draws view row `at` on canvas row `row`. Returns the column a comment mark goes in, or -1 for a placeholder drawn
- * because the row's chunk is not loaded.
+ * Draws `line` of `file` on canvas row `row`. Returns the column a comment mark goes in, or -1 for a placeholder drawn
+ * because the line's chunk is not loaded.
  */
-function drawRow(canvas: Canvas, row: number, at: number, src: Source): number {
+function drawRow(canvas: Canvas, row: number, file: number, line: number, src: Source): number {
   const { view } = src
   const { manifest } = view
-  const file = view.fileOfRow(at)
   if (view.collapsed[file] === 1) {
     const info = manifest.file(file)
     canvas.fill(row, theme.dimFg, theme.viewedBg)
@@ -150,7 +163,6 @@ function drawRow(canvas: Canvas, row: number, at: number, src: Source): number {
     canvas.text(row, col, `  +${info.added} −${info.removed}`, theme.gutterFg)
     return HEADER_MARK
   }
-  const line = view.lineOfRow(at)
   const chunk = src.chunk(Math.floor(line / manifest.chunkLines))
   if (chunk === undefined) {
     canvas.fill(row, DEFAULT, DEFAULT)

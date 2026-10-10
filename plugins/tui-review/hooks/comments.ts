@@ -30,3 +30,19 @@ function fence(lines: readonly string[]): string {
   for (const line of lines) for (const run of line.match(/`+/g) ?? []) longest = Math.max(longest, run.length)
   return '`'.repeat(Math.max(3, longest + 1))
 }
+
+/** Breaks `text` into rows of at most `width` columns, at spaces where it can. */
+export function wrap(text: string, width: number): string[] {
+  const rows: string[] = []
+  for (const paragraph of text.trim().split('\n')) {
+    let rest = paragraph.trim()
+    while (rest.length > width) {
+      const space = rest.lastIndexOf(' ', width)
+      const cut = space > 0 ? space : width
+      rows.push(rest.slice(0, cut).trimEnd())
+      rest = rest.slice(cut).trimStart()
+    }
+    rows.push(rest)
+  }
+  return rows
+}

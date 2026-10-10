@@ -43,6 +43,7 @@ test('c asks for a comment on the cursor line; s sends it to Claude with its pla
   await ui.press({ key: 'j' })
   expect(row(0)).toContain('✎ 1')
   expect(row(1 + code.at).charAt(6)).toBe('●')
+  expect(row(2 + code.at)).toContain('✎ why is this here?')
 
   await ui.press({ key: 's' })
   expect(recorded.prompts).toHaveLength(1)
@@ -54,6 +55,19 @@ test('c asks for a comment on the cursor line; s sends it to Claude with its pla
   expect(await buttons()).toContain('send')
   await ui.press({ key: 'k' })
   expect(row(0)).not.toContain('✎')
+  expect(row(2 + code.at)).not.toContain('why is this here?')
+})
+
+test('a long comment wraps under its line so all of it shows', async ($, on) => {
+  const { ui, row } = await open($, on)
+  for (let i = 0; i < code.at; i++) await ui.press({ key: 'j' })
+  const words = Array.from({ length: 60 }, (_, i) => `word${i}`)
+  await ui.press({ key: 'c' })
+  await ui.input({ key: 'comment', text: words.join(' ') })
+  await ui.press({ key: 'j' })
+  let shown = ''
+  for (let r = 2 + code.at; r < 39 && row(r).startsWith(' '.repeat(9)); r++) shown += ` ${row(r).replace('✎', '').trim()}`
+  expect(shown.trim()).toBe(words.join(' '))
 })
 
 test('c on a commented line edits it, and an empty comment deletes it', async ($, on) => {

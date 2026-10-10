@@ -37,4 +37,6 @@ export const theme = {
   dimFg: 0x7f848e,
   cursorBg: 0x3e4451,
   commentFg: 0xe5c07b,
+  noteFg: 0xdcdfe4,
+  noteBg: 0x2f2b1f,
 } as const

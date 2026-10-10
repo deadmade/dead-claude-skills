@@ -3,8 +3,8 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { ReviewComment, TuiReviewOpen } from '../types'
 import { Highlights, Kind, Lines, Manifest, chunkName, fromBase64, toBase64 } from './chunks'
-import { message, upsert } from './comments'
-import { type Loaded, paint } from './paint'
+import { message, upsert, wrap } from './comments'
+import { type Loaded, NOTE_TEXT, paint } from './paint'
 import { View } from './view'
 import { VIEWED_KEY, Viewed } from './viewed'
 
@@ -24,6 +24,8 @@ let manifest: { dir: string; value: Manifest } | undefined
 /** Viewed files are the collapsed ones: `files` is the view's `collapsed`. */
 let viewed: { marks: Viewed; files: Uint8Array; count: number } | undefined
 let view: View | undefined
+/** What the view's comment rows were built from, so a frame rebuilds them only when a comment or the width changed. */
+let notesFrom = ''
 const resident = new Map<number, Loaded>()
 /** The view row drawn first, and the cursor's row. */
 let top = 0
@@ -57,6 +59,7 @@ async function loadManifest($: $, dir: string): Promise<Manifest> {
     manifest = { dir, value }
     viewed = { marks, files, count }
     view = new View(value, files)
+    notesFrom = ''
     resident.clear()
   }
   return manifest.value
@@ -107,17 +110,17 @@ async function frame($: $): Promise<string | undefined> {
   await loadManifest($, review.value.dir)
   const v = view!
   const { cols, rows } = mounted
+  const drafts = (await $.state.get({ plugin: 'tui-review', key: 'comments' })).value ?? []
+  const here = drafts.filter(c => c.dir === review.value!.dir)
+  syncNotes(v, here, cols)
   await ensureChunks($, review.value.dir, windowChunks(v, top, rows - 1))
   const loadedAt = performance.now()
-  const drafts = (await $.state.get({ plugin: 'tui-review', key: 'comments' })).value ?? []
-  const here = new Set<number>()
-  for (const c of drafts) if (c.dir === review.value.dir) here.add(c.line)
   if (cells.length !== cols * rows * 3) cells = new Uint32Array(cols * rows * 3)
   paint(cells, cols, rows, top, {
     view: v,
     cursor,
     viewed,
-    comments: { lines: here, count: drafts.length },
+    comments: { lines: new Set(here.map(c => c.line)), count: drafts.length },
     chunk: c => resident.get(c),
   })
   const encoded = toBase64(new Uint8Array(cells.buffer))
@@ -149,6 +152,20 @@ function repaint($: $): Promise<void> {
     painting = undefined
   })
   return painting
+}
+
+/** Shows each comment under its line, wrapped to the pane, keeping the cursor on its line. */
+function syncNotes(v: View, comments: readonly ReviewComment[], cols: number) {
+  const from = JSON.stringify([cols, comments.map(c => [c.line, c.text])])
+  if (from === notesFrom) return
+  notesFrom = from
+  const width = Math.max(10, cols - NOTE_TEXT - 1)
+  const keep = { line: v.lineOfRow(cursor), above: cursor - top }
+  v.notes = new Map(comments.map(c => [c.line, wrap(c.text, width)]))
+  v.rebuild()
+  cursor = v.rowOfLine(keep.line)
+  top = cursor - keep.above
+  follow()
 }
 
 /** Rows of diff the window shows, below the header bar. */
