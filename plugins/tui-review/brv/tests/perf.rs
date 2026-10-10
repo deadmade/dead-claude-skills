@@ -1,7 +1,8 @@
 //! Speed and memory budgets for `brv review` on a large synthetic repository. Ignored by default, since they want a
 //! release build: `cargo test --release --test perf -- --ignored --nocapture`. A slower change fails CI instead of
 //! slipping in. Measured on a 4-core Linux container (base 19 ms, first chunk 50 ms, plain 60 ms, colours 2.7 s,
-//! reopen 19 ms, 19 MB heap); each budget leaves 3-5x headroom for slower CI runners, Windows ones in particular.
+//! reopen 19 ms, 19 MB heap); each budget leaves 3-5x headroom (8x for the git-bound ones) for slower CI runners,
+//! Windows ones in particular.
 //!
 //! The fixture (2,000 files across the ten grammars, a 2,000-commit history, 600 branches, and a feature branch
 //! changing every file for about 100k diff lines) is built once with `git fast-import` and kept under the target dir.
@@ -175,9 +176,12 @@ impl Write for Timed {
     }
 }
 
-fn check(name: &str, took: Duration, budget: Duration) {
+/// Prints a measure against its budget, and records it when over: every measure prints before the test fails.
+fn check(over: &mut Vec<String>, name: &str, took: Duration, budget: Duration) {
     eprintln!("{name:<38} {took:>10.1?}   budget {budget:?}");
-    assert!(took <= budget, "{name}: {took:?} is over its {budget:?} budget");
+    if took > budget {
+        over.push(format!("{name}: {took:?} is over its {budget:?} budget"));
+    }
 }
 
 #[test]
@@ -209,13 +213,20 @@ fn review_budgets() {
     let reopen = reopen.elapsed();
 
     eprintln!();
-    check("base detection (600 branches)", detect, Duration::from_millis(60));
-    check("manifest + first chunk", out.first_text.unwrap(), Duration::from_millis(300));
-    check("plain pass", summary.resolve + summary.text, Duration::from_millis(300));
-    check("highlight pass", summary.colour, Duration::from_secs(8));
-    check("reopen with a complete cache", reopen, Duration::from_millis(60));
+    let mut over = Vec::new();
+    // Git-bound: a cold first open on a Windows runner took 74 ms where Linux takes 19.
+    check(&mut over, "base detection (600 branches)", detect, Duration::from_millis(150));
+    check(&mut over, "manifest + first chunk", out.first_text.unwrap(), Duration::from_millis(300));
+    check(&mut over, "plain pass", summary.resolve + summary.text, Duration::from_millis(300));
+    check(&mut over, "highlight pass", summary.colour, Duration::from_secs(8));
+    check(&mut over, "reopen with a complete cache", reopen, Duration::from_millis(150));
     eprintln!("{:<38} {:>7} MB   budget 100 MB", "peak heap", peak / 1_000_000);
-    assert!(peak < 100_000_000, "peak heap {peak} bytes");
+    if peak >= 100_000_000 {
+        over.push(format!("peak heap {peak} bytes"));
+    }
     eprintln!("{:<38} {:>7} KB   budget 1024 KB", "largest cache file", largest / 1024);
-    assert!(largest <= 1024 * 1024, "largest cache file {largest} bytes");
+    if largest > 1024 * 1024 {
+        over.push(format!("largest cache file {largest} bytes"));
+    }
+    assert!(over.is_empty(), "{}", over.join("\n"));
 }
