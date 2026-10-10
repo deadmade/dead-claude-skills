@@ -19,22 +19,6 @@ The passes are vendored in this plugin (synced weekly, don't edit them):
 | Standards | same file | breaches of the repo's documented standards, code smells |
 | Specialists | agents `self-review:silent-failure-hunter`, `:pr-test-analyzer`, `:type-design-analyzer`, `:comment-analyzer` | swallowed errors, test gaps, weak types, stale comments |
 
-## Where these come from
-
-`scripts/sync-self-review.mjs` copies them from upstream (commits in `UPSTREAM`); each vendored file starts with a
-comment naming its source.
-
-| Vendored here | Upstream | License |
-|---|---|---|
-| `references/upstream/code-review.md` | [claude-plugins-official: code-review `/code-review` command](https://github.com/anthropics/claude-plugins-official/blob/main/plugins/code-review/commands/code-review.md) | Apache-2.0 |
-| `references/upstream/spec-standards-review.md` | [mattpocock/skills: engineering/code-review](https://github.com/mattpocock/skills/blob/main/skills/engineering/code-review/SKILL.md) | MIT |
-| `agents/*.md` | [claude-plugins-official: pr-review-toolkit agents](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/pr-review-toolkit/agents) | Apache-2.0 |
-
-Optional passes, used only when installed: `blast-radius` from `pstack-picks`
-([cursor/plugins: pstack](https://github.com/cursor/plugins/tree/main/pstack)), `claude-security` from
-[claude-plugins-official](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/claude-security),
-and Claude Code's built-in `security-review`.
-
 ## Rules for the whole run
 
 - **Never post.** The upstream bug pass ends by commenting on a PR with `gh`, and checks whether a PR is eligible

@@ -21,18 +21,6 @@ never suggests answers, that's `/dev-feature`.)
 | 6 Execute | superpowers `subagent-driven-development` or `executing-plans` | code, tests |
 | 7 Finish | `verification-before-completion`, `finishing-a-development-branch` | walkthrough, branch handled |
 
-## Where these come from
-
-Plugin names are entries in the dead-claude-skills marketplace (`/plugin install <name>@dead-claude-skills`).
-
-| Skills | Plugin | Upstream |
-|---|---|---|
-| `brainstorming`, `writing-plans`, `subagent-driven-development`, `executing-plans`, `test-driven-development`, `using-git-worktrees`, `verification-before-completion`, `finishing-a-development-branch` | `superpowers` (in the default bundle) | [obra/superpowers](https://github.com/obra/superpowers/tree/main/skills) |
-| `grilling`, `domain-modeling` | `mattpocock-picks` (vendored) | [mattpocock/skills](https://github.com/mattpocock/skills/tree/main/skills) |
-| `how`, `interrogate`, `blast-radius`, `architect`, `arena` | `pstack-picks` (vendored, optional) | [cursor/plugins: pstack](https://github.com/cursor/plugins/tree/main/pstack) |
-| `/code-review` | `code-review` from `claude-plugins-official` (in the default bundle) | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/code-review) |
-| context7 docs lookup | `mcp-basic` (in the default bundle) | [upstash/context7](https://github.com/upstash/context7) |
-
 ## Rules for the whole run
 
 - Open a todo list with one entry per phase. After every phase update `docs/features/<slug>/flow.md` (`phase:` in
