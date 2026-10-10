@@ -18,7 +18,7 @@ test('/tui-review demo opens the pane and draws the diff', async ($, on) => {
   expect(raster?.props.rows).toBe(ROWS - 1)
   expect(String(raster?.props.cells).length).toBeGreaterThan(0)
   const keys = (await ui.findAll({ type: 'Button' })).map(b => b.props.hotkey)
-  expect(keys).toEqual(['j', 'k', 'n', 'p', 'r', 'c', 's'])
+  expect(keys).toEqual(['j', 'k', 'n', 'p', 'r', 'c', 's', 'q'])
 })
 
 test('j and k move the cursor, and the window follows it past the bottom', async ($, on) => {
@@ -58,4 +58,39 @@ test('n and p move the cursor between files with few chunks resident', async ($,
   await ui.press({ key: 'p' })
   expect(bar()).toContain(' 1/')
   expect(residentOf(recorded.status.at(-1) ?? '')).toBeLessThanOrEqual(3)
+})
+
+test('q closes the pane and lets the review go', async ($, on) => {
+  const recorded = engine(on, PROGRESS)
+  await $.command.run(run)
+  await recorded.opened
+  const ui = await $.ui.mount(pane(COLS, ROWS))
+  await ui.press({ key: 'q' })
+  expect(recorded.closed).toEqual(['review'])
+  // A closed pane is not drawn again; drawn anew, it has no review left to show.
+  await ui.unmount()
+  const again = await $.ui.mount(pane(COLS, ROWS))
+  expect(await again.find({ type: 'Raster' })).toBeUndefined()
+  expect(JSON.stringify(await again.drawn())).toContain('No review open')
+})
+
+test('a new conversation closes the pane and drops the old comments', async ($, on) => {
+  const recorded = engine(on, PROGRESS)
+  await $.command.run(run)
+  await recorded.opened
+  const ui = await $.ui.mount(pane(COLS, ROWS))
+  await ui.press({ key: 'c' })
+  await ui.input({ key: 'comment', text: 'left over' })
+  await $.session.end({ reason: 'clear', sessionId: 'old', resume: { id: 'old' } } as never)
+  expect(recorded.closed).toEqual(['review'])
+  await $.command.run(run)
+  const labels = (await ui.findAll({ type: 'Button' })).map(b => b.props.label)
+  expect(labels).toContain('send')
+  expect(labels).not.toContain('send 1')
+})
+
+test('/tui-review without demo says real branches are not built yet', async ($, on) => {
+  engine(on, PROGRESS)
+  const answer = await $.command.run({ ...run, args: '' })
+  expect(JSON.stringify(answer)).toContain('not built yet')
 })

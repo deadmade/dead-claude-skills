@@ -290,20 +290,54 @@ async function run($: $, argv: string[]) {
     void stream.return?.(undefined as never)
   }
   let pending = ''
+  let errors = ''
+  let isAnswered = false
   try {
     for await (const piece of stream) {
       if (isStopped) break
-      if (piece.stream === 'stderr') continue
+      if (piece.stream === 'stderr') {
+        errors += piece.text
+        continue
+      }
       pending += piece.text
       for (let nl = pending.indexOf('\n'); nl >= 0; nl = pending.indexOf('\n')) {
         const line = pending.slice(0, nl).trimEnd()
         pending = pending.slice(nl + 1)
+        isAnswered ||= /^(manifest|cached|error) /.test(line)
         await onLine($, line)
       }
     }
   } catch (err) {
     $.ui.toast(`review: could not run ${argv[0]}: ${String(err)}`)
+    return
   }
+  // brv says what went wrong on stdout; a run that ends with nothing said gets its stderr shown instead.
+  if (!isStopped && !isAnswered) {
+    const why = errors.trim().split('\n')[0] ?? ''
+    $.ui.toast(`review: ${argv.slice(0, 2).join(' ')} ended without a review${why === '' ? '' : `: ${why}`}`)
+  }
+}
+
+/** Closes the pane and forgets its review. */
+async function close($: $) {
+  await $.ui.close({ id: PANE })
+  await closed($)
+}
+
+/** Forgets the open review: stops brv and lets go of the chunks. Comments stay, for the review opened again. */
+async function closed($: $) {
+  stopRun?.()
+  stopRun = undefined
+  manifest = undefined
+  viewed = undefined
+  view = undefined
+  resident.clear()
+  top = 0
+  cursor = 0
+  mounted = undefined
+  await update($, composingAtom, () => null)
+  await update($, reviewAtom, () => null)
+  $.ui.status(undefined)
 }
 
 async function onLine($: $, line: string) {
@@ -345,17 +379,36 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'tui-review',
-      description: 'Review this branch against the one it is based on, in a pane beside the chat',
-      argumentHint: '[base] | demo',
+      description: 'A diff pane beside the chat; for now a generated demo review (/tui-review demo)',
+      argumentHint: 'demo',
     })
+    return next(e)
+  })
+
+  // The person's close (the frame's close mark, ctrl+x x) takes the review with it. The engine skips this hook for the
+  // plugin's own $.ui.close, so close() cleans up itself.
+  on('ui.close', { id: PANE }, async ($, e, next) => {
+    const result = await next(e)
+    await closed($)
+    return result
+  })
+
+  // A new conversation (exit, /clear, resume) starts without the last one's review.
+  on('session.end', async ($, e, next) => {
+    await close($)
+    await update($, commentsAtom, () => [])
     return next(e)
   })
 
   on('command.run', { command: 'tui-review' }, async ($, e) => {
     const arg = e.args.trim()
-    const argv = arg === 'demo' ? [brv, 'gen', '--lines', '100000'] : [brv, 'review', ...(arg ? ['--base', arg] : [])]
-    void run($, argv)
-    return { text: arg === 'demo' ? 'Opening a 100k-line demo review.' : 'Opening the review.' }
+    if (arg !== 'demo') {
+      return {
+        text: 'Reviewing real branches is not built yet: brv has no `review` command so far. /tui-review demo opens a generated review.',
+      }
+    }
+    void run($, [brv, 'gen', '--lines', '100000'])
+    return { text: 'Opening a 100k-line demo review.' }
   })
 
   on('ui.scroll', { requestId: PANE }, async ($, e) => {
@@ -423,6 +476,7 @@ export const register: Register = (on, options) => {
           {key('r', 'viewed', () => void toggleViewed($))}
           {key('c', 'comment', startComment)}
           {key('s', comments.length === 0 ? 'send' : `send ${comments.length}`, () => void sendComments($))}
+          {key('q', 'close', () => close($))}
         </Box>
       </Box>
     )

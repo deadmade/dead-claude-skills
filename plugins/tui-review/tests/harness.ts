@@ -18,6 +18,8 @@ export type Recorded = {
   /** The prompts the plugin submitted, as Claude would get them. */
   prompts: string[]
   toasts: string[]
+  /** The ids of the panes closed. */
+  closed: string[]
   opened: Promise<void>
 }
 
@@ -48,6 +50,7 @@ export function engine(on: On, progress: string[], store: Record<string, unknown
     reads: [],
     prompts: [],
     toasts: [],
+    closed: [],
     opened: new Promise(resolve => (markOpened = resolve)),
   }
   const fileOf = (path: string) => {
@@ -74,6 +77,11 @@ export function engine(on: On, progress: string[], store: Record<string, unknown
     markOpened()
     return { value: { isPlaced: true as const } }
   })
+  on('ui.close', async (_$, e) => {
+    recorded.closed.push(e.id)
+    return { value: undefined }
+  })
+  on('session.end', async (_$, e) => ({ sessionId: e.sessionId }))
   on('ui.blit', async (_$, e) => {
     if ('cells' in e) recorded.blits.push(e.cells)
     return { value: {} }

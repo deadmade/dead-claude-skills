@@ -4,7 +4,8 @@
 same session. The diff, highlighting and git work happen in `brv`, a Rust binary. The mod only paints, from small
 binary chunk files `brv` writes to disk, so a 100k-line PR costs the same memory and frame time as a 100-line one.
 
-**Status: step 1 of 4 (spike).** `/tui-review demo` opens a generated 100k-line review. Real branches (`/tui-review [base]`),
+**Status: step 1 of 4 (spike).** `/tui-review demo` opens a generated 100k-line review; it is the only review there is so
+far. Real branches (`/tui-review [base]`, a `brv review` that diffs the branch against its base into the same cache) and
 tree-sitter highlighting come next.
 
 ## Use
@@ -23,6 +24,10 @@ the pane.
 | `r` | mark the cursor's file viewed and collapse it to its header; on a viewed file, clear the mark and open it |
 | `c` | comment on the cursor's line, or on the whole file from its header; on a commented line, edit the comment |
 | `s` | send every comment to Claude as one message, then clear them |
+| `q` | close the pane (so do the frame's close mark and ctrl+x x) |
+
+Closing the pane lets the review go; `/tui-review demo` opens it again. A new conversation (`/clear`, a resume, a new
+session) closes it too, and drops comments that were not sent.
 
 "Viewed" marks persist across sessions, by the file's content: a rebase that leaves a file alone keeps its mark (and
 the file opens collapsed), a change to it clears it. The header bar counts them.
