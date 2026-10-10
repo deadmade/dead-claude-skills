@@ -1,0 +1,19 @@
+{
+  "name": "branch-review",
+  "version": "0.1.0",
+  "description": "/brv: a fast diff pane for the current branch, next to the chat, so you can ask Claude about what you read. Needs the brv binary.",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "repository": "https://github.com/deadmade/dead-claude-skills",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "brvPath": {
+      "type": "string",
+      "title": "brv binary",
+      "description": "Path to the brv binary. Empty: brv on PATH.",
+      "default": ""
+    }
+  }
+}

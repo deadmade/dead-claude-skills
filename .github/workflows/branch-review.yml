@@ -1,0 +1,63 @@
+name: branch-review
+
+on:
+  push:
+    paths:
+      - "plugins/branch-review/**"
+      - ".github/workflows/branch-review.yml"
+  pull_request:
+    paths:
+      - "plugins/branch-review/**"
+      - ".github/workflows/branch-review.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: plugins/branch-review/brv
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Rust toolchain
+        run: rustup update stable && rustup default stable && rustup component add clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: plugins/branch-review/brv
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Rust tests
+        run: cargo test
+
+      - name: Benchmarks
+        run: cargo bench -- --sample-count 50 | tee "$RUNNER_TEMP/brv-bench.txt"
+
+      - name: Mod fixture from brv gen
+        run: |
+          cargo run --release -- gen --out "$RUNNER_TEMP/brv-fixture" > /dev/null
+          node ../tests/make-fixture.mjs "$RUNNER_TEMP/brv-fixture"
+
+      - name: Mod tests and speed budgets
+        working-directory: plugins/branch-review
+        run: |
+          npm install -g @anthropic-ai/claude-code
+          claude plugin validate .
+          claude plugin test .
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: brv-bench-${{ matrix.os }}
+          path: ${{ runner.temp }}/brv-bench.txt
