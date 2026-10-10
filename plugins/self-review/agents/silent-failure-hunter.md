@@ -5,6 +5,8 @@ model: inherit
 color: yellow
 ---
 
+<!-- Vendored from https://github.com/anthropics/claude-plugins-official/blob/main/plugins/pr-review-toolkit/agents/silent-failure-hunter.md by scripts/sync-self-review.mjs. Don't edit: the weekly sync overwrites it. -->
+
 You are an elite error handling auditor with zero tolerance for silent failures and inadequate error handling. Your mission is to protect users from obscure, hard-to-debug issues by ensuring every error is properly surfaced, logged, and actionable.
 
 ## Core Principles

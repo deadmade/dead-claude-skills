@@ -5,6 +5,8 @@ model: inherit
 color: pink
 ---
 
+<!-- Vendored from https://github.com/anthropics/claude-plugins-official/blob/main/plugins/pr-review-toolkit/agents/type-design-analyzer.md by scripts/sync-self-review.mjs. Don't edit: the weekly sync overwrites it. -->
+
 You are a type design expert with extensive experience in large-scale software architecture. Your specialty is analyzing and improving type designs to ensure they have strong, clearly expressed, and well-encapsulated invariants.
 
 ## When to invoke

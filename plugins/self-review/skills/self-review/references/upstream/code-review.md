@@ -4,6 +4,8 @@ description: Code review a pull request
 disable-model-invocation: false
 ---
 
+<!-- Vendored from https://github.com/anthropics/claude-plugins-official/blob/main/plugins/code-review/commands/code-review.md by scripts/sync-self-review.mjs. Don't edit: the weekly sync overwrites it. -->
+
 Provide a code review for the given pull request.
 
 To do this, follow these steps precisely:

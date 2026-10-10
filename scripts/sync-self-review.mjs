@@ -45,13 +45,29 @@ function retarget(agentMd, name) {
   return lines.join("\n");
 }
 
+// Source note right after the frontmatter (which must stay first). Links to main, not a commit: UPSTREAM has those,
+// and a SHA here would change every vendored file on every upstream commit.
+function stamp(text, url) {
+  const note = `<!-- Vendored from ${url} by scripts/sync-self-review.mjs. Don't edit: the weekly sync overwrites it. -->`;
+  const end = text.startsWith("---\n") ? text.indexOf("\n---\n", 4) : -1;
+  if (end < 0) return `${note}\n\n${text}`;
+  const cut = end + "\n---\n".length;
+  return `${text.slice(0, cut)}\n${note}\n${text.slice(cut)}`;
+}
+const OFFICIAL_WEB = "https://github.com/anthropics/claude-plugins-official/blob/main/plugins";
+const MATT_WEB = "https://github.com/mattpocock/skills/blob/main/skills";
+
 rmSync(AGENTS_DEST, { recursive: true, force: true });
 rmSync(REFS_DEST, { recursive: true, force: true });
 mkdirSync(AGENTS_DEST, { recursive: true });
 mkdirSync(REFS_DEST, { recursive: true });
-for (const a of AGENTS) writeFileSync(join(AGENTS_DEST, `${a}.md`), retarget(join(toolkit, "agents", `${a}.md`), a));
-cpSync(bugPass, join(REFS_DEST, "code-review.md"));
-cpSync(specPass, join(REFS_DEST, "spec-standards-review.md"));
+for (const a of AGENTS) {
+  const text = stamp(retarget(join(toolkit, "agents", `${a}.md`), a), `${OFFICIAL_WEB}/pr-review-toolkit/agents/${a}.md`);
+  writeFileSync(join(AGENTS_DEST, `${a}.md`), text);
+}
+const vendor = (from, to, url) => writeFileSync(join(REFS_DEST, to), stamp(readFileSync(from, "utf8"), url));
+vendor(bugPass, "code-review.md", `${OFFICIAL_WEB}/code-review/commands/code-review.md`);
+vendor(specPass, "spec-standards-review.md", `${MATT_WEB}/engineering/code-review/SKILL.md`);
 cpSync(join(toolkit, "LICENSE"), join(PLUGIN, "LICENSE"));
 cpSync(join(matt, "LICENSE"), join(PLUGIN, "LICENSE-MIT"));
 

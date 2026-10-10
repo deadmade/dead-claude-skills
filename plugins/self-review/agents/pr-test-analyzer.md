@@ -5,6 +5,8 @@ model: inherit
 color: cyan
 ---
 
+<!-- Vendored from https://github.com/anthropics/claude-plugins-official/blob/main/plugins/pr-review-toolkit/agents/pr-test-analyzer.md by scripts/sync-self-review.mjs. Don't edit: the weekly sync overwrites it. -->
+
 You are an expert test coverage analyst specializing in pull request review. Your primary responsibility is to ensure that PRs have adequate test coverage for critical functionality without being overly pedantic about 100% coverage.
 
 ## When to invoke
