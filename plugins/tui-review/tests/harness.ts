@@ -26,7 +26,8 @@ export function engine(on: On, progress: string[]): Recorded {
     opened: new Promise(resolve => (markOpened = resolve)),
   }
   const fileOf = (path: string) => {
-    const name = path.slice(DIR.length + 1)
+    // By file name: on Windows the engine hands the hook `/fixture/x` resolved, as `D:\fixture\x`.
+    const name = path.split(/[\\/]/).at(-1) ?? ''
     if (name === 'manifest.brv') return manifest
     const match = /^(\d{4})\.(lines|hl)$/.exec(name)
     if (match === null) return undefined
