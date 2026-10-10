@@ -132,6 +132,28 @@ export function dcgCommand(platform, action) {
   return ['bash', ['-c', `curl -fsSL '${DCG}/${script}' | bash -s -- ${flags}`]];
 }
 
+// cswap.exe: claude-swap built by .github/workflows/build-cswap.yml, attached to this repo's releases as
+// cswap-<upstream tag>. Windows only; Linux gets cswap from uv or nix.
+const RELEASES = 'https://github.com/deadmade/dead-claude-skills/releases/download';
+
+export function cswapDownload(platform, env, version) {
+  if (platform !== 'win32' || !env.LOCALAPPDATA) return null;
+  const dir = `${env.LOCALAPPDATA}\\Programs\\cswap`;
+  const url = `${RELEASES}/cswap-${version}/cswap.exe`;
+  return { url, sha256Url: `${url}.sha256`, dir, exe: `${dir}\\cswap.exe` };
+}
+
+// `cswap --version` prints "cswap 0.26.0"; the pin is the upstream tag "v0.26.0".
+export const cswapCurrent = (versionOutput, version) => versionOutput.trim() === `cswap ${version.replace(/^v/, '')}`;
+
+// The user PATH with dir appended, or null when it's already there (Windows paths: case and trailing \ ignored).
+export function pathWith(userPath, dir) {
+  const norm = (p) => p.trim().replace(/\\+$/, '').toLowerCase();
+  const parts = (userPath ?? '').split(';').filter((p) => p.trim());
+  if (parts.some((p) => norm(p) === norm(dir))) return null;
+  return [...parts, dir].join(';');
+}
+
 export function safeArg(s) {
   if (!/^[a-z0-9@.:=/_-]+$/i.test(s)) throw new Error(`refusing unsafe argument: ${JSON.stringify(s)}`);
   return s;
@@ -151,6 +173,7 @@ const BINARIES = [
   ['bwrap', 'sandbox', 'nix: bubblewrap', 'WSL2 only'],
   ['socat', 'sandbox', 'nix: socat', 'WSL2 only'],
   ['ccstatusline', 'ccstatusline', 'nix: ccstatusline', 'npm i -g ccstatusline'],
+  ['cswap', 'cswap', 'uv tool install claude-swap', 'rerun this installer (cswap.exe download)'],
 ];
 
 // wanted: plugin names (plus 'ccstatusline' when that toggle is on). onPath(binary) -> bool.

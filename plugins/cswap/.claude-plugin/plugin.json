@@ -1,0 +1,24 @@
+{
+  "name": "cswap",
+  "description": "claude-swap inside Claude Code: an accounts pane, /swap, a usage status line and opt-in auto-switching. Needs the cswap binary.",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "repository": "https://github.com/deadmade/dead-claude-skills",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "auto_switch": {
+      "type": "boolean",
+      "title": "Auto-switch",
+      "description": "Every 2 minutes run cswap auto --once: switch accounts before the active one hits its limit (threshold: cswap config set autoswitch.threshold).",
+      "default": false
+    },
+    "cswap_path": {
+      "type": "string",
+      "title": "cswap binary",
+      "description": "Optional. Full path to cswap(.exe); empty looks on PATH, then %LOCALAPPDATA%\\Programs\\cswap\\cswap.exe.",
+      "default": ""
+    }
+  }
+}
