@@ -8,8 +8,7 @@ argument-hint: "What do you want to build?"
 # feature-flow
 
 One entry point that runs the skills this marketplace already ships, in order, and stops at two gates for the user.
-Claude proposes and recommends; the user decides. (For the strict mode where the user writes the design and Claude
-never suggests answers, that's `/dev-feature`.)
+Claude proposes and recommends; the user decides.
 
 | Phase | Runs | Output |
 |---|---|---|

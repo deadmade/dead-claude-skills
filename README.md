@@ -11,7 +11,7 @@ It's built for me; use it if it fits, but expect it to change without notice.
   and the rust/csharp/typescript/pyright LSPs) install from `claude-plugins-official`; the installer adds that
   marketplace if it's missing.
 - **Opt-in:** language servers (rust, csharp, typescript, pyright, nix), mcp-github, mcp-azure, atlassian,
-  hallmark, dev-feature, feature-flow, self-review, mattpocock-picks, pstack-picks, graphify, cswap, skill-creator,
+  hallmark, feature-flow, self-review, mattpocock-picks, pstack-picks, graphify, cswap, skill-creator,
   tui-review (see [its README](plugins/tui-review/README.md); the installer downloads its `brv` binary).
 - **Installer toggles:** ccstatusline, sandbox (Linux/macOS/WSL2, needs bubblewrap and socat), and
   [dcg](https://github.com/Dicklesworthstone/destructive_command_guard) (runs dcg's own installer). The installer
@@ -35,6 +35,7 @@ this repo. Enter opens a category, where each item says its state in words (`ins
 single updates. Apply shows only what changes (install, remove, update, turn on/off) with Apply, Back and Quit.
 Keys are ↑/↓, enter and esc. Options that can't work on your OS or CPU (the sandbox and nix-lsp on Windows,
 tui-review where no `brv` build exists) are left off the pages unless they're already on; the review lists them.
+Plugins this repo no longer ships (dev-feature) are listed under Remove and uninstalled on every run.
 The installer has no npm dependencies: it uses only Node's standard library.
 
 The installer pins the marketplace to its own release: installer vX.Y.Z adds `deadmade/dead-claude-skills@vX.Y.Z`

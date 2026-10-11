@@ -107,6 +107,10 @@ export const CLEAN_TARGETS = ['CLAUDE.md', 'skills', 'agents', 'commands', 'rule
 export const foreignPlugins = (installedIds, managedIds) =>
   installedIds.filter((id) => marketOf(id) !== MARKETPLACE && !managedIds.includes(id));
 
+// Ours but gone from the marketplace (dev-feature): nothing can update them, so every run removes them.
+export const retiredPlugins = (installedIds, managedIds) =>
+  installedIds.filter((id) => marketOf(id) === MARKETPLACE && !managedIds.includes(id));
+
 export const foreignMarketplaces = (names) => names.filter((n) => n !== MARKETPLACE && n !== OFFICIAL);
 
 export const isStripped = (s) => Object.entries(STRIP).every(([k, v]) => s?.[k] === v);
@@ -239,7 +243,7 @@ export function brvAction({ onPath, installed, version, supported }) {
 export const TOGGLES = ['ccstatusline', 'sandbox', 'dcg', 'strip-defaults', 'clean'];
 export const CATEGORIES = [
   { id: 'workflow', title: 'Workflows & skills', blurb: 'Slash commands and skills that shape how Claude works.',
-    keys: ['dev-feature', 'feature-flow', 'self-review', 'mattpocock-picks', 'pstack-picks', 'hallmark', 'skill-creator'] },
+    keys: ['feature-flow', 'self-review', 'mattpocock-picks', 'pstack-picks', 'hallmark', 'skill-creator'] },
   { id: 'lsp', title: 'Language servers', blurb: 'Code intelligence per language; each needs its server on PATH.',
     keys: ['rust-analyzer-lsp', 'csharp-lsp', 'typescript-lsp', 'pyright-lsp', 'nix-lsp'] },
   { id: 'mcp', title: 'Integrations', blurb: 'MCP servers for the services you work with.',

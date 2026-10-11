@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   optIns, needsToken, planPlugins, duplicates, mergeSettings, safeArg, missingBinaries, SECRET_DENIES, isSandboxOn,
-  hasDcgHook, dcgCommand, bundleIds, foreignPlugins, foreignMarketplaces, stripDefaults, isStripped, resetSettings, CLEAN_TARGETS,
+  hasDcgHook, dcgCommand, bundleIds, foreignPlugins, retiredPlugins, foreignMarketplaces, stripDefaults, isStripped, resetSettings, CLEAN_TARGETS,
   marketplaceArg, pinMarketplace,
   cswapDownload, cswapCurrent, pathWith, brvAsset, sha256Of, brvAction, CATEGORIES, TOGGLES, categorize, unavailable,
   outdated,
@@ -17,7 +17,7 @@ const O = 'claude-plugins-official';
 
 test('opt-ins from the real manifests', () => {
   assert.deepEqual(optIns(marketplace, bundle).sort(), [
-    ...['atlassian', 'cswap', 'dev-feature', 'feature-flow', 'graphify', 'hallmark', 'mattpocock-picks', 'mcp-azure',
+    ...['atlassian', 'cswap', 'feature-flow', 'graphify', 'hallmark', 'mattpocock-picks', 'mcp-azure',
       'mcp-github', 'nix-lsp', 'pstack-picks', 'self-review', 'tui-review']
       .map((n) => `${n}@${M}`),
     ...['csharp-lsp', 'pyright-lsp', 'rust-analyzer-lsp', 'skill-creator', 'typescript-lsp'].map((n) => `${n}@${O}`),
@@ -153,6 +153,11 @@ test('foreign plugins and marketplaces spare ours and the official plugins we us
   assert.deepEqual(foreignPlugins([`ponytail@${M}`, `code-review@${O}`, `playwright@${O}`, 'x@y'], [`code-review@${O}`]),
     [`playwright@${O}`, 'x@y']);
   assert.deepEqual(foreignMarketplaces([M, O, 'other']), ['other']);
+});
+
+test('retired plugins are ours but no longer in the marketplace', () => {
+  const managed = [...bundleIds(bundle), ...optIns(marketplace, bundle)];
+  assert.deepEqual(retiredPlugins([`dev-feature@${M}`, `cswap@${M}`, `code-review@${O}`, 'x@y'], managed), [`dev-feature@${M}`]);
 });
 
 test('strip disables defaults, keeps foreign keys, drops other marketplaces', () => {

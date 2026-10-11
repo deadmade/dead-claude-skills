@@ -10,7 +10,7 @@ import { delimiter, dirname, join } from 'node:path';
 import { styleText } from 'node:util';
 import {
   BUNDLE, CLEAN_TARGETS, HINTS, MARKETPLACE, OFFICIAL, TOGGLES, brvAction, brvAsset, bundleIds, categorize, cswapCurrent,
-  cswapDownload, dcgCommand, duplicates, foreignMarketplaces, foreignPlugins, hasDcgHook, isOurStatusLine, isSandboxOn,
+  cswapDownload, dcgCommand, duplicates, foreignMarketplaces, foreignPlugins, retiredPlugins, hasDcgHook, isOurStatusLine, isSandboxOn,
   isStripped, mergeSettings, marketplaceArg, missingBinaries, nameOf, needsToken, optIns, pathWith, pinMarketplace,
   outdated, planPlugins, resetSettings, safeArg, sha256Of, stripDefaults, unavailable,
 } from './core.mjs';
@@ -397,6 +397,7 @@ const data = {
   updates: outdated(rows, shipped),
   core: `${BUNDLE} + ${bundle.dependencies.length}, always installed`,
   hidden,
+  retired: retiredPlugins(installedIds, managed),
   // What strip-defaults / clean remove on top of the choices, so the review shows it.
   sweep: [
     ...new Set([...foreignPlugins(installedIds, managed), ...duplicates(installedIds, managed)]),
@@ -468,10 +469,11 @@ const installedJson = tryJson(join(CONFIG, 'plugins', 'installed_plugins.json'))
 plan.install.push(...selected.filter((id) => opts.includes(id) && installedJson[id]?.some((e) => e.auto)));
 for (const id of plan.install) await run(`Installing ${nameOf(id)}`, `installed ${id}`, 'plugin', 'install', id, '--scope', 'user', '--json');
 for (const id of plan.uninstall) await run(`Uninstalling ${nameOf(id)}`, `uninstalled ${id}`, 'plugin', 'uninstall', id, '--json');
+for (const id of data.retired) await run(`Uninstalling ${nameOf(id)}`, `uninstalled ${id} (retired)`, 'plugin', 'uninstall', id, '--json');
 for (const u of changeList(state, data).update) {
   await run(`Updating ${nameOf(u.id)} ${u.from} → ${u.to}`, `updated ${u.id} ${u.from} → ${u.to}`, 'plugin', 'update', u.id, '--json');
 }
-if (plan.uninstall.length || dupes.length || foreign.length) await run('Pruning unused dependencies', 'pruned unused dependencies', 'plugin', 'prune', '-y');
+if (plan.uninstall.length || data.retired.length || dupes.length || foreign.length) await run('Pruning unused dependencies', 'pruned unused dependencies', 'plugin', 'prune', '-y');
 if (selected.includes(TUI_REVIEW)) await applyBrv();
 
 const toggles = { statusLine: on('ccstatusline'), sandbox: on('sandbox'), dcg: on('dcg'), version: VERSION };

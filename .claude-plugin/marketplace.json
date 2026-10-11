@@ -89,12 +89,6 @@
       "category": "development"
     },
     {
-      "name": "dev-feature",
-      "description": "/dev-feature: grills you on a feature, has you write the design, then implements against it behind a hook-enforced lock. Opt-in.",
-      "source": "./plugins/dev-feature",
-      "category": "development"
-    },
-    {
       "name": "feature-flow",
       "description": "/feature-flow: brainstorm with prior art, grill with domain docs, plan, have Claude evaluate the plan, then execute and finish through superpowers. Two approval gates, no lock. Opt-in.",
       "source": "./plugins/feature-flow",
