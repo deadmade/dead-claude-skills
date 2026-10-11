@@ -20,6 +20,22 @@ const SANDBOX = { enabled: true, autoAllowBashIfSandboxed: true, allowUnsandboxe
 const DCG = 'https://raw.githubusercontent.com/Dicklesworthstone/destructive_command_guard/main';
 
 export const nameOf = (id) => id.split('@')[0];
+
+// Our marketplace at the release tag of the installer that runs, so the plugins always match it: updating means
+// running a newer installer. As `claude plugin marketplace add` takes it, and as its settings entry.
+const REPO = 'deadmade/dead-claude-skills';
+export const marketplaceArg = (version) => `${REPO}@v${version}`;
+const marketplaceSource = (version) => ({ source: 'github', repo: REPO, ref: `v${version}` });
+
+// Claude Code refuses to add a marketplace whose source differs from its extraKnownMarketplaces entry, so the entry
+// is pinned before the add; the add then moves the checkout to the tag and keeps its plugins. Unchanged otherwise.
+export function pinMarketplace(settings, version) {
+  const entry = settings?.extraKnownMarketplaces?.[MARKETPLACE];
+  if (!entry || JSON.stringify(entry.source) === JSON.stringify(marketplaceSource(version))) return settings;
+  const out = structuredClone(settings);
+  out.extraKnownMarketplaces[MARKETPLACE].source = marketplaceSource(version);
+  return out;
+}
 const marketOf = (id) => id.split('@')[1];
 // Bare dependency names resolve against our marketplace, like Claude Code does.
 const idOf = (dep) => (dep.includes('@') ? dep : `${dep}@${MARKETPLACE}`);
@@ -55,7 +71,7 @@ export const isSandboxOn = (s) => s?.sandbox?.enabled === true;
 export const hasDcgHook = (s) =>
   (s?.hooks?.PreToolUse ?? []).some((e) => e?.hooks?.some((h) => /dcg(\.exe)?"?$/i.test(h?.command ?? '')));
 
-export function mergeSettings(settings, { statusLine, sandbox }) {
+export function mergeSettings(settings, { statusLine, sandbox, version }) {
   const out = structuredClone(settings);
   const allow = out.permissions?.allow ?? [];
   const deny = out.permissions?.deny ?? [];
@@ -66,7 +82,7 @@ export function mergeSettings(settings, { statusLine, sandbox }) {
   };
   out.extraKnownMarketplaces = {
     ...out.extraKnownMarketplaces,
-    [MARKETPLACE]: { source: { source: 'github', repo: 'deadmade/dead-claude-skills' }, autoUpdate: true },
+    [MARKETPLACE]: { source: marketplaceSource(version), autoUpdate: true },
   };
   if (statusLine && !isOurStatusLine(out.statusLine)) out.statusLine = STATUS_LINE;
   if (!statusLine && isOurStatusLine(out.statusLine)) delete out.statusLine;
@@ -134,7 +150,7 @@ export function dcgCommand(platform, action) {
 
 // cswap.exe: claude-swap built by .github/workflows/build-cswap.yml and attached to this repo's release
 // v<package.json version> by release.yml. Windows only; Linux gets cswap from uv or nix.
-const RELEASES = 'https://github.com/deadmade/dead-claude-skills/releases/download';
+const RELEASES = `https://github.com/${REPO}/releases/download`;
 
 export function cswapDownload(platform, env, release) {
   if (platform !== 'win32' || !env.LOCALAPPDATA) return null;

@@ -11,7 +11,8 @@ import { createInterface, emitKeypressEvents } from 'node:readline';
 import {
   BUNDLE, CLEAN_TARGETS, MARKETPLACE, OFFICIAL, brvAction, brvAsset, bundleIds, cswapCurrent, cswapDownload, dcgCommand,
   duplicates, foreignMarketplaces, foreignPlugins, hasDcgHook, isOurStatusLine, isSandboxOn, isStripped, mergeSettings,
-  missingBinaries, nameOf, needsToken, optIns, pathWith, planPlugins, resetSettings, safeArg, sha256Of, stripDefaults,
+  marketplaceArg, missingBinaries, nameOf, needsToken, optIns, pathWith, pinMarketplace, planPlugins, resetSettings, safeArg,
+  sha256Of, stripDefaults,
 } from './core.mjs';
 
 const PKG = join(import.meta.dirname, '..');
@@ -24,6 +25,7 @@ const FLAGS = process.argv.slice(2);
 
 const readJson = (p) => JSON.parse(readFileSync(p, 'utf8'));
 const tryJson = (p) => { try { return readJson(p); } catch { return undefined; } };
+const VERSION = readJson(join(PKG, 'package.json')).version;
 const failures = [];
 const done = [];
 
@@ -192,7 +194,7 @@ async function applyDcg(was, on) {
 // Windows: download cswap.exe from this version's release (checked against its .sha256), put its folder on PATH.
 async function applyCswap(on) {
   const version = readJson(join(PKG, 'installer', 'cswap.json')).upstream;
-  const dl = cswapDownload(process.platform, process.env, readJson(join(PKG, 'package.json')).version);
+  const dl = cswapDownload(process.platform, process.env, VERSION);
   if (!on || !dl) return;
   const have = existsSync(dl.exe) ? spawnSync(dl.exe, ['--version'], { encoding: 'utf8' }) : undefined;
   if (!(have?.status === 0 && cswapCurrent(have.stdout, version))) {
@@ -341,13 +343,28 @@ const HANDOFF = {
   ],
 };
 
+// The settings entry Claude Code checks the add against; a symlinked or broken settings.json is left as it is.
+// Returns the file as it was, or undefined when nothing was written.
+function pinSettingsEntry() {
+  if (!existsSync(SETTINGS) || lstatSync(SETTINGS).isSymbolicLink()) return undefined;
+  const raw = readFileSync(SETTINGS, 'utf8');
+  const before = tryJson(SETTINGS);
+  const after = before && pinMarketplace(before, VERSION);
+  if (!after || after === before) return undefined;
+  const eol = raw.includes('\r\n') ? '\r\n' : '\n';
+  writeAtomic(SETTINGS, JSON.stringify(after, null, 2).replaceAll('\n', eol) + eol);
+  done.push(`settings.json: pinned the ${MARKETPLACE} marketplace to v${VERSION}`);
+  return raw;
+}
+
 const marketplaces = JSON.parse(claude('plugin', 'marketplace', 'list', '--json').out || '[]');
-const hasMarket = marketplaces.some((m) => m.name === MARKETPLACE);
-const market = hasMarket
-  ? claude('plugin', 'marketplace', 'update', MARKETPLACE)
-  : claude('plugin', 'marketplace', 'add', 'deadmade/dead-claude-skills');
+const unpinned = pinSettingsEntry();
+// Adding again also moves an existing checkout to this installer's tag.
+const market = claude('plugin', 'marketplace', 'add', marketplaceArg(VERSION));
 if (!market.ok) {
-  console.error(`Marketplace ${hasMarket ? 'update' : 'add'} failed:\n${market.err}`);
+  // A pinned entry the checkout doesn't match hides the marketplace from Claude Code.
+  if (unpinned !== undefined) writeAtomic(SETTINGS, unpinned);
+  console.error(`Adding the marketplace at v${VERSION} failed (does the release exist?):\n${market.err}`);
   process.exit(1);
 }
 // The bundle's core plugins and some opt-ins install from Anthropic's marketplace.
@@ -436,7 +453,8 @@ for (const id of plan.uninstall) {
 if (plan.uninstall.length || dupes.length || foreign.length) step('pruned unused dependencies', 'plugin', 'prune', '-y');
 if (selected.includes(TUI_REVIEW)) await applyBrv();
 
-await applySettings({ statusLine: on('ccstatusline'), sandbox: on('sandbox'), dcg: on('dcg') }, { strip, reset: clean });
+const toggles = { statusLine: on('ccstatusline'), sandbox: on('sandbox'), dcg: on('dcg'), version: VERSION };
+await applySettings(toggles, { strip, reset: clean });
 const autoUpdate = tryJson(join(CONFIG, 'plugins', 'known_marketplaces.json'))?.[MARKETPLACE]?.autoUpdate;
 await applyCcstatusline(on('ccstatusline'));
 await applyDcg(hasDcgHook(settingsNow), on('dcg'));

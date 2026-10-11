@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import {
   optIns, needsToken, planPlugins, duplicates, mergeSettings, safeArg, missingBinaries, SECRET_DENIES, isSandboxOn,
   hasDcgHook, dcgCommand, bundleIds, foreignPlugins, foreignMarketplaces, stripDefaults, isStripped, resetSettings, CLEAN_TARGETS,
+  marketplaceArg, pinMarketplace,
   cswapDownload, cswapCurrent, pathWith, brvAsset, sha256Of, brvAction,
 } from './core.mjs';
 
@@ -52,11 +53,31 @@ test('duplicates are managed names from the wrong marketplace', () => {
 });
 
 test('merge adds owned keys and keeps foreign ones', () => {
-  const out = mergeSettings({ model: 'x', permissions: { allow: ['Bash(ls)'] } }, { statusLine: true });
+  const out = mergeSettings({ model: 'x', permissions: { allow: ['Bash(ls)'] } }, { statusLine: true, version: '1.2.3' });
   assert.equal(out.model, 'x');
   assert.deepEqual(out.permissions.allow, ['Bash(ls)', 'Read(~/.claude/plugins/**)']);
   assert.equal(out.extraKnownMarketplaces[M].autoUpdate, true);
+  assert.equal(out.extraKnownMarketplaces[M].source.ref, 'v1.2.3');
   assert.match(out.statusLine.command, /ccstatusline/);
+});
+
+test('the marketplace is pinned to the installer version', () => {
+  assert.equal(marketplaceArg('1.2.3'), 'deadmade/dead-claude-skills@v1.2.3');
+  const pinned = { source: 'github', repo: 'deadmade/dead-claude-skills', ref: 'v1.2.3' };
+  const before = {
+    model: 'x',
+    extraKnownMarketplaces: { [M]: { source: { source: 'github', repo: 'deadmade/dead-claude-skills' }, autoUpdate: true } },
+  };
+  const out = pinMarketplace(before, '1.2.3');
+  assert.deepEqual(out.extraKnownMarketplaces[M], { source: pinned, autoUpdate: true });
+  assert.equal(out.model, 'x');
+  assert.equal(before.extraKnownMarketplaces[M].source.ref, undefined);
+  // Unchanged settings come back as the same object, so nothing is written.
+  assert.equal(pinMarketplace(out, '1.2.3'), out);
+  assert.equal(pinMarketplace(out, '1.2.4').extraKnownMarketplaces[M].source.ref, 'v1.2.4');
+  // No entry yet: the add writes it.
+  const none = { model: 'x' };
+  assert.equal(pinMarketplace(none, '1.2.3'), none);
 });
 
 test('merge is idempotent', () => {
