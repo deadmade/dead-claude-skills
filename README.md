@@ -27,6 +27,14 @@ It's built for me; use it if it fits, but expect it to change without notice.
 `/plugin marketplace add deadmade/dead-claude-skills` (plus `anthropics/claude-plugins-official` if you removed it)
 then `/plugin install dead-skills@dead-claude-skills`.
 
+npx fetches `github:` packages with git, so on machines where git is blocked, run the installer tarball attached to
+the release instead (over plain HTTPS, no git):
+
+    npx https://github.com/deadmade/dead-claude-skills/releases/download/vX.Y.Z/dead-claude-skills-X.Y.Z.tgz
+
+Each release's notes have the exact line. Keep the version in the URL: npx reuses its cached copy for a URL it has
+seen, so a link that always points at the newest release would keep running the old installer.
+
 The installer has two optional rows (also `--strip-defaults` / `--clean`) that take over the whole machine:
 
 - **strip-defaults** uninstalls every plugin and removes every marketplace not from here, keeping
