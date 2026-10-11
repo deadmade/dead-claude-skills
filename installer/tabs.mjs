@@ -2,6 +2,7 @@
 import {
   S_BAR, S_BAR_H, S_CHECKBOX_ACTIVE, S_CHECKBOX_INACTIVE, S_CHECKBOX_SELECTED, limitOptions, symbol,
 } from '@clack/prompts';
+import { Prompt, isCancel } from '@clack/core';
 import { stripVTControlCharacters, styleText } from 'node:util';
 
 const TITLE = 'Choose what to install';
@@ -69,4 +70,22 @@ export function render(state, pages, { columns, rows, describe, status }) {
   const chrome = 1 + [...head, ...tail].reduce((n, l) => n + height(gutter + l, columns), 0);
   const list = limitOptions({ cursor, options: page.keys, style, output: { columns, rows }, columnPadding: 3, rowPadding: chrome });
   return [`${symbol(status)}  ${styleText('bold', TITLE)}`, ...[...head, ...list, ...tail].map((l) => gutter + l)].join('\n');
+}
+
+const MOVES = ['left', 'right', 'up', 'down', 'space'];
+
+// Runs the chooser starting on `tab` with `chosen`. Resolves { chosen, tab }, or clack's cancel symbol on esc/ctrl-c.
+export async function chooseTabs({ pages, chosen, tab = 0, describe, input, output }) {
+  let s = { tab, cursor: 0, chosen };
+  const pr = new Prompt({
+    ...(input && { input }),
+    ...(output && { output }),
+    render() {
+      return render(s, pages, { columns: this.output.columns ?? 80, rows: this.output.rows ?? 24, describe, status: this.state });
+    },
+  }, false);
+  pr.on('cursor', (a) => { if (MOVES.includes(a)) s = move(s, a, pages); });
+  pr.on('key', (ch) => { if (ch === 'a') s = move(s, 'all', pages); });
+  const r = await pr.prompt();
+  return isCancel(r) ? r : { chosen: s.chosen, tab: s.tab };
 }

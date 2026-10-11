@@ -1,7 +1,9 @@
 process.env.FORCE_COLOR = '1';
 const { test } = await import('node:test');
 const { default: assert } = await import('node:assert/strict');
-const { move, render } = await import('./tabs.mjs');
+const { chooseTabs, move, render } = await import('./tabs.mjs');
+const { isCancel } = await import('@clack/core');
+const { PassThrough } = await import('node:stream');
 const { stripVTControlCharacters: plain } = await import('node:util');
 
 const pages = [
@@ -82,6 +84,29 @@ test('render fits short terminals', () => {
   assert.ok(lines <= rows, `${lines} lines > ${rows}`);
   assert.match(plain(out), /a7/);
   assert.doesNotMatch(plain(out), /a1/);
+});
+
+// Runs chooseTabs on fake streams, typing `keys` once it is listening.
+async function choose(opts, ...keys) {
+  const input = new PassThrough();
+  const output = new PassThrough();
+  Object.assign(output, { columns: 120, rows: 40 });
+  output.resume();
+  const result = chooseTabs({ pages, chosen: {}, describe, input, output, ...opts });
+  for (const k of keys) input.write(k);
+  return result;
+}
+
+test('chooseTabs returns picks and last tab', async () => {
+  assert.deepEqual(await choose({ tab: 0 }, '\x1b[C', ' ', '\r'), { tab: 1, chosen: { m1: true } });
+});
+
+test('chooseTabs resolves its input on plain enter', async () => {
+  assert.deepEqual(await choose({ tab: 2, chosen: { m3: true } }, '\r'), { tab: 2, chosen: { m3: true } });
+});
+
+test('chooseTabs cancels on escape', async () => {
+  assert.equal(isCancel(await choose({}, '\x1b')), true);
 });
 
 test('render submit frame', () => {

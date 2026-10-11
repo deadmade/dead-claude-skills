@@ -8,13 +8,14 @@
       "name": "dead-claude-skills",
       "version": "0.1.1",
       "dependencies": {
+        "@clack/core": "1.5.1",
         "@clack/prompts": "1.8.1"
       },
       "bin": {
         "dead-claude-skills": "installer/install.mjs"
       },
       "engines": {
-        "node": ">=20"
+        "node": ">=20.12"
       }
     },
     "node_modules/@clack/core": {
