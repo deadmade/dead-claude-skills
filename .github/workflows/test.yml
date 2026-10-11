@@ -1,0 +1,38 @@
+# Repo checks, installer tests and cswap's mod tests on every PR and push to main; tui-review has its own workflow.
+name: test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Claude Code, for plugin validate and plugin test
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Repo checks and installer tests
+        run: npm test
+
+      - name: cswap mod tests
+        working-directory: plugins/cswap
+        run: claude plugin test .

@@ -47,8 +47,7 @@ for (const [f, version] of bumps) {
   writeFileSync(f, text.replace(version, `$1"${next}"`));
 }
 
-const tests = readdirSync("installer").filter((f) => f.endsWith(".test.mjs")).map((f) => `installer/${f}`);
-if (!run("node", ["scripts/check-repo.mjs"]) || !run("node", ["--test", ...tests])) {
+if (!run("npm", ["test"])) {
   git("checkout", "--", ...files);
   die("checks failed, versions reverted");
 }
