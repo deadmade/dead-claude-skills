@@ -1,5 +1,5 @@
 ---
-phase: execute
+phase: finish
 ---
 
 # Installer UX: flow
@@ -53,7 +53,27 @@ Round 1 (2026-10-11), reviewers: correctness, fit, simpler. 0 findings dropped. 
   manual-check text; footers private, no mutation assertion; tests keep shipping in npx.
 
 ## Deviations
+None that change an interface or add a library. Rulings made during execution (ledger):
+- Task 2: short-terminal test at 18 rows, not 14; 14 can't hold the non-list lines at 40 columns.
+- Task 4: manual check ran in a pty against a fake `claude` and a scratch home, not the real installer.
+- Final review: word-wrap overflow at 20–37 columns re-graded Minor → Important and fixed with
+  `wrapTextWithPrefix` from `@clack/core` (already a direct dependency).
+- Spec text says `render(state, pages, { width, describe })`; the plan and code use `{ columns, rows, describe, status }`.
 
 ## Walkthrough
 | spec goal | plan task | file:line | test |
 |---|---|---|---|
+| Tab bar, active tab highlighted, per-tab counts | 2 | `installer/tabs.mjs:51-57` | render shows full tab bar with counts |
+| Short labels on narrow terminals | 2 | `installer/tabs.mjs:53,57` | render falls back to short labels |
+| ←/→ switch tabs (wrap), cursor clamps | 1 | `installer/tabs.mjs:18-22` | move tabs wrap; move clamps cursor on tab switch |
+| ↑/↓ move (wrap), space toggles | 1 | `installer/tabs.mjs:23-27` | move up/down wrap; move space toggles focused item |
+| `a` toggles all, not on Danger | 1 | `installer/tabs.mjs:28-31`, `installer/core.mjs:253` | move all selects all, then clears; move all is a no-op without bulk; categorize keeps bulk:false on danger |
+| Footer key legend, no `a all` on Danger | 2 | `installer/tabs.mjs:59` | render shows blurb, detail and footer; render drops "a all" without bulk |
+| Full description of focused item, normal color, no clipping | 2, 4 | `installer/tabs.mjs:62`, `installer/install.mjs:403` | render shows blurb, detail and footer |
+| Danger items red | 2 | `installer/tabs.mjs:66` | render colors danger items red |
+| Frame fits the terminal, list scrolls | 2 + fix | `installer/tabs.mjs:68-73` | render fits short terminals; render fits narrow terminals once clack word-wraps it |
+| Enter → review; esc/ctrl-c quits | 3, 4 | `installer/tabs.mjs:80-93`, `installer/install.mjs:424` | chooseTabs returns picks and last tab; chooseTabs cancels on escape |
+| Review: Apply / Back to choices (same tab, picks kept) / Quit | 3, 4 | `installer/install.mjs:422-447` | chooseTabs resolves its input on plain enter; pty run (ledger Task 4) |
+| Always-installed note kept | 4 | `installer/install.mjs:420-421` | pty run |
+| `@clack/core` pinned 1.5.1 | 3 | `package.json`, `npm-shrinkwrap.json` | repo checks |
+| README describes the new flow | 4 | `README.md:31-33` | — |
