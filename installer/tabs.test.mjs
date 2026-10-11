@@ -1,7 +1,8 @@
 process.env.FORCE_COLOR = '1';
 const { test } = await import('node:test');
 const { default: assert } = await import('node:assert/strict');
-const { move } = await import('./tabs.mjs');
+const { move, render } = await import('./tabs.mjs');
+const { stripVTControlCharacters: plain } = await import('node:util');
 
 const pages = [
   { id: 'workflow', title: 'Workflows & skills', blurb: 'B1', keys: ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7'] },
@@ -40,4 +41,51 @@ test('move all selects all, then clears', () => {
 
 test('move all is a no-op without bulk', () => {
   assert.deepEqual(move(at({ tab: 2 }), 'all', pages).chosen, {});
+});
+
+const describe = (k) => ({ label: k, detail: `D-${k}` });
+const draw = (s, o = {}) => render(at(s), pages, { columns: 200, rows: 40, describe, status: 'active', ...o });
+const FOOTER = '←/→ category · ↑/↓ move · space select · a all · enter review · esc quit';
+
+test('render shows full tab bar with counts', () => {
+  assert.match(plain(draw({ chosen: { m1: true, m2: true } })), /Workflows & skills │ Integrations 2 │ Danger zone/);
+});
+
+test('render falls back to short labels', () => {
+  const out = plain(draw({ chosen: { m1: true, m2: true } }, { columns: 40 }));
+  assert.match(out, /Workflows │ Integrations 2 │ Danger/);
+  assert.doesNotMatch(out, /Workflows & skills/);
+  assert.doesNotThrow(() => draw({}, { columns: 10 }));
+});
+
+test('render shows blurb, detail and footer', () => {
+  const out = plain(draw({ tab: 1, cursor: 1 }));
+  for (const s of ['B2', 'D-m2', FOOTER]) assert.ok(out.includes(s), s);
+});
+
+test('render drops "a all" without bulk', () => {
+  const out = plain(draw({ tab: 2 }));
+  assert.ok(out.includes('enter review'));
+  assert.ok(!out.includes('a all'));
+});
+
+test('render colors danger items red', () => {
+  assert.ok(draw({ tab: 2 }).includes('\x1b[31mclean'));
+});
+
+test('render fits short terminals', () => {
+  const columns = 40;
+  const rows = 18;
+  const long = (k) => ({ label: k, detail: 'x'.repeat(170) });
+  const out = render(at({ tab: 0, cursor: 6 }), pages, { columns, rows, describe: long, status: 'active' });
+  const lines = plain(out).split('\n').reduce((n, l) => n + Math.max(1, Math.ceil(l.length / columns)), 0);
+  assert.ok(lines <= rows, `${lines} lines > ${rows}`);
+  assert.match(plain(out), /a7/);
+  assert.doesNotMatch(plain(out), /a1/);
+});
+
+test('render submit frame', () => {
+  const out = plain(draw({ chosen: { a1: true, m1: true, clean: true } }, { status: 'submit' }));
+  assert.equal(out.split('\n').length, 1);
+  assert.match(out, /3 selected/);
 });
