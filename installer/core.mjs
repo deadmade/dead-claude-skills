@@ -233,3 +233,53 @@ export function brvAction({ onPath, installed, version, supported }) {
   return supported ? 'download' : 'unsupported';
 }
 
+
+// The installer's pages, in order. keys: plugin names and installer toggles; an opt-in not listed here lands in Other,
+// so a new marketplace plugin is never left out.
+export const TOGGLES = ['ccstatusline', 'sandbox', 'dcg', 'strip-defaults', 'clean'];
+export const CATEGORIES = [
+  { id: 'workflow', title: 'Workflows & skills', blurb: 'Slash commands and skills that shape how Claude works.',
+    keys: ['dev-feature', 'feature-flow', 'self-review', 'mattpocock-picks', 'pstack-picks', 'hallmark', 'skill-creator'] },
+  { id: 'lsp', title: 'Language servers', blurb: 'Code intelligence per language; each needs its server on PATH.',
+    keys: ['rust-analyzer-lsp', 'csharp-lsp', 'typescript-lsp', 'pyright-lsp', 'nix-lsp'] },
+  { id: 'mcp', title: 'Integrations', blurb: 'MCP servers for the services you work with.',
+    keys: ['mcp-github', 'mcp-azure', 'atlassian'] },
+  { id: 'tools', title: 'Tools', blurb: 'Plugins that bring their own binary or pane.',
+    keys: ['graphify', 'cswap', 'tui-review'] },
+  { id: 'system', title: 'System', blurb: 'Status line, sandbox and command guard in settings.json.',
+    keys: ['ccstatusline', 'sandbox', 'dcg'] },
+  { id: 'danger', title: 'Danger zone', blurb: 'Take over the whole Claude Code config. Leave empty unless you mean it.',
+    keys: ['strip-defaults', 'clean'] },
+];
+
+// keys: opt-in plugin ids and toggle names. Returns the non-empty categories with their keys, in page order.
+export function categorize(keys) {
+  const known = CATEGORIES.flatMap((c) => c.keys);
+  const pages = CATEGORIES.map((c) => ({ ...c, keys: c.keys.flatMap((n) => keys.filter((k) => nameOf(k) === n)) }));
+  const rest = keys.filter((k) => !known.includes(nameOf(k)));
+  if (rest.length) pages.push({ id: 'other', title: 'Other', blurb: 'Not sorted into a category yet.', keys: rest });
+  return pages.filter((c) => c.keys.length);
+}
+
+// Short descriptions for what marketplace.json doesn't describe: the official opt-ins and the toggles.
+export const HINTS = {
+  'skill-creator': 'Anthropic\'s skill for writing and testing skills',
+  'rust-analyzer-lsp': 'Rust (rust-analyzer)',
+  'csharp-lsp': 'C# (csharp-ls)',
+  'typescript-lsp': 'TypeScript / JavaScript',
+  'pyright-lsp': 'Python (pyright)',
+  ccstatusline: 'status line + its config',
+  sandbox: 'Bash sandbox, no unsandboxed fallback',
+  dcg: 'destructive command guard, runs its own installer',
+  'strip-defaults': `remove other marketplaces + plugins (keeps the ${OFFICIAL} ones used here), claude.ai connectors, synced skills/plugins, builtins`,
+  clean: `clean slate: back up, then reset settings.json and delete ${CLEAN_TARGETS.join(', ')}`,
+};
+
+// Why an option can't work on this machine, or undefined when it can. version: the brv release to look for.
+export function unavailable(key, platform, arch, version) {
+  const name = nameOf(key);
+  if (platform === 'win32' && name === 'sandbox') return 'needs WSL2';
+  if (platform === 'win32' && name === 'nix-lsp') return 'nixd is not available on Windows';
+  if (name === 'tui-review' && !brvAsset(platform, arch, version)) return `no brv build for ${platform}-${arch}`;
+  return undefined;
+}

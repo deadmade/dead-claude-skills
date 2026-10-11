@@ -46,6 +46,8 @@ for (const dir of pluginDirs) {
 const { version } = JSON.parse(readFileSync("package.json", "utf8"));
 const marketVersion = JSON.parse(readFileSync(MARKETPLACE, "utf8")).metadata?.version;
 if (marketVersion !== version) problems.push(`${MARKETPLACE}: metadata.version is ${marketVersion}, package.json has ${version}`);
+const lock = JSON.parse(readFileSync("npm-shrinkwrap.json", "utf8"));
+if (lock.version !== version || lock.packages?.[""]?.version !== version) problems.push(`npm-shrinkwrap.json: version is ${lock.version}, package.json has ${version}`);
 for (const dir of pluginDirs) {
   const manifest = join(dir, ".claude-plugin", "plugin.json");
   const v = existsSync(manifest) && JSON.parse(readFileSync(manifest, "utf8")).version;

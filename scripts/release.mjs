@@ -35,6 +35,9 @@ if (git("tag", "--list", `v${next}`)) die(`tag v${next} already exists`);
 const json = /^( {2,4}"version": )"[^"]*"/m;
 const bumps = [
   ["package.json", json],
+  ["npm-shrinkwrap.json", json],
+  // The lockfile repeats the version in its root package entry.
+  ["npm-shrinkwrap.json", /^( {4}"": \{\n {6}"name": "dead-claude-skills",\n {6}"version": )"[^"]*"/m],
   [".claude-plugin/marketplace.json", json],
   ...readdirSync("plugins").map((p) => [`plugins/${p}/.claude-plugin/plugin.json`, json]),
   ["plugins/tui-review/brv/Cargo.toml", /^(version = )"[^"]*"/m],
