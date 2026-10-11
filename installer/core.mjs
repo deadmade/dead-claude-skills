@@ -140,6 +140,22 @@ export function resetSettings(settings, { dcg, ...toggles }) {
   return out;
 }
 
+// settings.json as written back over raw: two-space JSON with raw's line endings.
+export const settingsText = (raw, obj) => {
+  const eol = raw.includes('\r\n') ? '\r\n' : '\n';
+  return JSON.stringify(obj, null, 2).replaceAll('\n', eol) + eol;
+};
+
+// What writing build(settings) over raw changes: undefined when raw isn't JSON, null when nothing changes.
+export function settingsChange(raw, build) {
+  let before;
+  try { before = JSON.parse(raw); } catch { return undefined; }
+  const after = build(before);
+  const changed = [...new Set([...Object.keys(before), ...Object.keys(after)])]
+    .filter((k) => JSON.stringify(before[k]) !== JSON.stringify(after[k]));
+  return changed.length ? { before, after, changed, text: settingsText(raw, after) } : null;
+}
+
 // dcg's own installer/uninstaller: they install the binary and write or remove its Claude Code hook.
 export function dcgCommand(platform, action) {
   if (platform === 'win32') {
@@ -149,7 +165,8 @@ export function dcgCommand(platform, action) {
   }
   // No --easy-mode: it edits shell rc files, which home-manager owns on NixOS.
   const [script, flags] = action === 'install' ? ['install.sh', '--verify'] : ['uninstall.sh', '--yes'];
-  return ['bash', ['-c', `curl -fsSL '${DCG}/${script}' | bash -s -- ${flags}`]];
+  // pipefail: a failed download would otherwise feed bash nothing, which exits 0.
+  return ['bash', ['-c', `set -o pipefail; curl -fsSL '${DCG}/${script}' | bash -s -- ${flags}`]];
 }
 
 // cswap.exe: claude-swap built by .github/workflows/build-cswap.yml and attached to this repo's release

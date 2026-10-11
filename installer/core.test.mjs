@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import {
   optIns, needsToken, planPlugins, duplicates, mergeSettings, safeArg, missingBinaries, SECRET_DENIES, isSandboxOn,
   hasDcgHook, dcgCommand, bundleIds, foreignPlugins, retiredPlugins, foreignMarketplaces, stripDefaults, isStripped, resetSettings, CLEAN_TARGETS,
-  marketplaceArg, pinMarketplace,
+  marketplaceArg, pinMarketplace, settingsChange, settingsText,
   cswapDownload, cswapCurrent, pathWith, brvAsset, sha256Of, brvAction, CATEGORIES, TOGGLES, categorize, unavailable,
   outdated,
 } from './core.mjs';
@@ -139,6 +139,7 @@ test('dcg runs its own installer per OS', () => {
   assert.match(dcgCommand('win32', 'uninstall')[1].at(-1), /uninstall\.ps1/);
   const [sh, shArgs] = dcgCommand('linux', 'install');
   assert.equal(sh, 'bash');
+  assert.match(shArgs[1], /^set -o pipefail; curl /);
   assert.match(shArgs[1], /install\.sh' \| bash -s -- --verify$/);
   assert.match(dcgCommand('linux', 'uninstall')[1][1], /uninstall\.sh' \| bash -s -- --yes$/);
 });
@@ -195,6 +196,16 @@ test('reset keeps only our settings plus the dcg hook while dcg stays on', () =>
   assert.ok(isStripped(out));
   assert.equal(resetSettings(before, { dcg: false }).hooks, undefined);
   assert.deepEqual(resetSettings(out, { statusLine: true, sandbox: false, dcg: true }), out);
+});
+
+test('settings changes: invalid JSON is never written, unchanged is null, line endings are kept', () => {
+  const add = (s) => ({ ...s, a: 1 });
+  assert.equal(settingsChange('{"model": "x",}', add), undefined);
+  assert.equal(settingsChange('{"a": 1}', add), null);
+  const crlf = settingsChange('{\r\n  "model": "x"\r\n}\r\n', add);
+  assert.deepEqual(crlf.changed, ['a']);
+  assert.equal(crlf.text, '{\r\n  "model": "x",\r\n  "a": 1\r\n}\r\n');
+  assert.equal(settingsText('{}', { a: 1 }), '{\n  "a": 1\n}\n');
 });
 
 test('clean never targets credentials, plugins or project memory', () => {
