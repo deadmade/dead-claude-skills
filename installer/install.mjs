@@ -15,6 +15,7 @@ import {
   isStripped, mergeSettings, marketplaceArg, missingBinaries, nameOf, needsToken, optIns, pathWith, pinMarketplace,
   planPlugins, resetSettings, safeArg, sha256Of, stripDefaults, unavailable,
 } from './core.mjs';
+import { chooseTabs } from './tabs.mjs';
 
 const PKG = join(import.meta.dirname, '..');
 const CONFIG = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude');
@@ -393,27 +394,15 @@ const hidden = [...opts, ...TOGGLES]
 const pages = categorize([...opts, ...TOGGLES].filter((k) => !hidden.some((h) => h.key === k)));
 
 const describe = Object.fromEntries(manifest.plugins.map((pl) => [pl.name, pl.description.split(/(?<=\.)\s/)[0]]));
-const clip = (s, n = 90) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 function option(key) {
   const name = nameOf(key);
   const notes = [
     tokenPlugins.includes(key) && 'token entered in Claude Code',
     key.endsWith(`@${OFFICIAL}`) && `from ${OFFICIAL}`,
   ].filter(Boolean);
-  const hint = [clip(HINTS[name] ?? describe[name] ?? ''), ...notes].filter(Boolean).join(' · ');
+  const detail = [HINTS[name] ?? describe[name] ?? '', ...notes].filter(Boolean).join(' · ');
   const installed = !TOGGLES.includes(key) && current[key];
-  return { value: key, label: installed ? `${name} ${dim('(installed)')}` : name, hint };
-}
-
-async function page(i) {
-  const c = pages[i];
-  const picked = must(await p.multiselect({
-    message: `${styleText('bold', c.title)} ${dim(`· ${i + 1}/${pages.length}`)}\n${dim(c.blurb)}`,
-    options: c.keys.map(option),
-    initialValues: c.keys.filter((k) => chosen[k]),
-    required: false,
-  }));
-  for (const k of c.keys) chosen[k] = picked.includes(k);
+  return { label: installed ? `${name} ${dim('(installed)')}` : name, detail };
 }
 
 // The review lines for one page: + added, − removed, · kept.
@@ -430,9 +419,11 @@ function changes(c) {
 
 p.note(`${bundle.dependencies.map(nameOf).join(', ')}\n${dim('plus the global rules and personal agents')}`,
   `${BUNDLE} is always installed`);
-for (let i = 0; i < pages.length; i++) await page(i);
-
+let tab = 0;
 for (;;) {
+  const picked = must(await chooseTabs({ pages, chosen, tab, describe: option }));
+  Object.assign(chosen, picked.chosen);
+  tab = picked.tab;
   const review = pages.map((c) => ({ title: c.title, lines: changes(c) })).filter((r) => r.lines.length);
   const text = [
     ...review.flatMap((r, i) => [...(i ? [''] : []), styleText('bold', r.title), ...r.lines.map((l) => `  ${l}`)]),
@@ -445,8 +436,8 @@ for (;;) {
     message: 'Apply this?',
     options: [
       { value: 'apply', label: 'Apply' },
-      { value: 'edit', label: 'Change a category' },
-      { value: 'quit', label: 'Quit without changes' },
+      { value: 'back', label: 'Back to choices' },
+      { value: 'quit', label: 'Quit' },
     ],
   }));
   if (next === 'apply') break;
@@ -454,11 +445,6 @@ for (;;) {
     p.cancel('Cancelled before installing anything.');
     process.exit(0);
   }
-  const which = must(await p.select({
-    message: 'Which category?',
-    options: pages.map((c, i) => ({ value: i, label: c.title, hint: `${c.keys.filter((k) => chosen[k]).length} selected` })),
-  }));
-  await page(which);
 }
 const on = (k) => chosen[k];
 

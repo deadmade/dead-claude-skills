@@ -28,9 +28,9 @@ since npm 12, which refuses git packages with `EALLOWGIT` otherwise, and older n
 `/plugin marketplace add deadmade/dead-claude-skills` (plus `anthropics/claude-plugins-official` if you removed it)
 then `/plugin install dead-skills@dead-claude-skills`.
 
-The installer walks through one page per category (workflows & skills, language servers, integrations, tools,
-system, danger zone), then shows a review of what gets installed, removed or kept, where you can go back to any
-category before anything runs. Options that can't work on your OS or CPU (the sandbox and nix-lsp on Windows,
+The installer opens one screen with a tab per category (workflows & skills, language servers, integrations, tools,
+system, danger zone): ←/→ switches tabs, space selects, enter shows a review of what gets installed, removed or
+kept, and the review can go back to the tabs before anything runs. Options that can't work on your OS or CPU (the sandbox and nix-lsp on Windows,
 tui-review where no `brv` build exists) are left off the pages unless they're already on; the review lists them.
 The UI is [`@clack/prompts`](https://github.com/bombshell-dev/clack), pinned with its dependencies in
 `npm-shrinkwrap.json`.
