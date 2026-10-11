@@ -17,7 +17,7 @@
     forAllSystems = nixpkgs.lib.genAttrs ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
 
     # Upstream files copied by scripts/sync-*.mjs: fixing them here would churn every sync PR.
-    vendored = ["^plugins/(hallmark|mattpocock-picks|pstack-picks|graphify)/"];
+    vendored = ["^plugins/(hallmark|mattpocock-picks|pstack-picks|graphify)/" "^plugins/self-review/(LICENSE|agents/|skills/self-review/references/upstream/)"];
 
     preCommit = system: let
       pkgs = nixpkgs.legacyPackages.${system};

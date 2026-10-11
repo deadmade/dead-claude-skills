@@ -26,7 +26,7 @@ const SKILLS = [
 // Anything upstream lists that is in neither array is reported as new (see NEW_SKILLS_FILE).
 const SKIPPED = [
   "engineering/ask-matt",
-  "engineering/code-review",
+  "engineering/code-review", // vendored by scripts/sync-self-review.mjs as a reference of /self-review
   "engineering/diagnosing-bugs",
   "engineering/implement",
   "engineering/prototype",

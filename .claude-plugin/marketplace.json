@@ -95,6 +95,18 @@
       "category": "development"
     },
     {
+      "name": "feature-flow",
+      "description": "/feature-flow: brainstorm with prior art, grill with domain docs, plan, have Claude evaluate the plan, then execute and finish through superpowers. Two approval gates, no lock. Opt-in.",
+      "source": "./plugins/feature-flow",
+      "category": "development"
+    },
+    {
+      "name": "self-review",
+      "description": "/self-review: review your branch before opening a PR. Bug pass, spec and standards pass, and specialist agents (vendored from code-review, pr-review-toolkit and mattpocock) in one command, then fixes what you pick. Opt-in.",
+      "source": "./plugins/self-review",
+      "category": "development"
+    },
+    {
       "name": "hallmark",
       "description": "Hallmark: anti-AI-slop design skill for web frontends, scoped to browser UI work. Vendored from nutlope/hallmark. Opt-in.",
       "source": "./plugins/hallmark",

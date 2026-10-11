@@ -11,8 +11,8 @@ It's built for me; use it if it fits, but expect it to change without notice.
   and the rust/csharp/typescript/pyright LSPs) install from `claude-plugins-official`; the installer adds that
   marketplace if it's missing.
 - **Opt-in:** language servers (rust, csharp, typescript, pyright, nix), mcp-github, mcp-azure, atlassian,
-  hallmark, dev-feature, mattpocock-picks, pstack-picks, graphify, cswap, skill-creator, tui-review (see
-  [its README](plugins/tui-review/README.md); the installer downloads its `brv` binary).
+  hallmark, dev-feature, feature-flow, self-review, mattpocock-picks, pstack-picks, graphify, cswap, skill-creator,
+  tui-review (see [its README](plugins/tui-review/README.md); the installer downloads its `brv` binary).
 - **Installer toggles:** ccstatusline, sandbox (Linux/macOS/WSL2, needs bubblewrap and socat), and
   [dcg](https://github.com/Dicklesworthstone/destructive_command_guard) (runs dcg's own installer). The installer
   always denies reading `.env` files and credential dirs (`~/.ssh`, `~/.aws`, `~/.azure`, `~/.config/gh`, `~/.gnupg`).
