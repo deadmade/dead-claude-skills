@@ -1,6 +1,6 @@
 [package]
 name = "brv"
-version = "1.0.0"
+version = "0.1.0"
 edition = "2024"
 rust-version = "1.97"
 description = "Computes a branch's review diff and writes the cache the tui-review mod paints from."

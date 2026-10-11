@@ -1,6 +1,6 @@
 {
   "name": "feature-flow",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "/feature-flow: one entry point for a feature. Brainstorm with prior art, grill with domain docs, plan, have Claude evaluate the plan, then execute and finish through superpowers.",
   "author": {
     "name": "deadmade",
