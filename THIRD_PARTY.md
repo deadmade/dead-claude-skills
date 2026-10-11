@@ -57,7 +57,7 @@ skill (MIT License, Copyright Matt Pocock; `LICENSE-MIT`), unmodified apart from
 
 ## Re-listed plugins
 
-The marketplace entries for superpowers and ponytail only point at their upstream repositories; no code is
-vendored here. Anthropic's plugins (code-review, claude-code-setup, claude-md-management, security-guidance,
+The marketplace entries for superpowers and ponytail only point at their upstream repositories, pinned to a release
+commit; no code is vendored here. Anthropic's plugins (code-review, claude-code-setup, claude-md-management, security-guidance,
 claude-security, skill-creator and the LSPs) aren't listed here at all: they install from Anthropic's
 `claude-plugins-official` marketplace. Each is covered by its own upstream license.

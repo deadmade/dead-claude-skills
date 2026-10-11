@@ -6,7 +6,7 @@ import {
   hasDcgHook, dcgCommand, bundleIds, foreignPlugins, retiredPlugins, foreignMarketplaces, stripDefaults, isStripped, resetSettings, CLEAN_TARGETS,
   marketplaceArg, pinMarketplace, settingsChange, settingsText,
   cswapDownload, cswapCurrent, pathWith, brvAsset, sha256Of, brvAction, CATEGORIES, TOGGLES, categorize, unavailable,
-  outdated,
+  outdated, shippedVersions,
 } from './core.mjs';
 
 const json = (p) => JSON.parse(readFileSync(new URL(`../${p}`, import.meta.url), 'utf8'));
@@ -314,5 +314,19 @@ test('outdated compares our shipped versions only, once per id, never downgradin
   const shipped = { cswap: '0.1.1', 'feature-flow': '0.1.1', graphify: '0.1.1', hallmark: '0.1.1', 'code-review': '9.9.9' };
   assert.deepEqual(outdated(rows, shipped), [
     { id: `cswap@${M}`, from: '0.1.0', to: '0.1.1' }, { id: `graphify@${M}`, from: '29c78da38ecf', to: '0.1.1' },
+  ]);
+});
+
+test('shippedVersions counts pinned url plugins and skips unpinned ones', () => {
+  const plugins = [
+    { name: 'feature-flow', source: './plugins/feature-flow' },
+    { name: 'nover', source: './plugins/nover' },
+    { name: 'superpowers', source: { source: 'url', url: 'https://github.com/obra/superpowers.git', ref: 'v7.0.0', sha: 'b'.repeat(40) } },
+    { name: 'atlassian', source: { source: 'url', url: 'https://github.com/atlassian/atlassian-mcp-server.git' } },
+  ];
+  const shipped = shippedVersions(plugins, (src) => (src === './plugins/feature-flow' ? '0.1.1' : undefined));
+  assert.deepEqual(shipped, { 'feature-flow': '0.1.1', superpowers: '7.0.0' });
+  assert.deepEqual(outdated([{ id: `superpowers@${M}`, version: '6.4.2' }], shipped), [
+    { id: `superpowers@${M}`, from: '6.4.2', to: '7.0.0' },
   ]);
 });

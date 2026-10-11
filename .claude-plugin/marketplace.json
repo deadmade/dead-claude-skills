@@ -24,7 +24,9 @@
       "description": "Brainstorming, subagent driven development with built in code review, systematic debugging, and red/green TDD.",
       "source": {
         "source": "url",
-        "url": "https://github.com/obra/superpowers.git"
+        "url": "https://github.com/obra/superpowers.git",
+        "ref": "v7.0.0",
+        "sha": "bb92a77741419a4ab5f06e711a283343f1ada0c3"
       },
       "category": "development"
     },
@@ -33,7 +35,9 @@
       "description": "Forces the laziest solution that works. YAGNI, stdlib first, one line over fifty.",
       "source": {
         "source": "url",
-        "url": "https://github.com/DietrichGebert/ponytail.git"
+        "url": "https://github.com/DietrichGebert/ponytail.git",
+        "ref": "v5.1.0",
+        "sha": "9cc65d03aa2da1db7121b912d03596409ee340b8"
       },
       "category": "productivity"
     },

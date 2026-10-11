@@ -84,4 +84,6 @@ The script (main, clean tree only) bumps every version, runs the repo checks and
 `Release vX.Y.Z` and tags it. The tag runs `release.yml`: checks again, builds cswap.exe (`build-cswap.yml`) and brv
 for every platform (`build-brv.yml`), and publishes the GitHub release `vX.Y.Z` with all of them attached. Pull
 requests that touch those workflows or the cswap pin build and smoke-test; merges to main run nothing, and only a
-`v*` tag publishes. Superpowers, ponytail and atlassian come from their own repos and keep their own versions.
+`v*` tag publishes. Superpowers and ponytail are pinned to an upstream release tag and its commit in
+`marketplace.json`, so every machine gets the same copy; the weekly `sync-plugins.yml` opens a PR per plugin when
+upstream tags a new release (to decline one, leave its PR open). Atlassian follows its upstream main.

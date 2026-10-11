@@ -17,7 +17,12 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   together.
 - `plugins/cswap/`: a mod wrapping the external `claude-swap` CLI.
 - `plugins/dead-skills/`: the default bundle; its `dependencies` are the core plugins.
-- `scripts/`: `check-repo.mjs` (marketplace/bundle/version consistency), `release.mjs`, `sync-*.mjs` (vendoring).
+- `scripts/`: `check-repo.mjs` (marketplace/bundle/version consistency), `release.mjs`, `sync-*.mjs` (vendoring),
+  `sync-plugins.mjs` (re-pins url-sourced plugins).
+
+The url-sourced marketplace entries superpowers and ponytail are pinned by `ref` (release tag) and `sha` (its commit);
+`sync-plugins.yml` opens a PR per plugin when upstream tags a newer `vX.Y.Z`. The installer reads the version from
+the `ref`, so it must match upstream's `plugin.json`. Atlassian is deliberately unpinned.
 
 ## Vendored content: don't edit
 
@@ -40,7 +45,7 @@ plugins of ours that the manifest no longer lists.
 
 ## Checks
 
-- `npm test`: repo checks plus all `installer/*.test.mjs` (`claude plugin validate` is skipped when `claude` isn't
+- `npm test`: repo checks plus all `installer/*.test.mjs` and `scripts/*.test.mjs` (`claude plugin validate` is skipped when `claude` isn't
   on PATH).
 - brv: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `plugins/tui-review/brv`.
 - tui-review mod tests need a generated fixture first, from `plugins/tui-review/brv`:
@@ -48,7 +53,7 @@ plugins of ours that the manifest no longer lists.
   `plugins/tui-review`.
 - cswap mod tests: `claude plugin test .` in `plugins/cswap`.
 - `nix develop` (or direnv) gives the toolchain and installs the pre-commit hooks (alejandra, JSON, check-repo,
-  installer tests, end-of-file; vendored paths excluded).
+  installer and scripts tests, end-of-file; vendored paths excluded).
 
 CI: `test.yml` (npm test and cswap mod tests, Linux and Windows) on every PR and push to main; `tui-review.yml` on
 PRs touching tui-review; `build-brv.yml`/`build-cswap.yml` on PRs touching the workflow (or the cswap pin) and from `release.yml`; `sync-*.yml`
