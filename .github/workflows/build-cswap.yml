@@ -35,13 +35,23 @@ jobs:
         with:
           python-version: "3.12"
 
+      # Nuitka's C compiler cache, bytecode cache and tool downloads all live under NUITKA_CACHE_DIR. A run can only
+      # restore caches from its own ref or master, so PRs and release tags reuse what a run on master saved.
+      - uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/nuitka-cache
+          key: nuitka-4.3-py3.12-${{ steps.pin.outputs.tag }}
+          restore-keys: nuitka-4.3-py3.12-
+
       - name: Install claude-swap and Nuitka
         run: pip install ./upstream nuitka==4.3 zstandard
 
       - name: Compile
+        env:
+          NUITKA_CACHE_DIR: ${{ runner.temp }}/nuitka-cache
         run: |
           printf 'from claude_swap.cli import main\nraise SystemExit(main())\n' > entry.py
-          python -m nuitka --onefile --assume-yes-for-downloads --output-filename=cswap.exe \
+          python -m nuitka --onefile --lto=no --assume-yes-for-downloads --output-filename=cswap.exe \
             --include-package=claude_swap --include-package-data=claude_swap --include-package-data=textual \
             --include-distribution-metadata=claude-swap entry.py
 
