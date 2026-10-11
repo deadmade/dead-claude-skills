@@ -19,11 +19,12 @@ jobs:
       - name: Tag matches package.json
         run: test "$GITHUB_REF_NAME" = "v$(jq -r .version package.json)"
 
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
       - name: Repo checks and tests
-        run: |
-          node scripts/check-repo.mjs
-          node --test installer/*.test.mjs
-          node --test scripts/dev-feature-guard.test.mjs
+        run: npm test
 
   # cswap.exe is claude-swap at the pin in installer/cswap.json: while the pin is unchanged since the latest release, that
   # release's exe (checked against its .sha256) is carried over instead of compiled again; if that fails, it's built.

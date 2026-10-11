@@ -19,7 +19,7 @@ import {
 const PANE = 'cswap';
 const TICK_MS = 120_000;
 const INSTALL_HINT =
-  'cswap not found. Windows: rerun `npx --allow-git=root github:deadmade/dead-claude-skills` with cswap ticked. ' +
+  'cswap not found. Windows: rerun `npx --allow-git=root github:deadmade/dead-claude-skills#semver:*` with cswap ticked. ' +
   'Linux: `uv tool install claude-swap`. Or set the path with /plugin configure cswap.';
 
 const view = atom({ plugin: 'cswap', key: 'view' } as const, {

@@ -41,13 +41,7 @@
       installer-test = pkgs.writeShellApplication {
         name = "installer-test";
         runtimeInputs = [pkgs.nodejs];
-        text = ''exec node --test 'installer/*.test.mjs' '';
-      };
-
-      dev-feature-guard-test = pkgs.writeShellApplication {
-        name = "dev-feature-guard-test";
-        runtimeInputs = with pkgs; [git nodejs];
-        text = ''exec node --test scripts/dev-feature-guard.test.mjs'';
+        text = ''exec node --test 'installer/*.test.mjs' 'scripts/*.test.mjs' '';
       };
     in
       git-hooks.lib.${system}.run {
@@ -74,14 +68,7 @@
             enable = true;
             name = "installer tests";
             entry = "${installer-test}/bin/installer-test";
-            files = "^(installer/|package\\.json$)";
-            pass_filenames = false;
-          };
-          dev-feature-guard = {
-            enable = true;
-            name = "dev-feature lock tests";
-            entry = "${dev-feature-guard-test}/bin/dev-feature-guard-test";
-            files = "^(plugins/dev-feature/hooks/|scripts/dev-feature-guard\\.test\\.mjs$)";
+            files = "^(installer/|scripts/|\\.claude-plugin/marketplace\\.json$|package\\.json$)";
             pass_filenames = false;
           };
         };

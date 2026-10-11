@@ -1,0 +1,36 @@
+// The installer's file writes and the clean slate's backup and delete, split out of install.mjs so they can be tested.
+import { cpSync, existsSync, lstatSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { CLEAN_TARGETS } from './core.mjs';
+
+export function writeAtomic(file, text) {
+  mkdirSync(dirname(file), { recursive: true });
+  const tmp = `${file}.tmp-${process.pid}`;
+  writeFileSync(tmp, text);
+  renameSync(tmp, file);
+}
+
+// Copies every clean target that exists; any failure throws before the caller deletes anything.
+export function backup(config, dir) {
+  for (const t of [...CLEAN_TARGETS, 'settings.json']) {
+    const src = join(config, t);
+    if (existsSync(src)) cpSync(src, join(dir, t), { recursive: true, verbatimSymlinks: true });
+  }
+}
+
+// Deletes the clean targets under config and returns what happened to each, for the summary.
+export function clearTargets(config) {
+  const out = [];
+  for (const t of CLEAN_TARGETS) {
+    const path = join(config, t);
+    if (!existsSync(path)) continue;
+    // Managed elsewhere (e.g. home-manager): deleting through the link would hit the source.
+    if (lstatSync(path).isSymbolicLink()) {
+      out.push(`kept ${path}: symlink, remove it where it's managed`);
+      continue;
+    }
+    rmSync(path, { recursive: true });
+    out.push(`deleted ${path}`);
+  }
+  return out;
+}

@@ -36,7 +36,7 @@ jobs:
           python-version: '3.12'
 
       # Nuitka's C compiler cache, bytecode cache and tool downloads all live under NUITKA_CACHE_DIR. A run can only
-      # restore caches from its own ref or master, so PRs and release tags reuse what a run on master saved.
+      # restore caches from its own ref or main, so PRs and release tags reuse what a run on main saved.
       - uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/nuitka-cache

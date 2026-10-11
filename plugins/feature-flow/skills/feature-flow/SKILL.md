@@ -8,8 +8,7 @@ argument-hint: 'What do you want to build?'
 # feature-flow
 
 One entry point that runs the skills this marketplace already ships, in order, and stops at two gates for the user.
-Claude proposes and recommends; the user decides. (For the strict mode where the user writes the design and Claude
-never suggests answers, that's `/dev-feature`.)
+Claude proposes and recommends; the user decides.
 
 | Phase        | Runs                                                               | Output                                       |
 | ------------ | ------------------------------------------------------------------ | -------------------------------------------- |
@@ -67,10 +66,17 @@ doesn't need to offer recon of the codebase, and the web recon is already runnin
   question comes up, present the approaches from the prior-art report: per option, the shape in two lines, who does
   it this way (links), trade-offs for _this_ codebase, rough effort. End with your recommendation and why. The user
   picks; record the choice and the rejected options in flow.md under **Options**.
-- **Size.** If brainstorming sizes it as a quick task or small change, say this flow is overkill and offer to drop
-  out of it. If the user agrees, set `phase: done` with a note and do it the normal way.
-- **Exit.** Once the spec is written and the builder check is folded in, stop. Don't invoke `writing-plans`, even
-  though brainstorming's hard gate says to. Link the spec in flow.md and go to Phase 3.
+- **Size.** Brainstorming sizes the work as a quick task, a small change, or a project with a written design. A quick
+  task or small change writes no spec, so this flow is overkill: say so and offer to drop out of it. If the user
+  agrees, set `phase: done` with a note and let brainstorming finish its own way. Only a project continues here.
+- **Skip.** If the user takes brainstorming's offer to skip the questions, brainstorming ends without a spec. Write it
+  yourself from the request and the grounding, mark every choice you made as your call, and go to Phase 3; the grill
+  stands in for the builder check. Gate 1 still applies.
+- **Spike.** A spike the user agrees to is allowed. Record it in flow.md as throwaway: it isn't building, it doesn't
+  pass Gate 2, and keeping its code goes through the plan like any other code.
+- **Exit.** Once the spec is written and the builder check is folded in, stop: Gate 1 is the user's review of it,
+  after the grill. Don't invoke `writing-plans`, even though brainstorming's hard gate says to. Link the spec in
+  flow.md and go to Phase 3.
 
 ## Phase 3: Grill
 

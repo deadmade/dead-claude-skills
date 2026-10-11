@@ -75,7 +75,7 @@ test('the demo review adds no context', async ($, on) => {
   expect(recorded.contexts.at(-1)).toEqual([]);
 });
 
-test('a Bash call runs the review again; unchanged, the pane keeps its place', async ($, on) => {
+test('a Bash call runs the review again without re-saving the base; unchanged, the pane keeps its place', async ($, on) => {
   const clock = mock.clock(on);
   const recorded = engine(on, reviews(['/fixture']));
   await $.command.run(branch('b1'));
@@ -87,7 +87,8 @@ test('a Bash call runs the review again; unchanged, the pane keeps its place', a
   await $.tool.call({ tool: 'Bash', input: { command: 'git status' } } as never);
   await clock.settle();
   expect(recorded.spawns).toHaveLength(2);
-  expect(recorded.spawns[1]).toEqual(['brv', 'review', '--repo', CWD, '--base', 'b1']);
+  // brv saved b1 on the first run; passing it again would save it for whatever branch is checked out now.
+  expect(recorded.spawns[1]).toEqual(['brv', 'review', '--repo', CWD]);
   expect(recorded.opens).toHaveLength(1);
   await ui.press({ key: 'j' });
   await ui.press({ key: 'k' });

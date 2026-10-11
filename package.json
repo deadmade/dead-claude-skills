@@ -5,7 +5,8 @@
   "description": "Interactive installer for the dead-claude-skills Claude Code marketplace.",
   "type": "module",
   "scripts": {
-    "release": "node scripts/release.mjs"
+    "release": "node scripts/release.mjs",
+    "test": "node scripts/check-repo.mjs && node --test \"installer/*.test.mjs\" \"scripts/*.test.mjs\""
   },
   "bin": {
     "dead-claude-skills": "installer/install.mjs"

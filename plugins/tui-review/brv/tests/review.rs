@@ -150,6 +150,34 @@ fn a_given_base_is_remembered_and_wins() {
 }
 
 #[test]
+fn a_given_base_without_shared_history_is_not_remembered() {
+    let repo = stack();
+    repo.git(&["checkout", "-q", "--orphan", "unrelated"]);
+    repo.commit("u.txt", "u\n");
+    repo.git(&["checkout", "-q", "b2"]);
+    let git = brv::git::open(repo.path()).unwrap();
+    assert!(brv::git::resolve(&git, Some("unrelated")).is_err());
+    assert_eq!(repo.base(None), "b1");
+}
+
+#[test]
+fn a_branch_started_from_origin_main_is_reviewed_against_it() {
+    let repo = Repo::new();
+    repo.commit("a.txt", "a\n");
+    repo.git(&["branch", "stale"]);
+    repo.commit("upstream.txt", "upstream\n");
+    // origin/main is ahead of local main, which stays at the old commit.
+    repo.git(&["update-ref", "refs/remotes/origin/main", "HEAD"]);
+    repo.git(&["reset", "-q", "--hard", "stale"]);
+    repo.git(&["checkout", "-q", "-b", "feature", "origin/main"]);
+    repo.git(&["config", "branch.feature.remote", "origin"]);
+    repo.git(&["config", "branch.feature.merge", "refs/heads/main"]);
+    repo.commit("f.txt", "f\n");
+    assert_eq!(repo.base(None), "origin/main");
+    assert_eq!(paths(&repo.files()), ["f.txt"]);
+}
+
+#[test]
 fn a_branch_with_nothing_to_compare_says_how_to_pick_a_base() {
     let repo = Repo::new();
     repo.commit("a.txt", "a\n");

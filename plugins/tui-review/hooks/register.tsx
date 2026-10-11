@@ -304,7 +304,9 @@ async function reviewArgv($: $, brv: string, base: string | undefined): Promise<
 
 /**
  * Runs the open branch review again: brv answers `cached` at once when HEAD has not moved, and writes the new review
- * when it has. Skipped while a comment is being written, so its text is not lost; the next refresh catches up.
+ * when it has. Skipped while a comment is being written, so its text is not lost; the next refresh catches up. No
+ * `--base`: the first run saved it for its branch, and passing it again would save it for whatever branch Claude has
+ * checked out since.
  */
 async function refresh($: $) {
   const review = await read($, reviewAtom);
@@ -313,7 +315,7 @@ async function refresh($: $) {
     refreshAgain = true;
     return;
   }
-  await run($, await reviewArgv($, brvPath, review.base), { kind: 'branch', base: review.base });
+  await run($, await reviewArgv($, brvPath, undefined), { kind: 'branch', base: review.base });
 }
 
 /** Reads brv's progress lines and acts on them; one run at a time, a new one ends the old. */

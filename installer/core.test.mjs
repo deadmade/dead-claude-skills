@@ -15,6 +15,7 @@ import {
   dcgCommand,
   bundleIds,
   foreignPlugins,
+  retiredPlugins,
   foreignMarketplaces,
   stripDefaults,
   isStripped,
@@ -22,6 +23,8 @@ import {
   CLEAN_TARGETS,
   marketplaceArg,
   pinMarketplace,
+  settingsChange,
+  settingsText,
   cswapDownload,
   cswapCurrent,
   pathWith,
@@ -33,6 +36,7 @@ import {
   categorize,
   unavailable,
   outdated,
+  shippedVersions,
 } from './core.mjs';
 
 const json = (p) => JSON.parse(readFileSync(new URL(`../${p}`, import.meta.url), 'utf8'));
@@ -48,7 +52,6 @@ test('opt-ins from the real manifests', () => {
       ...[
         'atlassian',
         'cswap',
-        'dev-feature',
         'feature-flow',
         'graphify',
         'hallmark',
@@ -205,6 +208,7 @@ test('dcg runs its own installer per OS', () => {
   assert.match(dcgCommand('win32', 'uninstall')[1].at(-1), /uninstall\.ps1/);
   const [sh, shArgs] = dcgCommand('linux', 'install');
   assert.equal(sh, 'bash');
+  assert.match(shArgs[1], /^set -o pipefail; curl /);
   assert.match(shArgs[1], /install\.sh' \| bash -s -- --verify$/);
   assert.match(dcgCommand('linux', 'uninstall')[1][1], /uninstall\.sh' \| bash -s -- --yes$/);
 });
@@ -224,6 +228,13 @@ test('foreign plugins and marketplaces spare ours and the official plugins we us
     [`playwright@${O}`, 'x@y'],
   );
   assert.deepEqual(foreignMarketplaces([M, O, 'other']), ['other']);
+});
+
+test('retired plugins are ours but no longer in the marketplace', () => {
+  const managed = [...bundleIds(bundle), ...optIns(marketplace, bundle)];
+  assert.deepEqual(retiredPlugins([`dev-feature@${M}`, `cswap@${M}`, `code-review@${O}`, 'x@y'], managed), [
+    `dev-feature@${M}`,
+  ]);
 });
 
 test('strip disables defaults, keeps foreign keys, drops other marketplaces', () => {
@@ -268,6 +279,16 @@ test('reset keeps only our settings plus the dcg hook while dcg stays on', () =>
   assert.ok(isStripped(out));
   assert.equal(resetSettings(before, { dcg: false }).hooks, undefined);
   assert.deepEqual(resetSettings(out, { statusLine: true, sandbox: false, dcg: true }), out);
+});
+
+test('settings changes: invalid JSON is never written, unchanged is null, line endings are kept', () => {
+  const add = (s) => ({ ...s, a: 1 });
+  assert.equal(settingsChange('{"model": "x",}', add), undefined);
+  assert.equal(settingsChange('{"a": 1}', add), null);
+  const crlf = settingsChange('{\r\n  "model": "x"\r\n}\r\n', add);
+  assert.deepEqual(crlf.changed, ['a']);
+  assert.equal(crlf.text, '{\r\n  "model": "x",\r\n  "a": 1\r\n}\r\n');
+  assert.equal(settingsText('{}', { a: 1 }), '{\n  "a": 1\n}\n');
 });
 
 test('clean never targets credentials, plugins or project memory', () => {
@@ -398,5 +419,22 @@ test('outdated compares our shipped versions only, once per id, never downgradin
   assert.deepEqual(outdated(rows, shipped), [
     { id: `cswap@${M}`, from: '0.1.0', to: '0.1.1' },
     { id: `graphify@${M}`, from: '29c78da38ecf', to: '0.1.1' },
+  ]);
+});
+
+test('shippedVersions counts pinned url plugins and skips unpinned ones', () => {
+  const plugins = [
+    { name: 'feature-flow', source: './plugins/feature-flow' },
+    { name: 'nover', source: './plugins/nover' },
+    {
+      name: 'superpowers',
+      source: { source: 'url', url: 'https://github.com/obra/superpowers.git', ref: 'v7.0.0', sha: 'b'.repeat(40) },
+    },
+    { name: 'atlassian', source: { source: 'url', url: 'https://github.com/atlassian/atlassian-mcp-server.git' } },
+  ];
+  const shipped = shippedVersions(plugins, (src) => (src === './plugins/feature-flow' ? '0.1.1' : undefined));
+  assert.deepEqual(shipped, { 'feature-flow': '0.1.1', superpowers: '7.0.0' });
+  assert.deepEqual(outdated([{ id: `superpowers@${M}`, version: '6.4.2' }], shipped), [
+    { id: `superpowers@${M}`, from: '6.4.2', to: '7.0.0' },
   ]);
 });

@@ -64,6 +64,7 @@ export function changeList(s, data) {
     off: keys.filter((k) => toggle(k) && diff(k) && !s.chosen[k]),
     danger: keys.filter((k) => DANGER.includes(k) && s.chosen[k] && !data.current[k]),
     update: liveUpdates(s, data).filter((u) => !s.skip[u.id]),
+    retired: data.retired ?? [],
     // strip-defaults and clean remove every foreign plugin and marketplace on each run they're on.
     sweep: s.chosen['strip-defaults'] || s.chosen.clean ? (data.sweep ?? []) : [],
   };
@@ -279,7 +280,7 @@ function reviewScreen(s, data, { columns, rows: height }) {
   const nameW = Math.max(0, ...c.update.map((u) => width(nameOf(u.id))));
   const groups = [
     ['Install', 'green', c.install.map(name)],
-    ['Remove', 'red', [...c.remove.map(name), ...c.sweep]],
+    ['Remove', 'red', [...c.remove.map(name), ...c.retired.map(name), ...c.sweep]],
     ['Update', 'yellow', c.update.map((u) => `${pad(nameOf(u.id), nameW)}  ${u.from} → ${u.to}`)],
     ['Turn on', 'green', c.on.map((k) => LABELS[k] ?? k)],
     ['Turn off', 'red', c.off.map((k) => LABELS[k] ?? k)],

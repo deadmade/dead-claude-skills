@@ -15,7 +15,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
-import { delimiter, dirname, join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { styleText } from 'node:util';
 import {
   BUNDLE,
@@ -34,6 +34,7 @@ import {
   duplicates,
   foreignMarketplaces,
   foreignPlugins,
+  retiredPlugins,
   hasDcgHook,
   isOurStatusLine,
   isSandboxOn,
@@ -50,10 +51,14 @@ import {
   planPlugins,
   resetSettings,
   safeArg,
+  settingsChange,
+  settingsText,
   sha256Of,
+  shippedVersions,
   stripDefaults,
   unavailable,
 } from './core.mjs';
+import { backup, clearTargets, writeAtomic } from './files.mjs';
 import { confirm, line, log, note, progress, screen } from './ui.mjs';
 import { changeList, initial, move, render } from './view.mjs';
 
@@ -78,7 +83,7 @@ const failures = [];
 const done = [];
 
 if (!process.stdin.isTTY || !process.stdout.isTTY) {
-  console.error('Run this in a terminal: npx --allow-git=root github:deadmade/dead-claude-skills');
+  console.error('Run this in a terminal: npx --allow-git=root github:deadmade/dead-claude-skills#semver:*');
   process.exit(1);
 }
 
@@ -128,13 +133,6 @@ const record = (label, r) => {
 const run = async (doing, label, ...args) => record(label, await progress(doing, () => claude(undefined, ...args)));
 
 // --- files ------------------------------------------------------------------------------------------------------
-function writeAtomic(file, text) {
-  mkdirSync(dirname(file), { recursive: true });
-  const tmp = `${file}.tmp-${process.pid}`;
-  writeFileSync(tmp, text);
-  renameSync(tmp, file);
-}
-
 const remove = (file, label) => {
   if (!existsSync(file)) return;
   rmSync(file);
@@ -147,21 +145,17 @@ async function applySettings(toggles, { strip, reset }) {
     reset ? resetSettings(s, toggles) : strip ? stripDefaults(mergeSettings(s, toggles)) : mergeSettings(s, toggles);
   const snippet = (title) => note(title, JSON.stringify(build({}), null, 2).split('\n'));
   if (existsSync(SETTINGS) && lstatSync(SETTINGS).isSymbolicLink()) {
+    failures.push(`${SETTINGS} is a symlink; merge these keys where it's managed (printed above)`);
     return snippet(`${SETTINGS} is a symlink, not writing it. Merge these keys where it's managed`);
   }
   const raw = existsSync(SETTINGS) ? readFileSync(SETTINGS, 'utf8') : '{}';
-  let before;
-  try {
-    before = JSON.parse(raw);
-  } catch {
+  const change = settingsChange(raw, build);
+  if (change === undefined) {
     failures.push(`${SETTINGS} is not valid JSON; merge these keys by hand (printed above)`);
     return snippet(`${SETTINGS} is not valid JSON. Merge these keys by hand`);
   }
-  const after = build(before);
-  const changed = [...new Set([...Object.keys(before), ...Object.keys(after)])].filter(
-    (k) => JSON.stringify(before[k]) !== JSON.stringify(after[k]),
-  );
-  if (!changed.length) return;
+  if (!change) return;
+  const { before, after, changed } = change;
   const lines = (sign, k, v) => `${k}: ${JSON.stringify(v, null, 2)}`.split('\n').map((l) => `${sign} ${l}`);
   const diff = changed.flatMap((k) => [
     ...(k in before ? lines('-', k, before[k]).map(red) : []),
@@ -169,13 +163,14 @@ async function applySettings(toggles, { strip, reset }) {
   ]);
   note('settings.json changes', [SETTINGS, '', ...diff]);
   if (!(await ask('Write these changes?', true))) return done.push('settings.json: skipped by you');
-  const eol = raw.includes('\r\n') ? '\r\n' : '\n';
-  writeAtomic(SETTINGS, JSON.stringify(after, null, 2).replaceAll('\n', eol) + eol);
+  writeAtomic(SETTINGS, change.text);
   done.push(`settings.json: updated ${changed.join(', ')}`);
 }
 
-async function applyCcstatusline(on) {
-  if (!on) return remove(CCSL, CCSL);
+// Off only deletes the config when this installer's status line was on: the toggle also reads off for a ccstatusline
+// set up some other way, whose config isn't ours to delete.
+async function applyCcstatusline(was, on) {
+  if (!on) return was ? remove(CCSL, CCSL) : undefined;
   const shipped = readFileSync(join(PKG, 'installer', 'ccstatusline.json'), 'utf8');
   if (!existsSync(CCSL)) {
     writeAtomic(CCSL, shipped);
@@ -255,35 +250,15 @@ async function applyCswap(on) {
     process.env.PATH = `${process.env.PATH};${dl.dir}`;
   const ps = (cmd, env) =>
     spawnSync('powershell', ['-NoProfile', '-Command', cmd], { encoding: 'utf8', env: { ...process.env, ...env } });
-  const userPath = ps("[Environment]::GetEnvironmentVariable('Path', 'User')").stdout?.trim();
-  const next = pathWith(userPath, dl.dir);
+  const read = ps("[Environment]::GetEnvironmentVariable('Path', 'User')");
+  // Without the current PATH, writing would replace it with only this folder.
+  if (read.status !== 0) return failures.push(`cswap: couldn't read your user PATH; add ${dl.dir} to it by hand`);
+  const next = pathWith(read.stdout.trim(), dl.dir);
   if (!next) return;
   // The new PATH goes through the environment, never into the command text.
   const r = ps("[Environment]::SetEnvironmentVariable('Path', $env:DCS_PATH, 'User')", { DCS_PATH: next });
   if (r.status === 0) done.push(`cswap: added ${dl.dir} to your user PATH (new terminals see it)`);
   else failures.push(`cswap: couldn't add ${dl.dir} to PATH; add it by hand`);
-}
-
-// Copies every clean target that exists; any failure aborts the clean slate before something is deleted.
-function backup(dir) {
-  for (const t of [...CLEAN_TARGETS, 'settings.json']) {
-    const src = join(CONFIG, t);
-    if (existsSync(src)) cpSync(src, join(dir, t), { recursive: true, verbatimSymlinks: true });
-  }
-}
-
-function clearTargets() {
-  for (const t of CLEAN_TARGETS) {
-    const path = join(CONFIG, t);
-    if (!existsSync(path)) continue;
-    // Managed elsewhere (e.g. home-manager): deleting through the link would hit the source.
-    if (lstatSync(path).isSymbolicLink()) {
-      done.push(`kept ${path}: symlink, remove it where it's managed`);
-      continue;
-    }
-    rmSync(path, { recursive: true });
-    done.push(`deleted ${path}`);
-  }
 }
 
 // --- brv, tui-review's binary --------------------------------------------------------------------------------------
@@ -389,15 +364,25 @@ function pinSettingsEntry() {
   const before = tryJson(SETTINGS);
   const after = before && pinMarketplace(before, VERSION);
   if (!after || after === before) return undefined;
-  const eol = raw.includes('\r\n') ? '\r\n' : '\n';
-  writeAtomic(SETTINGS, JSON.stringify(after, null, 2).replaceAll('\n', eol) + eol);
+  writeAtomic(SETTINGS, settingsText(raw, after));
   done.push(`settings.json: pinned the ${MARKETPLACE} marketplace to v${VERSION}`);
   return raw;
 }
 
 log('info', `${styleText(['bold', 'magenta'], 'dead-claude-skills')} v${VERSION}`);
 
-const marketplaces = JSON.parse((await claude(undefined, 'plugin', 'marketplace', 'list', '--json')).out || '[]');
+// A failed list would read as "nothing installed": stop instead of planning from it.
+function listed(what, r) {
+  try {
+    if (r.ok) return JSON.parse(r.out || '[]');
+  } catch {
+    /* falls through to the error */
+  }
+  log('error', `Can't read the ${what} (claude plugin … list --json): ${r.err || r.out}`);
+  process.exit(1);
+}
+
+const marketplaces = listed('marketplaces', await claude(undefined, 'plugin', 'marketplace', 'list', '--json'));
 const unpinned = pinSettingsEntry();
 // Adding again also moves an existing checkout to this installer's tag.
 const market = await progress(`Adding the ${MARKETPLACE} marketplace at v${VERSION}`, () =>
@@ -420,10 +405,11 @@ if (!marketplaces.some((m) => m.name === OFFICIAL)) {
     `anthropics/${OFFICIAL}`,
   );
 }
-const listed = JSON.parse(
-  (await progress('Reading installed plugins', () => claude(undefined, 'plugin', 'list', '--json'))).out || '[]',
+const plugins = listed(
+  'installed plugins',
+  await progress('Reading installed plugins', () => claude(undefined, 'plugin', 'list', '--json')),
 );
-const rows = Array.isArray(listed) ? listed : (listed.installed ?? []);
+const rows = Array.isArray(plugins) ? plugins : (plugins.installed ?? []);
 
 const manifest = readJson(join(PKG, '.claude-plugin', 'marketplace.json'));
 const bundle = readJson(join(PKG, 'plugins', BUNDLE, '.claude-plugin', 'plugin.json'));
@@ -471,12 +457,10 @@ function option(key) {
   return { label: name, detail };
 }
 
-// Versions this release ships, for the local plugins; what's installed of each option, by name like has().
-const shipped = Object.fromEntries(
-  manifest.plugins
-    .filter((pl) => typeof pl.source === 'string')
-    .map((pl) => [pl.name, tryJson(join(PKG, pl.source, '.claude-plugin', 'plugin.json'))?.version])
-    .filter(([, v]) => v),
+// Versions this release ships; what's installed of each option, by name like has().
+const shipped = shippedVersions(
+  manifest.plugins,
+  (src) => tryJson(join(PKG, src, '.claude-plugin', 'plugin.json'))?.version,
 );
 const rowOf = (key) => rows.find((r) => nameOf(r.id) === nameOf(key));
 const data = {
@@ -491,6 +475,7 @@ const data = {
   updates: outdated(rows, shipped),
   core: `${BUNDLE} + ${bundle.dependencies.length}, always installed`,
   hidden,
+  retired: retiredPlugins(installedIds, managed),
   // What strip-defaults / clean remove on top of the choices, so the review shows it.
   sweep: [
     ...new Set([...foreignPlugins(installedIds, managed), ...duplicates(installedIds, managed)]),
@@ -534,7 +519,7 @@ if (clean) {
   if (!clean) done.push('clean slate: skipped by you');
   else {
     try {
-      backup(backupDir);
+      backup(CONFIG, backupDir);
     } catch (e) {
       log('error', `Backup failed, nothing was deleted: ${e.message}`);
       process.exit(1);
@@ -573,6 +558,8 @@ for (const id of plan.install)
   await run(`Installing ${nameOf(id)}`, `installed ${id}`, 'plugin', 'install', id, '--scope', 'user', '--json');
 for (const id of plan.uninstall)
   await run(`Uninstalling ${nameOf(id)}`, `uninstalled ${id}`, 'plugin', 'uninstall', id, '--json');
+for (const id of data.retired)
+  await run(`Uninstalling ${nameOf(id)}`, `uninstalled ${id} (retired)`, 'plugin', 'uninstall', id, '--json');
 for (const u of changeList(state, data).update) {
   await run(
     `Updating ${nameOf(u.id)} ${u.from} → ${u.to}`,
@@ -583,17 +570,17 @@ for (const u of changeList(state, data).update) {
     '--json',
   );
 }
-if (plan.uninstall.length || dupes.length || foreign.length)
+if (plan.uninstall.length || data.retired.length || dupes.length || foreign.length)
   await run('Pruning unused dependencies', 'pruned unused dependencies', 'plugin', 'prune', '-y');
 if (selected.includes(TUI_REVIEW)) await applyBrv();
 
 const toggles = { statusLine: on('ccstatusline'), sandbox: on('sandbox'), dcg: on('dcg'), version: VERSION };
 await applySettings(toggles, { strip, reset: clean });
 const autoUpdate = tryJson(join(CONFIG, 'plugins', 'known_marketplaces.json'))?.[MARKETPLACE]?.autoUpdate;
-await applyCcstatusline(on('ccstatusline'));
+await applyCcstatusline(current.ccstatusline, on('ccstatusline'));
 await applyDcg(current.dcg, on('dcg'));
 await applyCswap(selected.some((id) => nameOf(id) === 'cswap'));
-if (clean) clearTargets();
+if (clean) done.push(...clearTargets(CONFIG));
 // The global instructions moved into a dead-skills SessionStart hook; the old file would duplicate them.
 remove(RULES, RULES);
 

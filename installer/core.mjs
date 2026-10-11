@@ -127,6 +127,10 @@ export const CLEAN_TARGETS = [
 export const foreignPlugins = (installedIds, managedIds) =>
   installedIds.filter((id) => marketOf(id) !== MARKETPLACE && !managedIds.includes(id));
 
+// Ours but gone from the marketplace (dev-feature): nothing can update them, so every run removes them.
+export const retiredPlugins = (installedIds, managedIds) =>
+  installedIds.filter((id) => marketOf(id) === MARKETPLACE && !managedIds.includes(id));
+
 export const foreignMarketplaces = (names) => names.filter((n) => n !== MARKETPLACE && n !== OFFICIAL);
 
 export const isStripped = (s) => Object.entries(STRIP).every(([k, v]) => s?.[k] === v);
@@ -157,6 +161,27 @@ export function resetSettings(settings, { dcg, ...toggles }) {
   return out;
 }
 
+// settings.json as written back over raw: two-space JSON with raw's line endings.
+export const settingsText = (raw, obj) => {
+  const eol = raw.includes('\r\n') ? '\r\n' : '\n';
+  return JSON.stringify(obj, null, 2).replaceAll('\n', eol) + eol;
+};
+
+// What writing build(settings) over raw changes: undefined when raw isn't JSON, null when nothing changes.
+export function settingsChange(raw, build) {
+  let before;
+  try {
+    before = JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+  const after = build(before);
+  const changed = [...new Set([...Object.keys(before), ...Object.keys(after)])].filter(
+    (k) => JSON.stringify(before[k]) !== JSON.stringify(after[k]),
+  );
+  return changed.length ? { before, after, changed, text: settingsText(raw, after) } : null;
+}
+
 // dcg's own installer/uninstaller: they install the binary and write or remove its Claude Code hook.
 export function dcgCommand(platform, action) {
   if (platform === 'win32') {
@@ -166,7 +191,8 @@ export function dcgCommand(platform, action) {
   }
   // No --easy-mode: it edits shell rc files, which home-manager owns on NixOS.
   const [script, flags] = action === 'install' ? ['install.sh', '--verify'] : ['uninstall.sh', '--yes'];
-  return ['bash', ['-c', `curl -fsSL '${DCG}/${script}' | bash -s -- ${flags}`]];
+  // pipefail: a failed download would otherwise feed bash nothing, which exits 0.
+  return ['bash', ['-c', `set -o pipefail; curl -fsSL '${DCG}/${script}' | bash -s -- ${flags}`]];
 }
 
 // cswap.exe: claude-swap built by .github/workflows/build-cswap.yml and attached to this repo's release
@@ -266,15 +292,7 @@ export const CATEGORIES = [
     id: 'workflow',
     title: 'Workflows & skills',
     blurb: 'Slash commands and skills that shape how Claude works.',
-    keys: [
-      'dev-feature',
-      'feature-flow',
-      'self-review',
-      'mattpocock-picks',
-      'pstack-picks',
-      'hallmark',
-      'skill-creator',
-    ],
+    keys: ['feature-flow', 'self-review', 'mattpocock-picks', 'pstack-picks', 'hallmark', 'skill-creator'],
   },
   {
     id: 'lsp',
@@ -351,8 +369,19 @@ const newer = (a, b) => {
   return i >= 0 && x[i] > y[i];
 };
 
+// { name: version } this release ships: a local plugin's plugin.json version (via localVersion(source)), or a url
+// plugin's pinned vX.Y.Z ref. Plugins without either (unpinned url sources) are left out.
+export function shippedVersions(plugins, localVersion) {
+  return Object.fromEntries(
+    plugins.flatMap(({ name, source }) => {
+      const v = typeof source === 'string' ? localVersion(source) : /^v(\d+\.\d+\.\d+)$/.exec(source?.ref ?? '')?.[1];
+      return v ? [[name, v]] : [];
+    }),
+  );
+}
+
 // Our installed plugins whose version differs from the one this release ships, once per id. rows: `claude plugin
-// list --json`; shipped: { name: version } of the local plugins. A newer install isn't downgraded.
+// list --json`; shipped: shippedVersions(). A newer install isn't downgraded.
 export function outdated(rows, shipped) {
   const seen = new Set();
   return rows.flatMap(({ id, version }) => {
