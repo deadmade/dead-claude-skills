@@ -35,8 +35,8 @@ test("pin rewrites only the matching entry", () => {
   const current = JSON.parse(marketplace).plugins.find((p) => p.name === "ponytail").source.ref;
   const res = pin(marketplace, "DietrichGebert/ponytail", "v999.0.0", sha("f"));
   assert.equal(res.old, current);
-  const before = marketplace.split("\n");
-  const changed = res.text.split("\n").filter((line, i) => line !== before[i]);
+  const before = marketplace.split(/\r?\n/); // Windows CI checks out CRLF
+  const changed = res.text.split(/\r?\n/).filter((line, i) => line !== before[i]);
   assert.deepEqual(changed, [`        "ref": "v999.0.0",`, `        "sha": "${sha("f")}"`]);
 });
 
