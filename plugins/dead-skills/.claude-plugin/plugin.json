@@ -1,6 +1,6 @@
 {
   "name": "dead-skills",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Default bundle: global instructions and personal agents, plus the core plugins of the dead-claude-skills marketplace as dependencies.",
   "author": {
     "name": "deadmade",
