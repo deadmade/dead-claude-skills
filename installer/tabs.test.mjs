@@ -2,8 +2,9 @@ process.env.FORCE_COLOR = '1';
 const { test } = await import('node:test');
 const { default: assert } = await import('node:assert/strict');
 const { chooseTabs, move, render } = await import('./tabs.mjs');
-const { isCancel } = await import('@clack/core');
+const { isCancel, wrapTextWithPrefix } = await import('@clack/core');
 const { PassThrough } = await import('node:stream');
+const { CATEGORIES, HINTS, categorize } = await import('./core.mjs');
 const { stripVTControlCharacters: plain } = await import('node:util');
 
 const pages = [
@@ -107,6 +108,16 @@ test('chooseTabs resolves its input on plain enter', async () => {
 
 test('chooseTabs cancels on escape', async () => {
   assert.equal(isCancel(await choose({}, '\x1b')), true);
+});
+
+test('render fits narrow terminals once clack word-wraps it', () => {
+  const real = categorize(CATEGORIES.flatMap((c) => c.keys));
+  const words = (k) => ({ label: k, detail: HINTS[k] ?? 'remove other marketplaces and plugins, claude.ai connectors, synced skills' });
+  for (const [columns, rows] of [[33, 23], [37, 21]]) {
+    const out = render(at({ tab: 0, cursor: 6 }), real, { columns, rows, describe: words, status: 'active' });
+    const lines = wrapTextWithPrefix({ columns }, out, '').split('\n').length;
+    assert.ok(lines <= rows, `${columns}x${rows}: ${lines} lines`);
+  }
 });
 
 test('render submit frame', () => {

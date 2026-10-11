@@ -2,7 +2,7 @@
 import {
   S_BAR, S_BAR_H, S_CHECKBOX_ACTIVE, S_CHECKBOX_INACTIVE, S_CHECKBOX_SELECTED, limitOptions, symbol,
 } from '@clack/prompts';
-import { Prompt, isCancel } from '@clack/core';
+import { Prompt, isCancel, wrapTextWithPrefix } from '@clack/core';
 import { stripVTControlCharacters, styleText } from 'node:util';
 
 const TITLE = 'Choose what to install';
@@ -37,8 +37,6 @@ export function move(state, action, pages) {
 
 const dim = (s) => styleText('dim', s);
 const width = (s) => stripVTControlCharacters(s).length;
-// Terminal rows a line takes once it wraps at `columns`.
-const height = (s, columns) => Math.max(1, Math.ceil(width(s) / Math.max(columns, 1)));
 
 // The frame for clack's state `status`: the one-line summary once submitted or cancelled, else the chooser.
 // describe(key) -> { label, detail }.
@@ -67,9 +65,13 @@ export function render(state, pages, { columns, rows, describe, status }) {
     const { label } = describe(key);
     return `${active ? styleText('cyan', '❯') : ' '} ${box} ${page.bulk === false ? styleText('red', label) : label}`;
   };
-  const chrome = 1 + [...head, ...tail].reduce((n, l) => n + height(gutter + l, columns), 0);
-  const list = limitOptions({ cursor, options: page.keys, style, output: { columns, rows }, columnPadding: 3, rowPadding: chrome });
-  return [`${symbol(status)}  ${styleText('bold', TITLE)}`, ...[...head, ...list, ...tail].map((l) => gutter + l)].join('\n');
+  // Wrapped here the way clack wraps the frame, so the line count is exact and wrapped lines keep the gutter.
+  const fold = (ls) => ls.flatMap((l) => wrapTextWithPrefix({ columns: Math.max(columns - 3, 1) }, l, '').split('\n'));
+  const [top, bottom] = [fold(head), fold(tail)];
+  const list = limitOptions({
+    cursor, options: page.keys, style, output: { columns, rows }, columnPadding: 3, rowPadding: 1 + top.length + bottom.length,
+  });
+  return [`${symbol(status)}  ${styleText('bold', TITLE)}`, ...[...top, ...list, ...bottom].map((l) => gutter + l)].join('\n');
 }
 
 const MOVES = ['left', 'right', 'up', 'down', 'space'];
