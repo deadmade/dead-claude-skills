@@ -1,0 +1,83 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { PassThrough } from 'node:stream';
+import { confirm, line, progress, screen } from './ui.mjs';
+
+const tty = () => {
+  const input = Object.assign(new PassThrough(), { isTTY: true, isRaw: false, setRawMode(v) { this.isRaw = v; return this; } });
+  const output = Object.assign(new PassThrough(), { isTTY: true, columns: 60, rows: 20 });
+  let written = '';
+  output.on('data', (d) => { written += d; });
+  return { input, output, written: () => written };
+};
+const counter = {
+  move: (s, k) => (k === 'down' ? { ...s, n: s.n + 1 } : k === 'return' ? { ...s, result: 'apply' } : s),
+  render: (s) => [`n=${s.n}`],
+};
+
+test('screen resolves on enter and restores the terminal', async () => {
+  const io = tty();
+  const done = screen({ n: 0 }, counter, io);
+  io.input.write('\x1b[B');
+  io.input.write('\r');
+  const s = await done;
+  assert.deepEqual([s.n, s.result, io.input.isRaw, io.input.isPaused()], [1, 'apply', false, true]);
+  assert.ok(io.written().includes('\x1b[?25l') && io.written().endsWith('\x1b[?25h\n'));
+});
+
+test('screen maps enter, ignoring the one right after return', async () => {
+  const io = tty();
+  const done = screen({ n: 0 }, { ...counter, move: (s, k) => (k === 'return' ? { ...s, n: s.n + 1, result: s.n ? 'apply' : undefined } : s) }, io);
+  io.input.write('\r\n');
+  io.input.write('\n');
+  assert.equal((await done).n, 2);
+});
+
+test('ctrl-c resolves quit', async () => {
+  const io = tty();
+  const done = screen({ n: 0 }, counter, io);
+  io.input.write('\x03');
+  const s = await done;
+  assert.deepEqual([s.result, io.input.isRaw], ['quit', false]);
+});
+
+test('a throwing move still restores the terminal', async () => {
+  const io = tty();
+  const done = screen({ n: 0 }, { ...counter, move: () => { throw new Error('boom'); } }, io);
+  io.input.write('\x1b[B');
+  await assert.rejects(done, /boom/);
+  assert.deepEqual([io.input.isRaw, io.input.isPaused()], [false, true]);
+  assert.ok(io.written().includes('\x1b[?25h'));
+});
+
+test('confirm takes y/n and enter, ctrl-c is null', async () => {
+  const ask = async (keys, initial) => {
+    const io = tty();
+    const done = confirm('Write?', initial, io);
+    io.input.write(keys);
+    return done;
+  };
+  assert.equal(await ask('n', true), false);
+  assert.equal(await ask('y', false), true);
+  assert.equal(await ask('\r', true), true);
+  assert.equal(await ask('\x1b[C\r', true), false);
+  assert.equal(await ask('\x03', true), null);
+});
+
+test('line returns the typed text, ctrl-c is null', async () => {
+  let io = tty();
+  let done = line('Type "clean" to continue:', io);
+  io.input.write('clean\r');
+  assert.equal(await done, 'clean');
+  io = tty();
+  done = line('Type "clean" to continue:', io);
+  io.input.write('\x03');
+  assert.equal(await done, null);
+  assert.equal(io.input.isRaw, false);
+});
+
+test('progress turns a throw into failed', async () => {
+  const r = await progress('Downloading brv', async () => { throw new Error('boom'); });
+  assert.deepEqual(r, { ok: false, err: 'boom' });
+  assert.deepEqual(await progress('Installing x', async () => ({ ok: true })), { ok: true });
+});
