@@ -1,5 +1,5 @@
 ---
-phase: finish
+phase: done
 ---
 
 # Superpowers v7: flow
@@ -143,3 +143,5 @@ guard, and the installer assumes the tag matches upstream's plugin.json version.
 Not yet verified, because it needs a release and live runs:
 - After the next release, re-running the installer should offer superpowers 6.4.2 → 7.0.0.
 - After merge, a `workflow_dispatch` run of sync-plugins should finish with no PR.
+
+Finish (2026-10-11): user chose "push and create a PR" (option 2). Branch `superpowers-v7`.
