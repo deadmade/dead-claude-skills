@@ -54,7 +54,7 @@
             enable = true;
             name = "claude plugin validate + marketplace consistency";
             entry = "${check-repo}/bin/check-repo";
-            files = "^(\\.claude-plugin/|plugins/|scripts/check-repo\\.mjs$|(package|npm-shrinkwrap)\\.json$)";
+            files = "^(\\.claude-plugin/|plugins/|scripts/check-repo\\.mjs$|package\\.json$)";
             pass_filenames = false;
           };
           installer-test = {
