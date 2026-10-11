@@ -12,14 +12,10 @@
   },
   "files": [
     "installer/",
-    "npm-shrinkwrap.json",
     ".claude-plugin/marketplace.json",
     "plugins/*/.claude-plugin/plugin.json"
   ],
   "engines": {
     "node": ">=20.12"
-  },
-  "dependencies": {
-    "@clack/prompts": "1.8.1"
   }
 }

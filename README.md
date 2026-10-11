@@ -28,12 +28,14 @@ since npm 12, which refuses git packages with `EALLOWGIT` otherwise, and older n
 `/plugin marketplace add deadmade/dead-claude-skills` (plus `anthropics/claude-plugins-official` if you removed it)
 then `/plugin install dead-skills@dead-claude-skills`.
 
-The installer walks through one page per category (workflows & skills, language servers, integrations, tools,
-system, danger zone), then shows a review of what gets installed, removed or kept, where you can go back to any
-category before anything runs. Options that can't work on your OS or CPU (the sandbox and nix-lsp on Windows,
+The installer opens on a start screen with one line per category (workflows & skills, language servers,
+integrations, tools, system, danger zone) that says what's installed in it, plus a line for outdated plugins from
+this repo. Enter opens a category, where each item says its state in words (`installed 0.1.1`, `will install`,
+`will remove`, `outdated 0.1.0 → 0.1.1`) and enter installs, removes or undoes it; the updates line lets you skip
+single updates. Apply shows only what changes (install, remove, update, turn on/off) with Apply, Back and Quit.
+Keys are ↑/↓, enter and esc. Options that can't work on your OS or CPU (the sandbox and nix-lsp on Windows,
 tui-review where no `brv` build exists) are left off the pages unless they're already on; the review lists them.
-The UI is [`@clack/prompts`](https://github.com/bombshell-dev/clack), pinned with its dependencies in
-`npm-shrinkwrap.json`.
+The installer has no npm dependencies: it uses only Node's standard library.
 
 The installer pins the marketplace to its own release: installer vX.Y.Z adds `deadmade/dead-claude-skills@vX.Y.Z`
 and sets that ref in the marketplace's `extraKnownMarketplaces` entry, so the plugins always match the installer that
@@ -63,7 +65,8 @@ Multi-account switching with [claude-swap](https://github.com/realiti4/claude-sw
 
 On Windows the installer downloads `cswap.exe` (claude-swap at the tag pinned in `installer/cswap.json`, compiled
 with Nuitka by `build-cswap.yml` and attached to every release) to `%LOCALAPPDATA%\Programs\cswap` and puts it on
-your user PATH. On Linux, install it with `uv tool install claude-swap` (or nix).
+your user PATH. Elsewhere the installer hides cswap (unless it is already installed); `uv tool install claude-swap`
+still works if you add the plugin by hand.
 
 ## Releases
 

@@ -6,6 +6,7 @@ import {
   hasDcgHook, dcgCommand, bundleIds, foreignPlugins, foreignMarketplaces, stripDefaults, isStripped, resetSettings, CLEAN_TARGETS,
   marketplaceArg, pinMarketplace,
   cswapDownload, cswapCurrent, pathWith, brvAsset, sha256Of, brvAction, CATEGORIES, TOGGLES, categorize, unavailable,
+  outdated,
 } from './core.mjs';
 
 const json = (p) => JSON.parse(readFileSync(new URL(`../${p}`, import.meta.url), 'utf8'));
@@ -269,13 +270,33 @@ test('an uncategorized plugin lands in Other, empty pages are dropped', () => {
   assert.deepEqual(pages.map((p) => [p.id, p.keys]), [['system', ['sandbox']], ['other', [`new-thing@${M}`]]]);
 });
 
+test('categorize keeps bulk:false on danger', () => {
+  assert.equal(categorize(['strip-defaults', 'clean']).find((c) => c.id === 'danger').bulk, false);
+});
+
 test('options hidden per platform', () => {
   assert.equal(unavailable('sandbox', 'win32', 'x64', '1.0.0'), 'needs WSL2');
   assert.ok(unavailable(`nix-lsp@${M}`, 'win32', 'x64', '1.0.0'));
   assert.equal(unavailable(`tui-review@${M}`, 'win32', 'x64', '1.0.0'), undefined);
   assert.ok(unavailable(`tui-review@${M}`, 'win32', 'arm64', '1.0.0'));
-  for (const k of ['sandbox', `nix-lsp@${M}`, `tui-review@${M}`, `cswap@${M}`, 'dcg']) {
+  assert.equal(unavailable(`cswap@${M}`, 'win32', 'x64', '1.0.0'), undefined);
+  assert.ok(unavailable(`cswap@${M}`, 'linux', 'x64', '1.0.0'));
+  assert.ok(unavailable(`cswap@${M}`, 'darwin', 'arm64', '1.0.0'));
+  for (const k of ['sandbox', `nix-lsp@${M}`, `tui-review@${M}`, 'dcg']) {
     assert.equal(unavailable(k, 'linux', 'x64', '1.0.0'), undefined);
     assert.equal(unavailable(k, 'darwin', 'arm64', '1.0.0'), undefined);
   }
+});
+
+test('outdated compares our shipped versions only, once per id, never downgrading', () => {
+  const rows = [
+    { id: `cswap@${M}`, version: '0.1.0', scope: 'user' }, { id: `cswap@${M}`, version: '0.1.0', scope: 'project' },
+    { id: `feature-flow@${M}`, version: '0.1.1' }, { id: `graphify@${M}`, version: '29c78da38ecf' },
+    { id: `hallmark@${M}`, version: '0.2.0' }, { id: `superpowers@${M}`, version: '6.4.2' },
+    { id: `code-review@${O}`, version: '1.0.0' },
+  ];
+  const shipped = { cswap: '0.1.1', 'feature-flow': '0.1.1', graphify: '0.1.1', hallmark: '0.1.1', 'code-review': '9.9.9' };
+  assert.deepEqual(outdated(rows, shipped), [
+    { id: `cswap@${M}`, from: '0.1.0', to: '0.1.1' }, { id: `graphify@${M}`, from: '29c78da38ecf', to: '0.1.1' },
+  ]);
 });

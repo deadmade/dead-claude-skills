@@ -149,7 +149,7 @@ export function dcgCommand(platform, action) {
 }
 
 // cswap.exe: claude-swap built by .github/workflows/build-cswap.yml and attached to this repo's release
-// v<package.json version> by release.yml. Windows only; Linux gets cswap from uv or nix.
+// v<package.json version> by release.yml. Windows only: the option is hidden elsewhere unless already installed.
 const RELEASES = `https://github.com/${REPO}/releases/download`;
 
 export function cswapDownload(platform, env, release) {
@@ -248,8 +248,9 @@ export const CATEGORIES = [
     keys: ['graphify', 'cswap', 'tui-review'] },
   { id: 'system', title: 'System', blurb: 'Status line, sandbox and command guard in settings.json.',
     keys: ['ccstatusline', 'sandbox', 'dcg'] },
+  // bulk: false, so no single key ticks every option here.
   { id: 'danger', title: 'Danger zone', blurb: 'Take over the whole Claude Code config. Leave empty unless you mean it.',
-    keys: ['strip-defaults', 'clean'] },
+    keys: ['strip-defaults', 'clean'], bulk: false },
 ];
 
 // keys: opt-in plugin ids and toggle names. Returns the non-empty categories with their keys, in page order.
@@ -280,6 +281,27 @@ export function unavailable(key, platform, arch, version) {
   const name = nameOf(key);
   if (platform === 'win32' && name === 'sandbox') return 'needs WSL2';
   if (platform === 'win32' && name === 'nix-lsp') return 'nixd is not available on Windows';
+  if (platform !== 'win32' && name === 'cswap') return 'releases ship cswap.exe for Windows only';
   if (name === 'tui-review' && !brvAsset(platform, arch, version)) return `no brv build for ${platform}-${arch}`;
   return undefined;
+}
+
+const semver = (v) => /^(\d+)\.(\d+)\.(\d+)$/.exec(v)?.slice(1).map(Number);
+const newer = (a, b) => {
+  const [x, y] = [semver(a), semver(b)];
+  if (!x || !y) return false;
+  const i = x.findIndex((n, k) => n !== y[k]);
+  return i >= 0 && x[i] > y[i];
+};
+
+// Our installed plugins whose version differs from the one this release ships, once per id. rows: `claude plugin
+// list --json`; shipped: { name: version } of the local plugins. A newer install isn't downgraded.
+export function outdated(rows, shipped) {
+  const seen = new Set();
+  return rows.flatMap(({ id, version }) => {
+    const to = shipped[nameOf(id)];
+    if (marketOf(id) !== MARKETPLACE || !to || seen.has(id)) return [];
+    seen.add(id);
+    return version === to || newer(version, to) ? [] : [{ id, from: version, to }];
+  });
 }
