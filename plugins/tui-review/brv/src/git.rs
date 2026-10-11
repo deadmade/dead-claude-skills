@@ -36,7 +36,7 @@ const WALK_LIMIT: usize = 50_000;
 ///
 /// # Errors
 /// When HEAD has no commit, the given base does not resolve, or no base can be found.
-pub fn resolve(repo: &gix::Repository, base: Option<&str>) -> Result<Range> {
+pub fn resolve(repo: &gix::Repository, given: Option<&str>) -> Result<Range> {
     let head = repo.head_id().context("HEAD has no commit yet")?.detach();
     let head_ref = repo.head_name()?;
     let head_branch = head_ref
@@ -44,14 +44,8 @@ pub fn resolve(repo: &gix::Repository, base: Option<&str>) -> Result<Range> {
         .and_then(|name| name.as_bstr().strip_prefix(b"refs/heads/").map(|short| short.to_str_lossy().into_owned()));
     let head_name = head_branch.clone().unwrap_or_else(|| "HEAD".to_owned());
 
-    let picked = match base {
-        Some(base) => {
-            let id = peel(repo, base)?;
-            if let Some(branch) = &head_branch {
-                remember(repo, branch, base)?;
-            }
-            Some((base.to_owned(), id))
-        }
+    let picked = match given {
+        Some(base) => Some((base.to_owned(), peel(repo, base)?)),
         None => match head_branch.as_deref().and_then(|b| remembered(repo, b)) {
             // A remembered base that no longer resolves (deleted branch) falls through to detection.
             Some(name) => peel(repo, &name).ok().map(|id| (name, id)),
@@ -64,6 +58,10 @@ pub fn resolve(repo: &gix::Repository, base: Option<&str>) -> Result<Range> {
     };
     let merge_base =
         repo.merge_base(base, head).with_context(|| format!("{base_name} and {head_name} share no history"))?.detach();
+    // Only a given base that works is saved: a bad one would fail every later run instead of falling back to detection.
+    if let (Some(given), Some(branch)) = (given, &head_branch) {
+        remember(repo, branch, given)?;
+    }
     Ok(Range { head, head_name, base, base_name, merge_base })
 }
 
@@ -186,7 +184,6 @@ impl Ancestry {
 
 /// Local and remote-tracking branches, minus HEAD's own branch and its remote copies.
 fn candidates(repo: &gix::Repository, head: ObjectId, head_branch: Option<&str>) -> Result<Vec<Candidate>> {
-    let upstream = head_branch.and_then(|b| upstream(repo, b));
     let defaults = default_branches(repo);
     let mut out = Vec::new();
     for reference in repo.references()?.all()? {
@@ -205,9 +202,10 @@ fn candidates(repo: &gix::Repository, head: ObjectId, head_branch: Option<&str>)
             continue;
         }
         if !is_local {
-            // `origin/HEAD` points at a branch listed anyway; `origin/<this branch>` is this branch.
+            // `origin/HEAD` points at a branch listed anyway; `origin/<this branch>` is this branch. The upstream is
+            // not skipped: a branch started from `origin/main` tracks it, and it's the base.
             let branch = name.split_once('/').map_or(name.as_str(), |(_, b)| b);
-            if branch == "HEAD" || Some(branch) == head_branch || upstream.as_deref() == Some(name.as_str()) {
+            if branch == "HEAD" || Some(branch) == head_branch {
                 continue;
             }
         }
@@ -222,15 +220,6 @@ fn candidates(repo: &gix::Repository, head: ObjectId, head_branch: Option<&str>)
         out.push(Candidate { name, tip: commit.id, is_default, is_local, time });
     }
     Ok(out)
-}
-
-/// `remote/branch` that `branch` tracks, from `branch.<name>.remote` and `.merge`.
-fn upstream(repo: &gix::Repository, branch: &str) -> Option<String> {
-    let config = repo.config_snapshot();
-    let remote = config.string(format!("branch.{branch}.remote").as_str())?;
-    let merge = config.string(format!("branch.{branch}.merge").as_str())?;
-    let merge = merge.to_str_lossy();
-    Some(format!("{}/{}", remote.to_str_lossy(), merge.strip_prefix("refs/heads/").unwrap_or(&merge)))
 }
 
 /// What counts as the default branch: `main`, `master`, and whatever each remote's `HEAD` points at.
