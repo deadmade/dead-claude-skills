@@ -11,7 +11,7 @@ It's built for me; use it if it fits, but expect it to change without notice.
   and the rust/csharp/typescript/pyright LSPs) install from `claude-plugins-official`; the installer adds that
   marketplace if it's missing.
 - **Opt-in:** language servers (rust, csharp, typescript, pyright, nix), mcp-github, mcp-azure, atlassian,
-  hallmark, dev-feature, feature-flow, self-review, mattpocock-picks, pstack-picks, graphify, cswap, skill-creator,
+  hallmark, feature-flow, self-review, mattpocock-picks, pstack-picks, graphify, cswap, skill-creator,
   tui-review (see [its README](plugins/tui-review/README.md); the installer downloads its `brv` binary).
 - **Installer toggles:** ccstatusline, sandbox (Linux/macOS/WSL2, needs bubblewrap and socat), and
   [dcg](https://github.com/Dicklesworthstone/destructive_command_guard) (runs dcg's own installer). The installer
@@ -23,7 +23,7 @@ It's built for me; use it if it fits, but expect it to change without notice.
 
     npx --allow-git=root github:deadmade/dead-claude-skills#semver:*
 
-(`#semver:*` runs the installer from the newest release; without it you get master; `--allow-git=root` is needed
+(`#semver:*` runs the installer from the newest release; without it you get main; `--allow-git=root` is needed
 since npm 12, which refuses git packages with `EALLOWGIT` otherwise, and older npm ignores it) or
 `/plugin marketplace add deadmade/dead-claude-skills` (plus `anthropics/claude-plugins-official` if you removed it)
 then `/plugin install dead-skills@dead-claude-skills`.
@@ -35,12 +35,14 @@ this repo. Enter opens a category, where each item says its state in words (`ins
 single updates. Apply shows only what changes (install, remove, update, turn on/off) with Apply, Back and Quit.
 Keys are ↑/↓, enter and esc. Options that can't work on your OS or CPU (the sandbox and nix-lsp on Windows,
 tui-review where no `brv` build exists) are left off the pages unless they're already on; the review lists them.
+Plugins this repo no longer ships (dev-feature) are listed under Remove and uninstalled on every run.
 The installer has no npm dependencies: it uses only Node's standard library.
 
 The installer pins the marketplace to its own release: installer vX.Y.Z adds `deadmade/dead-claude-skills@vX.Y.Z`
 and sets that ref in the marketplace's `extraKnownMarketplaces` entry, so the plugins always match the installer that
 ran. `/plugin update` and auto-update stay on that tag; to update, run the command above again. The marketplace added
-by hand with `/plugin marketplace add` tracks master instead.
+by hand with `/plugin marketplace add` tracks main instead (one added while the branch was still `master` needs
+removing and adding once).
 
 The danger zone page has two options (also `--strip-defaults` / `--clean`) that take over the whole machine:
 
@@ -72,14 +74,14 @@ still works if you add the plugin by hand.
 
 Everything here ships as one version: `package.json`, the marketplace's `metadata.version`, every plugin under
 `plugins/` and tui-review's `brv` crate carry the same number, and the pre-commit checks fail if they drift. Claude Code
-only offers `/plugin update` when that number changes, so sync PRs and other commits on master reach machines with
+only offers `/plugin update` when that number changes, so sync PRs and other commits on main reach machines with
 the next release.
 
     npm run release -- patch    # or minor, major, X.Y.Z
-    git push --follow-tags origin master
+    git push --follow-tags origin main
 
-The script (master, clean tree only) bumps every version, runs the repo checks and installer tests, commits
+The script (main, clean tree only) bumps every version, runs the repo checks and installer tests, commits
 `Release vX.Y.Z` and tags it. The tag runs `release.yml`: checks again, builds cswap.exe (`build-cswap.yml`) and brv
 for every platform (`build-brv.yml`), and publishes the GitHub release `vX.Y.Z` with all of them attached. Pull
-requests that touch those workflows or the cswap pin build and smoke-test; merges to master run nothing, and only a
+requests that touch those workflows or the cswap pin build and smoke-test; merges to main run nothing, and only a
 `v*` tag publishes. Superpowers, ponytail and atlassian come from their own repos and keep their own versions.

@@ -195,3 +195,10 @@ test('review lists what strip-defaults sweeps away and counts it', () => {
   assert.equal(changeList(s, d).count, 3); // 2 swept + the atlassian update (no danger page in the fixture)
   assert.equal(changeList({ ...s, chosen }, d).count, 1);
 });
+
+test('review always lists retired plugins for removal and counts them', () => {
+  const d = { ...data, retired: ['dev-feature@dead-claude-skills'] };
+  const s = { ...initial({ ...chosen }), screen: 'review' };
+  assert.match(text(s, d), /Remove\s+dev-feature/);
+  assert.equal(changeList(s, d).count, 2); // retired + the atlassian update
+});

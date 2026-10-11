@@ -54,6 +54,9 @@ for (const dir of pluginDirs) {
 const CARGO = "plugins/tui-review/brv/Cargo.toml";
 const brv = /^version = "(.*)"/m.exec(readFileSync(CARGO, "utf8"))?.[1];
 if (brv !== version) problems.push(`${CARGO}: version is ${brv}, package.json has ${version}`);
+const LOCK = "plugins/tui-review/brv/Cargo.lock";
+const locked = /^name = "brv"\r?\nversion = "(.*)"/m.exec(readFileSync(LOCK, "utf8"))?.[1];
+if (locked !== version) problems.push(`${LOCK}: brv is ${locked}, package.json has ${version}`);
 
 if (problems.length) {
   console.error(problems.map((p) => `✗ ${p}`).join("\n"));

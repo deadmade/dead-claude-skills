@@ -8,8 +8,7 @@ argument-hint: "What do you want to build?"
 # feature-flow
 
 One entry point that runs the skills this marketplace already ships, in order, and stops at two gates for the user.
-Claude proposes and recommends; the user decides. (For the strict mode where the user writes the design and Claude
-never suggests answers, that's `/dev-feature`.)
+Claude proposes and recommends; the user decides.
 
 | Phase | Runs | Output |
 |---|---|---|
@@ -67,10 +66,12 @@ doesn't need to offer recon of the codebase, and the web recon is already runnin
   question comes up, present the approaches from the prior-art report: per option, the shape in two lines, who does
   it this way (links), trade-offs for *this* codebase, rough effort. End with your recommendation and why. The user
   picks; record the choice and the rejected options in flow.md under **Options**.
-- **Size.** If brainstorming sizes it as a quick task or small change, say this flow is overkill and offer to drop
-  out of it. If the user agrees, set `phase: done` with a note and do it the normal way.
-- **Exit.** Once the spec is written and the builder check is folded in, stop. Don't invoke `writing-plans`, even
-  though brainstorming's hard gate says to. Link the spec in flow.md and go to Phase 3.
+- **Size.** Brainstorming classifies the request as Spike, Bounded or Architectural. Spike and Bounded write no spec,
+  so this flow is overkill: say so and offer to drop out of it. If the user agrees, set `phase: done` with a note and
+  let brainstorming finish its own path. Only Architectural continues here.
+- **Exit.** Once the spec is written and self-reviewed, stop: Gate 1 is the user's review of it, after the grill.
+  Don't invoke `writing-plans`, even though brainstorming's hard gate says to. Link the spec in flow.md and go to
+  Phase 3.
 
 ## Phase 3: Grill
 
