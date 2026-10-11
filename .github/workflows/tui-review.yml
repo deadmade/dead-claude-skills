@@ -55,7 +55,7 @@ jobs:
           claude plugin validate .
           claude plugin test .
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: brv-bench-${{ matrix.os }}
