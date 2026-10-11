@@ -2,7 +2,7 @@ process.env.FORCE_COLOR = '1';
 const { test } = await import('node:test');
 const { default: assert } = await import('node:assert/strict');
 const { stripVTControlCharacters: plain } = await import('node:util');
-const { changeList, frame, initial, move, wrap } = await import('./view.mjs');
+const { changeList, frame, initial, move, render, wrap } = await import('./view.mjs');
 
 const M = 'dead-claude-skills';
 const azure = `mcp-azure@${M}`;
@@ -88,4 +88,83 @@ test('frame cuts long lines and stays one under the width; wrap never cuts', () 
   const url = 'https://github.com/settings/personal-access-tokens/new';
   assert.equal(wrap(url, 20).join(''), url);
   assert.deepEqual(wrap('one two three four', 9), ['one two', 'three', 'four']);
+});
+
+const text = (s, d = data, size = { columns: 80, rows: 30 }) => render(s, d, size).map(plain).join('\n');
+
+test('start shows kept, pending + and −, toggles and the Apply count', () => {
+  const s = { ...initial(chosen), chosen: { ...chosen, [azure]: true, [atlassian]: false } };
+  const out = text(s);
+  assert.match(out, /Integrations\s+\+ mcp-azure {2}− atlassian/);
+  assert.match(out, /System\s+sandbox on, status line off/);
+  assert.match(out, /dead-skills \+ 7, always installed/);
+  assert.match(out, /Apply 2 changes/);
+  assert.ok(render(s, data, { columns: 80, rows: 30 }).join('\n').includes('\x1b[32m+ mcp-azure'));
+});
+
+test('start lists updates; idle start reads Nothing to change and so does the review', () => {
+  assert.match(text(initial(chosen)), /↑ 1 updates?/);
+  const idle = { ...initial(chosen), skip: { [atlassian]: true } };
+  assert.match(text(idle), /Nothing to change/);
+  assert.match(text({ ...idle, screen: 'review' }), /Nothing to change\./);
+});
+
+test('empty categories read none', () => {
+  const d = { ...data, pages: [...pages, { id: 'lsp', title: 'Language servers', blurb: 'b', keys: [`nix-lsp@${M}`] }] };
+  assert.match(text(initial(chosen), d), /Language servers\s+none/);
+});
+
+test('category states are words', () => {
+  const s = { ...initial(chosen), screen: 'category', page: 0, chosen: { ...chosen, [azure]: true, [atlassian]: false } };
+  const out = text(s);
+  assert.match(out, /mcp-azure\s+will install/);
+  assert.match(out, /mcp-github\s+not installed/);
+  assert.match(out, /atlassian\s+will remove \(installed 0\.1\.0\)/);
+  assert.match(text({ ...s, chosen }), /atlassian\s+outdated 0\.1\.0 → 0\.1\.1/);
+  const d = { ...data, updates: [], disabled: { [atlassian]: true } };
+  assert.match(text({ ...s, chosen }, d), /atlassian\s+installed 0\.1\.0, disabled/);
+  const sys = { ...s, page: 1, chosen: { ...chosen, ccstatusline: true } };
+  assert.match(text(sys), /sandbox\s+on/);
+  assert.match(text(sys), /ccstatusline\s+will turn on/);
+});
+
+test('category shows the focused item description, none on ← Back', () => {
+  const s = { ...initial(chosen), screen: 'category', page: 0, cursor: 1 };
+  assert.match(text(s), /About mcp-azure\./);
+  assert.doesNotMatch(text({ ...s, cursor: 0 }), /About/);
+});
+
+test('updates screen shows from → to and skip', () => {
+  const s = { ...initial(chosen), screen: 'updates' };
+  assert.match(text(s), /atlassian\s+0\.1\.0 → 0\.1\.1\s+will update/);
+  assert.match(text({ ...s, skip: { [atlassian]: true } }), /atlassian\s+0\.1\.0 → 0\.1\.1\s+skip/);
+});
+
+test('review lists only non-empty groups, token note and platform', () => {
+  const s = { ...initial(chosen), screen: 'review', chosen: { ...chosen, [azure]: true, [github]: true, [atlassian]: false } };
+  const out = text(s);
+  assert.match(out, /Install\s+mcp-azure/);
+  assert.match(out, /mcp-github \(finish in Claude Code\)/);
+  assert.match(out, /Remove\s+atlassian/);
+  assert.doesNotMatch(out, /Turn on|Update/);
+  assert.match(out, /Unchanged: 1 installed, 1 not installed/);
+  assert.match(out, /Not available on linux-x64: nix-lsp \(nixd is not available\)/);
+  assert.match(out, /Apply 3 changes\s+Back\s+Quit/);
+});
+
+test('every line fits narrow terminals', () => {
+  for (const columns of [20, 40]) {
+    for (const screen of ['start', 'category', 'updates', 'review']) {
+      const lines = render({ ...initial(chosen), screen, chosen: { ...chosen, [azure]: true } }, data, { columns, rows: 30 });
+      assert.ok(lines.every((l) => plain(l).length <= columns - 1), `${screen}@${columns}\n${lines.map(plain).join('\n')}`);
+    }
+  }
+});
+
+test('short terminals scroll the list and keep the cursor row', () => {
+  const keys = [1, 2, 3, 4, 5, 6, 7].map((i) => `p${i}@${M}`);
+  const d = { ...data, pages: [{ id: 'workflow', title: 'Workflows & skills', blurb: 'x '.repeat(30), keys }] };
+  const lines = render({ ...initial({}), screen: 'category', page: 0, cursor: 7 }, d, { columns: 40, rows: 12 });
+  assert.ok(lines.length <= 12, lines.map(plain).join('\n'));
+  assert.match(lines.map(plain).join('\n'), /❯ p7/);
 });

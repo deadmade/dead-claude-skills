@@ -1,6 +1,6 @@
 // The installer's screens as pure functions: state + data in, next state or lines to draw out. ui.mjs runs them.
 import { stripVTControlCharacters, styleText } from 'node:util';
-import { TOGGLES } from './core.mjs';
+import { HINTS, TOGGLES, nameOf } from './core.mjs';
 
 const width = (s) => stripVTControlCharacters(s).length;
 const DANGER = ['strip-defaults', 'clean'];
@@ -118,4 +118,140 @@ export function move(s, key, data) {
     case 'update': return { ...s, skip: { ...s.skip, [row.id]: !s.skip[row.id] } };
     default: return s;
   }
+}
+
+const COLORS = { workflow: 'cyan', lsp: 'yellow', mcp: 'blue', tools: 'green', system: 'magenta', danger: 'red', other: 'white' };
+const LABELS = { ccstatusline: 'status line' };
+const pad = (s, n) => s + ' '.repeat(Math.max(0, n - width(s)));
+const pointer = (on) => (on ? styleText(['bold', 'magenta'], '❯') : ' ');
+// Lines outside the frame obey the same width rule as the frame.
+const fitLine = (l, columns) => (width(l) > columns - 1 ? `${stripVTControlCharacters(l).slice(0, Math.max(columns - 2, 0))}…` : l);
+
+// What the start screen says a page holds after the pending changes.
+function pageValue(page, s, data) {
+  const parts = page.keys.flatMap((k) => {
+    const [want, has] = [!!s.chosen[k], !!data.current[k]];
+    if (page.id === 'danger') return want ? [styleText('red', nameOf(k))] : [];
+    if (TOGGLES.includes(k)) {
+      const text = `${LABELS[k] ?? k} ${want ? 'on' : 'off'}`;
+      return [want === has ? text : styleText(want ? 'green' : 'red', text)];
+    }
+    if (want && has) return [nameOf(k)];
+    if (want) return [styleText('green', `+ ${nameOf(k)}`)];
+    if (has) return [styleText('red', `− ${nameOf(k)}`)];
+    return [];
+  });
+  if (parts.length) return parts.join(parts.some((p) => /^[+−]/.test(stripVTControlCharacters(p))) ? '  ' : ', ');
+  return page.id === 'danger' ? 'off' : 'none';
+}
+
+// The state word for one item on a category screen.
+function stateOf(k, s, data) {
+  const [want, has] = [!!s.chosen[k], !!data.current[k]];
+  if (TOGGLES.includes(k)) {
+    if (want !== has) return styleText(['bold', want ? 'green' : 'red'], want ? 'will turn on' : 'will turn off');
+    return want ? styleText('green', 'on') : 'off';
+  }
+  const v = data.versions[k];
+  if (want && !has) return styleText(['bold', 'green'], 'will install');
+  if (!want && has) return styleText(['bold', 'red'], v ? `will remove (installed ${v})` : 'will remove');
+  if (!has) return 'not installed';
+  const u = data.updates.find((x) => x.id === k);
+  if (u) return styleText('yellow', `outdated ${u.from} → ${u.to}`);
+  return styleText('green', `installed${v ? ` ${v}` : ''}${data.disabled[k] ? ', disabled' : ''}`);
+}
+
+// A window of `size` rows around the cursor.
+function scroll(lines, cursor, size) {
+  if (lines.length <= size) return lines;
+  const start = Math.min(Math.max(0, cursor - size + 1), lines.length - size);
+  return lines.slice(start, start + size);
+}
+
+function startScreen(s, data, columns) {
+  const rows = rowsOf(s, data);
+  const at = (kind, i) => rows[s.cursor]?.kind === kind && (i === undefined || rows[s.cursor].i === i);
+  const titleW = Math.max(...data.pages.map((p) => width(p.title)));
+  const ups = changeList(s, data);
+  const body = [
+    `    ${pad('Core', titleW)}  ${data.core}`,
+    ...data.pages.map((p, i) => {
+      const c = COLORS[p.id] ?? 'white';
+      return `${pointer(at('page', i))} ${styleText(c, '●')} ${styleText(['bold', c], pad(p.title, titleW))}  ${pageValue(p, s, data)}`;
+    }),
+    ...(rows.some((r) => r.kind === 'updates')
+      ? ['', `${pointer(at('updates'))} ${styleText('yellow', ups.update.length ? `↑ ${ups.update.length} updates` : '↑ updates skipped')}`]
+      : []),
+  ];
+  const apply = ups.count ? styleText(['bold', 'green', 'inverse'], ` Apply ${ups.count} changes `) : 'Nothing to change';
+  return [
+    ...frame(`${styleText(['bold', 'magenta'], 'dead-claude-skills')} ${data.version}`, body, { columns }),
+    `${pointer(at('apply'))} ${apply}   ${pointer(at('quit'))} Quit`,
+    '↑↓ move  enter open  esc quit',
+  ];
+}
+
+function listScreen(s, data, { columns, rows: height }) {
+  const inner = Math.max(columns - 1, 8) - 4;
+  const list = rowsOf(s, data);
+  const page = data.pages[s.page];
+  const updates = s.screen === 'updates';
+  const labelW = Math.max(6, ...list.filter((r) => r.kind !== 'back').map((r) => width(nameOf(r.key ?? r.id))));
+  const lines = list.map((r, i) => {
+    const p = pointer(i === s.cursor);
+    if (r.kind === 'back') return `${p} ← Back`;
+    if (r.kind === 'update') {
+      const what = s.skip[r.id] ? 'skip' : styleText('yellow', 'will update');
+      return `${p} ${pad(nameOf(r.id), labelW)}  ${r.from} → ${r.to}  ${what}`;
+    }
+    const name = pad(data.describe(r.key).label, labelW);
+    return `${p} ${page.id === 'danger' ? styleText('red', name) : name}  ${stateOf(r.key, s, data)}`;
+  });
+  const focused = list[s.cursor];
+  const detail = focused?.kind === 'item'
+    ? [data.describe(focused.key).detail, focused.key === 'strip-defaults' && 'one-way, nothing to undo'].filter(Boolean).join(' · ')
+    : '';
+  const head = updates ? [] : [...wrap(page.blurb, inner), ''];
+  const tail = detail ? ['', ...wrap(detail, inner)] : [];
+  // Frame top and bottom, plus the hint line under it.
+  const size = Math.max(1, height - head.length - tail.length - 3);
+  const title = updates ? 'Updates' : styleText(['bold', COLORS[page.id] ?? 'white'], page.title);
+  const hint = updates ? '↑↓ move  enter update/skip  esc back' : '↑↓ move  enter install/remove  esc back';
+  return [...frame(title, [...head, ...scroll(lines, s.cursor, size), ...tail], { columns }), hint];
+}
+
+function reviewScreen(s, data, columns) {
+  const inner = Math.max(columns - 1, 8) - 4;
+  const c = changeList(s, data);
+  const name = (k) => `${nameOf(k)}${data.tokens.includes(k) ? ' (finish in Claude Code)' : ''}`;
+  const nameW = Math.max(0, ...c.update.map((u) => width(nameOf(u.id))));
+  const groups = [
+    ['Install', 'green', c.install.map(name)],
+    ['Remove', 'red', c.remove.map(name)],
+    ['Update', 'yellow', c.update.map((u) => `${pad(nameOf(u.id), nameW)}  ${u.from} → ${u.to}`)],
+    ['Turn on', 'green', c.on.map((k) => LABELS[k] ?? k)],
+    ['Turn off', 'red', c.off.map((k) => LABELS[k] ?? k)],
+    ['Danger', ['bold', 'red'], c.danger.map((k) => `${k}: ${HINTS[k]}`)],
+  ].filter(([, , items]) => items.length);
+  const body = groups.length
+    ? groups.flatMap(([label, color, items]) => items.flatMap((item, i) => wrap(item, Math.max(inner - 10, 4))
+      .map((l, j) => `${pad(i || j ? '' : styleText(color, label), 10)}${l}`)))
+    : ['Nothing to change.'];
+  const hidden = data.hidden.length
+    ? wrap(`Not available on ${data.platform}: ${data.hidden.map((h) => `${nameOf(h.key)} (${h.why})`).join(', ')}`, inner)
+    : [];
+  const choices = [c.count ? `Apply ${c.count} changes` : 'Apply', 'Back', 'Quit']
+    .map((t, i) => `${pointer(i === s.cursor)} ${i === 0 && c.count ? styleText(['bold', 'green'], t) : t}`).join('   ');
+  return [
+    ...frame(styleText('bold', 'This will change'), [...body, '', `Unchanged: ${c.unchanged.installed} installed, ${c.unchanged.notInstalled} not installed`, ...hidden], { columns }),
+    choices,
+  ];
+}
+
+// The lines for state's screen, each at most columns - 1 wide.
+export function render(s, data, { columns, rows }) {
+  const lines = s.screen === 'start' ? startScreen(s, data, columns)
+    : s.screen === 'review' ? reviewScreen(s, data, columns)
+      : listScreen(s, data, { columns, rows });
+  return lines.map((l) => fitLine(l, columns));
 }
