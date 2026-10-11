@@ -28,7 +28,7 @@ const failures = [];
 const done = [];
 
 if (!process.stdin.isTTY || !process.stdout.isTTY) {
-  console.error('Run the installer in a terminal (see the README for the npx line).');
+  console.error('Run this in a terminal: npx --allow-git=root github:deadmade/dead-claude-skills');
   process.exit(1);
 }
 

@@ -44,19 +44,13 @@ jobs:
           path: dist
           merge-multiple: true
 
-      # The installer as an npm tarball, so npx can run it over plain HTTPS on machines where git is blocked.
-      - name: Pack installer
-        run: npm pack --pack-destination dist
-
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cswap=$(jq -r .upstream installer/cswap.json)
-          tgz="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/dead-claude-skills-${GITHUB_REF_NAME#v}.tgz"
           gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes \
-            --notes "Install or update with \`npx github:deadmade/dead-claude-skills#$GITHUB_REF_NAME\`, or \`/plugin update\` in Claude Code.
-          Without git (npx's github: form needs it): \`npx $tgz\`.
+            --notes "Install or update with \`npx --allow-git=root github:deadmade/dead-claude-skills#$GITHUB_REF_NAME\`, or \`/plugin update\` in Claude Code.
 
           brv-*: the binary behind tui-review, for each platform; the installer downloads yours.
           cswap.exe is claude-swap $cswap (https://github.com/realiti4/claude-swap, MIT) compiled with Nuitka for Windows."
