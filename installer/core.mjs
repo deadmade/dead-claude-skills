@@ -315,8 +315,17 @@ const newer = (a, b) => {
   return i >= 0 && x[i] > y[i];
 };
 
+// { name: version } this release ships: a local plugin's plugin.json version (via localVersion(source)), or a url
+// plugin's pinned vX.Y.Z ref. Plugins without either (unpinned url sources) are left out.
+export function shippedVersions(plugins, localVersion) {
+  return Object.fromEntries(plugins.flatMap(({ name, source }) => {
+    const v = typeof source === 'string' ? localVersion(source) : /^v(\d+\.\d+\.\d+)$/.exec(source?.ref ?? '')?.[1];
+    return v ? [[name, v]] : [];
+  }));
+}
+
 // Our installed plugins whose version differs from the one this release ships, once per id. rows: `claude plugin
-// list --json`; shipped: { name: version } of the local plugins. A newer install isn't downgraded.
+// list --json`; shipped: shippedVersions(). A newer install isn't downgraded.
 export function outdated(rows, shipped) {
   const seen = new Set();
   return rows.flatMap(({ id, version }) => {

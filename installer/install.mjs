@@ -12,7 +12,8 @@ import {
   BUNDLE, CLEAN_TARGETS, HINTS, MARKETPLACE, OFFICIAL, TOGGLES, brvAction, brvAsset, bundleIds, categorize, cswapCurrent,
   cswapDownload, dcgCommand, duplicates, foreignMarketplaces, foreignPlugins, retiredPlugins, hasDcgHook, isOurStatusLine, isSandboxOn,
   isStripped, mergeSettings, marketplaceArg, missingBinaries, nameOf, needsToken, optIns, pathWith, pinMarketplace,
-  outdated, planPlugins, resetSettings, safeArg, settingsChange, settingsText, sha256Of, stripDefaults, unavailable,
+  outdated, planPlugins, resetSettings, safeArg, settingsChange, settingsText, sha256Of, shippedVersions, stripDefaults,
+  unavailable,
 } from './core.mjs';
 import { backup, clearTargets, writeAtomic } from './files.mjs';
 import { confirm, line, log, note, progress, screen } from './ui.mjs';
@@ -363,9 +364,8 @@ function option(key) {
   return { label: name, detail };
 }
 
-// Versions this release ships, for the local plugins; what's installed of each option, by name like has().
-const shipped = Object.fromEntries(manifest.plugins.filter((pl) => typeof pl.source === 'string')
-  .map((pl) => [pl.name, tryJson(join(PKG, pl.source, '.claude-plugin', 'plugin.json'))?.version]).filter(([, v]) => v));
+// Versions this release ships; what's installed of each option, by name like has().
+const shipped = shippedVersions(manifest.plugins, (src) => tryJson(join(PKG, src, '.claude-plugin', 'plugin.json'))?.version);
 const rowOf = (key) => rows.find((r) => nameOf(r.id) === nameOf(key));
 const data = {
   version: VERSION,
