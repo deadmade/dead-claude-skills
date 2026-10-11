@@ -40,6 +40,14 @@ test("pin rewrites only the matching entry", () => {
   assert.deepEqual(changed, [`        "ref": "v999.0.0",`, `        "sha": "${sha("f")}"`]);
 });
 
+test("pin works on a CRLF checkout (Windows CI)", () => {
+  const crlf = marketplace.replace(/\r?\n/g, "\r\n");
+  const res = pin(crlf, "DietrichGebert/ponytail", "v999.0.0", sha("f"));
+  const before = crlf.split("\r\n");
+  const changed = res.text.split("\r\n").filter((line, i) => line !== before[i]);
+  assert.deepEqual(changed, [`        "ref": "v999.0.0",`, `        "sha": "${sha("f")}"`]);
+});
+
 test("pin returns undefined for an unknown repo", () => {
   assert.equal(pin(marketplace, "nobody/nothing", "v1.0.0", sha("f")), undefined);
 });

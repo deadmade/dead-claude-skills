@@ -26,7 +26,7 @@ export function newestTag(lsRemote) {
 // entry has no url/ref/sha lines.
 export function pin(text, repo, tag, sha) {
   const url = `https://github.com/${repo}.git`.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
-  const re = new RegExp(`("url": "${url}",\\n\\s*"ref": )"([^"]*)"(,\\n\\s*"sha": )"[^"]*"`);
+  const re = new RegExp(`("url": "${url}",\\r?\\n\\s*"ref": )"([^"]*)"(,\\r?\\n\\s*"sha": )"[^"]*"`);
   const m = re.exec(text);
   if (!m) return undefined;
   return { text: text.replace(re, `$1"${tag}"$3"${sha}"`), old: m[2] };
