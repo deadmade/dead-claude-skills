@@ -1,5 +1,5 @@
 ---
-phase: execute
+phase: finish
 ---
 
 # Installer rewrite: flow
@@ -62,7 +62,29 @@ User: apply all must-fix; delete shrinkwrap (spec edit); keep the Updates screen
 - Spec edits (reopen Gate 1 for these items only): Code section signatures; shrinkwrap deleted; no-downgrade rule.
 
 ## Deviations
+None that change an interface or add a library. Rulings (ledger, `.superpowers/sdd/plan/progress.md`):
+- T2: `wrap()` keeps color only for lines that fit; wrapped lines are plain. `rowsOf` exported; esc on review → start.
+- T4: enter-after-return dropped by a flag, not a time window; ctrl-c via readline's `SIGINT` event.
+- T5: leftover grep scoped to the three UI files; Quit/esc-confirmed/ctrl-c on a screen exit 0, ctrl-c at
+  confirm/line prompts exit 130.
+- T5 Step 8 (real `claude plugin update`) not run: it would modify the user's real plugins and the sandbox denies
+  writes to `~/.claude/plugins`. Handed to the user.
+- Final review fixes: screens fit the terminal height; review lists strip-defaults/clean removals (`data.sweep`);
+  50 ms type-ahead guard in `screen()`; updates of a plugin not in `chosen` no longer counted.
+- Deferred minors: throw on first draw skips cleanup; narrowing resize leaves reflowed lines; "1 changes" plural;
+  applied strip-defaults reads "will turn off"; versionless row renders "undefined → X".
 
 ## Walkthrough
 | spec goal | plan task | file:line | test |
 |---|---|---|---|
+| No npm dependency (clack, shrinkwrap gone) | 5, 6 | `package.json`, `installer/ui.mjs:2-5`, `installer/view.mjs:2-3` | repo checks; `git grep clack` empty |
+| Framed start screen, category values, Core line, Apply/Quit | 2, 3 | `installer/view.mjs:137-205` | start shows kept, pending + and −, toggles and the Apply count; empty categories read none |
+| Keys ↑/↓ enter esc only; esc asks with pending changes | 2, 5 | `installer/view.mjs:101-127`, `installer/install.mjs:407-421` | down/up wrap…; esc on start: quit when idle, ask-quit…; pty run |
+| Category screen: states as words, disabled, description | 3 | `installer/view.mjs:155-169, 207-236` | category states are words; category shows the focused item description |
+| Updates screen, skip, outdated rule (no downgrade) | 1, 2, 3 | `installer/core.mjs:298`, `installer/view.mjs:50-54` | outdated compares our shipped versions…; updates rows toggle skip…; updates screen shows from → to and skip |
+| Review lists only changes (incl. strip/clean removals) | 3 + fix | `installer/view.mjs:238-267`, `installer/install.mjs:401-405` | review lists only non-empty groups…; review lists what strip-defaults sweeps away |
+| `claude plugin update` step | 5 | `installer/install.mjs:471-473` | pty Apply run (log shows `plugin update … --json`) |
+| One line per step; framed notes that wrap; summary ✓/✗ | 4, 5 | `installer/ui.mjs:117-139` | progress turns a throw into failed; frame cuts…, wrap never cuts |
+| Raw mode/cursor restored on every exit; no type-ahead | 4 + fix | `installer/ui.mjs:12-82` | screen resolves on enter and restores…; ctrl-c…; throwing move…; keys typed before a prompt…; pty ctrl-c checks |
+| Fits narrow and short terminals | 3 + fix | `installer/view.mjs:171-180, 269-275` | every line fits narrow terminals; every screen fits short, narrow terminals |
+| README describes the new flow | 6 | `README.md:31-38` | — |
