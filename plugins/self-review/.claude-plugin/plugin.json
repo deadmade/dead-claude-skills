@@ -1,6 +1,6 @@
 {
   "name": "self-review",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "/self-review: review your branch before opening a PR. One command runs a confidence-scored bug pass, a spec and standards pass, and specialist agents, then fixes what you pick.",
   "author": {
     "name": "deadmade",

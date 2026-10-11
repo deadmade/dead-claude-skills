@@ -1,6 +1,6 @@
 {
   "name": "dev-feature",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "/dev-feature: grills you on a feature, has you write the design, then implements against it behind a hook-enforced lock.",
   "author": {
     "name": "deadmade",

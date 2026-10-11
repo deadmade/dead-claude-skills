@@ -1,6 +1,6 @@
 {
   "name": "mcp-github",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "GitHub's hosted MCP server (repos, issues, PRs, Actions, code search). Opt-in per machine; needs a GitHub PAT.",
   "author": {
     "name": "deadmade",
