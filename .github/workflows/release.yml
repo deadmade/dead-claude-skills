@@ -1,7 +1,8 @@
 name: Release
 
 # One release for the whole repo: scripts/release.mjs bumps package.json, the marketplace and every plugin to the
-# same version and tags vX.Y.Z; pushing that tag checks the repo, builds cswap.exe and brv and publishes the release.
+# same version and tags vX.Y.Z; pushing that tag checks the repo, builds brv and cswap.exe (or carries the unchanged
+# cswap.exe over from the latest release) and publishes the release.
 on:
   push:
     tags: ["v*"]
@@ -24,14 +25,55 @@ jobs:
           node --test installer/*.test.mjs
           node --test scripts/dev-feature-guard.test.mjs
 
+  # cswap.exe is claude-swap at the pin in installer/cswap.json: while the pin is unchanged since the latest release, that
+  # release's exe (checked against its .sha256) is carried over instead of compiled again; if that fails, it's built.
+  # A change to build-cswap.yml alone ships with the next pin bump (its PR run builds and smoke-tests it).
+  cswap-reuse:
+    runs-on: ubuntu-latest
+    outputs:
+      reused: ${{ steps.reuse.outputs.reused }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Carry over the latest release's cswap.exe
+        id: reuse
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prev=$(gh release view --json tagName -q .tagName 2>/dev/null || true)
+          if [ -z "$prev" ] || ! git diff --quiet "$prev" HEAD -- installer/cswap.json; then
+            echo "reused=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          mkdir dist
+          if gh release download "$prev" -D dist -p cswap.exe -p cswap.exe.sha256 && (cd dist && sha256sum -c cswap.exe.sha256); then
+            echo "Carried over cswap.exe from $prev" >> "$GITHUB_STEP_SUMMARY"
+            echo "reused=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::couldn't carry over cswap.exe from $prev, building it"
+            echo "reused=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.reuse.outputs.reused == 'true'
+        uses: actions/upload-artifact@v5
+        with:
+          name: cswap-reused
+          path: dist/cswap.exe*
+
   cswap:
+    needs: cswap-reuse
+    if: needs.cswap-reuse.outputs.reused != 'true'
     uses: ./.github/workflows/build-cswap.yml
 
   brv:
     uses: ./.github/workflows/build-brv.yml
 
   publish:
-    needs: [check, cswap, brv]
+    needs: [check, cswap-reuse, cswap, brv]
+    # cswap is skipped when its exe was carried over; any failure still stops the release.
+    if: ${{ !cancelled() && !failure() }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
