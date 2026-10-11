@@ -5,7 +5,7 @@ import {
   optIns, needsToken, planPlugins, duplicates, mergeSettings, safeArg, missingBinaries, SECRET_DENIES, isSandboxOn,
   hasDcgHook, dcgCommand, bundleIds, foreignPlugins, foreignMarketplaces, stripDefaults, isStripped, resetSettings, CLEAN_TARGETS,
   marketplaceArg, pinMarketplace,
-  cswapDownload, cswapCurrent, pathWith, brvAsset, sha256Of, brvAction,
+  cswapDownload, cswapCurrent, pathWith, brvAsset, sha256Of, brvAction, CATEGORIES, TOGGLES, categorize, unavailable,
 } from './core.mjs';
 
 const json = (p) => JSON.parse(readFileSync(new URL(`../${p}`, import.meta.url), 'utf8'));
@@ -253,4 +253,29 @@ test('brv checksum lines and what to do about brv', () => {
   assert.equal(at({ installed: '0.1.0' }), 'download');
   assert.equal(at({}), 'download');
   assert.equal(at({ supported: false }), 'unsupported');
+});
+
+test('every opt-in and toggle is on exactly one page', () => {
+  const keys = [...optIns(marketplace, bundle), ...TOGGLES];
+  const pages = categorize(keys);
+  assert.deepEqual(pages.flatMap((p) => p.keys).sort(), [...keys].sort());
+  assert.ok(!pages.some((p) => p.id === 'other'), 'every real opt-in has a category');
+  const listed = CATEGORIES.flatMap((c) => c.keys);
+  assert.equal(new Set(listed).size, listed.length);
+});
+
+test('an uncategorized plugin lands in Other, empty pages are dropped', () => {
+  const pages = categorize([`new-thing@${M}`, 'sandbox']);
+  assert.deepEqual(pages.map((p) => [p.id, p.keys]), [['system', ['sandbox']], ['other', [`new-thing@${M}`]]]);
+});
+
+test('options hidden per platform', () => {
+  assert.equal(unavailable('sandbox', 'win32', 'x64', '1.0.0'), 'needs WSL2');
+  assert.ok(unavailable(`nix-lsp@${M}`, 'win32', 'x64', '1.0.0'));
+  assert.equal(unavailable(`tui-review@${M}`, 'win32', 'x64', '1.0.0'), undefined);
+  assert.ok(unavailable(`tui-review@${M}`, 'win32', 'arm64', '1.0.0'));
+  for (const k of ['sandbox', `nix-lsp@${M}`, `tui-review@${M}`, `cswap@${M}`, 'dcg']) {
+    assert.equal(unavailable(k, 'linux', 'x64', '1.0.0'), undefined);
+    assert.equal(unavailable(k, 'darwin', 'arm64', '1.0.0'), undefined);
+  }
 });

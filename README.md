@@ -28,12 +28,19 @@ since npm 12, which refuses git packages with `EALLOWGIT` otherwise, and older n
 `/plugin marketplace add deadmade/dead-claude-skills` (plus `anthropics/claude-plugins-official` if you removed it)
 then `/plugin install dead-skills@dead-claude-skills`.
 
+The installer walks through one page per category (workflows & skills, language servers, integrations, tools,
+system, danger zone), then shows a review of what gets installed, removed or kept, where you can go back to any
+category before anything runs. Options that can't work on your OS or CPU (the sandbox and nix-lsp on Windows,
+tui-review where no `brv` build exists) are left off the pages unless they're already on; the review lists them.
+The UI is [`@clack/prompts`](https://github.com/bombshell-dev/clack), pinned with its dependencies in
+`npm-shrinkwrap.json`.
+
 The installer pins the marketplace to its own release: installer vX.Y.Z adds `deadmade/dead-claude-skills@vX.Y.Z`
 and sets that ref in the marketplace's `extraKnownMarketplaces` entry, so the plugins always match the installer that
 ran. `/plugin update` and auto-update stay on that tag; to update, run the command above again. The marketplace added
 by hand with `/plugin marketplace add` tracks master instead.
 
-The installer has two optional rows (also `--strip-defaults` / `--clean`) that take over the whole machine:
+The danger zone page has two options (also `--strip-defaults` / `--clean`) that take over the whole machine:
 
 - **strip-defaults** uninstalls every plugin and removes every marketplace not from here, keeping
   `claude-plugins-official` and only the plugins above from it. It also sets `disableClaudeAiConnectors`,
