@@ -401,8 +401,7 @@ function option(key) {
     key.endsWith(`@${OFFICIAL}`) && `from ${OFFICIAL}`,
   ].filter(Boolean);
   const detail = [HINTS[name] ?? describe[name] ?? '', ...notes].filter(Boolean).join(' · ');
-  const installed = !TOGGLES.includes(key) && current[key];
-  return { label: installed ? `${name} ${dim('(installed)')}` : name, detail };
+  return { label: name, detail };
 }
 
 // The review lines for one page: + added, − removed, · kept.
@@ -421,7 +420,7 @@ p.note(`${bundle.dependencies.map(nameOf).join(', ')}\n${dim('plus the global ru
   `${BUNDLE} is always installed`);
 let tab = 0;
 for (;;) {
-  const picked = must(await chooseTabs({ pages, chosen, tab, describe: option }));
+  const picked = must(await chooseTabs({ pages, chosen, current, tab, describe: option }));
   Object.assign(chosen, picked.chosen);
   tab = picked.tab;
   const review = pages.map((c) => ({ title: c.title, lines: changes(c) })).filter((r) => r.lines.length);

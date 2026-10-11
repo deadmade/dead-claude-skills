@@ -32,16 +32,18 @@ everything, then the existing review.
   ─────────────────────────────────────────────────────────────────
   MCP servers for the services you work with.
 
-  ❯ ◼ mcp-github  (installed)
-    ◻ mcp-azure
-    ◻ atlassian
+  ❯ ◼ mcp-github
+    + mcp-azure
+    − atlassian
 
   GitHub's MCP server. Needs a fine-grained PAT you enter in Claude Code.
 
   ←/→ category · ↑/↓ move · space select · a all · enter review · esc quit
 ```
 - Tab bar: active tab bold + inverse; each tab shows its selected count when > 0.
-- Category blurb under the bar; item names in normal color; `(installed)`, separators dim.
+- Category blurb under the bar; item names in normal color; separators dim.
+- The box shows each item against what's installed now: green ◼ kept, green + will install, red − will uninstall,
+  dim ◻ off. No `(installed)` suffix: a tag at the line end starts at a different column each line and is hard to scan.
 - Detail line: full description of the focused item (marketplace description first sentence / `HINTS`, plus the
   existing notes "token entered in Claude Code", "from claude-plugins-official") in normal color. No clipping.
 - Danger tab items render red.

@@ -76,6 +76,11 @@ test('render colors danger items red', () => {
   assert.ok(draw({ tab: 2 }).includes('\x1b[31mclean'));
 });
 
+test('render marks kept, added and removed against current', () => {
+  const out = plain(draw({ tab: 1, chosen: { m1: true, m2: true } }, { current: { m1: true, m3: true } }));
+  for (const l of ['◼ m1', '+ m2', '− m3']) assert.ok(out.includes(l), l);
+});
+
 test('render fits short terminals', () => {
   const columns = 40;
   const rows = 18;

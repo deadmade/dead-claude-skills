@@ -9,6 +9,10 @@ const TITLE = 'Choose what to install';
 const KEYS = ['←/→ category', '↑/↓ move', 'space select', 'a all', 'enter review', 'esc quit'];
 
 const wrap = (i, n) => (i + n) % n;
+// Pending changes against what's installed now; clack's ASCII fallback for selected is already [+].
+const ascii = S_CHECKBOX_SELECTED !== '◼';
+const ADD = ascii ? '[n]' : '+';
+const DROP = ascii ? '[-]' : '−';
 
 // state: { tab, cursor, chosen }; pages: categorize() output. Returns a new state.
 export function move(state, action, pages) {
@@ -39,8 +43,8 @@ const dim = (s) => styleText('dim', s);
 const width = (s) => stripVTControlCharacters(s).length;
 
 // The frame for clack's state `status`: the one-line summary once submitted or cancelled, else the chooser.
-// describe(key) -> { label, detail }.
-export function render(state, pages, { columns, rows, describe, status }) {
+// describe(key) -> { label, detail }. current: what's installed now; the box shows kept, add or remove against it.
+export function render(state, pages, { columns, rows, describe, status, current = {} }) {
   const { tab, cursor, chosen } = state;
   const picked = pages.flatMap((p) => p.keys).filter((k) => chosen[k]).length;
   if (status === 'submit' || status === 'cancel') {
@@ -60,7 +64,8 @@ export function render(state, pages, { columns, rows, describe, status }) {
   const head = [tabs, dim(S_BAR_H.repeat(Math.max(1, Math.min(width(tabs), columns - 3)))), page.blurb, ''];
   const tail = ['', describe(page.keys[cursor]).detail, '', footer];
   const style = (key, active) => {
-    const box = chosen[key] ? styleText('green', S_CHECKBOX_SELECTED)
+    const box = chosen[key] ? styleText('green', current[key] ? S_CHECKBOX_SELECTED : ADD)
+      : current[key] ? styleText('red', DROP)
       : active ? styleText('cyan', S_CHECKBOX_ACTIVE) : dim(S_CHECKBOX_INACTIVE);
     const { label } = describe(key);
     return `${active ? styleText('cyan', '❯') : ' '} ${box} ${page.bulk === false ? styleText('red', label) : label}`;
@@ -77,13 +82,13 @@ export function render(state, pages, { columns, rows, describe, status }) {
 const MOVES = ['left', 'right', 'up', 'down', 'space'];
 
 // Runs the chooser starting on `tab` with `chosen`. Resolves { chosen, tab }, or clack's cancel symbol on esc/ctrl-c.
-export async function chooseTabs({ pages, chosen, tab = 0, describe, input, output }) {
+export async function chooseTabs({ pages, chosen, current, tab = 0, describe, input, output }) {
   let s = { tab, cursor: 0, chosen };
   const pr = new Prompt({
     ...(input && { input }),
     ...(output && { output }),
     render() {
-      return render(s, pages, { columns: this.output.columns ?? 80, rows: this.output.rows ?? 24, describe, status: this.state });
+      return render(s, pages, { columns: this.output.columns ?? 80, rows: this.output.rows ?? 24, describe, status: this.state, current });
     },
   }, false);
   pr.on('cursor', (a) => { if (MOVES.includes(a)) s = move(s, a, pages); });
