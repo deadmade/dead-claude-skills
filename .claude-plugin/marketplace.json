@@ -15,7 +15,7 @@
   "plugins": [
     {
       "name": "dead-skills",
-      "description": "Default bundle: global instructions and personal agents, and pulls in the core plugins of this marketplace as dependencies.",
+      "description": "Default bundle: global instructions, and pulls in the core plugins of this marketplace as dependencies.",
       "source": "./plugins/dead-skills",
       "category": "productivity"
     },

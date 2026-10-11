@@ -6,7 +6,7 @@ binary chunk files `brv` writes to disk, so a 100k-line PR costs the same memory
 
 ## Install
 
-    /plugin install tui-review --marketplace deadmade/dead-claude-skills
+    /plugin install tui-review@dead-claude-skills
 
 It needs `brv`. The installer (`npx --allow-git=root github:deadmade/dead-claude-skills#semver:*`) downloads the build for your machine
 into `~/.claude/bin` and sets the plugin's `brvPath`, unless a `brv` is already on PATH. By hand: unpack the `brv-*`
@@ -78,7 +78,7 @@ The status line shows `load · paint · chunks` for the last frame.
     brv gen [--lines N] [--out DIR]                      a synthetic review cache (what /tui-review demo runs)
     brv bench [--repo DIR] [--base REF]                  how long a review of a real repository takes, cold and cached
 
-Reviews are cached in `<git dir>/brv/`, keyed by merge-base, HEAD and base; the five most recent are kept.
+Reviews are cached in `<git common dir>/brv/` (shared by a repo's worktrees), keyed by merge-base, HEAD and base; the five most recent are kept.
 
 `nix develop` (or direnv) gives the Rust toolchain: cargo, clippy, rustfmt and rust-analyzer.
 
