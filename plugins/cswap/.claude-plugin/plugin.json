@@ -1,6 +1,6 @@
 {
   "name": "cswap",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "claude-swap inside Claude Code: an accounts pane, /swap, a usage status line and opt-in auto-switching. Needs the cswap binary.",
   "author": {
     "name": "deadmade",
