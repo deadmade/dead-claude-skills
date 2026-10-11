@@ -21,11 +21,17 @@ It's built for me; use it if it fits, but expect it to change without notice.
 
 ## Install
 
-    npx github:deadmade/dead-claude-skills#semver:*
+    npx --allow-git=root github:deadmade/dead-claude-skills#semver:*
 
-(`#semver:*` runs the installer from the newest release; without it you get master) or
+(`#semver:*` runs the installer from the newest release; without it you get master; `--allow-git=root` is needed
+since npm 12, which refuses git packages with `EALLOWGIT` otherwise, and older npm ignores it) or
 `/plugin marketplace add deadmade/dead-claude-skills` (plus `anthropics/claude-plugins-official` if you removed it)
 then `/plugin install dead-skills@dead-claude-skills`.
+
+The installer pins the marketplace to its own release: installer vX.Y.Z adds `deadmade/dead-claude-skills@vX.Y.Z`
+and sets that ref in the marketplace's `extraKnownMarketplaces` entry, so the plugins always match the installer that
+ran. `/plugin update` and auto-update stay on that tag; to update, run the command above again. The marketplace added
+by hand with `/plugin marketplace add` tracks master instead.
 
 The installer has two optional rows (also `--strip-defaults` / `--clean`) that take over the whole machine:
 

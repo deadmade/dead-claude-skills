@@ -8,7 +8,7 @@ binary chunk files `brv` writes to disk, so a 100k-line PR costs the same memory
 
     /plugin install tui-review --marketplace deadmade/dead-claude-skills
 
-It needs `brv`. The installer (`npx github:deadmade/dead-claude-skills#semver:*`) downloads the build for your machine
+It needs `brv`. The installer (`npx --allow-git=root github:deadmade/dead-claude-skills#semver:*`) downloads the build for your machine
 into `~/.claude/bin` and sets the plugin's `brvPath`, unless a `brv` is already on PATH. By hand: unpack the `brv-*`
 archive for your platform from the [releases](https://github.com/deadmade/dead-claude-skills/releases), or build it,
 and put it on PATH or set its path with `/plugin configure tui-review`:
