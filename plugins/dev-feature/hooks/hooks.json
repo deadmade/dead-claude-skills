@@ -4,7 +4,9 @@
     "PreToolUse": [
       {
         "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash",
-        "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/dev-feature-guard.mjs\" pre-tool" }]
+        "hooks": [
+          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/dev-feature-guard.mjs\" pre-tool" }
+        ]
       }
     ],
     "UserPromptSubmit": [

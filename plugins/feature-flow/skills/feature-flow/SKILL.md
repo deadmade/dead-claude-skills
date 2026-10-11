@@ -1,8 +1,8 @@
 ---
 name: feature-flow
-description: "Build a feature through the whole skill chain: ground in the code and in how other projects solve it, brainstorm with options, grill the spec with domain docs and ADRs, write the plan, evaluate it adversarially, then execute, verify and finish. Two approval gates, no lock. Use for /feature-flow <what to build>; no argument resumes the active feature."
+description: 'Build a feature through the whole skill chain: ground in the code and in how other projects solve it, brainstorm with options, grill the spec with domain docs and ADRs, write the plan, evaluate it adversarially, then execute, verify and finish. Two approval gates, no lock. Use for /feature-flow <what to build>; no argument resumes the active feature.'
 disable-model-invocation: true
-argument-hint: "What do you want to build?"
+argument-hint: 'What do you want to build?'
 ---
 
 # feature-flow
@@ -11,15 +11,15 @@ One entry point that runs the skills this marketplace already ships, in order, a
 Claude proposes and recommends; the user decides. (For the strict mode where the user writes the design and Claude
 never suggests answers, that's `/dev-feature`.)
 
-| Phase | Runs | Output |
-|---|---|---|
-| 1 Ground | pstack `how` or Explore agents, a prior-art agent | grounding notes, prior-art report |
-| 2 Brainstorm | superpowers `brainstorming` | spec |
-| 3 Grill | mattpocock `grilling` + `domain-modeling` | sharper spec, `CONTEXT.md`, ADRs. **Gate 1** |
-| 4 Plan | superpowers `writing-plans` | plan |
-| 5 Evaluate | reviewer subagents per plan-review.md | revised plan. **Gate 2** |
-| 6 Execute | superpowers `subagent-driven-development` or `executing-plans` | code, tests |
-| 7 Finish | `verification-before-completion`, `finishing-a-development-branch` | walkthrough, branch handled |
+| Phase        | Runs                                                               | Output                                       |
+| ------------ | ------------------------------------------------------------------ | -------------------------------------------- |
+| 1 Ground     | pstack `how` or Explore agents, a prior-art agent                  | grounding notes, prior-art report            |
+| 2 Brainstorm | superpowers `brainstorming`                                        | spec                                         |
+| 3 Grill      | mattpocock `grilling` + `domain-modeling`                          | sharper spec, `CONTEXT.md`, ADRs. **Gate 1** |
+| 4 Plan       | superpowers `writing-plans`                                        | plan                                         |
+| 5 Evaluate   | reviewer subagents per plan-review.md                              | revised plan. **Gate 2**                     |
+| 6 Execute    | superpowers `subagent-driven-development` or `executing-plans`     | code, tests                                  |
+| 7 Finish     | `verification-before-completion`, `finishing-a-development-branch` | walkthrough, branch handled                  |
 
 ## Rules for the whole run
 
@@ -65,7 +65,7 @@ doesn't need to offer recon of the codebase, and the web recon is already runnin
 
 - **Options.** Brainstorming wants the user describing before seeing options; keep that. Once the "how it gets made"
   question comes up, present the approaches from the prior-art report: per option, the shape in two lines, who does
-  it this way (links), trade-offs for *this* codebase, rough effort. End with your recommendation and why. The user
+  it this way (links), trade-offs for _this_ codebase, rough effort. End with your recommendation and why. The user
   picks; record the choice and the rejected options in flow.md under **Options**.
 - **Size.** If brainstorming sizes it as a quick task or small change, say this flow is overkill and offer to drop
   out of it. If the user agrees, set `phase: done` with a note and do it the normal way.

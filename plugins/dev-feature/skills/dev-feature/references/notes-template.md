@@ -17,24 +17,30 @@ verdict: pending
 # <Feature>: notes
 
 ## Intent
+
 <!-- Decisions from the intent grill; the confirmed summary. -->
 
 ## Later
+
 <!-- Other slices, out-of-scope items, tangents. -->
 
 ## Sources
-| id | source (title § section) | url or file:line | used for |
-|---|---|---|---|
+
+| id  | source (title § section) | url or file:line | used for |
+| --- | ------------------------ | ---------------- | -------- |
 
 ## What matters
-| id | item | critical | source |
-|---|---|---|---|
+
+| id  | item | critical | source |
+| --- | ---- | -------- | ------ |
 
 ## Understanding grill
-| Q | question | source | answer (summary) | grade |
-|---|---|---|---|---|
+
+| Q   | question | source | answer (summary) | grade |
+| --- | -------- | ------ | ---------------- | ----- |
 
 ## Verdict
+
 <!-- Makes sense / feasible / ready, each with reasons and sources. Not ready: gaps + learning sources. -->
 
 ## Critique rounds
@@ -42,6 +48,7 @@ verdict: pending
 ## Design grill
 
 ## Implementation
+
 <!-- Slice list, then one report per slice. -->
 
 ## Deviations

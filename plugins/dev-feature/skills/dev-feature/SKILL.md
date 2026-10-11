@@ -2,7 +2,7 @@
 name: dev-feature
 description: "Build a feature without losing touch with the code: grill the developer on intent and understanding, refuse when they aren't ready, have them write the structure, then implement fast against the approved design. A hook locks code edits until the user types 'approve design'. Use for /dev-feature <what to build>; no argument resumes the active feature."
 disable-model-invocation: true
-argument-hint: "What do you want to build?"
+argument-hint: 'What do you want to build?'
 ---
 
 # dev-feature

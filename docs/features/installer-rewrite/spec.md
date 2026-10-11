@@ -3,6 +3,7 @@
 Approved 2026-10-11 (Gate 1).
 
 ## Context
+
 The installer's UI is `@clack/prompts` 1.8.1 + `@clack/core` 1.5.1 (the package's only dependencies, plus their
 transitive `sisteransi`, `fast-wrap-ansi`, …). The user wants no npm dependency an attacker could compromise, and a
 flow that is readable: today's tabbed checkbox chooser (`installer/tabs.mjs`) packs "installed" and "selected" into one
@@ -13,6 +14,7 @@ Goal: rebuild the UI on Node's stdlib only, as a framed start screen (mockup A2)
 category, with versions and pending updates, and a review that lists only what changes.
 
 ## Grounding
+
 - `installer/core.mjs`: pure decisions (`CATEGORIES`, `categorize`, `HINTS`, `TOGGLES`, `unavailable`, `planPlugins`, …),
   no deps; stays as is apart from the additions below.
 - `installer/install.mjs`: I/O. clack is used for intro/outro, spinners, notes, `log.*`, `confirm`, `select`, `text`
@@ -26,6 +28,7 @@ category, with versions and pending updates, and a review that lists only what c
 - `npm-shrinkwrap.json` is read by `scripts/release.mjs` and `scripts/check-repo.mjs` (version lines only).
 
 ## Prior art (fetched this session)
+
 - State as one line per setting with its current value: archinstall's main menu
   ([global_menu.py](https://raw.githubusercontent.com/archlinux/archinstall/master/archinstall/lib/global_menu.py)).
 - State as words/versions, not glyphs: rustup `(installed)`, Homebrew `jq 1.8.1 -> 1.8.2`
@@ -41,6 +44,7 @@ category, with versions and pending updates, and a review that lists only what c
 ## Spec
 
 ### Start screen
+
 ```
 ╭─ dead-claude-skills 0.1.1 ──────────────────────────╮
 │                                                     │
@@ -56,6 +60,7 @@ category, with versions and pending updates, and a review that lists only what c
 ╰─────────────────────────────────────────────────────╯
    Apply 7 changes   Quit                ↑↓  enter  esc
 ```
+
 - Rounded frame in the accent color (magenta). Title: name + version.
 - One row per category from `categorize()` (hidden options already filtered). Each category has its own color for
   dot and name; Danger zone is red. Value column: what's on after the pending changes. Unchanged items appear
@@ -69,6 +74,7 @@ category, with versions and pending updates, and a review that lists only what c
 - Value column too long for the width → cut with `…`. Frame always fits the terminal width; it's redrawn on resize.
 
 ### Keys (every screen)
+
 - ↑/↓ move (wraps over the selectable rows: categories, Updates, Apply, Quit).
 - enter: on a category → its screen; on Updates → updates screen; on Apply → review; on Quit → quit.
 - esc: on a sub-screen → back to the start screen; on the start screen → quit, but with changes pending it first
@@ -77,6 +83,7 @@ category, with versions and pending updates, and a review that lists only what c
 - Quit before Apply: `Cancelled before installing anything.`, exit 0.
 
 ### Category screen
+
 ```
 ╭─ Integrations ──────────────────────────────────────╮
 │ MCP servers for the services you work with.         │
@@ -91,6 +98,7 @@ category, with versions and pending updates, and a review that lists only what c
 ╰─────────────────────────────────────────────────────╯
    ↑↓ move   enter install/remove   esc back
 ```
+
 - The frame and category color match the start screen. The rows are `← Back` followed by the category's items.
 - Each item's state is a word, with color added:
   - `installed 0.1.1` and `on` are green.
@@ -110,6 +118,7 @@ category, with versions and pending updates, and a review that lists only what c
 - The list scrolls when the terminal is too short.
 
 ### Updates screen
+
 - Same frame. One row per outdated plugin: `cswap  0.1.0 → 0.1.1  will update`. Enter toggles the row to
   `skip`. All rows start as `will update`.
 - Outdated means a plugin from this repo (shipped `plugin.json` exists) is installed and selected, and its installed
@@ -118,6 +127,7 @@ category, with versions and pending updates, and a review that lists only what c
   outdated.
 
 ### Review screen (Apply)
+
 ```
 ╭─ This will change ──────────────────────────────────╮
 │ Install   mcp-azure                                 │
@@ -132,6 +142,7 @@ category, with versions and pending updates, and a review that lists only what c
 ╰─────────────────────────────────────────────────────╯
  ❯ Apply 7 changes    Back    Quit
 ```
+
 - Only the change groups that have entries are listed. Install and Turn on are green, Remove and Turn off red,
   Update yellow, Danger red and bold.
 - Tokens: an install that needs a token reads `mcp-github (finish in Claude Code)`.
@@ -139,6 +150,7 @@ category, with versions and pending updates, and a review that lists only what c
   start screen with all picks kept.
 
 ### Running
+
 - One line per step, no animation: `Installing mcp-azure … done` with `done` in green, or `failed` in red and the reason
   on the next line. Same for uninstall, update, prune, brv/cswap download, marketplace add.
 - The existing yes/no questions (write settings.json changes, run dcg's installer, download cswap.exe, uninstall
@@ -149,10 +161,12 @@ category, with versions and pending updates, and a review that lists only what c
   binaries and the restart hint as today.
 
 ### Updating plugins
+
 - After installs and uninstalls, each plugin left on Updates runs `claude plugin update <id>`. The result is
   recorded in `done` and `failures` like the other steps.
 
 ### Terminal
+
 - Colors: `util.styleText` with the 16 standard ANSI colors only, so the terminal theme decides the shades.
   No dim/grey anywhere.
 - Unicode frame and symbols always (no ASCII fallback, no NO_COLOR handling beyond what `styleText` does).
@@ -164,7 +178,9 @@ category, with versions and pending updates, and a review that lists only what c
 - Not a TTY: exits with the same error as today.
 
 ### Code
+
 (Amended 2026-10-11 after plan review: signatures from the plan; shrinkwrap deleted.)
+
 - `installer/ui.mjs` (new), the only code touching the TTY: `screen(state, { move, render }, io)`,
   `confirm(message, initial, io)` (built on `screen`), `line(message, io)`, `note(title, lines)` (wraps, never cuts),
   `progress(label, fn)`, `log(kind, text)`.
@@ -184,6 +200,7 @@ category, with versions and pending updates, and a review that lists only what c
 - README installer paragraph rewritten (it currently names `@clack/prompts`).
 
 ### Testing
+
 - `installer/view.test.mjs` (`node:test`, `FORCE_COLOR=1` for color asserts):
   - start screen values with pending + and −, and `none` for empty categories
   - the Apply count
@@ -201,6 +218,7 @@ category, with versions and pending updates, and a review that lists only what c
   were made. Repeat at 40 columns.
 
 ### Out of scope
+
 - Screen-reader / line-by-line mode, `--status`, `--add/--remove` flags (offered, not picked).
 - NO_COLOR, `TERM=dumb`, ASCII fallback (user picked "always Unicode + color").
 - Updating url-sourced and official plugins (no version to compare).

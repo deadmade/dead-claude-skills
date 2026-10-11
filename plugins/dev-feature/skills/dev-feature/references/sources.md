@@ -17,8 +17,8 @@
 
 ## In notes
 
-| id | source (title § section) | url or file:line | used for |
-|---|---|---|---|
+| id  | source (title § section) | url or file:line | used for |
+| --- | ------------------------ | ---------------- | -------- |
 
 What-matters items and grill questions refer to these ids.
 

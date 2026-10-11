@@ -2,7 +2,7 @@ name: Sync mattpocock-picks
 
 on:
   schedule:
-    - cron: "15 6 * * 1" # Mondays 06:15 UTC
+    - cron: '15 6 * * 1' # Mondays 06:15 UTC
   workflow_dispatch:
 
 permissions:
@@ -60,8 +60,8 @@ jobs:
         with:
           branch: sync/mattpocock-picks
           delete-branch: true
-          commit-message: "Sync mattpocock-picks to ${{ steps.check.outputs.sha }}"
-          title: "Sync mattpocock-picks to ${{ steps.check.outputs.sha }}"
+          commit-message: 'Sync mattpocock-picks to ${{ steps.check.outputs.sha }}'
+          title: 'Sync mattpocock-picks to ${{ steps.check.outputs.sha }}'
           body: |
             Automated sync of the curated skills from https://github.com/mattpocock/skills at
             https://github.com/mattpocock/skills/commit/${{ steps.check.outputs.sha }}.

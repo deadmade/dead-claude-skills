@@ -1,14 +1,14 @@
 // Turns a `brv gen` cache into tests/fixture.gen.ts, since plugin tests have no file system. Not committed:
 //   cargo run --release --manifest-path brv/Cargo.toml -- gen --out <dir> && node tests/make-fixture.mjs <dir>
-import { readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
-const dir = process.argv[2]
-if (!dir) throw new Error('usage: node tests/make-fixture.mjs <brv gen output dir>')
-const b64 = name => readFileSync(join(dir, name)).toString('base64')
-const chunk = (i, ext) => `${String(i).padStart(4, '0')}.${ext}`
-const CHUNKS = 3
-const list = ext => Array.from({ length: CHUNKS }, (_, i) => `  '${b64(chunk(i, ext))}',`).join('\n')
+const dir = process.argv[2];
+if (!dir) throw new Error('usage: node tests/make-fixture.mjs <brv gen output dir>');
+const b64 = (name) => readFileSync(join(dir, name)).toString('base64');
+const chunk = (i, ext) => `${String(i).padStart(4, '0')}.${ext}`;
+const CHUNKS = 3;
+const list = (ext) => Array.from({ length: CHUNKS }, (_, i) => `  '${b64(chunk(i, ext))}',`).join('\n');
 
 writeFileSync(
   new URL('./fixture.gen.ts', import.meta.url),
@@ -21,4 +21,4 @@ export const hl: readonly string[] = [
 ${list('hl')}
 ]
 `,
-)
+);

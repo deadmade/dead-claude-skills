@@ -39,20 +39,22 @@ a plain `@clack/core` `Prompt` wired to them. `installer/install.mjs` swaps its 
 ### Task 1: `move`, the pure state transition (+ `bulk` flag)
 
 **Files:**
+
 - Create: `installer/tabs.mjs`
 - Modify: `installer/core.mjs:251` (Danger entry of `CATEGORIES`), `installer/core.test.mjs`
 - Test: `installer/tabs.test.mjs`
 
 **Interfaces:**
+
 - Produces: `move(state, action, pages) -> state`, `state = { tab: number, cursor: number, chosen: Record<string, boolean> }`,
   `action ∈ 'left' | 'right' | 'up' | 'down' | 'space' | 'all'`, `pages` = `categorize()` output
   (`[{ id, title, blurb, keys, bulk? }]`). Returns a new state object (a new `chosen` when it changes).
 - `CATEGORIES` Danger entry gains `bulk: false`; `categorize()` already spreads it through.
 
 - [ ] **Step 1: Write the failing tests.** In `core.test.mjs`: `categorize keeps bulk:false on danger` —
-  `categorize(['strip-defaults','clean']).find(c => c.id === 'danger').bulk === false`.
-  In `installer/tabs.test.mjs`, fixture
-  `const pages = [{ id: 'workflow', title: 'Workflows & skills', blurb: 'B1', keys: ['a1','a2','a3','a4','a5','a6','a7'] }, { id: 'mcp', title: 'Integrations', blurb: 'B2', keys: ['m1','m2','m3'] }, { id: 'danger', title: 'Danger zone', blurb: 'B3', keys: ['strip-defaults','clean'], bulk: false }]`:
+      `categorize(['strip-defaults','clean']).find(c => c.id === 'danger').bulk === false`.
+      In `installer/tabs.test.mjs`, fixture
+      `const pages = [{ id: 'workflow', title: 'Workflows & skills', blurb: 'B1', keys: ['a1','a2','a3','a4','a5','a6','a7'] }, { id: 'mcp', title: 'Integrations', blurb: 'B2', keys: ['m1','m2','m3'] }, { id: 'danger', title: 'Danger zone', blurb: 'B3', keys: ['strip-defaults','clean'], bulk: false }]`:
   - `move tabs wrap`: `{tab:0}` `'left'` → tab 2; `{tab:2}` `'right'` → tab 0.
   - `move clamps cursor on tab switch`: `{tab:0,cursor:6}` `'right'` → `{tab:1,cursor:2}`.
   - `move up/down wrap`: `{tab:1,cursor:0}` `'up'` → cursor 2; `{tab:1,cursor:2}` `'down'` → cursor 0.
@@ -63,7 +65,7 @@ a plain `@clack/core` `Prompt` wired to them. `installer/install.mjs` swaps its 
 - [ ] **Step 2: Run** `node --test installer/*.test.mjs` — Expected: FAIL (`move` not exported, `bulk` undefined).
 
 - [ ] **Step 3: Implement** `bulk: false` on the Danger entry, and `export function move(state, action, pages)` in
-  `installer/tabs.mjs` (header comment: `// The installer's tabbed chooser: pure state and render, plus the clack prompt that runs them.`).
+      `installer/tabs.mjs` (header comment: `// The installer's tabbed chooser: pure state and render, plus the clack prompt that runs them.`).
 
 - [ ] **Step 4: Run** `node --test installer/*.test.mjs` — Expected: PASS.
 
@@ -72,10 +74,12 @@ a plain `@clack/core` `Prompt` wired to them. `installer/install.mjs` swaps its 
 ### Task 2: `render`, the pure frame
 
 **Files:**
+
 - Modify: `installer/tabs.mjs`
 - Test: `installer/tabs.test.mjs`
 
 **Interfaces:**
+
 - Consumes: `state`, `pages` from Task 1.
 - Produces: `render(state, pages, { columns, rows, describe, status }) -> string`.
   `describe(key) -> { label: string, detail: string }` (label may carry styling). `status` is clack's state;
@@ -83,7 +87,7 @@ a plain `@clack/core` `Prompt` wired to them. `installer/install.mjs` swaps its 
 
 Layout (active), top to bottom: `symbol(status)` from `@clack/prompts` + bold `Choose what to install`; tab bar;
 `S_BAR_H` rule; page blurb; blank; the list; blank; focused item's `detail`; blank; footer. Tab bar entry: `title`
-plus ` ${n}` when n > 0 selected; active one `styleText(['bold','inverse'], …)`; joined with dim ` │ `. If the bar's
+plus ` ${n}` when n > 0 selected; active one `styleText(['bold','inverse'], …)`; joined with dim `│`. If the bar's
 plain width (`stripVTControlCharacters`) exceeds `columns - 2`, use each title's first word. List via
 `limitOptions({ cursor, options: keys, style, output: { columns, rows }, rowPadding })` with
 `S_CHECKBOX_ACTIVE / SELECTED / INACTIVE`, `❯ ` on the cursor line, red labels on a `bulk: false` page;
@@ -110,10 +114,12 @@ Submit/cancel frame: one line, `symbol(status)` + `Choose what to install` + dim
 ### Task 3: `chooseTabs`, the clack prompt
 
 **Files:**
+
 - Modify: `installer/tabs.mjs`, `package.json`, `npm-shrinkwrap.json`
 - Test: `installer/tabs.test.mjs`
 
 **Interfaces:**
+
 - Consumes: `move`, `render`.
 - Produces: `chooseTabs({ pages, chosen, tab = 0, describe, input?, output? }) -> Promise<{ chosen, tab } | symbol>`
   (cancel symbol from `@clack/core`, same one `p.isCancel` checks).
@@ -125,11 +131,11 @@ How: no subclass. Keep `let s = { tab, cursor: 0, chosen }` in a closure;
 `pr.on('key', ch => ch === 'a' && …)` → `'all'`. `const r = await pr.prompt(); return isCancel(r) ? r : { chosen: s.chosen, tab: s.tab }`.
 
 - [ ] **Step 1: Pin the dependency.** Add `"@clack/core": "1.5.1"` to `package.json` `dependencies`, run
-  `npm install --package-lock-only`, then `git diff npm-shrinkwrap.json` — Expected: root `dependencies` gains
-  `@clack/core`, root `engines` becomes `>=20.12`; no new `node_modules/*` entries.
+      `npm install --package-lock-only`, then `git diff npm-shrinkwrap.json` — Expected: root `dependencies` gains
+      `@clack/core`, root `engines` becomes `>=20.12`; no new `node_modules/*` entries.
 
 - [ ] **Step 2: Write the failing tests** with `PassThrough` streams for `input`/`output`
-  (`output.columns = 120; output.rows = 40`), writing raw key sequences to `input`:
+      (`output.columns = 120; output.rows = 40`), writing raw key sequences to `input`:
   - `chooseTabs returns picks and last tab`: tab 0, write `'\x1b[C'`, `' '`, `'\r'` → `{ tab: 1, chosen: { m1: true } }`.
   - `chooseTabs resolves its input on plain enter`: `tab: 2, chosen: { m3: true }`, write `'\r'` → `{ tab: 2, chosen: { m3: true } }`.
   - `chooseTabs cancels on escape`: write `'\x1b'` → `isCancel(result) === true`.
@@ -145,26 +151,28 @@ How: no subclass. Keep `let s = { tab, cursor: 0, chosen }` in a closure;
 ### Task 4: Wire it into the installer
 
 **Files:**
+
 - Modify: `installer/install.mjs:395-462`, `README.md` (paragraph "The installer walks through one page per category…")
 
 **Interfaces:**
+
 - Consumes: `chooseTabs` from Task 3.
 
 - [ ] **Step 1: Adapt `option()`** (`install.mjs:397-406`): drop `clip()` and the `clip` helper; rename the returned
-  `hint` field to `detail`; drop `value`. Pass `describe: option` to `chooseTabs`.
+      `hint` field to `detail`; drop `value`. Pass `describe: option` to `chooseTabs`.
 
 - [ ] **Step 2: Replace `page()`, the page loop and the review loop** (keep the always-installed `p.note` before it):
-  `let tab = 0; for (;;) { const r = must(await chooseTabs({ pages, chosen, tab, describe: option })); Object.assign(chosen, r.chosen); tab = r.tab; <existing review note>; select Apply / Back to choices / Quit; apply → break; quit → existing cancel + exit 0; back → continue }`.
-  Keep `changes()` and the review note text as now.
+      `let tab = 0; for (;;) { const r = must(await chooseTabs({ pages, chosen, tab, describe: option })); Object.assign(chosen, r.chosen); tab = r.tab; <existing review note>; select Apply / Back to choices / Quit; apply → break; quit → existing cancel + exit 0; back → continue }`.
+      Keep `changes()` and the review note text as now.
 
 - [ ] **Step 3: Update the README paragraph**: one screen with a tab per category (←/→ switch, space selects,
-  enter reviews); the review can go back to the tabs before anything runs. Keep the hidden-options and clack sentences.
+      enter reviews); the review can go back to the tabs before anything runs. Keep the hidden-options and clack sentences.
 
 - [ ] **Step 4: Run** `node --test installer/*.test.mjs` and `node scripts/check-repo.mjs` — Expected: PASS / no problems.
 
 - [ ] **Step 5: Manual check in a terminal** (`node installer/install.mjs`): ←/→ through every tab, space toggles,
-  `a` does nothing on Danger, enter → review shows the picks, `Back to choices` reopens on the same tab with picks
-  kept, then enter again works, `Quit` exits 0 with "Cancelled before installing anything." Esc in the chooser exits
-  via `must()` (code 130).
+      `a` does nothing on Danger, enter → review shows the picks, `Back to choices` reopens on the same tab with picks
+      kept, then enter again works, `Quit` exits 0 with "Cancelled before installing anything." Esc in the chooser exits
+      via `must()` (code 130).
 
 - [ ] **Step 6: Commit** `git commit -am "Use the tabbed chooser in the installer and let the review go back to it."`

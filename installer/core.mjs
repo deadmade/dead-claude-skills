@@ -9,11 +9,23 @@ const STATUS_LINE = { type: 'command', command: 'ccstatusline', padding: 0 };
 // Always denied, sandbox or not. The sandbox also blocks Bash reads of these, except the ** globs it can't apply on
 // Linux; the ./ dotenv names cover the project root there.
 export const SECRET_DENIES = [
-  'Read(**/.env)', 'Read(**/.env.*)',
-  ...['', '.local', '.development', '.development.local', '.production', '.production.local', '.test', '.test.local']
-    .map((s) => `Read(./.env${s})`),
-  'Read(~/.ssh/**)', 'Read(~/.aws/**)', 'Read(~/.azure/**)',
-  'Read(~/.config/gh/**)', 'Read(~/.gnupg/**)',
+  'Read(**/.env)',
+  'Read(**/.env.*)',
+  ...[
+    '',
+    '.local',
+    '.development',
+    '.development.local',
+    '.production',
+    '.production.local',
+    '.test',
+    '.test.local',
+  ].map((s) => `Read(./.env${s})`),
+  'Read(~/.ssh/**)',
+  'Read(~/.aws/**)',
+  'Read(~/.azure/**)',
+  'Read(~/.config/gh/**)',
+  'Read(~/.gnupg/**)',
 ];
 // The sandbox keys we own; excludedCommands, network etc. stay the user's.
 const SANDBOX = { enabled: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: false };
@@ -47,8 +59,7 @@ export const optIns = (marketplace, bundle) => [
   ...OFFICIAL_OPT_INS.map((n) => `${n}@${OFFICIAL}`),
 ];
 
-export const needsToken = (pluginJson) =>
-  Object.values(pluginJson.userConfig ?? {}).some((c) => c.sensitive === true);
+export const needsToken = (pluginJson) => Object.values(pluginJson.userConfig ?? {}).some((c) => c.sensitive === true);
 
 // All plugin ids. installedIds: installed bundle and opt-ins only.
 export function planPlugins(selected, installedIds, tokenPlugins) {
@@ -101,7 +112,16 @@ const STRIP_PLUGINS = { 'agents-md@builtin': false, 'telemetry@builtin': false }
 
 // User-authored config under CLAUDE_CONFIG_DIR that a clean slate backs up and removes. Credentials, ~/.claude.json,
 // projects/, plugins/, history and other app state are never touched.
-export const CLEAN_TARGETS = ['CLAUDE.md', 'skills', 'agents', 'commands', 'rules', 'output-styles', 'workflows', 'hooks'];
+export const CLEAN_TARGETS = [
+  'CLAUDE.md',
+  'skills',
+  'agents',
+  'commands',
+  'rules',
+  'output-styles',
+  'workflows',
+  'hooks',
+];
 
 // Everything not from our marketplace, except the official plugins we use.
 export const foreignPlugins = (installedIds, managedIds) =>
@@ -116,7 +136,8 @@ export function stripDefaults(settings) {
   const out = { ...structuredClone(settings), ...STRIP };
   out.enabledPlugins = { ...out.enabledPlugins, ...STRIP_PLUGINS };
   // Another marketplace listed here would be re-added on the next launch.
-  for (const name of foreignMarketplaces(Object.keys(out.extraKnownMarketplaces ?? {}))) delete out.extraKnownMarketplaces[name];
+  for (const name of foreignMarketplaces(Object.keys(out.extraKnownMarketplaces ?? {})))
+    delete out.extraKnownMarketplaces[name];
   return out;
 }
 
@@ -179,7 +200,12 @@ export function safeArg(s) {
 const BINARIES = [
   ['rust-analyzer', 'rust-analyzer-lsp', 'nix: rust-analyzer', 'rustup component add rust-analyzer'],
   ['csharp-ls', 'csharp-lsp', 'nix: csharp-ls dotnet-sdk', 'dotnet tool install --global csharp-ls'],
-  ['typescript-language-server', 'typescript-lsp', 'nix: typescript-language-server typescript', 'npm i -g typescript typescript-language-server'],
+  [
+    'typescript-language-server',
+    'typescript-lsp',
+    'nix: typescript-language-server typescript',
+    'npm i -g typescript typescript-language-server',
+  ],
   ['pyright-langserver', 'pyright-lsp', 'nix: pyright', 'npm i -g pyright'],
   ['nixd', 'nix-lsp', 'nix: nixd', 'not available on Windows, deselect nix-lsp'],
   ['jq', BUNDLE, 'nix: jq', 'winget install -e --id jqlang.jq'],
@@ -195,11 +221,10 @@ const BINARIES = [
 // wanted: plugin names (plus 'ccstatusline' when that toggle is on). onPath(binary) -> bool.
 export function missingBinaries(platform, wanted, onPath) {
   const win = platform === 'win32';
-  return BINARIES.filter(([bin, for_]) => wanted.includes(for_) && !onPath(bin))
-    .map(([binary, , nix, windows]) => {
-      const cmd = win ? windows : nix;
-      return { binary, command: cmd.startsWith('nix: ') ? `add to home.packages: ${cmd.slice(5)}` : cmd };
-    });
+  return BINARIES.filter(([bin, for_]) => wanted.includes(for_) && !onPath(bin)).map(([binary, , nix, windows]) => {
+    const cmd = win ? windows : nix;
+    return { binary, command: cmd.startsWith('nix: ') ? `add to home.packages: ${cmd.slice(5)}` : cmd };
+  });
 }
 
 // brv, the tui-review plugin's binary, built per platform by .github/workflows/build-brv.yml and attached to the
@@ -233,24 +258,56 @@ export function brvAction({ onPath, installed, version, supported }) {
   return supported ? 'download' : 'unsupported';
 }
 
-
 // The installer's pages, in order. keys: plugin names and installer toggles; an opt-in not listed here lands in Other,
 // so a new marketplace plugin is never left out.
 export const TOGGLES = ['ccstatusline', 'sandbox', 'dcg', 'strip-defaults', 'clean'];
 export const CATEGORIES = [
-  { id: 'workflow', title: 'Workflows & skills', blurb: 'Slash commands and skills that shape how Claude works.',
-    keys: ['dev-feature', 'feature-flow', 'self-review', 'mattpocock-picks', 'pstack-picks', 'hallmark', 'skill-creator'] },
-  { id: 'lsp', title: 'Language servers', blurb: 'Code intelligence per language; each needs its server on PATH.',
-    keys: ['rust-analyzer-lsp', 'csharp-lsp', 'typescript-lsp', 'pyright-lsp', 'nix-lsp'] },
-  { id: 'mcp', title: 'Integrations', blurb: 'MCP servers for the services you work with.',
-    keys: ['mcp-github', 'mcp-azure', 'atlassian'] },
-  { id: 'tools', title: 'Tools', blurb: 'Plugins that bring their own binary or pane.',
-    keys: ['graphify', 'cswap', 'tui-review'] },
-  { id: 'system', title: 'System', blurb: 'Status line, sandbox and command guard in settings.json.',
-    keys: ['ccstatusline', 'sandbox', 'dcg'] },
+  {
+    id: 'workflow',
+    title: 'Workflows & skills',
+    blurb: 'Slash commands and skills that shape how Claude works.',
+    keys: [
+      'dev-feature',
+      'feature-flow',
+      'self-review',
+      'mattpocock-picks',
+      'pstack-picks',
+      'hallmark',
+      'skill-creator',
+    ],
+  },
+  {
+    id: 'lsp',
+    title: 'Language servers',
+    blurb: 'Code intelligence per language; each needs its server on PATH.',
+    keys: ['rust-analyzer-lsp', 'csharp-lsp', 'typescript-lsp', 'pyright-lsp', 'nix-lsp'],
+  },
+  {
+    id: 'mcp',
+    title: 'Integrations',
+    blurb: 'MCP servers for the services you work with.',
+    keys: ['mcp-github', 'mcp-azure', 'atlassian'],
+  },
+  {
+    id: 'tools',
+    title: 'Tools',
+    blurb: 'Plugins that bring their own binary or pane.',
+    keys: ['graphify', 'cswap', 'tui-review'],
+  },
+  {
+    id: 'system',
+    title: 'System',
+    blurb: 'Status line, sandbox and command guard in settings.json.',
+    keys: ['ccstatusline', 'sandbox', 'dcg'],
+  },
   // bulk: false, so no single key ticks every option here.
-  { id: 'danger', title: 'Danger zone', blurb: 'Take over the whole Claude Code config. Leave empty unless you mean it.',
-    keys: ['strip-defaults', 'clean'], bulk: false },
+  {
+    id: 'danger',
+    title: 'Danger zone',
+    blurb: 'Take over the whole Claude Code config. Leave empty unless you mean it.',
+    keys: ['strip-defaults', 'clean'],
+    bulk: false,
+  },
 ];
 
 // keys: opt-in plugin ids and toggle names. Returns the non-empty categories with their keys, in page order.
@@ -264,7 +321,7 @@ export function categorize(keys) {
 
 // Short descriptions for what marketplace.json doesn't describe: the official opt-ins and the toggles.
 export const HINTS = {
-  'skill-creator': 'Anthropic\'s skill for writing and testing skills',
+  'skill-creator': "Anthropic's skill for writing and testing skills",
   'rust-analyzer-lsp': 'Rust (rust-analyzer)',
   'csharp-lsp': 'C# (csharp-ls)',
   'typescript-lsp': 'TypeScript / JavaScript',

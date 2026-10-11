@@ -2,10 +2,36 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  optIns, needsToken, planPlugins, duplicates, mergeSettings, safeArg, missingBinaries, SECRET_DENIES, isSandboxOn,
-  hasDcgHook, dcgCommand, bundleIds, foreignPlugins, foreignMarketplaces, stripDefaults, isStripped, resetSettings, CLEAN_TARGETS,
-  marketplaceArg, pinMarketplace,
-  cswapDownload, cswapCurrent, pathWith, brvAsset, sha256Of, brvAction, CATEGORIES, TOGGLES, categorize, unavailable,
+  optIns,
+  needsToken,
+  planPlugins,
+  duplicates,
+  mergeSettings,
+  safeArg,
+  missingBinaries,
+  SECRET_DENIES,
+  isSandboxOn,
+  hasDcgHook,
+  dcgCommand,
+  bundleIds,
+  foreignPlugins,
+  foreignMarketplaces,
+  stripDefaults,
+  isStripped,
+  resetSettings,
+  CLEAN_TARGETS,
+  marketplaceArg,
+  pinMarketplace,
+  cswapDownload,
+  cswapCurrent,
+  pathWith,
+  brvAsset,
+  sha256Of,
+  brvAction,
+  CATEGORIES,
+  TOGGLES,
+  categorize,
+  unavailable,
   outdated,
 } from './core.mjs';
 
@@ -16,12 +42,27 @@ const M = 'dead-claude-skills';
 const O = 'claude-plugins-official';
 
 test('opt-ins from the real manifests', () => {
-  assert.deepEqual(optIns(marketplace, bundle).sort(), [
-    ...['atlassian', 'cswap', 'dev-feature', 'feature-flow', 'graphify', 'hallmark', 'mattpocock-picks', 'mcp-azure',
-      'mcp-github', 'nix-lsp', 'pstack-picks', 'self-review', 'tui-review']
-      .map((n) => `${n}@${M}`),
-    ...['csharp-lsp', 'pyright-lsp', 'rust-analyzer-lsp', 'skill-creator', 'typescript-lsp'].map((n) => `${n}@${O}`),
-  ].sort());
+  assert.deepEqual(
+    optIns(marketplace, bundle).sort(),
+    [
+      ...[
+        'atlassian',
+        'cswap',
+        'dev-feature',
+        'feature-flow',
+        'graphify',
+        'hallmark',
+        'mattpocock-picks',
+        'mcp-azure',
+        'mcp-github',
+        'nix-lsp',
+        'pstack-picks',
+        'self-review',
+        'tui-review',
+      ].map((n) => `${n}@${M}`),
+      ...['csharp-lsp', 'pyright-lsp', 'rust-analyzer-lsp', 'skill-creator', 'typescript-lsp'].map((n) => `${n}@${O}`),
+    ].sort(),
+  );
 });
 
 test('bundle ids resolve bare names to our marketplace', () => {
@@ -48,13 +89,19 @@ test('select installs, deselect uninstalls, token plugins hand off', () => {
 
 test('duplicates are managed names from the wrong marketplace', () => {
   assert.deepEqual(
-    duplicates(['ponytail@ponytail', `ponytail@${M}`, `code-review@${O}`, `code-review@${M}`, 'other@x'],
-      [`ponytail@${M}`, `code-review@${O}`]),
-    ['ponytail@ponytail', `code-review@${M}`]);
+    duplicates(
+      ['ponytail@ponytail', `ponytail@${M}`, `code-review@${O}`, `code-review@${M}`, 'other@x'],
+      [`ponytail@${M}`, `code-review@${O}`],
+    ),
+    ['ponytail@ponytail', `code-review@${M}`],
+  );
 });
 
 test('merge adds owned keys and keeps foreign ones', () => {
-  const out = mergeSettings({ model: 'x', permissions: { allow: ['Bash(ls)'] } }, { statusLine: true, version: '1.2.3' });
+  const out = mergeSettings(
+    { model: 'x', permissions: { allow: ['Bash(ls)'] } },
+    { statusLine: true, version: '1.2.3' },
+  );
   assert.equal(out.model, 'x');
   assert.deepEqual(out.permissions.allow, ['Bash(ls)', 'Read(~/.claude/plugins/**)']);
   assert.equal(out.extraKnownMarketplaces[M].autoUpdate, true);
@@ -67,7 +114,9 @@ test('the marketplace is pinned to the installer version', () => {
   const pinned = { source: 'github', repo: 'deadmade/dead-claude-skills', ref: 'v1.2.3' };
   const before = {
     model: 'x',
-    extraKnownMarketplaces: { [M]: { source: { source: 'github', repo: 'deadmade/dead-claude-skills' }, autoUpdate: true } },
+    extraKnownMarketplaces: {
+      [M]: { source: { source: 'github', repo: 'deadmade/dead-claude-skills' }, autoUpdate: true },
+    },
   };
   const out = pinMarketplace(before, '1.2.3');
   assert.deepEqual(out.extraKnownMarketplaces[M], { source: pinned, autoUpdate: true });
@@ -87,7 +136,10 @@ test('merge is idempotent', () => {
 });
 
 test('statusLine off removes ours, keeps a foreign one', () => {
-  assert.equal(mergeSettings({ statusLine: { type: 'command', command: 'ccstatusline' } }, { statusLine: false }).statusLine, undefined);
+  assert.equal(
+    mergeSettings({ statusLine: { type: 'command', command: 'ccstatusline' } }, { statusLine: false }).statusLine,
+    undefined,
+  );
   const foreign = { type: 'command', command: 'my-line.sh' };
   assert.deepEqual(mergeSettings({ statusLine: foreign }, { statusLine: false }).statusLine, foreign);
 });
@@ -105,18 +157,30 @@ test('missing binaries per OS', () => {
   const nix = missingBinaries('linux', ['nix-lsp', 'graphify'], none);
   assert.ok(nix.some((r) => r.binary === 'nixd' && /nixd/.test(r.command)));
   assert.ok(nix.some((r) => r.binary === 'graphify'));
-  assert.deepEqual(missingBinaries('linux', ['dead-skills'], () => true), []);
+  assert.deepEqual(
+    missingBinaries('linux', ['dead-skills'], () => true),
+    [],
+  );
 });
 
 test('secret denies are added once and keep existing ones', () => {
   const out = mergeSettings({ permissions: { deny: ['Bash(sudo:*)', 'Read(~/.ssh/**)'] } }, {});
-  assert.deepEqual(out.permissions.deny, ['Bash(sudo:*)', 'Read(~/.ssh/**)', ...SECRET_DENIES.filter((d) => d !== 'Read(~/.ssh/**)')]);
+  assert.deepEqual(out.permissions.deny, [
+    'Bash(sudo:*)',
+    'Read(~/.ssh/**)',
+    ...SECRET_DENIES.filter((d) => d !== 'Read(~/.ssh/**)'),
+  ]);
   assert.deepEqual(mergeSettings(out, {}), out);
 });
 
 test('sandbox on merges our keys, off removes only ours', () => {
   const on = mergeSettings({ sandbox: { excludedCommands: ['docker'] } }, { sandbox: true });
-  assert.deepEqual(on.sandbox, { excludedCommands: ['docker'], enabled: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: false });
+  assert.deepEqual(on.sandbox, {
+    excludedCommands: ['docker'],
+    enabled: true,
+    autoAllowBashIfSandboxed: true,
+    allowUnsandboxedCommands: false,
+  });
   assert.ok(isSandboxOn(on));
   assert.deepEqual(mergeSettings(on, { sandbox: true }), on);
   assert.deepEqual(mergeSettings(on, { sandbox: false }).sandbox, { excludedCommands: ['docker'] });
@@ -125,7 +189,9 @@ test('sandbox on merges our keys, off removes only ours', () => {
 });
 
 test('dcg hook detection', () => {
-  const hook = (command) => ({ hooks: { PreToolUse: [{ matcher: 'Bash|PowerShell', hooks: [{ type: 'command', command }] }] } });
+  const hook = (command) => ({
+    hooks: { PreToolUse: [{ matcher: 'Bash|PowerShell', hooks: [{ type: 'command', command }] }] },
+  });
   assert.ok(hasDcgHook(hook('/home/me/.local/bin/dcg')));
   assert.ok(hasDcgHook(hook('"C:\\Users\\me\\.local\\bin\\dcg.exe"')));
   assert.ok(!hasDcgHook(hook('node guard.mjs')));
@@ -145,19 +211,26 @@ test('dcg runs its own installer per OS', () => {
 
 test('sandbox needs bubblewrap and socat', () => {
   const rows = missingBinaries('linux', ['sandbox'], () => false);
-  assert.deepEqual(rows.map((r) => r.binary), ['bwrap', 'socat']);
+  assert.deepEqual(
+    rows.map((r) => r.binary),
+    ['bwrap', 'socat'],
+  );
   assert.match(rows[0].command, /home\.packages: bubblewrap/);
 });
 
 test('foreign plugins and marketplaces spare ours and the official plugins we use', () => {
-  assert.deepEqual(foreignPlugins([`ponytail@${M}`, `code-review@${O}`, `playwright@${O}`, 'x@y'], [`code-review@${O}`]),
-    [`playwright@${O}`, 'x@y']);
+  assert.deepEqual(
+    foreignPlugins([`ponytail@${M}`, `code-review@${O}`, `playwright@${O}`, 'x@y'], [`code-review@${O}`]),
+    [`playwright@${O}`, 'x@y'],
+  );
   assert.deepEqual(foreignMarketplaces([M, O, 'other']), ['other']);
 });
 
 test('strip disables defaults, keeps foreign keys, drops other marketplaces', () => {
   const before = {
-    model: 'x', env: { FOO: '1' }, enabledPlugins: { 'a@b': true },
+    model: 'x',
+    env: { FOO: '1' },
+    enabledPlugins: { 'a@b': true },
     extraKnownMarketplaces: { [M]: { autoUpdate: true }, [O]: { source: {} }, other: { source: {} } },
   };
   const out = stripDefaults(before);
@@ -175,9 +248,14 @@ test('reset keeps only our settings plus the dcg hook while dcg stays on', () =>
   const dcgEntry = { matcher: 'Bash|PowerShell', hooks: [{ type: 'command', command: '/home/me/.local/bin/dcg' }] };
   const other = { matcher: 'Edit', hooks: [{ type: 'command', command: 'fmt.sh' }] };
   const before = {
-    model: 'x', permissions: { allow: ['Bash(ls)'] }, hooks: { PreToolUse: [other, dcgEntry], Stop: [other] },
+    model: 'x',
+    permissions: { allow: ['Bash(ls)'] },
+    hooks: { PreToolUse: [other, dcgEntry], Stop: [other] },
     enabledPlugins: { [`dead-skills@${M}`]: true, [`code-review@${O}`]: true, 'x@other': true },
-    extraKnownMarketplaces: { [O]: { source: { source: 'github', repo: 'anthropics/claude-plugins-official' } }, other: {} },
+    extraKnownMarketplaces: {
+      [O]: { source: { source: 'github', repo: 'anthropics/claude-plugins-official' } },
+      other: {},
+    },
   };
   const out = resetSettings(before, { statusLine: true, sandbox: false, dcg: true });
   assert.equal(out.model, undefined);
@@ -222,12 +300,18 @@ test('user PATH gains the cswap folder once', () => {
 });
 
 test('cswap missing on Linux points at uv', () => {
-  assert.deepEqual(missingBinaries('linux', ['cswap'], () => false), [{ binary: 'cswap', command: 'uv tool install claude-swap' }]);
+  assert.deepEqual(
+    missingBinaries('linux', ['cswap'], () => false),
+    [{ binary: 'cswap', command: 'uv tool install claude-swap' }],
+  );
 });
 
 test('brv downloads the release archive built for this machine', () => {
   const win = brvAsset('win32', 'x64', '1.2.3');
-  assert.equal(win.url, 'https://github.com/deadmade/dead-claude-skills/releases/download/v1.2.3/brv-x86_64-pc-windows-msvc.zip');
+  assert.equal(
+    win.url,
+    'https://github.com/deadmade/dead-claude-skills/releases/download/v1.2.3/brv-x86_64-pc-windows-msvc.zip',
+  );
   assert.equal(win.sha256, `${win.url}.sha256`);
   assert.equal(win.exe, 'brv.exe');
   assert.equal(brvAsset('linux', 'x64', '1.0.0').file, 'brv-x86_64-unknown-linux-musl.tar.gz');
@@ -267,7 +351,13 @@ test('every opt-in and toggle is on exactly one page', () => {
 
 test('an uncategorized plugin lands in Other, empty pages are dropped', () => {
   const pages = categorize([`new-thing@${M}`, 'sandbox']);
-  assert.deepEqual(pages.map((p) => [p.id, p.keys]), [['system', ['sandbox']], ['other', [`new-thing@${M}`]]]);
+  assert.deepEqual(
+    pages.map((p) => [p.id, p.keys]),
+    [
+      ['system', ['sandbox']],
+      ['other', [`new-thing@${M}`]],
+    ],
+  );
 });
 
 test('categorize keeps bulk:false on danger', () => {
@@ -290,13 +380,23 @@ test('options hidden per platform', () => {
 
 test('outdated compares our shipped versions only, once per id, never downgrading', () => {
   const rows = [
-    { id: `cswap@${M}`, version: '0.1.0', scope: 'user' }, { id: `cswap@${M}`, version: '0.1.0', scope: 'project' },
-    { id: `feature-flow@${M}`, version: '0.1.1' }, { id: `graphify@${M}`, version: '29c78da38ecf' },
-    { id: `hallmark@${M}`, version: '0.2.0' }, { id: `superpowers@${M}`, version: '6.4.2' },
+    { id: `cswap@${M}`, version: '0.1.0', scope: 'user' },
+    { id: `cswap@${M}`, version: '0.1.0', scope: 'project' },
+    { id: `feature-flow@${M}`, version: '0.1.1' },
+    { id: `graphify@${M}`, version: '29c78da38ecf' },
+    { id: `hallmark@${M}`, version: '0.2.0' },
+    { id: `superpowers@${M}`, version: '6.4.2' },
     { id: `code-review@${O}`, version: '1.0.0' },
   ];
-  const shipped = { cswap: '0.1.1', 'feature-flow': '0.1.1', graphify: '0.1.1', hallmark: '0.1.1', 'code-review': '9.9.9' };
+  const shipped = {
+    cswap: '0.1.1',
+    'feature-flow': '0.1.1',
+    graphify: '0.1.1',
+    hallmark: '0.1.1',
+    'code-review': '9.9.9',
+  };
   assert.deepEqual(outdated(rows, shipped), [
-    { id: `cswap@${M}`, from: '0.1.0', to: '0.1.1' }, { id: `graphify@${M}`, from: '29c78da38ecf', to: '0.1.1' },
+    { id: `cswap@${M}`, from: '0.1.0', to: '0.1.1' },
+    { id: `graphify@${M}`, from: '29c78da38ecf', to: '0.1.1' },
   ]);
 });

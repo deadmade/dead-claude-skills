@@ -1,6 +1,6 @@
 // Colours, 0xRRGGBB, or DEFAULT for the terminal's own. Style ids follow brv/src/styles.rs; keep the order.
 
-export const DEFAULT = 0x01000000
+export const DEFAULT = 0x01000000;
 
 export const styleFg: readonly number[] = [
   DEFAULT, // plain
@@ -19,7 +19,7 @@ export const styleFg: readonly number[] = [
   0xe06c75, // tag
   0x56b6c2, // builtin
   0x56b6c2, // escape
-]
+];
 
 export const theme = {
   barFg: 0xdcdfe4,
@@ -39,4 +39,4 @@ export const theme = {
   commentFg: 0xe5c07b,
   noteFg: 0xdcdfe4,
   noteBg: 0x2f2b1f,
-} as const
+} as const;

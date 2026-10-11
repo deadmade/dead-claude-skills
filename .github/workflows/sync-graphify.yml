@@ -2,7 +2,7 @@ name: Sync graphify
 
 on:
   schedule:
-    - cron: "45 6 * * 1" # Mondays 06:45 UTC
+    - cron: '45 6 * * 1' # Mondays 06:45 UTC
   workflow_dispatch:
 
 permissions:
@@ -31,8 +31,8 @@ jobs:
         with:
           branch: sync/graphify
           delete-branch: true
-          commit-message: "Sync graphify to ${{ steps.check.outputs.sha }}"
-          title: "Sync graphify to ${{ steps.check.outputs.sha }}"
+          commit-message: 'Sync graphify to ${{ steps.check.outputs.sha }}'
+          title: 'Sync graphify to ${{ steps.check.outputs.sha }}'
           body: |
             Automated sync of the graphify Claude Code skill from https://github.com/Graphify-Labs/graphify at
             https://github.com/Graphify-Labs/graphify/commit/${{ steps.check.outputs.sha }}.

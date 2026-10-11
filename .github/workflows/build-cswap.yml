@@ -33,7 +33,7 @@ jobs:
 
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: '3.12'
 
       # Nuitka's C compiler cache, bytecode cache and tool downloads all live under NUITKA_CACHE_DIR. A run can only
       # restore caches from its own ref or master, so PRs and release tags reuse what a run on master saved.
@@ -73,4 +73,3 @@ jobs:
           path: |
             cswap.exe
             cswap.exe.sha256
-

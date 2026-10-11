@@ -1,8 +1,8 @@
 ---
 name: self-review
-description: "Review your own branch before opening a PR: a confidence-scored bug pass, a spec pass and a standards pass, and specialist agents for error handling, tests, types and comments, all in parallel, then one ranked report and fixes for the findings you pick. Never posts anything. Use for /self-review [base]."
+description: 'Review your own branch before opening a PR: a confidence-scored bug pass, a spec pass and a standards pass, and specialist agents for error handling, tests, types and comments, all in parallel, then one ranked report and fixes for the findings you pick. Never posts anything. Use for /self-review [base].'
 disable-model-invocation: true
-argument-hint: "[base branch or commit]"
+argument-hint: '[base branch or commit]'
 ---
 
 # self-review
@@ -12,12 +12,12 @@ report, fix what they pick. Nothing is posted to GitHub or anywhere else.
 
 The passes are vendored in this plugin (synced weekly, don't edit them):
 
-| Pass | Instructions | Catches |
-|---|---|---|
-| Bugs | [references/upstream/code-review.md](references/upstream/code-review.md) | real bugs, CLAUDE.md breaches, regressions against history, each scored for confidence |
-| Spec | [references/upstream/spec-standards-review.md](references/upstream/spec-standards-review.md) | missing or wrong requirements, scope creep |
-| Standards | same file | breaches of the repo's documented standards, code smells |
-| Specialists | agents `self-review:silent-failure-hunter`, `:pr-test-analyzer`, `:type-design-analyzer`, `:comment-analyzer` | swallowed errors, test gaps, weak types, stale comments |
+| Pass        | Instructions                                                                                                  | Catches                                                                                |
+| ----------- | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Bugs        | [references/upstream/code-review.md](references/upstream/code-review.md)                                      | real bugs, CLAUDE.md breaches, regressions against history, each scored for confidence |
+| Spec        | [references/upstream/spec-standards-review.md](references/upstream/spec-standards-review.md)                  | missing or wrong requirements, scope creep                                             |
+| Standards   | same file                                                                                                     | breaches of the repo's documented standards, code smells                               |
+| Specialists | agents `self-review:silent-failure-hunter`, `:pr-test-analyzer`, `:type-design-analyzer`, `:comment-analyzer` | swallowed errors, test gaps, weak types, stale comments                                |
 
 ## Rules for the whole run
 
@@ -35,7 +35,7 @@ The passes are vendored in this plugin (synced weekly, don't edit them):
    Otherwise the default branch: `origin/HEAD`, else `origin/main` or `origin/master`.
 2. Run `git merge-base <base> HEAD`. If that fails, say why and stop.
 3. List the changed and untracked files, with their `+/−` counts and the commits (`git log <merge-base>..HEAD
-   --oneline`). If the diff is empty, say so and stop.
+--oneline`). If the diff is empty, say so and stop.
 4. Tell the user the scope in one line (`feature-x ← main, 12 files, +340 −95, 4 commits + uncommitted changes`), then
    continue without waiting.
 

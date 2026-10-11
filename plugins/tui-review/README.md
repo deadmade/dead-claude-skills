@@ -39,15 +39,15 @@ The pane docks beside the chat under Claude Code's fullscreen renderer (`/tui fu
 110 columns wide; otherwise it opens above the prompt. It takes the keyboard when it opens. Esc goes back to the prompt
 to type a question; ctrl+x tab goes back to the pane.
 
-| Key | |
-| --- | --- |
-| `j` / `k` | cursor down / up; the window follows it |
-| mouse wheel | scroll the window; the cursor stays in it |
-| `n` / `p` | cursor to the next / previous file (`p` inside a file goes to its own header first) |
-| `r` | mark the cursor's file viewed and collapse it to its header; on a viewed file, clear the mark and open it |
-| `c` | comment on the cursor's line, or on the whole file from its header; on a commented line, edit the comment |
-| `s` | send every comment to Claude as one message, then clear them |
-| `q` | close the pane (so do the frame's close mark and ctrl+x x) |
+| Key         |                                                                                                           |
+| ----------- | --------------------------------------------------------------------------------------------------------- |
+| `j` / `k`   | cursor down / up; the window follows it                                                                   |
+| mouse wheel | scroll the window; the cursor stays in it                                                                 |
+| `n` / `p`   | cursor to the next / previous file (`p` inside a file goes to its own header first)                       |
+| `r`         | mark the cursor's file viewed and collapse it to its header; on a viewed file, clear the mark and open it |
+| `c`         | comment on the cursor's line, or on the whole file from its header; on a commented line, edit the comment |
+| `s`         | send every comment to Claude as one message, then clear them                                              |
+| `q`         | close the pane (so do the frame's close mark and ctrl+x x)                                                |
 
 Closing the pane lets the review go; `/tui-review` opens it again. A new conversation (`/clear`, a resume, a new
 session) closes it too, and drops comments that were not sent.
