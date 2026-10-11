@@ -279,7 +279,10 @@ test('options hidden per platform', () => {
   assert.ok(unavailable(`nix-lsp@${M}`, 'win32', 'x64', '1.0.0'));
   assert.equal(unavailable(`tui-review@${M}`, 'win32', 'x64', '1.0.0'), undefined);
   assert.ok(unavailable(`tui-review@${M}`, 'win32', 'arm64', '1.0.0'));
-  for (const k of ['sandbox', `nix-lsp@${M}`, `tui-review@${M}`, `cswap@${M}`, 'dcg']) {
+  assert.equal(unavailable(`cswap@${M}`, 'win32', 'x64', '1.0.0'), undefined);
+  assert.ok(unavailable(`cswap@${M}`, 'linux', 'x64', '1.0.0'));
+  assert.ok(unavailable(`cswap@${M}`, 'darwin', 'arm64', '1.0.0'));
+  for (const k of ['sandbox', `nix-lsp@${M}`, `tui-review@${M}`, 'dcg']) {
     assert.equal(unavailable(k, 'linux', 'x64', '1.0.0'), undefined);
     assert.equal(unavailable(k, 'darwin', 'arm64', '1.0.0'), undefined);
   }

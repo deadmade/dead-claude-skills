@@ -65,7 +65,8 @@ Multi-account switching with [claude-swap](https://github.com/realiti4/claude-sw
 
 On Windows the installer downloads `cswap.exe` (claude-swap at the tag pinned in `installer/cswap.json`, compiled
 with Nuitka by `build-cswap.yml` and attached to every release) to `%LOCALAPPDATA%\Programs\cswap` and puts it on
-your user PATH. On Linux, install it with `uv tool install claude-swap` (or nix).
+your user PATH. Elsewhere the installer hides cswap (unless it is already installed); `uv tool install claude-swap`
+still works if you add the plugin by hand.
 
 ## Releases
 

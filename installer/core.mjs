@@ -149,7 +149,7 @@ export function dcgCommand(platform, action) {
 }
 
 // cswap.exe: claude-swap built by .github/workflows/build-cswap.yml and attached to this repo's release
-// v<package.json version> by release.yml. Windows only; Linux gets cswap from uv or nix.
+// v<package.json version> by release.yml. Windows only: the option is hidden elsewhere unless already installed.
 const RELEASES = `https://github.com/${REPO}/releases/download`;
 
 export function cswapDownload(platform, env, release) {
@@ -281,6 +281,7 @@ export function unavailable(key, platform, arch, version) {
   const name = nameOf(key);
   if (platform === 'win32' && name === 'sandbox') return 'needs WSL2';
   if (platform === 'win32' && name === 'nix-lsp') return 'nixd is not available on Windows';
+  if (platform !== 'win32' && name === 'cswap') return 'releases ship cswap.exe for Windows only';
   if (name === 'tui-review' && !brvAsset(platform, arch, version)) return `no brv build for ${platform}-${arch}`;
   return undefined;
 }
