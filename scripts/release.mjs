@@ -1,5 +1,5 @@
 // Cuts a release: one version for package.json, the marketplace, every local plugin and brv, committed and tagged
-// vX.Y.Z on master. Pushing the tag runs .github/workflows/release.yml, which builds cswap.exe and brv and publishes the
+// vX.Y.Z on main. Pushing the tag runs .github/workflows/release.yml, which builds cswap.exe and brv and publishes the
 // GitHub release. Claude Code only offers plugin updates when this version changes.
 // Usage: npm run release -- patch|minor|major|X.Y.Z
 import { spawnSync } from "node:child_process";
@@ -26,7 +26,7 @@ const next = { major: `${major + 1}.0.0`, minor: `${major}.${minor + 1}.0`, patc
 if (!/^\d+\.\d+\.\d+$/.test(next ?? "")) die("usage: npm run release -- patch|minor|major|X.Y.Z");
 
 const branch = git("rev-parse", "--abbrev-ref", "HEAD");
-if (branch !== "master") die(`releases are cut from master, you are on ${branch}`);
+if (branch !== "main") die(`releases are cut from main, you are on ${branch}`);
 if (git("status", "--porcelain")) die("working tree is not clean");
 if (git("tag", "--list", `v${next}`)) die(`tag v${next} already exists`);
 
@@ -53,7 +53,7 @@ if (!run("node", ["scripts/check-repo.mjs"]) || !run("node", ["--test", ...tests
   die("checks failed, versions reverted");
 }
 
-// Releasing the version already on master (the first release) only tags.
+// Releasing the version already on main (the first release) only tags.
 if (git("status", "--porcelain")) git("commit", "-m", `Release v${next}`, "--", ...files);
 git("tag", "-a", `v${next}`, "-m", `v${next}`);
-console.log(`\n✓ v${current} → v${next}, committed and tagged. Publish with:\n\n    git push --follow-tags origin master\n`);
+console.log(`\n✓ v${current} → v${next}, committed and tagged. Publish with:\n\n    git push --follow-tags origin main\n`);
