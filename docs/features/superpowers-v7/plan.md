@@ -90,6 +90,7 @@ PR per plugin when upstream tags a newer release. Patch feature-flow for v7 brai
     - `cccc… refs/tags/v8.0.0-beta.1`
 
     Expect `{tag: 'v7.0.0', sha: 'bb92…'}`. Use full 40-hex values.
+
   - `newestTag takes the plain line of a lightweight tag and orders v5.10.0 above v5.9.0`.
   - `newestTag returns undefined without a stable tag`.
   - `pin rewrites only the matching entry`. Run it on the real `.claude-plugin/marketplace.json` with repo
@@ -163,8 +164,8 @@ PR per plugin when upstream tags a newer release. Patch feature-flow for v7 brai
     - `localVersion = (src) => src === './plugins/feature-flow' ? '0.1.1' : undefined`, plus a fourth entry
       `{name:'nover', source:'./plugins/nover'}`
   - Expected: `{ 'feature-flow': '0.1.1', superpowers: '7.0.0' }`.
-  - Also: `` outdated([{ id: `superpowers@${M}`, version: '6.4.2' }], that) `` deep-equals
-    `` [{ id: `superpowers@${M}`, from: '6.4.2', to: '7.0.0' }] ``.
+  - Also: ``outdated([{ id: `superpowers@${M}`, version: '6.4.2' }], that)`` deep-equals
+    ``[{ id: `superpowers@${M}`, from: '6.4.2', to: '7.0.0' }]``.
 - [ ] **Step 2: Run** `node --test installer/`. Expected: FAIL, because `shippedVersions` isn't exported.
 - [ ] **Step 3: Implement** `shippedVersions` and use it in `install.mjs`.
 - [ ] **Step 4: Run** `node --test installer/`. Expected: PASS, including the existing `outdated` test.

@@ -19,6 +19,16 @@
     # Upstream files copied by scripts/sync-*.mjs: fixing them here would churn every sync PR.
     vendored = ["^plugins/(hallmark|mattpocock-picks|pstack-picks|graphify)/" "^plugins/self-review/(LICENSE|agents/|skills/self-review/references/upstream/)"];
 
+    # treefmt with the formatters treefmt.toml names: `nix fmt` and the pre-commit hook.
+    treefmt = system: let
+      pkgs = nixpkgs.legacyPackages.${system};
+    in
+      pkgs.writeShellApplication {
+        name = "treefmt";
+        runtimeInputs = [pkgs.treefmt pkgs.alejandra pkgs.prettier pkgs.rustfmt];
+        text = ''exec treefmt "$@"'';
+      };
+
     preCommit = system: let
       pkgs = nixpkgs.legacyPackages.${system};
 
@@ -37,7 +47,10 @@
       git-hooks.lib.${system}.run {
         src = ./.;
         hooks = {
-          alejandra.enable = true;
+          treefmt = {
+            enable = true;
+            package = treefmt system;
+          };
           check-merge-conflicts.enable = true;
           check-json.enable = true;
           end-of-file-fixer = {
@@ -95,6 +108,6 @@
       };
     });
 
-    formatter = forAllSystems (system: nixpkgs.legacyPackages.${system}.alejandra);
+    formatter = forAllSystems treefmt;
   };
 }

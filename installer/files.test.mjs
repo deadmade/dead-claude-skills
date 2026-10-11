@@ -1,6 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { backup, clearTargets } from './files.mjs';
@@ -36,9 +45,13 @@ test('clean slate: backup copies the targets, clear deletes them but keeps symli
   assert.ok(out.some((l) => l.startsWith('kept') && l.includes('rules')));
 });
 
-test('a failed backup throws, so nothing gets deleted', { skip: process.platform === 'win32' || process.getuid?.() === 0 }, () => {
-  const { root, cfg } = config();
-  chmodSync(join(cfg, 'skills', 'x', 'SKILL.md'), 0o000);
-  assert.throws(() => backup(cfg, join(root, 'backup')));
-  chmodSync(join(cfg, 'skills', 'x', 'SKILL.md'), 0o644);
-});
+test(
+  'a failed backup throws, so nothing gets deleted',
+  { skip: process.platform === 'win32' || process.getuid?.() === 0 },
+  () => {
+    const { root, cfg } = config();
+    chmodSync(join(cfg, 'skills', 'x', 'SKILL.md'), 0o000);
+    assert.throws(() => backup(cfg, join(root, 'backup')));
+    chmodSync(join(cfg, 'skills', 'x', 'SKILL.md'), 0o644);
+  },
+);

@@ -3,8 +3,8 @@ name: tui-review
 on:
   pull_request:
     paths:
-      - "plugins/tui-review/**"
-      - ".github/workflows/tui-review.yml"
+      - 'plugins/tui-review/**'
+      - '.github/workflows/tui-review.yml'
   workflow_dispatch:
 
 permissions:

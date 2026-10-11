@@ -127,20 +127,21 @@ origin/main in the worktree on branch `worktree-superpowers-v7`.
 
 ## Walkthrough
 
-| spec goal | plan task | file:line | test |
-| --------- | --------- | --------- | ---- |
-| 1. superpowers pinned to v7.0.0, ponytail to v5.1.0 (ref + sha) | T1 | `.claude-plugin/marketplace.json:28-29,39-40` | `claude plugin validate .` passed; `npm test` (check-repo) |
-| 2. Weekly PR per plugin on a newer stable tag | T2 | `scripts/sync-plugins.mjs:10,27,35`; `.github/workflows/sync-plugins.yml` | `scripts/sync-plugins.test.mjs:9-51` (6 tests); live dry run v5.0.0→v5.1.0, superpowers unchanged |
-| 2a. New tests run in CI and pre-commit (D2) | T2 | `package.json:9`, `flake.nix:34` | `npm test` 72/72 |
-| 2b. Re-running the installer updates pinned plugins (F3) | T3 | `installer/core.mjs` `shippedVersions`, `installer/install.mjs` | `installer/core.test.mjs:320` |
-| 3. feature-flow Phase 2 for v7 (Size, Skip, Spike, Exit) | T4 | `plugins/feature-flow/skills/feature-flow/SKILL.md:69-79` | grep: no Bounded/Architectural left (prose, no unit test) |
-| 4. Docs say how imported plugins are pinned | T2 | `README.md:87-89`, `THIRD_PARTY.md:60`, `CLAUDE.md:20-25` | review |
+| spec goal                                                       | plan task | file:line                                                                 | test                                                                                              |
+| --------------------------------------------------------------- | --------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| 1. superpowers pinned to v7.0.0, ponytail to v5.1.0 (ref + sha) | T1        | `.claude-plugin/marketplace.json:28-29,39-40`                             | `claude plugin validate .` passed; `npm test` (check-repo)                                        |
+| 2. Weekly PR per plugin on a newer stable tag                   | T2        | `scripts/sync-plugins.mjs:10,27,35`; `.github/workflows/sync-plugins.yml` | `scripts/sync-plugins.test.mjs:9-51` (6 tests); live dry run v5.0.0→v5.1.0, superpowers unchanged |
+| 2a. New tests run in CI and pre-commit (D2)                     | T2        | `package.json:9`, `flake.nix:34`                                          | `npm test` 72/72                                                                                  |
+| 2b. Re-running the installer updates pinned plugins (F3)        | T3        | `installer/core.mjs` `shippedVersions`, `installer/install.mjs`           | `installer/core.test.mjs:320`                                                                     |
+| 3. feature-flow Phase 2 for v7 (Size, Skip, Spike, Exit)        | T4        | `plugins/feature-flow/skills/feature-flow/SKILL.md:69-79`                 | grep: no Bounded/Architectural left (prose, no unit test)                                         |
+| 4. Docs say how imported plugins are pinned                     | T2        | `README.md:87-89`, `THIRD_PARTY.md:60`, `CLAUDE.md:20-25`                 | review                                                                                            |
 
 No goal without code, and no code without a goal. The final review (Opus) found 1 Important issue, fixed: the CRLF regex
 (`e784948`, test "pin works on a CRLF checkout", red then green). It also found 2 Minor issues, deferred: no downgrade
 guard, and the installer assumes the tag matches upstream's plugin.json version. Both are in the ledger.
 
 Not yet verified, because it needs a release and live runs:
+
 - After the next release, re-running the installer should offer superpowers 6.4.2 → 7.0.0.
 - After merge, a `workflow_dispatch` run of sync-plugins should finish with no PR.
 

@@ -53,9 +53,11 @@ review screens. New `installer/ui.mjs` is the only code touching the TTY (`scree
 ### Task 1: `outdated` in core
 
 **Files:**
+
 - Modify: `installer/core.mjs` (append after `unavailable`), `installer/core.test.mjs`
 
 **Interfaces:**
+
 - Produces: `outdated(rows, shipped) -> [{ id, from, to }]`.
   - `rows`: the normalised `claude plugin list --json` array (`{ id, version, scope }`).
   - `shipped`: `{ [pluginName]: version }` for local plugins of this repo.
@@ -69,14 +71,24 @@ review screens. New `installer/ui.mjs` is the only code touching the TTY (`scree
 ```js
 test('outdated compares our shipped versions only, once per id, never downgrading', () => {
   const rows = [
-    { id: `cswap@${M}`, version: '0.1.0', scope: 'user' }, { id: `cswap@${M}`, version: '0.1.0', scope: 'project' },
-    { id: `feature-flow@${M}`, version: '0.1.1' }, { id: `graphify@${M}`, version: '29c78da38ecf' },
-    { id: `hallmark@${M}`, version: '0.2.0' }, { id: `superpowers@${M}`, version: '6.4.2' },
+    { id: `cswap@${M}`, version: '0.1.0', scope: 'user' },
+    { id: `cswap@${M}`, version: '0.1.0', scope: 'project' },
+    { id: `feature-flow@${M}`, version: '0.1.1' },
+    { id: `graphify@${M}`, version: '29c78da38ecf' },
+    { id: `hallmark@${M}`, version: '0.2.0' },
+    { id: `superpowers@${M}`, version: '6.4.2' },
     { id: `code-review@${O}`, version: '1.0.0' },
   ];
-  const shipped = { cswap: '0.1.1', 'feature-flow': '0.1.1', graphify: '0.1.1', hallmark: '0.1.1', 'code-review': '9.9.9' };
+  const shipped = {
+    cswap: '0.1.1',
+    'feature-flow': '0.1.1',
+    graphify: '0.1.1',
+    hallmark: '0.1.1',
+    'code-review': '9.9.9',
+  };
   assert.deepEqual(outdated(rows, shipped), [
-    { id: `cswap@${M}`, from: '0.1.0', to: '0.1.1' }, { id: `graphify@${M}`, from: '29c78da38ecf', to: '0.1.1' },
+    { id: `cswap@${M}`, from: '0.1.0', to: '0.1.1' },
+    { id: `graphify@${M}`, from: '29c78da38ecf', to: '0.1.1' },
   ]);
 });
 ```
@@ -91,9 +103,11 @@ test('outdated compares our shipped versions only, once per id, never downgradin
 ### Task 2: `view.mjs`: frame, wrap, changeList, state machine
 
 **Files:**
+
 - Create: `installer/view.mjs`, `installer/view.test.mjs`
 
 **Interfaces:**
+
 - Consumes: `nameOf`, `TOGGLES`, `HINTS` from `core.mjs`.
 - Produces:
   - `frame(title, lines, { columns, color = 'magenta' }) -> string[]`: a rounded box `columns - 1` wide. The top is
@@ -103,10 +117,10 @@ test('outdated compares our shipped versions only, once per id, never downgradin
   - `wrap(text, width) -> string[]`: word-wraps plain text and hard-breaks words longer than `width`. `note` (Task 4)
     wraps its lines with this before framing, so copyable text is never cut.
   - `data`: `{ version, platform, pages, current, versions: { [key]: string }, disabled: { [key]: true },
-    tokens: string[], describe(key) -> { label, detail }, updates: [{ id, from, to }], core: string,
-    hidden: [{ key, why }] }`. `pages` is `categorize()` output; `platform` is `${process.platform}-${process.arch}`.
+tokens: string[], describe(key) -> { label, detail }, updates: [{ id, from, to }], core: string,
+hidden: [{ key, why }] }`. `pages` is `categorize()` output; `platform` is `${process.platform}-${process.arch}`.
   - `state`: `{ screen: 'start' | 'category' | 'updates' | 'review', cursor: number, page: number, chosen, skip,
-    result? }`. `initial(chosen) -> state` starts at `screen: 'start', cursor: 0, page: 0, skip: {}`.
+result? }`. `initial(chosen) -> state` starts at `screen: 'start', cursor: 0, page: 0, skip: {}`.
   - `changeList(state, data) -> { install, remove, update, on, off, danger, count, unchanged }`. `keys` is
     `data.pages.flatMap((p) => p.keys)`.
     - `install` / `remove`: plugin keys (not in `TOGGLES`) where `chosen` and `current` differ.
@@ -121,6 +135,7 @@ test('outdated compares our shipped versions only, once per id, never downgradin
     end.
 
 Rows on each screen:
+
 - **Start:** one row per page, then `Updates` (shown when `data.updates` has a row for a still-chosen plugin), then
   `Apply`, then `Quit`. The `Core` line isn't a row; the cursor skips it.
 - **Category:** `← Back`, then the page's keys.
@@ -129,7 +144,7 @@ Rows on each screen:
 - **Review:** `Apply`, `Back`, `Quit`. ←/→ and ↑/↓ both move.
 
 - [ ] **Step 1: Write the failing tests** (`view.test.mjs`, FORCE_COLOR header as in Global Constraints). Use a
-  small fixture:
+      small fixture:
   - two pages, `mcp` (`mcp-azure@…`, `mcp-github@…`, `atlassian@…`) and `system` (`sandbox`, `ccstatusline`);
   - `current` with atlassian and sandbox on;
   - one update for atlassian (`0.1.0 → 0.1.1`).
@@ -138,7 +153,10 @@ Rows on each screen:
 test('changeList groups changes and drops updates of removed plugins', () => {
   const s = { ...initial(chosen), chosen: { ...chosen, [azure]: true, [atlassian]: false, ccstatusline: true } };
   const r = changeList(s, data);
-  assert.deepEqual([r.install, r.remove, r.on, r.off, r.danger, r.update], [[azure], [atlassian], ['ccstatusline'], [], [], []]);
+  assert.deepEqual(
+    [r.install, r.remove, r.on, r.off, r.danger, r.update],
+    [[azure], [atlassian], ['ccstatusline'], [], [], []],
+  );
   assert.equal(r.count, 3);
   assert.deepEqual(r.unchanged, { installed: 1, notInstalled: 1 });
 });
@@ -157,8 +175,12 @@ test('enter on a page opens it, esc returns with the page row focused', () => {
   const back = move(s, 'escape', data);
   assert.deepEqual([back.screen, back.cursor], ['start', 0]);
 });
-test('enter on an item toggles it, again undoes it; enter on ← Back returns', () => { /* mcp-azure true, then false; cursor 0 + return → start */ });
-test('updates rows toggle skip; removing the plugin hides its row', () => { /* open Updates, down, return → skip[atlassian] true */ });
+test('enter on an item toggles it, again undoes it; enter on ← Back returns', () => {
+  /* mcp-azure true, then false; cursor 0 + return → start */
+});
+test('updates rows toggle skip; removing the plugin hides its row', () => {
+  /* open Updates, down, return → skip[atlassian] true */
+});
 test('esc on start: quit when idle, ask-quit with changes', () => {
   const idle = { ...initial(chosen), skip: { [atlassian]: true } };
   assert.equal(move(idle, 'escape', data).result, 'quit');
@@ -172,7 +194,10 @@ test('frame cuts long lines and stays one under the width; wrap never cuts', () 
   const out = frame('T', ['x'.repeat(100)], { columns: 30 });
   assert.ok(out.every((l) => plain(l).length === 29));
   assert.ok(plain(out[1]).includes('…'));
-  assert.equal(wrap('https://github.com/settings/personal-access-tokens/new', 20).join(''), 'https://github.com/settings/personal-access-tokens/new');
+  assert.equal(
+    wrap('https://github.com/settings/personal-access-tokens/new', 20).join(''),
+    'https://github.com/settings/personal-access-tokens/new',
+  );
 });
 ```
 
@@ -186,9 +211,11 @@ test('frame cuts long lines and stays one under the width; wrap never cuts', () 
 ### Task 3: `render` for the four screens
 
 **Files:**
+
 - Modify: `installer/view.mjs`, `installer/view.test.mjs`
 
 **Interfaces:**
+
 - Consumes: Task 2's `frame`, `wrap`, `state`, `data` and `changeList`.
 - Produces: `render(state, data, { columns, rows }) -> string[]`. It returns lines with no trailing newline; ui joins
   them with `\n`.
@@ -196,6 +223,7 @@ test('frame cuts long lines and stays one under the width; wrap never cuts', () 
 The layout follows the spec's mockups (Start screen, Category screen, Updates screen, Review screen).
 
 **Start screen:**
+
 - A frame titled `dead-claude-skills <version>`, then the `Core` line (`data.core`).
 - One line per page: `● <title padded to the longest title>  <value>`. The dot and title use the page color; Danger
   is red.
@@ -214,6 +242,7 @@ The layout follows the spec's mockups (Start screen, Category screen, Updates sc
 - The cursor row gets `❯` in bold magenta.
 
 **Category screen:**
+
 - A frame titled with the page title in its color, then the blurb, then a blank line.
 - One row per item, with the state word from the spec's Category screen:
   - versions come from `data.versions`
@@ -225,11 +254,13 @@ The layout follows the spec's mockups (Start screen, Category screen, Updates sc
 - Danger item names are red, and `strip-defaults` adds `one-way, nothing to undo` to its detail.
 
 **Updates screen:**
+
 - The same code path as a category, with the frame titled `Updates`.
 - Each row is `name  from → to  will update|skip`, with `will update` in yellow and `skip` in the normal color.
 - Hint: `↑↓ move  enter update/skip  esc back`.
 
 **Review screen:**
+
 - A frame titled `This will change`, with one line per non-empty group:
   - `Install` and `Turn on`: green
   - `Remove` and `Turn off`: red
@@ -254,14 +285,23 @@ test('start shows kept, pending + and −, none and the Apply count', () => {
   assert.match(lines.map(plain).join('\n'), /Apply 2 changes/);
   assert.ok(lines.join('\n').includes('\x1b[32m+ mcp-azure'));
 });
-test('idle start reads Nothing to change; review says Nothing to change.', () => { /* skip the update first */ });
+test('idle start reads Nothing to change; review says Nothing to change.', () => {
+  /* skip the update first */
+});
 test('category states are words', () => {
   /* will install, will remove (installed 0.1.0), not installed, installed 0.1.0, installed 0.1.0, disabled */
 });
-test('review lists only non-empty groups, token note and platform', () => { /* Install + Remove, no "Turn on"; "(finish in Claude Code)"; "Not available on linux-x64" */ });
+test('review lists only non-empty groups, token note and platform', () => {
+  /* Install + Remove, no "Turn on"; "(finish in Claude Code)"; "Not available on linux-x64" */
+});
 test('every line fits narrow terminals', () => {
-  for (const columns of [20, 40]) for (const screen of ['start', 'category', 'updates', 'review'])
-    assert.ok(render({ ...initial(chosen), screen }, data, { columns, rows: 30 }).every((l) => plain(l).length <= columns - 1));
+  for (const columns of [20, 40])
+    for (const screen of ['start', 'category', 'updates', 'review'])
+      assert.ok(
+        render({ ...initial(chosen), screen }, data, { columns, rows: 30 }).every(
+          (l) => plain(l).length <= columns - 1,
+        ),
+      );
 });
 test('short terminals scroll the list and keep the cursor row', () => {
   /* 7-item page, rows 12, cursor 6 → lines.length <= 12 and the focused label is in the output */
@@ -278,9 +318,11 @@ test('short terminals scroll the list and keep the cursor row', () => {
 ### Task 4: `ui.mjs`, the terminal I/O
 
 **Files:**
+
 - Create: `installer/ui.mjs`, `installer/ui.test.mjs`
 
 **Interfaces:**
+
 - Consumes: `frame` and `wrap` (Task 2).
 - Produces:
   - `screen(state, { move, render }, io = { input: process.stdin, output: process.stdout }) -> Promise<state>`. It
@@ -312,24 +354,43 @@ test('short terminals scroll the list and keep the cursor row', () => {
 
 ```js
 const tty = () => {
-  const input = Object.assign(new PassThrough(), { isTTY: true, isRaw: false, setRawMode(v) { this.isRaw = v; } });
+  const input = Object.assign(new PassThrough(), {
+    isTTY: true,
+    isRaw: false,
+    setRawMode(v) {
+      this.isRaw = v;
+    },
+  });
   const output = Object.assign(new PassThrough(), { isTTY: true, columns: 60, rows: 20 });
   return { input, output };
 };
 test('screen resolves on enter and restores the terminal', async () => {
   const io = tty();
-  const done = screen({ n: 0 }, {
-    move: (s, k) => (k === 'down' ? { ...s, n: s.n + 1 } : k === 'return' ? { ...s, result: 'apply' } : s),
-    render: (s) => [`n=${s.n}`],
-  }, io);
-  io.input.write('\x1b[B'); io.input.write('\r');
+  const done = screen(
+    { n: 0 },
+    {
+      move: (s, k) => (k === 'down' ? { ...s, n: s.n + 1 } : k === 'return' ? { ...s, result: 'apply' } : s),
+      render: (s) => [`n=${s.n}`],
+    },
+    io,
+  );
+  io.input.write('\x1b[B');
+  io.input.write('\r');
   const s = await done;
   assert.deepEqual([s.n, s.result, io.input.isRaw, io.input.isPaused()], [1, 'apply', false, true]);
 });
-test('ctrl-c resolves quit; a throwing move still restores the terminal', async () => { /* \x03 → result 'quit'; move throws → rejects, isRaw false, output has \x1b[?25h */ });
-test('confirm takes y/n and enter, ctrl-c is null', async () => { /* 'n' → false; '\r' with initial true → true; \x03 → null */ });
-test('line returns the typed text, ctrl-c is null', async () => { /* 'clean\r' → 'clean'; '\x03' → null */ });
-test('progress turns a throw into failed', async () => { /* fn throws Error('boom') → { ok: false, err: 'boom' } */ });
+test('ctrl-c resolves quit; a throwing move still restores the terminal', async () => {
+  /* \x03 → result 'quit'; move throws → rejects, isRaw false, output has \x1b[?25h */
+});
+test('confirm takes y/n and enter, ctrl-c is null', async () => {
+  /* 'n' → false; '\r' with initial true → true; \x03 → null */
+});
+test('line returns the typed text, ctrl-c is null', async () => {
+  /* 'clean\r' → 'clean'; '\x03' → null */
+});
+test('progress turns a throw into failed', async () => {
+  /* fn throws Error('boom') → { ok: false, err: 'boom' } */
+});
 ```
 
 - [ ] **Step 2: Run** `node --test installer/ui.test.mjs`. Expected: FAIL, module not found.
@@ -342,11 +403,13 @@ test('progress turns a throw into failed', async () => { /* fn throws Error('boo
 ### Task 5: Wire `install.mjs`, add the update step
 
 **Files:**
+
 - Modify: `installer/install.mjs`: every `p.*` call; `dim` at `:40` and its uses at `:124`, `:412`, `:429-431`,
   `:512`, `:516`, `:521`; the chooser loop at `:419-447`; the plugin steps at `:487-495`.
 - Delete: `installer/tabs.mjs`, `installer/tabs.test.mjs`.
 
 **Interfaces:**
+
 - Consumes: Tasks 1–4.
 
 - [ ] **Step 1: Replace the UI calls** in `install.mjs`, one for one:
@@ -385,14 +448,14 @@ test('progress turns a throw into failed', async () => { /* fn throws Error('boo
   - Loop:
     - `state = await screen(state, { move: (s, k) => move(s, k, data), render: (s, o) => render(s, data, o) })`.
       ui passes `{ columns, rows }` from `output` as `o`.
-    - On `'ask-quit'`: `confirm(\`Quit without applying ${n} changes?\`, false)`. Yes or `null` takes the quit path;
-      No re-enters with `result` cleared.
+    - On `'ask-quit'`: `confirm(\`Quit without applying ${n} changes?\`, false)`. Yes or `null`takes the quit path;
+No re-enters with`result` cleared.
     - On `'quit'`: `Cancelled before installing anything.`, exit 0.
     - On `'apply'`: copy `state.chosen` into `chosen` and continue.
   - Delete `changes()` and the old review note.
 - [ ] **Step 3: Add the update step** after the install/uninstall loops, before prune. For each
-  `changeList(state, data).update` row, run
-  ``run(`Updating ${nameOf(id)} ${from} → ${to}`, `updated ${id} ${from} → ${to}`, 'plugin', 'update', id, '--json')``.
+      `changeList(state, data).update` row, run
+      ``run(`Updating ${nameOf(id)} ${from} → ${to}`, `updated ${id} ${from} → ${to}`, 'plugin', 'update', id, '--json')``.
 - [ ] **Step 4: Delete** with `git rm installer/tabs.mjs installer/tabs.test.mjs`.
 - [ ] **Step 5: Check for leftovers** with `grep -nE '\bp\.|\bdim\b|clack' installer/*.mjs`. Expected: no output.
 - [ ] **Step 6: Run the tests** with `node --test installer/*.test.mjs`. Expected: all pass.
@@ -409,9 +472,9 @@ test('progress turns a throw into failed', async () => { /* fn throws Error('boo
   5. Press ctrl-c on the start screen and at the `Type "clean"` prompt. Expected: the terminal is usable afterwards
      (echo on, cursor visible).
 - [ ] **Step 8: Real CLI check, once.** Run `claude plugin update cswap@dead-claude-skills --json` on a machine where
-  `claude plugin list --json` shows cswap at an older version, after the installer has pinned the marketplace.
-  Expected: `plugin list --json` then reports the shipped version. If it doesn't (it stays put or moves past the
-  tag), stop: that is a deviation.
+      `claude plugin list --json` shows cswap at an older version, after the installer has pinned the marketplace.
+      Expected: `plugin list --json` then reports the shipped version. If it doesn't (it stays put or moves past the
+      tag), stop: that is a deviation.
 - [ ] **Step 9: Commit** with `git add -A installer && git commit -m "Rebuild the installer UI on Node's stdlib."`
 
 ---
@@ -419,15 +482,16 @@ test('progress turns a throw into failed', async () => { /* fn throws Error('boo
 ### Task 6: Drop the dependencies and the shrinkwrap
 
 **Files:**
+
 - Modify: `package.json` (`dependencies`, `files`), `scripts/release.mjs:38-40`, `scripts/check-repo.mjs:49-50`,
   `flake.nix:57`, `README.md:31-36`
 - Delete: `npm-shrinkwrap.json`
 
 - [ ] **Step 1: Remove** `dependencies` and the `"npm-shrinkwrap.json"` entry in `files` from `package.json`. Then
-  run `git rm npm-shrinkwrap.json`.
+      run `git rm npm-shrinkwrap.json`.
 - [ ] **Step 2: Remove** the two `npm-shrinkwrap.json` bump entries in `release.mjs:38-40` (and the comment above
-  the second one). Remove the lockfile read and check at `check-repo.mjs:49-50`. Drop `|npm-shrinkwrap` from the
-  `flake.nix:57` regex, so it reads `(package)\\.json$`, or simplify it to `package\\.json$`.
+      the second one). Remove the lockfile read and check at `check-repo.mjs:49-50`. Drop `|npm-shrinkwrap` from the
+      `flake.nix:57` regex, so it reads `(package)\\.json$`, or simplify it to `package\\.json$`.
 - [ ] **Step 3: README**: rewrite the installer paragraph at `README.md:31-36` to describe the new flow:
   - the start screen, with one line per category;
   - enter opens a category;
@@ -436,10 +500,12 @@ test('progress turns a throw into failed', async () => { /* fn throws Error('boo
   - keys ↑/↓, enter and esc.
 
   Replace the clack/shrinkwrap sentence with: the installer has no npm dependencies.
+
 - [ ] **Step 4: Run the checks**: `grep -rn 'shrinkwrap\|clack' package.json scripts flake.nix README.md installer`
-  should give no output. Then run `node scripts/check-repo.mjs && node --test installer/*.test.mjs`. Expected: no
-  problems, all tests pass.
+      should give no output. Then run `node scripts/check-repo.mjs && node --test installer/*.test.mjs`. Expected: no
+      problems, all tests pass.
 - [ ] **Step 5: Commit** with `git add -A package.json scripts flake.nix README.md npm-shrinkwrap.json && git commit -m "Drop the installer's npm dependencies and the shrinkwrap."`
 
 ## Execution Handoff
+
 Plan complete; execution method chosen at Gate 2.

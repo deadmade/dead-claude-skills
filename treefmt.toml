@@ -1,0 +1,26 @@
+# Run with `nix fmt`; the pre-commit hook checks staged files with it.
+on-unmatched = "debug"
+# Vendored upstream files and the generated hook config: reformatting them would churn every sync.
+excludes = [
+  "plugins/hallmark/**",
+  "plugins/mattpocock-picks/**",
+  "plugins/pstack-picks/**",
+  "plugins/graphify/**",
+  "plugins/self-review/agents/**",
+  "plugins/self-review/skills/self-review/references/upstream/**",
+  ".pre-commit-config.yaml",
+]
+
+[formatter.alejandra]
+command = "alejandra"
+includes = ["*.nix"]
+
+[formatter.prettier]
+command = "prettier"
+options = ["--write"]
+includes = ["*.js", "*.mjs", "*.ts", "*.tsx", "*.json", "*.md", "*.yaml", "*.yml"]
+
+[formatter.rustfmt]
+command = "rustfmt"
+options = ["--edition", "2024"]
+includes = ["*.rs"]

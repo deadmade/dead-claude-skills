@@ -14,7 +14,10 @@ function restore() {
   if (process.stdout.isTTY) process.stdout.write(SHOW);
 }
 process.on('exit', restore);
-for (const [sig, n] of [['SIGTERM', 15], ['SIGHUP', 1]]) {
+for (const [sig, n] of [
+  ['SIGTERM', 15],
+  ['SIGHUP', 1],
+]) {
   process.on(sig, () => {
     restore();
     process.exit(128 + n);
@@ -33,7 +36,9 @@ export function screen(state, { move, render }, { input, output } = STD) {
     let over = false;
     // Keys buffered while a step ran (an Enter pressed during "Installing …") must not answer this screen.
     let ready = false;
-    const settle = setTimeout(() => { ready = true; }, 50);
+    const settle = setTimeout(() => {
+      ready = true;
+    }, 50);
     const draw = () => {
       const lines = render(s, { columns: output.columns ?? 80, rows: output.rows ?? 24 });
       output.write(`${drawn ? `\r${drawn > 1 ? `\x1b[${drawn - 1}A` : ''}\x1b[J` : ''}${lines.join('\n')}`);
@@ -82,17 +87,21 @@ export function screen(state, { move, render }, { input, output } = STD) {
 
 // Yes / No on one line: ←/→ to switch, y/n to pick, enter to confirm. null on ctrl-c.
 export async function confirm(message, initial = true, io = STD) {
-  const s = await screen({ yes: initial }, {
-    move: (st, k) => {
-      if (k === 'left' || k === 'right') return { ...st, yes: !st.yes };
-      if (k === 'y' || k === 'n') return { yes: k === 'y', result: 'done' };
-      return k === 'return' ? { ...st, result: 'done' } : st;
+  const s = await screen(
+    { yes: initial },
+    {
+      move: (st, k) => {
+        if (k === 'left' || k === 'right') return { ...st, yes: !st.yes };
+        if (k === 'y' || k === 'n') return { yes: k === 'y', result: 'done' };
+        return k === 'return' ? { ...st, result: 'done' } : st;
+      },
+      render: (st) => {
+        const choice = (label, on) => (on ? styleText(['bold', 'inverse'], ` ${label} `) : ` ${label} `);
+        return [`${message}  ${choice('Yes', st.yes)} / ${choice('No', !st.yes)}`];
+      },
     },
-    render: (st) => {
-      const choice = (label, on) => (on ? styleText(['bold', 'inverse'], ` ${label} `) : ` ${label} `);
-      return [`${message}  ${choice('Yes', st.yes)} / ${choice('No', !st.yes)}`];
-    },
-  }, io);
+    io,
+  );
   return s.result === 'quit' ? null : s.yes;
 }
 
@@ -117,7 +126,13 @@ export async function line(message, { input, output } = STD) {
 export function note(title, lines) {
   const columns = process.stdout.columns ?? 80;
   const inner = Math.max(columns - 1, 8) - 4;
-  process.stdout.write(`${frame(styleText('bold', title), lines.flatMap((l) => wrap(l, inner)), { columns }).join('\n')}\n`);
+  process.stdout.write(
+    `${frame(
+      styleText('bold', title),
+      lines.flatMap((l) => wrap(l, inner)),
+      { columns },
+    ).join('\n')}\n`,
+  );
 }
 
 // One line per step: label …, then done or failed (with the reason on the next line). fn resolves { ok, err } or throws.
@@ -129,7 +144,9 @@ export async function progress(label, fn) {
   } catch (e) {
     r = { ok: false, err: e.message };
   }
-  process.stdout.write(r.ok ? `${styleText('green', 'done')}\n` : `${styleText('red', 'failed')}\n${r.err ? `  ${r.err}\n` : ''}`);
+  process.stdout.write(
+    r.ok ? `${styleText('green', 'done')}\n` : `${styleText('red', 'failed')}\n${r.err ? `  ${r.err}\n` : ''}`,
+  );
   return r;
 }
 

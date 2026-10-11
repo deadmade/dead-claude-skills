@@ -2,7 +2,7 @@ name: Sync self-review
 
 on:
   schedule:
-    - cron: "30 7 * * 1" # Mondays 07:30 UTC
+    - cron: '30 7 * * 1' # Mondays 07:30 UTC
   workflow_dispatch:
 
 permissions:
@@ -33,8 +33,8 @@ jobs:
         with:
           branch: sync/self-review
           delete-branch: true
-          commit-message: "Sync self-review to claude-plugins-official ${{ steps.check.outputs.official }} and mattpocock/skills ${{ steps.check.outputs.matt }}"
-          title: "Sync self-review upstreams"
+          commit-message: 'Sync self-review to claude-plugins-official ${{ steps.check.outputs.official }} and mattpocock/skills ${{ steps.check.outputs.matt }}'
+          title: 'Sync self-review upstreams'
           body: |
             Automated sync of the review passes vendored in plugins/self-review:
             - https://github.com/anthropics/claude-plugins-official/commit/${{ steps.check.outputs.official }}

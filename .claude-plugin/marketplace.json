@@ -9,9 +9,7 @@
     "name": "deadmade",
     "url": "https://github.com/deadmade"
   },
-  "allowCrossMarketplaceDependenciesOn": [
-    "claude-plugins-official"
-  ],
+  "allowCrossMarketplaceDependenciesOn": ["claude-plugins-official"],
   "plugins": [
     {
       "name": "dead-skills",

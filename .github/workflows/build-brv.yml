@@ -4,7 +4,7 @@ name: Build brv
 # them to the vX.Y.Z release the installer downloads from. A PR that changes this file, or a run by hand, builds only.
 on:
   pull_request:
-    paths: [".github/workflows/build-brv.yml"]
+    paths: ['.github/workflows/build-brv.yml']
   workflow_dispatch:
   workflow_call:
 

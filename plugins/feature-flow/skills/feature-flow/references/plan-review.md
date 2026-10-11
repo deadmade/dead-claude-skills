@@ -10,11 +10,11 @@ Spawn 2–3 `general-purpose` subagents in one message. Each gets: the spec, the
 sections of flow.md, the ADRs, its angle below, and the rubric. If pstack `interrogate` is installed, use its model
 spread (one reviewer per model) instead of one model with three angles.
 
-| Angle | Looks for |
-|---|---|
-| **Correctness** | Spec goals with no task. Failure paths with no handling or no test. Wrong use of an API or library against its docs. Concurrency, retries, ordering, data loss. |
-| **Fit** | Contradictions with existing code (`file:line`). Responsibility in the wrong module. Blast radius: callers, data, wire formats, configs the plan changes without saying so (pstack `blast-radius` if installed). Task order: dependencies, a slice that can't be tested alone. |
-| **Simpler** | Tasks the spec doesn't need. A library or built-in that replaces custom code. A smaller first slice that delivers the core. Divergence from every prior-art approach with no stated reason. |
+| Angle           | Looks for                                                                                                                                                                                                                                                                      |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Correctness** | Spec goals with no task. Failure paths with no handling or no test. Wrong use of an API or library against its docs. Concurrency, retries, ordering, data loss.                                                                                                                |
+| **Fit**         | Contradictions with existing code (`file:line`). Responsibility in the wrong module. Blast radius: callers, data, wire formats, configs the plan changes without saying so (pstack `blast-radius` if installed). Task order: dependencies, a slice that can't be tested alone. |
+| **Simpler**     | Tasks the spec doesn't need. A library or built-in that replaces custom code. A smaller first slice that delivers the core. Divergence from every prior-art approach with no stated reason.                                                                                    |
 
 Reviewer prompt tail:
 

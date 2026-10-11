@@ -33,11 +33,11 @@ HEAD was when it installed or updated. Superpowers moves to 7.0.0 as part of thi
 
 ### Pins: `.claude-plugin/marketplace.json`
 
-| plugin      | source fields added                                                   |
-| ----------- | --------------------------------------------------------------------- |
+| plugin      | source fields added                                                    |
+| ----------- | ---------------------------------------------------------------------- |
 | superpowers | `"ref": "v7.0.0"`, `"sha": "bb92a77741419a4ab5f06e711a283343f1ada0c3"` |
 | ponytail    | `"ref": "v5.1.0"`, `"sha": "9cc65d03aa2da1db7121b912d03596409ee340b8"` |
-| atlassian   | none                                                                  |
+| atlassian   | none                                                                   |
 
 These shas were resolved on 2026-10-11 with `git ls-remote`. superpowers' v7.0.0 tag is annotated, so its pin uses the
 peeled `^{}` commit and not the tag object `7f043e5…`. When both fields are set, Claude Code checks out `sha`

@@ -9,24 +9,43 @@ const azure = `mcp-azure@${M}`;
 const github = `mcp-github@${M}`;
 const atlassian = `atlassian@${M}`;
 const pages = [
-  { id: 'mcp', title: 'Integrations', blurb: 'MCP servers for the services you work with.', keys: [azure, github, atlassian] },
-  { id: 'system', title: 'System', blurb: 'Status line, sandbox and command guard.', keys: ['sandbox', 'ccstatusline'] },
+  {
+    id: 'mcp',
+    title: 'Integrations',
+    blurb: 'MCP servers for the services you work with.',
+    keys: [azure, github, atlassian],
+  },
+  {
+    id: 'system',
+    title: 'System',
+    blurb: 'Status line, sandbox and command guard.',
+    keys: ['sandbox', 'ccstatusline'],
+  },
 ];
 const current = { [azure]: false, [github]: false, [atlassian]: true, sandbox: true, ccstatusline: false };
 const chosen = { ...current };
 const data = {
-  version: '0.1.1', platform: 'linux-x64', pages, current,
-  versions: { [atlassian]: '0.1.0' }, disabled: {}, tokens: [github],
+  version: '0.1.1',
+  platform: 'linux-x64',
+  pages,
+  current,
+  versions: { [atlassian]: '0.1.0' },
+  disabled: {},
+  tokens: [github],
   describe: (k) => ({ label: k.split('@')[0], detail: `About ${k.split('@')[0]}.` }),
   updates: [{ id: atlassian, from: '0.1.0', to: '0.1.1' }],
-  core: 'dead-skills + 7, always installed', hidden: [{ key: `nix-lsp@${M}`, why: 'nixd is not available' }],
+  core: 'dead-skills + 7, always installed',
+  hidden: [{ key: `nix-lsp@${M}`, why: 'nixd is not available' }],
 };
 const press = (s, ...keys) => keys.reduce((st, k) => move(st, k, data), s);
 
 test('changeList groups changes and drops updates of removed plugins', () => {
   const s = { ...initial(chosen), chosen: { ...chosen, [azure]: true, [atlassian]: false, ccstatusline: true } };
   const r = changeList(s, data);
-  assert.deepEqual([r.install, r.remove, r.on, r.off, r.danger, r.update], [[azure], [atlassian], ['ccstatusline'], [], [], []]);
+  assert.deepEqual(
+    [r.install, r.remove, r.on, r.off, r.danger, r.update],
+    [[azure], [atlassian], ['ccstatusline'], [], [], []],
+  );
   assert.equal(r.count, 3);
   assert.deepEqual(r.unchanged, { installed: 1, notInstalled: 1 });
 });
@@ -83,7 +102,10 @@ test('Apply opens review; review Apply/Back/Quit', () => {
 
 test('frame cuts long lines and stays one under the width; wrap never cuts', () => {
   const out = frame('T', ['x'.repeat(100), 'short'], { columns: 30 });
-  assert.ok(out.every((l) => plain(l).length === 29), out.map(plain).join('\n'));
+  assert.ok(
+    out.every((l) => plain(l).length === 29),
+    out.map(plain).join('\n'),
+  );
   assert.ok(plain(out[1]).includes('…'));
   const url = 'https://github.com/settings/personal-access-tokens/new';
   assert.equal(wrap(url, 20).join(''), url);
@@ -110,12 +132,20 @@ test('start lists updates; idle start reads Nothing to change and so does the re
 });
 
 test('empty categories read none', () => {
-  const d = { ...data, pages: [...pages, { id: 'lsp', title: 'Language servers', blurb: 'b', keys: [`nix-lsp@${M}`] }] };
+  const d = {
+    ...data,
+    pages: [...pages, { id: 'lsp', title: 'Language servers', blurb: 'b', keys: [`nix-lsp@${M}`] }],
+  };
   assert.match(text(initial(chosen), d), /Language servers\s+none/);
 });
 
 test('category states are words', () => {
-  const s = { ...initial(chosen), screen: 'category', page: 0, chosen: { ...chosen, [azure]: true, [atlassian]: false } };
+  const s = {
+    ...initial(chosen),
+    screen: 'category',
+    page: 0,
+    chosen: { ...chosen, [azure]: true, [atlassian]: false },
+  };
   const out = text(s);
   assert.match(out, /mcp-azure\s+will install/);
   assert.match(out, /mcp-github\s+not installed/);
@@ -141,7 +171,11 @@ test('updates screen shows from → to and skip', () => {
 });
 
 test('review lists only non-empty groups, token note and platform', () => {
-  const s = { ...initial(chosen), screen: 'review', chosen: { ...chosen, [azure]: true, [github]: true, [atlassian]: false } };
+  const s = {
+    ...initial(chosen),
+    screen: 'review',
+    chosen: { ...chosen, [azure]: true, [github]: true, [atlassian]: false },
+  };
   const out = text(s);
   assert.match(out, /Install\s+mcp-azure/);
   assert.match(out, /mcp-github \(finish in Claude Code\)/);
@@ -155,8 +189,14 @@ test('review lists only non-empty groups, token note and platform', () => {
 test('every line fits narrow terminals', () => {
   for (const columns of [20, 40]) {
     for (const screen of ['start', 'category', 'updates', 'review']) {
-      const lines = render({ ...initial(chosen), screen, chosen: { ...chosen, [azure]: true } }, data, { columns, rows: 30 });
-      assert.ok(lines.every((l) => plain(l).length <= columns - 1), `${screen}@${columns}\n${lines.map(plain).join('\n')}`);
+      const lines = render({ ...initial(chosen), screen, chosen: { ...chosen, [azure]: true } }, data, {
+        columns,
+        rows: 30,
+      });
+      assert.ok(
+        lines.every((l) => plain(l).length <= columns - 1),
+        `${screen}@${columns}\n${lines.map(plain).join('\n')}`,
+      );
     }
   }
 });
@@ -172,13 +212,23 @@ test('short terminals scroll the list and keep the cursor row', () => {
 test('every screen fits short, narrow terminals', () => {
   const keys = [1, 2, 3, 4, 5, 6, 7].map((i) => `p${i}@${M}`);
   const long = 'A long description that wraps over several lines on a narrow terminal. '.repeat(3);
-  const d = { ...data, describe: () => ({ label: 'p', detail: long }),
-    pages: [{ id: 'workflow', title: 'Workflows & skills', blurb: long, keys }, ...pages] };
+  const d = {
+    ...data,
+    describe: () => ({ label: 'p', detail: long }),
+    pages: [{ id: 'workflow', title: 'Workflows & skills', blurb: long, keys }, ...pages],
+  };
   const many = { ...initial({}), chosen: Object.fromEntries(keys.map((k) => [k, true])) };
-  for (const [columns, rows] of [[30, 12], [20, 12], [80, 10]]) {
+  for (const [columns, rows] of [
+    [30, 12],
+    [20, 12],
+    [80, 10],
+  ]) {
     for (const s of [{ ...many, screen: 'category', cursor: 7 }, { ...many, screen: 'review' }, many]) {
       const lines = render(s, d, { columns, rows });
-      assert.ok(lines.length <= rows, `${s.screen}@${columns}x${rows}: ${lines.length}\n${lines.map(plain).join('\n')}`);
+      assert.ok(
+        lines.length <= rows,
+        `${s.screen}@${columns}x${rows}: ${lines.length}\n${lines.map(plain).join('\n')}`,
+      );
     }
   }
   const review = render({ ...many, screen: 'review' }, d, { columns: 80, rows: 10 }).map(plain);

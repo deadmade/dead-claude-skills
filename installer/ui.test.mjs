@@ -4,10 +4,19 @@ import { PassThrough } from 'node:stream';
 import { confirm, line, progress, screen } from './ui.mjs';
 
 const tty = () => {
-  const input = Object.assign(new PassThrough(), { isTTY: true, isRaw: false, setRawMode(v) { this.isRaw = v; return this; } });
+  const input = Object.assign(new PassThrough(), {
+    isTTY: true,
+    isRaw: false,
+    setRawMode(v) {
+      this.isRaw = v;
+      return this;
+    },
+  });
   const output = Object.assign(new PassThrough(), { isTTY: true, columns: 60, rows: 20 });
   let written = '';
-  output.on('data', (d) => { written += d; });
+  output.on('data', (d) => {
+    written += d;
+  });
   return { input, output, written: () => written };
 };
 // screen() drops keys from its first 50 ms (type-ahead from a running step).
@@ -30,7 +39,11 @@ test('screen resolves on enter and restores the terminal', async () => {
 
 test('screen maps enter, ignoring the one right after return', async () => {
   const io = tty();
-  const done = screen({ n: 0 }, { ...counter, move: (s, k) => (k === 'return' ? { ...s, n: s.n + 1, result: s.n ? 'apply' : undefined } : s) }, io);
+  const done = screen(
+    { n: 0 },
+    { ...counter, move: (s, k) => (k === 'return' ? { ...s, n: s.n + 1, result: s.n ? 'apply' : undefined } : s) },
+    io,
+  );
   await settle();
   io.input.write('\r\n');
   io.input.write('\n');
@@ -48,7 +61,16 @@ test('ctrl-c resolves quit', async () => {
 
 test('a throwing move still restores the terminal', async () => {
   const io = tty();
-  const done = screen({ n: 0 }, { ...counter, move: () => { throw new Error('boom'); } }, io);
+  const done = screen(
+    { n: 0 },
+    {
+      ...counter,
+      move: () => {
+        throw new Error('boom');
+      },
+    },
+    io,
+  );
   await settle();
   io.input.write('\x1b[B');
   await assert.rejects(done, /boom/);
@@ -84,7 +106,9 @@ test('line returns the typed text, ctrl-c is null', async () => {
 });
 
 test('progress turns a throw into failed', async () => {
-  const r = await progress('Downloading brv', async () => { throw new Error('boom'); });
+  const r = await progress('Downloading brv', async () => {
+    throw new Error('boom');
+  });
   assert.deepEqual(r, { ok: false, err: 'boom' });
   assert.deepEqual(await progress('Installing x', async () => ({ ok: true })), { ok: true });
 });
@@ -94,7 +118,9 @@ test('keys typed before a prompt opens do not answer it', async () => {
   io.input.write('\r');
   const done = confirm('Write?', true, io);
   let settled = false;
-  done.then(() => { settled = true; });
+  done.then(() => {
+    settled = true;
+  });
   await new Promise((r) => setTimeout(r, 30));
   assert.equal(settled, false);
   await new Promise((r) => setTimeout(r, 150));

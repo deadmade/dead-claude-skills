@@ -2,7 +2,7 @@ name: Sync hallmark
 
 on:
   schedule:
-    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+    - cron: '0 6 * * 1' # Mondays 06:00 UTC
   workflow_dispatch:
 
 permissions:
@@ -30,8 +30,8 @@ jobs:
         with:
           branch: sync/hallmark
           delete-branch: true
-          commit-message: "Sync hallmark to ${{ steps.check.outputs.sha }}"
-          title: "Sync hallmark to ${{ steps.check.outputs.sha }}"
+          commit-message: 'Sync hallmark to ${{ steps.check.outputs.sha }}'
+          title: 'Sync hallmark to ${{ steps.check.outputs.sha }}'
           body: |
             Automated sync of `skills/hallmark` from https://github.com/nutlope/hallmark at
             https://github.com/nutlope/hallmark/commit/${{ steps.check.outputs.sha }}.
