@@ -1,6 +1,6 @@
 ---
 name: self-review
-description: 'Review your own branch before opening a PR: a confidence-scored bug pass, a spec pass and a standards pass, and specialist agents for error handling, tests, types and comments, all in parallel, then one ranked report and fixes for the findings you pick. Never posts anything. Use for /self-review [base].'
+description: 'Review your own branch before opening a PR: a confidence-scored bug pass, a spec pass, a standards pass, a security pass, a CLAUDE.md audit, and specialist agents for error handling, tests, types and comments, all in parallel, then one ranked report and fixes for the findings you pick. Never posts anything. Use for /self-review [base].'
 disable-model-invocation: true
 argument-hint: '[base branch or commit]'
 ---
@@ -10,7 +10,8 @@ argument-hint: '[base branch or commit]'
 The user is about to open a PR and wants it reviewed first. Run every pass in parallel on the local diff, give one
 report, fix what they pick. Nothing is posted to GitHub or anywhere else.
 
-The passes are vendored in this plugin (synced weekly, don't edit them):
+The first four passes are vendored in this plugin (synced weekly, don't edit them); the last two come from Claude Code
+and the claude-md-management plugin:
 
 | Pass        | Instructions                                                                                                  | Catches                                                                                |
 | ----------- | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
@@ -18,6 +19,8 @@ The passes are vendored in this plugin (synced weekly, don't edit them):
 | Spec        | [references/upstream/spec-standards-review.md](references/upstream/spec-standards-review.md)                  | missing or wrong requirements, scope creep                                             |
 | Standards   | same file                                                                                                     | breaches of the repo's documented standards, code smells                               |
 | Specialists | agents `self-review:silent-failure-hunter`, `:pr-test-analyzer`, `:type-design-analyzer`, `:comment-analyzer` | swallowed errors, test gaps, weak types, stale comments                                |
+| Security    | the built-in `security-review` skill                                                                          | exploitable vulnerabilities in the diff                                                |
+| CLAUDE.md   | `claude-md-management:claude-md-improver`, when installed                                                     | CLAUDE.md files the diff made stale, and gaps a future session would trip on           |
 
 ## Rules for the whole run
 
@@ -61,6 +64,12 @@ One message, every agent in parallel:
 - **Spec and Standards:** follow the upstream spec-standards-review.md, steps 3 and 4, with the diff, spec and
   standards from Phases 1 and 2. Its tracker setup (`/setup-matt-pocock-skills`) isn't needed: Phase 2 found the
   spec.
+- **Security**, always: an agent that loads the built-in `security-review` skill and follows it, with the diff from
+  Phase 1 in place of the branch diff the skill builds itself (that one leaves out uncommitted work).
+- **CLAUDE.md**, always, when claude-md-management is installed: an agent that loads
+  `claude-md-management:claude-md-improver` and runs its discovery, assessment and proposed diffs, but applies
+  nothing. Give it the diff too, and have it lead with the statements in any CLAUDE.md that the diff made untrue.
+  Its proposed diffs are findings like any other and get applied in Phase 5.
 - **Specialists**, by what the diff touches. Give each the diff command, the file list and the intent:
   - `self-review:silent-failure-hunter`: try/catch, error returns, fallbacks, retries, default values on failure
   - `self-review:pr-test-analyzer`: whenever non-test source changed
@@ -70,14 +79,13 @@ One message, every agent in parallel:
   - pstack `blast-radius`, for changes to shared code, public interfaces, data, wire formats or config. pstack skills
     can't be loaded with the Skill tool: read
     `${CLAUDE_SKILL_DIR}/../../../../pstack-picks/*/skills/blast-radius/SKILL.md` and follow it.
-  - `claude-security`, or the built-in `security-review`, for auth, input parsing, secrets, file paths, shelling out
-    or SQL.
 
 Tell the user which passes are running and which were skipped, and why, in one line.
 
 **Small diff** (at most 3 files and about 50 changed lines of code): agents cost more than they find here. Run the
 passes yourself, one after another, each with its own checklist (the bug pass's angles and false-positive list, both
-upstream axes, each applicable specialist's agent file under `${CLAUDE_SKILL_DIR}/../../agents/`), and say you did.
+upstream axes, each applicable specialist's agent file under `${CLAUDE_SKILL_DIR}/../../agents/`, and the security and
+CLAUDE.md skills loaded with the Skill tool), and say you did.
 Everything else stays the same, the report format included.
 
 ## Phase 4: Report

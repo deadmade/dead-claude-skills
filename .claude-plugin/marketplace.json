@@ -98,7 +98,7 @@
     },
     {
       "name": "self-review",
-      "description": "/self-review: review your branch before opening a PR. Bug pass, spec and standards pass, and specialist agents (vendored from code-review, pr-review-toolkit and mattpocock) in one command, then fixes what you pick. Opt-in.",
+      "description": "/self-review: review your branch before opening a PR. Bug pass, spec and standards pass, security-review, a CLAUDE.md audit, and specialist agents (vendored from code-review, pr-review-toolkit and mattpocock) in one command, then fixes what you pick. Opt-in.",
       "source": "./plugins/self-review",
       "category": "development"
     },

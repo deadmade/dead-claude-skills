@@ -18,12 +18,14 @@ this right before opening a PR and wants to know what would embarrass them in re
 
 Bug-pass findings are already verified by their score. For every other finding, trace a realistic path from a real
 caller or input to the failure, reading the code. Drop what doesn't hold up, what is pre-existing on lines the
-branch didn't touch, and what lint, the typechecker or CI would catch anyway. Count what you dropped.
+branch didn't touch (except the CLAUDE.md audit's, which looks at the whole file by design), and what lint, the
+typechecker or CI would catch anyway. Count what you dropped.
 
 ## Buckets
 
-- **Fix before PR:** a real bug, a breach of a documented standard, a silent failure, a missing test for a behavior
-  the branch adds, or anything a reviewer would block on.
+- **Fix before PR:** a real bug, a security vulnerability, a breach of a documented standard, a silent failure, a
+  missing test for a behavior the branch adds, a CLAUDE.md statement the branch made untrue, or anything a reviewer
+  would block on. CLAUDE.md gaps the branch didn't cause go under Consider.
 - **Consider:** a legitimate point whose fix might not be worth it now. Say the trade-off.
 - **Noted:** valid, low impact. One line each.
 - **Dismissed:** raised by a pass but wrong, nitpicky or missing context. One line each, with the reason.
@@ -33,7 +35,7 @@ branch didn't touch, and what lint, the typechecker or CI would catch anyway. Co
 ```markdown
 ## Self-review: <branch> ← <base>
 
-Passes: bugs, spec, standards, silent-failure-hunter, pr-test-analyzer (skipped: type-design-analyzer, no new types)
+Passes: bugs, spec, standards, security, claude-md, silent-failure-hunter, pr-test-analyzer (skipped: type-design-analyzer, no new types)
 
 **Verdict:** not ready, 2 to fix before PR
 
