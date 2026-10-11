@@ -38,7 +38,7 @@ const bumps = [
   [".claude-plugin/marketplace.json", json],
   ...readdirSync("plugins").map((p) => [`plugins/${p}/.claude-plugin/plugin.json`, json]),
   ["plugins/tui-review/brv/Cargo.toml", /^(version = )"[^"]*"/m],
-  ["plugins/tui-review/brv/Cargo.lock", /^(name = "brv"\nversion = )"[^"]*"/m],
+  ["plugins/tui-review/brv/Cargo.lock", /^(name = "brv"\r?\nversion = )"[^"]*"/m],
 ];
 const files = bumps.map(([f]) => f);
 for (const [f, version] of bumps) {
