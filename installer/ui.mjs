@@ -31,6 +31,9 @@ export function screen(state, { move, render }, { input, output } = STD) {
     let drawn = 0;
     let afterReturn = false;
     let over = false;
+    // Keys buffered while a step ran (an Enter pressed during "Installing …") must not answer this screen.
+    let ready = false;
+    const settle = setTimeout(() => { ready = true; }, 50);
     const draw = () => {
       const lines = render(s, { columns: output.columns ?? 80, rows: output.rows ?? 24 });
       output.write(`${drawn ? `\r${drawn > 1 ? `\x1b[${drawn - 1}A` : ''}\x1b[J` : ''}${lines.join('\n')}`);
@@ -39,6 +42,7 @@ export function screen(state, { move, render }, { input, output } = STD) {
     const finish = (err, value) => {
       if (over) return;
       over = true;
+      clearTimeout(settle);
       input.off('keypress', onKey);
       output.off('resize', draw);
       rl.close();
@@ -52,6 +56,7 @@ export function screen(state, { move, render }, { input, output } = STD) {
       if (over) return;
       try {
         if (key.ctrl && key.name === 'c') return finish(null, { ...s, result: 'quit' });
+        if (!ready) return;
         let name = key.name;
         // \r\n arrives as return + enter: one press.
         const skip = name === 'enter' && afterReturn;

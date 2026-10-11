@@ -45,8 +45,12 @@ export function wrap(text, w) {
 
 export const initial = (chosen) => ({ screen: 'start', cursor: 0, page: 0, chosen, skip: {} });
 
-// Updates of plugins that stay installed; skipped ones included, so the Updates screen can untick them.
-const liveUpdates = (s, data) => data.updates.filter((u) => s.chosen[u.id] ?? true);
+// Updates of plugins that stay installed (bundle plugins aren't on any page and always do); skipped ones included,
+// so the Updates screen can untick them.
+const liveUpdates = (s, data) => {
+  const keys = data.pages.flatMap((p) => p.keys);
+  return data.updates.filter((u) => !keys.includes(u.id) || s.chosen[u.id]);
+};
 
 export function changeList(s, data) {
   const keys = data.pages.flatMap((p) => p.keys);
@@ -60,6 +64,8 @@ export function changeList(s, data) {
     off: keys.filter((k) => toggle(k) && diff(k) && !s.chosen[k]),
     danger: keys.filter((k) => DANGER.includes(k) && s.chosen[k] && !data.current[k]),
     update: liveUpdates(s, data).filter((u) => !s.skip[u.id]),
+    // strip-defaults and clean remove every foreign plugin and marketplace on each run they're on.
+    sweep: s.chosen['strip-defaults'] || s.chosen.clean ? data.sweep ?? [] : [],
   };
   const changed = keys.filter(diff);
   return {
@@ -168,7 +174,12 @@ function scroll(lines, cursor, size) {
   return lines.slice(start, start + size);
 }
 
-function startScreen(s, data, columns) {
+// At most n lines; a cut ends in …. For the wrapped blurb and description.
+const cap = (lines, n) => (lines.length <= n ? lines : [...lines.slice(0, n - 1), `${stripVTControlCharacters(lines[n - 1])}…`].slice(0, n));
+// At most n lines, the rest summed up as "… N more". For the review's groups.
+const more = (lines, n) => (lines.length <= n ? lines : [...lines.slice(0, Math.max(n - 1, 0)), `… ${lines.length - Math.max(n - 1, 0)} more`].slice(0, Math.max(n, 1)));
+
+function startScreen(s, data, { columns, rows: height }) {
   const rows = rowsOf(s, data);
   const at = (kind, i) => rows[s.cursor]?.kind === kind && (i === undefined || rows[s.cursor].i === i);
   const titleW = Math.max(...data.pages.map((p) => width(p.title)));
@@ -184,8 +195,10 @@ function startScreen(s, data, columns) {
       : []),
   ];
   const apply = ups.count ? styleText(['bold', 'green', 'inverse'], ` Apply ${ups.count} changes `) : 'Nothing to change';
+  // Frame top and bottom plus the two lines under it; the body scrolls around the focused row.
+  const focus = at('updates') ? body.length - 1 : 1 + (rows[s.cursor]?.i ?? 0);
   return [
-    ...frame(`${styleText(['bold', 'magenta'], 'dead-claude-skills')} ${data.version}`, body, { columns }),
+    ...frame(`${styleText(['bold', 'magenta'], 'dead-claude-skills')} ${data.version}`, scroll(body, focus, Math.max(1, height - 4)), { columns }),
     `${pointer(at('apply'))} ${apply}   ${pointer(at('quit'))} Quit`,
     '↑↓ move  enter open  esc quit',
   ];
@@ -211,23 +224,25 @@ function listScreen(s, data, { columns, rows: height }) {
   const detail = focused?.kind === 'item'
     ? [data.describe(focused.key).detail, focused.key === 'strip-defaults' && 'one-way, nothing to undo'].filter(Boolean).join(' · ')
     : '';
-  const head = updates ? [] : [...wrap(page.blurb, inner), ''];
-  const tail = detail ? ['', ...wrap(detail, inner)] : [];
-  // Frame top and bottom, plus the hint line under it.
+  let head = updates ? [] : [...cap(wrap(page.blurb, inner), 1), ''];
+  let tail = detail ? ['', ...cap(wrap(detail, inner), 2)] : [];
+  // Frame top and bottom plus the hint line under it; on tiny terminals the list wins over blurb and description.
+  if (head.length + tail.length + 4 > height) tail = [];
+  if (head.length + tail.length + 4 > height) head = [];
   const size = Math.max(1, height - head.length - tail.length - 3);
   const title = updates ? 'Updates' : styleText(['bold', COLORS[page.id] ?? 'white'], page.title);
   const hint = updates ? '↑↓ move  enter update/skip  esc back' : '↑↓ move  enter install/remove  esc back';
   return [...frame(title, [...head, ...scroll(lines, s.cursor, size), ...tail], { columns }), hint];
 }
 
-function reviewScreen(s, data, columns) {
+function reviewScreen(s, data, { columns, rows: height }) {
   const inner = Math.max(columns - 1, 8) - 4;
   const c = changeList(s, data);
   const name = (k) => `${nameOf(k)}${data.tokens.includes(k) ? ' (finish in Claude Code)' : ''}`;
   const nameW = Math.max(0, ...c.update.map((u) => width(nameOf(u.id))));
   const groups = [
     ['Install', 'green', c.install.map(name)],
-    ['Remove', 'red', c.remove.map(name)],
+    ['Remove', 'red', [...c.remove.map(name), ...c.sweep]],
     ['Update', 'yellow', c.update.map((u) => `${pad(nameOf(u.id), nameW)}  ${u.from} → ${u.to}`)],
     ['Turn on', 'green', c.on.map((k) => LABELS[k] ?? k)],
     ['Turn off', 'red', c.off.map((k) => LABELS[k] ?? k)],
@@ -240,18 +255,21 @@ function reviewScreen(s, data, columns) {
   const hidden = data.hidden.length
     ? wrap(`Not available on ${data.platform}: ${data.hidden.map((h) => `${nameOf(h.key)} (${h.why})`).join(', ')}`, inner)
     : [];
+  // Frame top and bottom, the blank and Unchanged lines, and the choices row.
+  const room = Math.max(1, height - 5 - hidden.length);
   const choices = [c.count ? `Apply ${c.count} changes` : 'Apply', 'Back', 'Quit']
     .map((t, i) => `${pointer(i === s.cursor)} ${i === 0 && c.count ? styleText(['bold', 'green'], t) : t}`).join('   ');
   return [
-    ...frame(styleText('bold', 'This will change'), [...body, '', `Unchanged: ${c.unchanged.installed} installed, ${c.unchanged.notInstalled} not installed`, ...hidden], { columns }),
+    ...frame(styleText('bold', 'This will change'), [...more(body, room), '', `Unchanged: ${c.unchanged.installed} installed, ${c.unchanged.notInstalled} not installed`, ...hidden], { columns }),
     choices,
   ];
 }
 
 // The lines for state's screen, each at most columns - 1 wide.
 export function render(s, data, { columns, rows }) {
-  const lines = s.screen === 'start' ? startScreen(s, data, columns)
-    : s.screen === 'review' ? reviewScreen(s, data, columns)
-      : listScreen(s, data, { columns, rows });
+  const size = { columns, rows };
+  const lines = s.screen === 'start' ? startScreen(s, data, size)
+    : s.screen === 'review' ? reviewScreen(s, data, size)
+      : listScreen(s, data, size);
   return lines.map((l) => fitLine(l, columns));
 }

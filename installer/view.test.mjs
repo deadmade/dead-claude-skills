@@ -168,3 +168,30 @@ test('short terminals scroll the list and keep the cursor row', () => {
   assert.ok(lines.length <= 12, lines.map(plain).join('\n'));
   assert.match(lines.map(plain).join('\n'), /❯ p7/);
 });
+
+test('every screen fits short, narrow terminals', () => {
+  const keys = [1, 2, 3, 4, 5, 6, 7].map((i) => `p${i}@${M}`);
+  const long = 'A long description that wraps over several lines on a narrow terminal. '.repeat(3);
+  const d = { ...data, describe: () => ({ label: 'p', detail: long }),
+    pages: [{ id: 'workflow', title: 'Workflows & skills', blurb: long, keys }, ...pages] };
+  const many = { ...initial({}), chosen: Object.fromEntries(keys.map((k) => [k, true])) };
+  for (const [columns, rows] of [[30, 12], [20, 12], [80, 10]]) {
+    for (const s of [{ ...many, screen: 'category', cursor: 7 }, { ...many, screen: 'review' }, many]) {
+      const lines = render(s, d, { columns, rows });
+      assert.ok(lines.length <= rows, `${s.screen}@${columns}x${rows}: ${lines.length}\n${lines.map(plain).join('\n')}`);
+    }
+  }
+  const review = render({ ...many, screen: 'review' }, d, { columns: 80, rows: 10 }).map(plain);
+  assert.match(review.at(-1), /Apply 9 changes/);
+  assert.ok(review.some((l) => /… \d+ more/.test(l)));
+});
+
+test('review lists what strip-defaults sweeps away and counts it', () => {
+  const d = { ...data, sweep: [`foreign@other`, 'marketplace other'] };
+  const s = { ...initial({ ...chosen, 'strip-defaults': true }), screen: 'review' };
+  const out = text(s, d);
+  assert.match(out, /Remove\s+foreign@other/);
+  assert.match(out, /marketplace other/);
+  assert.equal(changeList(s, d).count, 3); // 2 swept + the atlassian update (no danger page in the fixture)
+  assert.equal(changeList({ ...s, chosen }, d).count, 1);
+});

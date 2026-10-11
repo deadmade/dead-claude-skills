@@ -397,6 +397,11 @@ const data = {
   updates: outdated(rows, shipped),
   core: `${BUNDLE} + ${bundle.dependencies.length}, always installed`,
   hidden,
+  // What strip-defaults / clean remove on top of the choices, so the review shows it.
+  sweep: [
+    ...new Set([...foreignPlugins(installedIds, managed), ...duplicates(installedIds, managed)]),
+    ...foreignMarketplaces(marketplaces.map((m) => m.name)).map((n) => `marketplace ${n}`),
+  ],
 };
 
 let state = initial({ ...chosen });

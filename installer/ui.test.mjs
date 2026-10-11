@@ -10,6 +10,8 @@ const tty = () => {
   output.on('data', (d) => { written += d; });
   return { input, output, written: () => written };
 };
+// screen() drops keys from its first 50 ms (type-ahead from a running step).
+const settle = () => new Promise((r) => setTimeout(r, 60));
 const counter = {
   move: (s, k) => (k === 'down' ? { ...s, n: s.n + 1 } : k === 'return' ? { ...s, result: 'apply' } : s),
   render: (s) => [`n=${s.n}`],
@@ -18,6 +20,7 @@ const counter = {
 test('screen resolves on enter and restores the terminal', async () => {
   const io = tty();
   const done = screen({ n: 0 }, counter, io);
+  await settle();
   io.input.write('\x1b[B');
   io.input.write('\r');
   const s = await done;
@@ -28,6 +31,7 @@ test('screen resolves on enter and restores the terminal', async () => {
 test('screen maps enter, ignoring the one right after return', async () => {
   const io = tty();
   const done = screen({ n: 0 }, { ...counter, move: (s, k) => (k === 'return' ? { ...s, n: s.n + 1, result: s.n ? 'apply' : undefined } : s) }, io);
+  await settle();
   io.input.write('\r\n');
   io.input.write('\n');
   assert.equal((await done).n, 2);
@@ -36,6 +40,7 @@ test('screen maps enter, ignoring the one right after return', async () => {
 test('ctrl-c resolves quit', async () => {
   const io = tty();
   const done = screen({ n: 0 }, counter, io);
+  await settle();
   io.input.write('\x03');
   const s = await done;
   assert.deepEqual([s.result, io.input.isRaw], ['quit', false]);
@@ -44,6 +49,7 @@ test('ctrl-c resolves quit', async () => {
 test('a throwing move still restores the terminal', async () => {
   const io = tty();
   const done = screen({ n: 0 }, { ...counter, move: () => { throw new Error('boom'); } }, io);
+  await settle();
   io.input.write('\x1b[B');
   await assert.rejects(done, /boom/);
   assert.deepEqual([io.input.isRaw, io.input.isPaused()], [false, true]);
@@ -54,6 +60,7 @@ test('confirm takes y/n and enter, ctrl-c is null', async () => {
   const ask = async (keys, initial) => {
     const io = tty();
     const done = confirm('Write?', initial, io);
+    await settle();
     io.input.write(keys);
     return done;
   };
@@ -80,4 +87,17 @@ test('progress turns a throw into failed', async () => {
   const r = await progress('Downloading brv', async () => { throw new Error('boom'); });
   assert.deepEqual(r, { ok: false, err: 'boom' });
   assert.deepEqual(await progress('Installing x', async () => ({ ok: true })), { ok: true });
+});
+
+test('keys typed before a prompt opens do not answer it', async () => {
+  const io = tty();
+  io.input.write('\r');
+  const done = confirm('Write?', true, io);
+  let settled = false;
+  done.then(() => { settled = true; });
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(settled, false);
+  await new Promise((r) => setTimeout(r, 150));
+  io.input.write('n');
+  assert.equal(await done, false);
 });
