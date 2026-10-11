@@ -236,9 +236,9 @@ test('brv downloads the release archive built for this machine', () => {
   assert.equal(brvAsset('freebsd', 'x64', '1.0.0'), undefined);
 });
 
-test('brv versions match the release the installer fetches', () => {
-  const cargo = readFileSync(new URL('../plugins/tui-review/brv/Cargo.toml', import.meta.url), 'utf8');
-  assert.equal(/^version = "(.+)"/m.exec(cargo)[1], json('plugins/tui-review/.claude-plugin/plugin.json').version);
+// brv keeps its own version (the release that last changed it), which the installer reads from Cargo.toml.
+test('the installer package ships brv\'s Cargo.toml', () => {
+  assert.ok(json('package.json').files.includes('plugins/tui-review/brv/Cargo.toml'));
 });
 
 test('brv checksum lines and what to do about brv', () => {

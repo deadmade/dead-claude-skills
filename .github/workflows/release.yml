@@ -1,8 +1,8 @@
 name: Release
 
 # One release for the whole repo: scripts/release.mjs bumps package.json, the marketplace and every plugin to the
-# same version and tags vX.Y.Z; pushing that tag checks the repo, builds brv and cswap.exe (or carries the unchanged
-# cswap.exe over from the latest release) and publishes the release.
+# same version and tags vX.Y.Z (brv only when its sources changed); pushing that tag checks the repo, builds brv and
+# cswap.exe (or carries unchanged ones over from the latest release) and publishes the release.
 on:
   push:
     tags: ["v*"]
@@ -67,12 +67,62 @@ jobs:
     if: needs.cswap-reuse.outputs.reused != 'true'
     uses: ./.github/workflows/build-cswap.yml
 
+  # brv likewise: while its sources (the same paths scripts/release.mjs diffs) are unchanged since the latest release,
+  # that release's archive for every target in build-brv.yml (each checked against its .sha256) is carried over; brv's
+  # version stayed put too, so the installer still finds the version it expects. A changed source must come with
+  # release.mjs's bump to this tag's version. A change to build-brv.yml alone ships with the next brv change, unless it
+  # adds a target, which has nothing to carry over and so builds.
+  brv-reuse:
+    runs-on: ubuntu-latest
+    outputs:
+      reused: ${{ steps.reuse.outputs.reused }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Carry over the latest release's brv
+        id: reuse
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          brv=plugins/tui-review/brv
+          prev=$(gh release view --json tagName -q .tagName 2>/dev/null || true)
+          if [ -z "$prev" ] || ! git diff --quiet "$prev" HEAD -- "$brv/src" "$brv/Cargo.toml" "$brv/Cargo.lock"; then
+            version=$(sed -n 's/^version = "\(.*\)"/\1/p' "$brv/Cargo.toml")
+            if [ -n "$prev" ] && [ "v$version" != "$GITHUB_REF_NAME" ]; then
+              echo "::error::brv changed since $prev but its version is $version, not ${GITHUB_REF_NAME#v}: cut the release with npm run release"
+              exit 1
+            fi
+            echo "reused=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          mkdir dist
+          targets=$(sed -n 's/.*target: \([^,} ]*\).*/\1/p' .github/workflows/build-brv.yml)
+          if gh release download "$prev" -D dist -p 'brv-*' && (cd dist && for t in $targets; do
+               ls brv-"$t".*.sha256 > /dev/null && sha256sum -c brv-"$t".*.sha256 || exit 1
+             done); then
+            echo "Carried over brv from $prev" >> "$GITHUB_STEP_SUMMARY"
+            echo "reused=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::couldn't carry over brv from $prev, building it"
+            echo "reused=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.reuse.outputs.reused == 'true'
+        uses: actions/upload-artifact@v5
+        with:
+          name: brv-reused
+          path: dist/brv-*
+
   brv:
+    needs: brv-reuse
+    if: needs.brv-reuse.outputs.reused != 'true'
     uses: ./.github/workflows/build-brv.yml
 
   publish:
-    needs: [check, cswap-reuse, cswap, brv]
-    # cswap is skipped when its exe was carried over; any failure still stops the release.
+    needs: [check, cswap-reuse, cswap, brv-reuse, brv]
+    # cswap and brv are skipped when carried over; any failure still stops the release.
     if: ${{ !cancelled() && !failure() }}
     runs-on: ubuntu-latest
     permissions:

@@ -1,6 +1,6 @@
 // Repo checks for the pre-commit hook: every plugin manifest validates, the marketplace and the dead-skills
-// bundle agree on the plugin list, and everything carries package.json's version. Skips `claude plugin validate` when claude isn't on PATH
-// (nix flake check sandbox, CI).
+// bundle agree on the plugin list, and everything carries package.json's version (brv's may trail it). Skips
+// `claude plugin validate` when claude isn't on PATH (nix flake check sandbox, CI).
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -42,7 +42,7 @@ for (const dir of pluginDirs) {
   if (!market.some((p) => p.source === `./${dir}`)) problems.push(`${dir} is not listed in ${MARKETPLACE}`);
 }
 
-// --- one version: package.json, marketplace metadata.version, every local plugin.json and brv (scripts/release.mjs) ---
+// --- one version: package.json, marketplace metadata.version, every local plugin.json; brv trails (scripts/release.mjs)
 const { version } = JSON.parse(readFileSync("package.json", "utf8"));
 const marketVersion = JSON.parse(readFileSync(MARKETPLACE, "utf8")).metadata?.version;
 if (marketVersion !== version) problems.push(`${MARKETPLACE}: metadata.version is ${marketVersion}, package.json has ${version}`);
@@ -53,9 +53,15 @@ for (const dir of pluginDirs) {
   const v = existsSync(manifest) && JSON.parse(readFileSync(manifest, "utf8")).version;
   if (v !== version) problems.push(`${manifest}: version is ${v}, package.json has ${version}`);
 }
+// brv keeps the version of the release that last changed it (scripts/release.mjs), so it may trail package.json.
 const CARGO = "plugins/tui-review/brv/Cargo.toml";
 const brv = /^version = "(.*)"/m.exec(readFileSync(CARGO, "utf8"))?.[1];
-if (brv !== version) problems.push(`${CARGO}: version is ${brv}, package.json has ${version}`);
+// Compares X.Y.Z versions: negative, zero or positive as a is older, the same or newer; NaN when either isn't X.Y.Z.
+const semver = (v) => (/^\d+\.\d+\.\d+$/.test(v ?? "") ? v.split(".").map(Number) : [NaN]);
+const compare = (a, b) => semver(a).reduce((d, n, i) => d || n - semver(b)[i], 0);
+if (!(compare(brv, version) <= 0)) problems.push(`${CARGO}: version is ${brv}, newer than package.json's ${version} or not X.Y.Z`);
+const brvLock = /^name = "brv"\nversion = "(.*)"/m.exec(readFileSync("plugins/tui-review/brv/Cargo.lock", "utf8"))?.[1];
+if (brvLock !== brv) problems.push(`plugins/tui-review/brv/Cargo.lock: brv is ${brvLock}, Cargo.toml has ${brv}`);
 
 if (problems.length) {
   console.error(problems.map((p) => `✗ ${p}`).join("\n"));

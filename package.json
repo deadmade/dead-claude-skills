@@ -14,7 +14,8 @@
     "installer/",
     "npm-shrinkwrap.json",
     ".claude-plugin/marketplace.json",
-    "plugins/*/.claude-plugin/plugin.json"
+    "plugins/*/.claude-plugin/plugin.json",
+    "plugins/tui-review/brv/Cargo.toml"
   ],
   "engines": {
     "node": ">=20.12"

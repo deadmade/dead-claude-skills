@@ -235,7 +235,8 @@ function clearTargets() {
 // --- brv, tui-review's binary --------------------------------------------------------------------------------------
 const TUI_REVIEW = `tui-review@${MARKETPLACE}`;
 const BRV_DIR = join(CONFIG, 'bin');
-const BRV_VERSION = readJson(join(PKG, 'plugins', 'tui-review', '.claude-plugin', 'plugin.json')).version;
+// brv keeps the version of the release that last changed it; every release carries its archives (release.yml).
+const BRV_VERSION = /^version = "(.*)"/m.exec(readFileSync(join(PKG, 'plugins', 'tui-review', 'brv', 'Cargo.toml'), 'utf8'))[1];
 
 // The version a brv binary reports, or undefined when there is none or it does not run.
 function brvVersionAt(path) {
@@ -276,11 +277,11 @@ async function downloadBrv(asset, bin) {
   }
 }
 
-// tui-review needs brv: a brv on PATH is used as is; otherwise the release for this version goes to ~/.claude/bin
+// tui-review needs brv: a brv on PATH is used as is; otherwise the one in this version's release goes to ~/.claude/bin
 // and the plugin's brvPath points at it.
 async function applyBrv() {
   const version = BRV_VERSION;
-  const asset = brvAsset(process.platform, process.arch, version);
+  const asset = brvAsset(process.platform, process.arch, VERSION);
   const bin = join(BRV_DIR, asset?.exe ?? (WIN ? 'brv.exe' : 'brv'));
   const action = brvAction({ onPath: onPath('brv'), installed: brvVersionAt(bin), version, supported: asset !== undefined });
   const build = 'build it with `cargo build --release` in plugins/tui-review/brv and set its path with /plugin configure tui-review';

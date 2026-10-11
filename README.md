@@ -67,16 +67,19 @@ your user PATH. On Linux, install it with `uv tool install claude-swap` (or nix)
 
 ## Releases
 
-Everything here ships as one version: `package.json`, the marketplace's `metadata.version`, every plugin under
-`plugins/` and tui-review's `brv` crate carry the same number, and the pre-commit checks fail if they drift. Claude Code
+Everything here ships as one version: `package.json`, the marketplace's `metadata.version` and every plugin under
+`plugins/` carry the same number, and the pre-commit checks fail if they drift. tui-review's `brv` crate keeps the
+version of the release that last changed its sources (`src/`, `Cargo.toml`, `Cargo.lock`). Claude Code
 only offers `/plugin update` when that number changes, so sync PRs and other commits on master reach machines with
 the next release.
 
     npm run release -- patch    # or minor, major, X.Y.Z
     git push --follow-tags origin master
 
-The script (master, clean tree only) bumps every version, runs the repo checks and installer tests, commits
-`Release vX.Y.Z` and tags it. The tag runs `release.yml`: checks again, builds cswap.exe (`build-cswap.yml`) and brv
-for every platform (`build-brv.yml`), and publishes the GitHub release `vX.Y.Z` with all of them attached. Pull
+The script (master, clean tree only) bumps every version (brv's only if its sources changed since the last
+release), runs the repo checks and installer tests, commits `Release vX.Y.Z` and tags it. The tag runs `release.yml`:
+checks again, builds cswap.exe (`build-cswap.yml`) and brv for every platform (`build-brv.yml`), and publishes the
+GitHub release `vX.Y.Z` with all of them attached. Each binary is only built when it changed: while the cswap pin or
+brv's sources are unchanged since the latest release, that release's files are carried over instead. Pull
 requests that touch those workflows or the cswap pin build and smoke-test; merges to master run nothing, and only a
 `v*` tag publishes. Superpowers, ponytail and atlassian come from their own repos and keep their own versions.

@@ -1,5 +1,6 @@
-// Cuts a release: one version for package.json, the marketplace, every local plugin and brv, committed and tagged
-// vX.Y.Z on master. Pushing the tag runs .github/workflows/release.yml, which builds cswap.exe and brv and publishes the
+// Cuts a release: one version for package.json, the marketplace and every local plugin, committed and tagged vX.Y.Z on
+// master; brv takes it too, but only when its sources changed since the last release. Pushing the tag runs
+// .github/workflows/release.yml, which builds cswap.exe and brv (or carries unchanged ones over) and publishes the
 // GitHub release. Claude Code only offers plugin updates when this version changes.
 // Usage: npm run release -- patch|minor|major|X.Y.Z
 import { spawnSync } from "node:child_process";
@@ -30,6 +31,14 @@ if (branch !== "master") die(`releases are cut from master, you are on ${branch}
 if (git("status", "--porcelain")) die("working tree is not clean");
 if (git("tag", "--list", `v${next}`)) die(`tag v${next} already exists`);
 
+// brv's sources: what release.yml diffs against the latest release to decide whether brv needs building. brv keeps the
+// version of the release that last changed them, so the binary carried over still reports the version the installer
+// expects. Without the previous tag locally, bump it anyway: that only costs a build.
+const BRV_SOURCES = ["src", "Cargo.toml", "Cargo.lock"].map((f) => `plugins/tui-review/brv/${f}`);
+const prevTag = `v${current}`;
+const brvChanged =
+  !git("tag", "--list", prevTag) || spawnSync("git", ["diff", "--quiet", prevTag, "HEAD", "--", ...BRV_SOURCES]).status !== 0;
+
 // Each file's own version line, edited in place so the rest of the file keeps its formatting. JSON: the top-level
 // (or marketplace metadata) "version". brv: its crate version, and its entry in Cargo.lock so --locked builds pass.
 const json = /^( {2,4}"version": )"[^"]*"/m;
@@ -40,8 +49,12 @@ const bumps = [
   ["npm-shrinkwrap.json", /^( {4}"": \{\n {6}"name": "dead-claude-skills",\n {6}"version": )"[^"]*"/m],
   [".claude-plugin/marketplace.json", json],
   ...readdirSync("plugins").map((p) => [`plugins/${p}/.claude-plugin/plugin.json`, json]),
-  ["plugins/tui-review/brv/Cargo.toml", /^(version = )"[^"]*"/m],
-  ["plugins/tui-review/brv/Cargo.lock", /^(name = "brv"\nversion = )"[^"]*"/m],
+  ...(brvChanged
+    ? [
+        ["plugins/tui-review/brv/Cargo.toml", /^(version = )"[^"]*"/m],
+        ["plugins/tui-review/brv/Cargo.lock", /^(name = "brv"\nversion = )"[^"]*"/m],
+      ]
+    : []),
 ];
 const files = bumps.map(([f]) => f);
 for (const [f, version] of bumps) {
@@ -59,4 +72,5 @@ if (!run("node", ["scripts/check-repo.mjs"]) || !run("node", ["--test", ...tests
 // Releasing the version already on master (the first release) only tags.
 if (git("status", "--porcelain")) git("commit", "-m", `Release v${next}`, "--", ...files);
 git("tag", "-a", `v${next}`, "-m", `v${next}`);
-console.log(`\n✓ v${current} → v${next}, committed and tagged. Publish with:\n\n    git push --follow-tags origin master\n`);
+const brvNote = brvChanged ? "" : ` (brv unchanged, stays ${/^version = "(.*)"/m.exec(readFileSync("plugins/tui-review/brv/Cargo.toml", "utf8"))[1]})`;
+console.log(`\n✓ v${current} → v${next}${brvNote}, committed and tagged. Publish with:\n\n    git push --follow-tags origin master\n`);

@@ -203,7 +203,7 @@ export function missingBinaries(platform, wanted, onPath) {
 }
 
 // brv, the tui-review plugin's binary, built per platform by .github/workflows/build-brv.yml and attached to the
-// vX.Y.Z release by release.yml.
+// vX.Y.Z release by release.yml (or carried over from the previous release while its sources are unchanged).
 const BRV_TARGETS = {
   'win32-x64': 'x86_64-pc-windows-msvc',
   'linux-x64': 'x86_64-unknown-linux-musl',
@@ -212,7 +212,7 @@ const BRV_TARGETS = {
   'darwin-x64': 'x86_64-apple-darwin',
 };
 
-// The release archive of brv `version` for this machine, or undefined where none is built.
+// The brv archive in release `version` for this machine, or undefined where none is built.
 export function brvAsset(platform, arch, version) {
   const target = BRV_TARGETS[`${platform}-${arch}`];
   if (!target) return undefined;
