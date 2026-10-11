@@ -248,8 +248,9 @@ export const CATEGORIES = [
     keys: ['graphify', 'cswap', 'tui-review'] },
   { id: 'system', title: 'System', blurb: 'Status line, sandbox and command guard in settings.json.',
     keys: ['ccstatusline', 'sandbox', 'dcg'] },
+  // bulk: false, so no single key ticks every option here.
   { id: 'danger', title: 'Danger zone', blurb: 'Take over the whole Claude Code config. Leave empty unless you mean it.',
-    keys: ['strip-defaults', 'clean'] },
+    keys: ['strip-defaults', 'clean'], bulk: false },
 ];
 
 // keys: opt-in plugin ids and toggle names. Returns the non-empty categories with their keys, in page order.

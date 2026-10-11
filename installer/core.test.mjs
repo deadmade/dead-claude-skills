@@ -269,6 +269,10 @@ test('an uncategorized plugin lands in Other, empty pages are dropped', () => {
   assert.deepEqual(pages.map((p) => [p.id, p.keys]), [['system', ['sandbox']], ['other', [`new-thing@${M}`]]]);
 });
 
+test('categorize keeps bulk:false on danger', () => {
+  assert.equal(categorize(['strip-defaults', 'clean']).find((c) => c.id === 'danger').bulk, false);
+});
+
 test('options hidden per platform', () => {
   assert.equal(unavailable('sandbox', 'win32', 'x64', '1.0.0'), 'needs WSL2');
   assert.ok(unavailable(`nix-lsp@${M}`, 'win32', 'x64', '1.0.0'));
