@@ -15,7 +15,8 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
 - `plugins/tui-review/`: a Claude Code mod (TypeScript, `hooks/`) driving the Rust binary `brv` (`brv/`). The two
   share a binary cache format (`brv/src/format.rs` ↔ `hooks/chunks.ts`) and a stdout line protocol; change both sides
   together.
-- `plugins/cswap/`: a mod wrapping the external `claude-swap` CLI.
+- `plugins/cswap/`: a mod wrapping the external `claude-swap` CLI, whose release tag is pinned in `installer/cswap.json`
+  (bumped by `sync-cswap.yml`).
 - `plugins/dead-skills/`: the default bundle; its `dependencies` are the core plugins.
 - `scripts/`: `check-repo.mjs` (marketplace/bundle/version consistency), `release.mjs`, `sync-*.mjs` (vendoring),
   `sync-plugins.mjs` (re-pins url-sourced plugins).
@@ -33,7 +34,7 @@ the sync script's transform. When what's vendored or its license changes, update
 
 ## Versions and releases
 
-Everything ships as one version: `package.json`, the marketplace's `metadata.version`, every `plugins/*/plugin.json`
+Everything ships as one version: `package.json`, the marketplace's `metadata.version`, every `plugins/*/.claude-plugin/plugin.json`
 and brv's `Cargo.toml`/`Cargo.lock`. `check-repo.mjs` fails on drift. Never bump by hand:
 
     npm run release -- patch      # on main, clean tree; bumps, runs npm test, commits and tags
@@ -52,8 +53,9 @@ plugins of ours that the manifest no longer lists.
   `cargo run --release -- gen --out <dir> && node ../tests/make-fixture.mjs <dir>`, then `claude plugin test .` in
   `plugins/tui-review`.
 - cswap mod tests: `claude plugin test .` in `plugins/cswap`.
-- `nix develop` (or direnv) gives the toolchain and installs the pre-commit hooks (alejandra, JSON, check-repo,
-  installer and scripts tests, end-of-file; vendored paths excluded).
+- `nix develop` (or direnv) gives the toolchain and installs the pre-commit hooks (treefmt, merge conflicts, JSON,
+  check-repo, installer and scripts tests, end-of-file; vendored paths excluded).
+- `nix fmt` formats everything per `treefmt.toml` (alejandra, prettier for js/ts/json/md/yaml, rustfmt).
 
 CI: `test.yml` (npm test and cswap mod tests, Linux and Windows) on every PR and push to main; `tui-review.yml` on
 PRs touching tui-review; `build-brv.yml`/`build-cswap.yml` on PRs touching the workflow (or the cswap pin) and from `release.yml`; `sync-*.yml`
