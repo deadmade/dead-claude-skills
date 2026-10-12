@@ -69,16 +69,16 @@ const CLAUDE_MODELS = '`fable`, `opus`, `sonnet`, `haiku`';
 const CURSOR_PANEL = String.raw`\`claude-fable-5-1-thinking-max\`, \`gpt-5\.6-sol-max\`, \`grok-4\.6-fast-xhigh\`, \`claude-opus-5-thinking-xhigh\``;
 const re = (src, flags = 'g') => new RegExp(src, flags);
 const REWRITES = [
-  // --- subagent config blocks (how, why, interrogate) ---
-  // read-only subagents -> Explore (Claude Code's read-only agent type)
+  // --- subagent config (how, why, interrogate) ---
+  // read-only subagents -> Explore (Claude Code's read-only agent type), with the role-line models and fallbacks
   [
-    /- `subagent_type`: `generalPurpose`\n(- `model`: [^\n]*\n)- `readonly`: `true`\n/g,
-    '- `subagent_type`: `Explore`\n$1',
+    /Every spawn is a Task subagent with `subagent_type: generalPurpose` and `readonly: true`\. Explorers use the `how explorer` line[^\n]*/g,
+    'Every spawn is an Agent subagent with `subagent_type: Explore`. Explorers use `model: sonnet`, and every explainer uses `model: fable`.',
   ],
   // "not readonly" subagents (MCP access) -> general-purpose; the Cursor Ask-mode caveat doesn't apply
   [
-    /- `subagent_type`: `generalPurpose`\n(- `model`: [^\n]*\n)- `readonly`: `false`[^\n]*\n/g,
-    '- `subagent_type`: `general-purpose`\n$1',
+    /Every spawn is `generalPurpose` with `readonly: false` \(agent mode\)\.[^\n]*?(?=Investigators still)/g,
+    'Every spawn is `subagent_type: general-purpose`, so investigators and the synthesizer keep MCP access. ',
   ],
 
   // --- model panels and defaults (upstream reads `pstack-models.mdc` role lines; slugs matched loosely, they churn) ---
@@ -96,13 +96,19 @@ const REWRITES = [
   ],
   [/Spawn one readonly judge subagent/g, 'Spawn one read-only judge subagent (`subagent_type`: `Explore`)'],
 
-  [/Use the `interrogate reviewers` line in `~\/\.cursor\/rules\/pstack-models\.mdc`[^\n]*/g, 'Use the table below.'],
+  [
+    /, one per entry on the `interrogate reviewers` line in `~\/\.cursor\/rules\/pstack-models\.mdc`[^\n]*/g,
+    ', one per row of the table below.',
+  ],
   [/\| Reviewer A \| `[^`]+` \|/g, '| Reviewer A | `fable` |'],
   [/\| Reviewer B \| `[^`]+` \|/g, '| Reviewer B | `opus` |'],
   [/\| Reviewer C \| `[^`]+` \|/g, '| Reviewer C | `sonnet` |'],
   [/\| Reviewer D \| `[^`]+` \|/g, '| Reviewer D | `haiku` |'],
   [/\| Subagent \| Default model \|/g, '| Subagent | Model |'],
-  [/- `model`: the configured `interrogate reviewers` entry[^\n]*/g, "- `model`: the reviewer's model from the table"],
+  [
+    /Each reviewer gets `subagent_type: generalPurpose`, `readonly: true`, and `model` set to[^\n]*/g,
+    "Each reviewer gets `subagent_type: Explore` and `model` set to the reviewer's model from the table.",
+  ],
   [
     /If the Task tool rejects a configured entry, run that reviewer[^\n]*\n/g,
     `Valid \`model\` values for the Agent tool are ${CLAUDE_MODELS}.\n`,
