@@ -63,7 +63,7 @@ jobs:
             if command -v sha256sum > /dev/null; then sha256sum "$f"; else shasum -a 256 "$f"; fi > "$f.sha256"
           done
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: brv-${{ matrix.target }}
           path: ${{ runner.temp }}/dist/*

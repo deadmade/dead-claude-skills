@@ -31,7 +31,7 @@ jobs:
           ref: ${{ steps.pin.outputs.tag }}
           path: upstream
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
@@ -67,7 +67,7 @@ jobs:
           sha256sum cswap.exe > cswap.exe.sha256
           cat cswap.exe.sha256
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: cswap-${{ steps.pin.outputs.tag }}
           path: |
