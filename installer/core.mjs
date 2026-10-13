@@ -318,9 +318,9 @@ export const CATEGORIES = [
   },
   {
     id: 'lsp',
-    title: 'Language servers',
-    blurb: 'Code intelligence per language; each needs its server on PATH.',
-    keys: ['rust-analyzer-lsp', 'csharp-lsp', 'typescript-lsp', 'pyright-lsp', 'nix-lsp'],
+    title: 'Languages',
+    blurb: 'Per-language code intelligence (servers must be on PATH) and best-practice skills.',
+    keys: ['rust-analyzer-lsp', 'rust-skills', 'csharp-lsp', 'csharp-skills', 'typescript-lsp', 'pyright-lsp', 'nix-lsp'],
   },
   {
     id: 'mcp',

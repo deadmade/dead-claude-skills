@@ -385,6 +385,12 @@ test('an uncategorized plugin lands in Other, empty pages are dropped', () => {
   );
 });
 
+test('the language servers page is Languages and lists the language skills', () => {
+  const lang = CATEGORIES.find((c) => c.id === 'lsp');
+  assert.equal(lang.title, 'Languages');
+  for (const k of ['csharp-skills', 'rust-skills', 'csharp-lsp', 'rust-analyzer-lsp']) assert.ok(lang.keys.includes(k));
+});
+
 test('categorize keeps bulk:false on danger', () => {
   assert.equal(categorize(['strip-defaults', 'clean']).find((c) => c.id === 'danger').bulk, false);
 });
