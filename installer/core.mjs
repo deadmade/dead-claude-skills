@@ -351,8 +351,8 @@ export const CATEGORIES = [
   {
     id: 'system',
     title: 'System',
-    blurb: 'Status line, sandbox and command guard in settings.json.',
-    keys: ['ccstatusline', 'sandbox', 'dcg'],
+    blurb: 'Status line, sandbox, command guard and secret scanners.',
+    keys: ['ccstatusline', 'sandbox', 'dcg', 'secret-scan'],
   },
   // bulk: false, so no single key ticks every option here.
   {

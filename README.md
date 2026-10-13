@@ -7,7 +7,8 @@ The default bundle, **dead-skills**, pulls in code-review, claude-code-setup, cl
 claude-security, superpowers, ponytail, mcp-basic (context7) and my global rules. Everything else is opt-in: language
 servers, language and database skills (rust, csharp, postgres), integrations (GitHub, Azure, Atlassian), skill packs
 like hallmark, self-review, graphify and the mattpocock/pstack/Trail of Bits picks, plus tools such as
-[tui-review](plugins/tui-review/README.md) and cswap for multi-account switching.
+[tui-review](plugins/tui-review/README.md), cswap for multi-account switching and secret-scan, which blocks prompts
+and commits that contain secrets.
 
     npx --allow-git=root github:deadmade/dead-claude-skills#semver:*
 

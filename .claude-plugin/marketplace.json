@@ -133,6 +133,12 @@
       "category": "development"
     },
     {
+      "name": "secret-scan",
+      "description": "Blocks prompts and git commits that contain secrets (API keys, tokens, private keys, seed phrases). claude-guardrails' scanners, vendored. Needs bash and jq. Opt-in.",
+      "source": "./plugins/secret-scan",
+      "category": "security"
+    },
+    {
       "name": "cswap",
       "description": "claude-swap in Claude Code: accounts pane, /swap, usage status line, opt-in auto-switch. The installer downloads cswap.exe on Windows. Opt-in.",
       "source": "./plugins/cswap",

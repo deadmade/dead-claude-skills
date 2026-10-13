@@ -100,6 +100,15 @@ pr-review-toolkit agents (Apache License 2.0, Copyright Anthropic, PBC; `LICENSE
 `description:` rewritten, and [mattpocock/skills](https://github.com/mattpocock/skills)'s engineering code-review
 skill (MIT License, Copyright Matt Pocock; `LICENSE-MIT`), unmodified apart from a source comment.
 
+## secret-scan
+
+`plugins/secret-scan/` vendors `scan-secrets.sh` and `scan-commit.sh` (the lite variant) and `patterns/` from
+[dwarvesf/claude-guardrails](https://github.com/dwarvesf/claude-guardrails) (MIT License, Copyright Dwarves Foundation;
+full text in `plugins/secret-scan/LICENSE`), unmodified. `plugins/secret-scan/hooks/hooks.json` wires them as upstream's
+installer does. The rest of claude-guardrails (deny rules, the destructive-command and injection hooks, the CLAUDE.md
+section) is not vendored. Synced by `scripts/sync-secret-scan.mjs` (weekly via GitHub Actions); the synced upstream
+commit is in `plugins/secret-scan/UPSTREAM`.
+
 ## Re-listed plugins
 
 The marketplace entries for superpowers and ponytail only point at their upstream repositories, pinned to a release

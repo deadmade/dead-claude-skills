@@ -1,0 +1,11 @@
+{
+  "name": "secret-scan",
+  "version": "0.2.0",
+  "description": "Blocks prompts and git commits that contain secrets (API keys, tokens, private keys, seed phrases). Vendored from dwarvesf/claude-guardrails' scanners, synced weekly. Needs bash and jq.",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "repository": "https://github.com/deadmade/dead-claude-skills",
+  "license": "MIT"
+}
