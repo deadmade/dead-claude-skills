@@ -41,8 +41,9 @@ No run errors, no partial results.
 ## Caveats
 
 - All 72 pairs (12 questions x 2 arms x 3 pairs) were judged AGREE. The guard added in the fix round (throws on a reply
-  under 200 chars) passed on a re-run over the same JSON, and the evidence strings are the full replies (1.6-4.6 KB, see
-  the excerpts in the task report). So the AGREEs are not a missing-evidence artifact.
+  under 200 chars) passed on a re-run over the same JSON. The evidence strings are 1.6-4.6 KB, with no common length
+  cap, and 71 of 72 end in sentence punctuation or a code fence. Completeness is not verified: the run transcripts
+  were temp files that no longer exist, so the evidence could not be compared with the final messages.
 - Even so, the metric could not discriminate: the judge compares headline recommendations only, and with every pair at
   AGREE in both arms there is no spread to show a difference. It cannot see differences in detail (specific commands,
   lint flags, test names).

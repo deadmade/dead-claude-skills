@@ -32,7 +32,7 @@ for (const file of process.argv.slice(2)) {
         for (let j = i + 1; j < replies.length; j++) agree += judge(replies[i], replies[j]) ? 1 : 0;
       out[arm] = `${agree}/${(replies.length * (replies.length - 1)) / 2}`;
     }
-    if (process.env.SHOW) for (const arm of ["with", "without"]) (c.arms[arm] ?? []).slice(0, 2).forEach((r, i) => console.log(`  [${c.name} ${arm} #${i + 1}] ${reply(r, "").slice(0, 300).replace(/\n/g, " ")}`));
+    if (process.env.SHOW) for (const arm of ["with", "without"]) (c.arms[arm] ?? []).slice(0, 2).forEach((r, i) => console.log(`  [${c.name} ${arm} #${i + 1}] ${reply(r, `${c.name}/${arm}/show`).slice(0, 300).replace(/\n/g, " ")}`));
     console.log(`${out.name}\twith ${out.with}\twithout ${out.without}`);
   }
 }
