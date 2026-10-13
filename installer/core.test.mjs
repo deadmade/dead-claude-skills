@@ -60,6 +60,7 @@ test('opt-ins from the real manifests', () => {
         'mattpocock-picks',
         'mcp-azure',
         'mcp-github',
+        'night-city',
         'nix-lsp',
         'postgres',
         'pstack-picks',

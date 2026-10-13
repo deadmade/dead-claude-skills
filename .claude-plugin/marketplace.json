@@ -139,6 +139,12 @@
       "category": "security"
     },
     {
+      "name": "night-city",
+      "description": "Night City: a loud neon Claude Code theme (hot pink, cyan, signal yellow, purple). Opt-in.",
+      "source": "./plugins/night-city",
+      "category": "security"
+    },
+    {
       "name": "cswap",
       "description": "claude-swap in Claude Code: accounts pane, /swap, usage status line, opt-in auto-switch. The installer downloads cswap.exe on Windows. Opt-in.",
       "source": "./plugins/cswap",

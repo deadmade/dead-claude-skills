@@ -1,0 +1,10 @@
+{
+  "name": "night-city",
+  "version": "0.2.0",
+  "description": "Night City: a loud neon Claude Code theme (hot pink, cyan, signal yellow, purple).",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "repository": "https://github.com/deadmade/dead-claude-skills"
+}
