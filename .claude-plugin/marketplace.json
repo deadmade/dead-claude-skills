@@ -97,6 +97,12 @@
       "category": "development"
     },
     {
+      "name": "csharp-skills",
+      "description": "Microsoft's .NET skills (dotnet/skills): C#, testing, MSBuild/NuGet, ASP.NET Core, Blazor, EF Core, MAUI, WinForms, behind six C#-only router skills. Vendored, synced weekly. Opt-in.",
+      "source": "./plugins/languages/csharp-skills",
+      "category": "development"
+    },
+    {
       "name": "graphify",
       "description": "Graphify: turn a codebase into a queryable knowledge graph (/graphify). Needs the graphify CLI (uv tool install graphifyy). Opt-in.",
       "source": "./plugins/graphify",
