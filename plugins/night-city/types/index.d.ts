@@ -1,5 +1,5 @@
 declare module 'claude-code' {
-  // No $.state: the mod only rewrites props.
+  // No $.state: the words only rewrite props, and the intro keeps its four seconds in module variables.
   interface PluginState {}
 }
 
