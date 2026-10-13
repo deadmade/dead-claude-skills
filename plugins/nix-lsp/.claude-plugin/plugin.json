@@ -1,6 +1,6 @@
 {
   "name": "nix-lsp",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Nix language server (nixd) for code intelligence (requires nixd on PATH)",
   "author": {
     "name": "deadmade",

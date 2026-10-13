@@ -1,6 +1,6 @@
 {
   "name": "tob-picks",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Curated Trail of Bits skills: property-based testing, spec-to-code compliance, sharp-edges API and config review, and mutation-testing analysis. Vendored from trailofbits/skills, synced weekly.",
   "author": {
     "name": "deadmade",
