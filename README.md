@@ -14,7 +14,8 @@ It's built for me; use it if it fits, but expect it to change without notice.
   hallmark, feature-flow, self-review, mattpocock-picks, pstack-picks, tob-picks (Trail of Bits: property-based
   testing, spec compliance, sharp-edges, mutation-testing analysis), graphify, cswap, skill-creator, hookify,
   tui-review (see [its README](plugins/tui-review/README.md); the installer downloads its `brv` binary), and the
-  language skill plugins rust-skills (Apollo's rust-best-practices) and csharp-skills (Microsoft's dotnet/skills).
+  language skill plugins rust-skills (Apollo's rust-best-practices) and csharp-skills (Microsoft's dotnet/skills),
+  and the database plugin postgres (Neon's postgres-best-practices and Timescale's postgres-database-migration skills).
   csharp-skills ships its 102 skills in an unscanned `library/` behind six router skills (core, testing, build, web,
   data, desktop) so only the routers' short descriptions load into context.
 - **Installer toggles:** ccstatusline, sandbox (Linux/macOS/WSL2, needs bubblewrap and socat), and
@@ -32,7 +33,7 @@ since npm 12, which refuses git packages with `EALLOWGIT` otherwise, and older n
 `/plugin marketplace add deadmade/dead-claude-skills` (plus `anthropics/claude-plugins-official` if you removed it)
 then `/plugin install dead-skills@dead-claude-skills`.
 
-The installer opens on a start screen with one line per category (workflows & skills, language servers,
+The installer opens on a start screen with one line per category (workflows & skills, language servers, databases,
 integrations, tools, system, danger zone) that says what's installed in it, plus a line for outdated plugins from
 this repo. Enter opens a category, where each item says its state in words (`installed 0.1.1`, `will install`,
 `will remove`, `outdated 0.1.0 → 0.1.1`) and enter installs, removes or undoes it; the updates line lets you skip

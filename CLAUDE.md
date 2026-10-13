@@ -22,6 +22,9 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   gate plugin skills in Claude Code (checked on 2.1.272 and 2.1.296), so csharp-skills exposes six router skills over an
   unscanned `library/`; the router reads library files via the installer's `Read(~/.claude/plugins/**)` rule (without
   the installer users get a permission prompt).
+- `plugins/database/`: a second `GROUPS` folder; each folder under it is a database plugin. `postgres` vendors
+  Neon's and Timescale's Postgres skills from two upstreams (`sync-postgres.mjs`), so each skill folder carries its
+  own LICENSE, NOTICE and UPSTREAM instead of one set at the plugin root.
 - `plugins/dead-skills/`: the default bundle; its `dependencies` are the core plugins.
 - `scripts/`: `check-repo.mjs` (marketplace/bundle/version consistency), `release.mjs`, `sync-*.mjs` (vendoring),
   `sync-plugins.mjs` (re-pins url-sourced plugins).
@@ -34,7 +37,7 @@ the `ref`, so it must match upstream's `plugin.json`. Atlassian is deliberately 
 
 These are copied from upstream by `scripts/sync-*.mjs` (weekly workflows open the PRs) and overwritten on every
 sync: `plugins/hallmark/`, `plugins/graphify/skills/`, `plugins/mattpocock-picks/`, `plugins/pstack-picks/`,
-`plugins/tob-picks/` (CC BY-SA 4.0), `plugins/languages/*/{library,skills}/`, `plugins/languages/*/LICENSE` and `UPSTREAM` (their `plugin.json` and `evals/` are hand-written), `plugins/self-review/agents/`,
+`plugins/tob-picks/` (CC BY-SA 4.0), `plugins/languages/*/{library,skills}/`, `plugins/languages/*/LICENSE` and `UPSTREAM` (their `plugin.json` and `evals/` are hand-written), `plugins/database/*/skills/` (their `plugin.json` is hand-written), `plugins/self-review/agents/`,
 `plugins/self-review/skills/self-review/references/upstream/`. To change them, change the sync script's transform.
 When what's vendored or its license changes, update THIRD_PARTY.md.
 
