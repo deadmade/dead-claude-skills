@@ -34,14 +34,18 @@ No run errors, no partial results.
 ## Keep bar
 
 - Qualifying questions (without-arm under 3 agreeing pairs): **0 of 12**. Every without-arm already had 3/3.
-- So "with higher on at least 8, or on all qualifying" holds vacuously (0 of 0). Nothing in this test shows the plugins
-  improving consistency; the model is already consistent on these questions without them.
+- So "with higher on at least 8, or on all qualifying" holds vacuously (0 of 0). That vacuous pass is not evidence for
+  keeping the plugins: the test could not discriminate, and it shows nothing about whether they help.
 - The eval's own scores are 1.00 in both arms everywhere (the `answers` grader only checks that a reply picks one approach).
 
 ## Caveats
 
-- The agreement judge was lenient: all 36 pairs were AGREE. "Same approach" judged at the headline recommendation level
-  cannot see differences in detail (specific commands, lint flags, test names).
+- All 72 pairs (12 questions x 2 arms x 3 pairs) were judged AGREE. The guard added in the fix round (throws on a reply
+  under 200 chars) passed on a re-run over the same JSON, and the evidence strings are the full replies (1.6-4.6 KB, see
+  the excerpts in the task report). So the AGREEs are not a missing-evidence artifact.
+- Even so, the metric could not discriminate: the judge compares headline recommendations only, and with every pair at
+  AGREE in both arms there is no spread to show a difference. It cannot see differences in detail (specific commands,
+  lint flags, test names).
 - The skills did not fire in every with-run: q2 and q5 (rust) 0/3, q3 2/3, q10 (web router) 0/3, q11 2/3. Those with-arms
   are effectively baseline runs.
 
