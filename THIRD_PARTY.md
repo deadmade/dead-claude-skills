@@ -30,6 +30,17 @@ full text in `plugins/pstack-picks/LICENSE`). Modified mechanically for Claude C
 `scripts/sync-pstack.mjs` (tool names, subagent types, model names, paths, and an added port note
 under each file's frontmatter). The synced upstream commit is in `plugins/pstack-picks/UPSTREAM`.
 
+## tob-picks
+
+`plugins/tob-picks/` vendors four skills (property-based-testing, spec-to-code-compliance, sharp-edges,
+mutation-testing), the `spec-compliance-checker` and `sharp-edges-analyzer` agents and the `spec-compliance` workflow
+from [trailofbits/skills](https://github.com/trailofbits/skills) (Creative Commons Attribution-ShareAlike 4.0,
+Copyright Trail of Bits; full text in `plugins/tob-picks/LICENSE`). The vendored files stay under CC BY-SA 4.0.
+Modified by `scripts/sync-tob.mjs`: each upstream plugin's skill, agents and workflow are merged into one plugin,
+the Codex-only `agents/openai.yaml` and its icon are dropped, the `spec-to-code-compliance:` namespace is renamed to
+`tob-picks:`, and `FsCheck|CsCheck` is added to property-based-testing's library detection command. Synced weekly via
+GitHub Actions; the synced upstream commit is in `plugins/tob-picks/UPSTREAM`.
+
 ## graphify
 
 `plugins/graphify/skills/graphify/` vendors the Claude Code skill (`graphify/skill.md`) and its `references/`
@@ -59,5 +70,5 @@ skill (MIT License, Copyright Matt Pocock; `LICENSE-MIT`), unmodified apart from
 
 The marketplace entries for superpowers and ponytail only point at their upstream repositories, pinned to a release
 commit; no code is vendored here. Anthropic's plugins (code-review, claude-code-setup, claude-md-management, security-guidance,
-claude-security, skill-creator and the LSPs) aren't listed here at all: they install from Anthropic's
+claude-security, skill-creator, hookify and the LSPs) aren't listed here at all: they install from Anthropic's
 `claude-plugins-official` marketplace. Each is covered by its own upstream license.

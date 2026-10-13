@@ -1,0 +1,70 @@
+name: Sync tob-picks
+
+on:
+  schedule:
+    - cron: '45 7 * * 1' # Mondays 07:45 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      NEW_SKILLS_FILE: /tmp/tob-new-skills.tsv
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Sync skills from upstream
+        run: node scripts/sync-tob.mjs
+
+      - name: Open issues for new upstream skills
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ ! -s "$NEW_SKILLS_FILE" ]; then echo "No new upstream skills."; exit 0; fi
+          while IFS=$'\t' read -r skill desc; do
+            name="${skill##*/}"
+            title="New upstream skill in trailofbits/skills: $name"
+            if gh issue list --state all --limit 100 --search "$name in:title" --json title --jq '.[].title' \
+              | grep -Fxq -- "$title"; then
+              echo "Already flagged: $name"; continue
+            fi
+            body="$(printf '%s\n' \
+              "trailofbits/skills now publishes \`$skill\`, which is neither vendored nor skipped." \
+              "" \
+              "> ${desc:-no description}" \
+              "" \
+              "Source: https://github.com/trailofbits/skills/tree/main/plugins/$skill" \
+              "" \
+              "Decide in \`scripts/sync-tob.mjs\`:" \
+              "- **Include:** add \`$skill\` to \`SKILLS\` (its agents and workflows to \`AGENTS\`/\`WORKFLOWS\`), bump the skill count check in \`.github/workflows/sync-tob.yml\`, run the script." \
+              "- **Skip:** add \`$skill\` to \`SKIPPED\`." \
+              "" \
+              "Check for overlap with self-review, superpowers and the other picks before including it.")"
+            gh issue create --title "$title" --body "$body"
+          done < "$NEW_SKILLS_FILE"
+
+      - name: Sanity checks
+        id: check
+        run: |
+          jq empty .claude-plugin/marketplace.json plugins/tob-picks/.claude-plugin/plugin.json
+          test "$(find plugins/tob-picks/skills -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l)" -eq 4
+          echo "sha=$(cat plugins/tob-picks/UPSTREAM)" >> "$GITHUB_OUTPUT"
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v8
+        with:
+          branch: sync/tob-picks
+          delete-branch: true
+          commit-message: 'Sync tob-picks to ${{ steps.check.outputs.sha }}'
+          title: 'Sync tob-picks to ${{ steps.check.outputs.sha }}'
+          body: |
+            Automated sync of the curated skills from https://github.com/trailofbits/skills at
+            https://github.com/trailofbits/skills/commit/${{ steps.check.outputs.sha }}.
+
+            cc @deadmade
+          add-paths: plugins/tob-picks

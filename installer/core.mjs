@@ -3,7 +3,14 @@ export const MARKETPLACE = 'dead-claude-skills';
 export const BUNDLE = 'dead-skills';
 // Anthropic's own plugins come straight from their marketplace: ours may not reuse their names.
 export const OFFICIAL = 'claude-plugins-official';
-const OFFICIAL_OPT_INS = ['skill-creator', 'rust-analyzer-lsp', 'csharp-lsp', 'typescript-lsp', 'pyright-lsp'];
+const OFFICIAL_OPT_INS = [
+  'skill-creator',
+  'hookify',
+  'rust-analyzer-lsp',
+  'csharp-lsp',
+  'typescript-lsp',
+  'pyright-lsp',
+];
 const PERMISSION = 'Read(~/.claude/plugins/**)';
 const STATUS_LINE = { type: 'command', command: 'ccstatusline', padding: 0 };
 // Always denied, sandbox or not. The sandbox also blocks Bash reads of these, except the ** globs it can't apply on
@@ -292,7 +299,16 @@ export const CATEGORIES = [
     id: 'workflow',
     title: 'Workflows & skills',
     blurb: 'Slash commands and skills that shape how Claude works.',
-    keys: ['feature-flow', 'self-review', 'mattpocock-picks', 'pstack-picks', 'hallmark', 'skill-creator'],
+    keys: [
+      'feature-flow',
+      'self-review',
+      'mattpocock-picks',
+      'pstack-picks',
+      'tob-picks',
+      'hallmark',
+      'skill-creator',
+      'hookify',
+    ],
   },
   {
     id: 'lsp',
@@ -340,6 +356,7 @@ export function categorize(keys) {
 // Short descriptions for what marketplace.json doesn't describe: the official opt-ins and the toggles.
 export const HINTS = {
   'skill-creator': "Anthropic's skill for writing and testing skills",
+  hookify: "Anthropic's rules-as-hooks from .claude/hookify.*.local.md",
   'rust-analyzer-lsp': 'Rust (rust-analyzer)',
   'csharp-lsp': 'C# (csharp-ls)',
   'typescript-lsp': 'TypeScript / JavaScript',

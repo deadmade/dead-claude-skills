@@ -5,6 +5,7 @@ excludes = [
   "plugins/hallmark/**",
   "plugins/mattpocock-picks/**",
   "plugins/pstack-picks/**",
+  "plugins/tob-picks/**",
   "plugins/graphify/**",
   "plugins/self-review/agents/**",
   "plugins/self-review/skills/self-review/references/upstream/**",

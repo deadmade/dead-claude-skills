@@ -7,11 +7,12 @@ It's built for me; use it if it fits, but expect it to change without notice.
 
 - **dead-skills** (default bundle): code-review, claude-code-setup, claude-md-management,
   security-guidance, claude-security, superpowers, ponytail, mcp-basic (context7), plus my global rules. Anthropic's
-  own plugins (code-review, claude-code-setup, claude-md-management, security-guidance, claude-security, skill-creator
-  and the rust/csharp/typescript/pyright LSPs) install from `claude-plugins-official`; the installer adds that
+  own plugins (code-review, claude-code-setup, claude-md-management, security-guidance, claude-security, skill-creator,
+  hookify and the rust/csharp/typescript/pyright LSPs) install from `claude-plugins-official`; the installer adds that
   marketplace if it's missing.
 - **Opt-in:** language servers (rust, csharp, typescript, pyright, nix), mcp-github, mcp-azure, atlassian,
-  hallmark, feature-flow, self-review, mattpocock-picks, pstack-picks, graphify, cswap, skill-creator,
+  hallmark, feature-flow, self-review, mattpocock-picks, pstack-picks, tob-picks (Trail of Bits: property-based
+  testing, spec compliance, sharp-edges, mutation-testing analysis), graphify, cswap, skill-creator, hookify,
   tui-review (see [its README](plugins/tui-review/README.md); the installer downloads its `brv` binary).
 - **Installer toggles:** ccstatusline, sandbox (Linux/macOS/WSL2, needs bubblewrap and socat), and
   [dcg](https://github.com/Dicklesworthstone/destructive_command_guard) (runs dcg's own installer). The installer

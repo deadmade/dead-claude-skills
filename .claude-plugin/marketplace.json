@@ -85,6 +85,12 @@
       "category": "development"
     },
     {
+      "name": "tob-picks",
+      "description": "Curated Trail of Bits skills: property-based testing, spec-to-code compliance, sharp-edges API and config review, mutation-testing analysis. Opt-in.",
+      "source": "./plugins/tob-picks",
+      "category": "development"
+    },
+    {
       "name": "graphify",
       "description": "Graphify: turn a codebase into a queryable knowledge graph (/graphify). Needs the graphify CLI (uv tool install graphifyy). Opt-in.",
       "source": "./plugins/graphify",
