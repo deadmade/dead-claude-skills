@@ -29,8 +29,9 @@ the `ref`, so it must match upstream's `plugin.json`. Atlassian is deliberately 
 
 These are copied from upstream by `scripts/sync-*.mjs` (weekly workflows open the PRs) and overwritten on every
 sync: `plugins/hallmark/`, `plugins/graphify/skills/`, `plugins/mattpocock-picks/`, `plugins/pstack-picks/`,
-`plugins/self-review/agents/`, `plugins/self-review/skills/self-review/references/upstream/`. To change them, change
-the sync script's transform. When what's vendored or its license changes, update THIRD_PARTY.md.
+`plugins/tob-picks/` (CC BY-SA 4.0), `plugins/self-review/agents/`,
+`plugins/self-review/skills/self-review/references/upstream/`. To change them, change the sync script's transform.
+When what's vendored or its license changes, update THIRD_PARTY.md.
 
 ## Versions and releases
 

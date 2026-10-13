@@ -61,9 +61,12 @@ test('opt-ins from the real manifests', () => {
         'nix-lsp',
         'pstack-picks',
         'self-review',
+        'tob-picks',
         'tui-review',
       ].map((n) => `${n}@${M}`),
-      ...['csharp-lsp', 'pyright-lsp', 'rust-analyzer-lsp', 'skill-creator', 'typescript-lsp'].map((n) => `${n}@${O}`),
+      ...['csharp-lsp', 'hookify', 'pyright-lsp', 'rust-analyzer-lsp', 'skill-creator', 'typescript-lsp'].map(
+        (n) => `${n}@${O}`,
+      ),
     ].sort(),
   );
 });
