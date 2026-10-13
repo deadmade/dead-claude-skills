@@ -1,94 +1,22 @@
 # dead-claude-skills
 
-My personal Claude Code setup as a plugin marketplace, so every machine (Linux, Windows) gets the same skills.
-It's built for me; use it if it fits, but expect it to change without notice.
+My personal Claude Code setup as a plugin marketplace, so every machine (Linux, Windows) gets the same skills. It's
+built for me; use it if it fits, but expect it to change without notice.
 
-## Included
-
-- **dead-skills** (default bundle): code-review, claude-code-setup, claude-md-management,
-  security-guidance, claude-security, superpowers, ponytail, mcp-basic (context7), plus my global rules. Anthropic's
-  own plugins (code-review, claude-code-setup, claude-md-management, security-guidance, claude-security, skill-creator,
-  hookify and the rust/csharp/typescript/pyright LSPs) install from `claude-plugins-official`; the installer adds that
-  marketplace if it's missing.
-- **Opt-in:** language servers (rust, csharp, typescript, pyright, nix), mcp-github, mcp-azure, atlassian,
-  hallmark, feature-flow, self-review, mattpocock-picks, pstack-picks, tob-picks (Trail of Bits: property-based
-  testing, spec compliance, sharp-edges, mutation-testing analysis), graphify, cswap, skill-creator, hookify,
-  tui-review (see [its README](plugins/tui-review/README.md); the installer downloads its `brv` binary), and the
-  language skill plugins rust-skills (Apollo's rust-best-practices) and csharp-skills (Microsoft's dotnet/skills),
-  and the database plugin postgres (Neon's postgres-best-practices and Timescale's postgres-database-migration skills).
-  csharp-skills ships its 102 skills in an unscanned `library/` behind six router skills (core, testing, build, web,
-  data, desktop) so only the routers' short descriptions load into context.
-- **Installer toggles:** ccstatusline, sandbox (Linux/macOS/WSL2, needs bubblewrap and socat), and
-  [dcg](https://github.com/Dicklesworthstone/destructive_command_guard) (runs dcg's own installer). The installer
-  always denies reading `.env` files and credential dirs (`~/.ssh`, `~/.aws`, `~/.azure`, `~/.config/gh`, `~/.gnupg`).
-  With the sandbox on, Bash is blocked from those dirs and from the project root's `.env*` files only; `.env` files
-  in subdirectories are protected from Claude's Read tool but not from Bash.
-
-## Install
+The default bundle, **dead-skills**, pulls in code-review, claude-code-setup, claude-md-management, security-guidance,
+claude-security, superpowers, ponytail, mcp-basic (context7) and my global rules. Everything else is opt-in: language
+servers, language and database skills (rust, csharp, postgres), integrations (GitHub, Azure, Atlassian), skill packs
+like hallmark, self-review, graphify and the mattpocock/pstack/Trail of Bits picks, plus tools such as
+[tui-review](plugins/tui-review/README.md) and cswap for multi-account switching.
 
     npx --allow-git=root github:deadmade/dead-claude-skills#semver:*
 
-(`#semver:*` runs the installer from the newest release; without it you get main; `--allow-git=root` is needed
-since npm 12, which refuses git packages with `EALLOWGIT` otherwise, and older npm ignores it) or
-`/plugin marketplace add deadmade/dead-claude-skills` (plus `anthropics/claude-plugins-official` if you removed it)
-then `/plugin install dead-skills@dead-claude-skills`.
+The installer (Node standard library only) shows one page per category where you pick what to install, remove or
+update, then applies only the changes. It pins the marketplace to its own release so plugins match the installer, and
+it always denies Claude reading `.env` files and credential dirs. Optional toggles add ccstatusline, the Bash sandbox
+and dcg; the danger zone can strip all foreign plugins or reset `~/.claude` to a clean slate (after a backup). Without
+the installer, `/plugin marketplace add deadmade/dead-claude-skills` and `/plugin install dead-skills@dead-claude-skills`
+work too, but track main.
 
-The installer opens on a start screen with one line per category (workflows & skills, language servers, databases,
-integrations, tools, system, danger zone) that says what's installed in it, plus a line for outdated plugins from
-this repo. Enter opens a category, where each item says its state in words (`installed 0.1.1`, `will install`,
-`will remove`, `outdated 0.1.0 → 0.1.1`) and enter installs, removes or undoes it; the updates line lets you skip
-single updates. Apply shows only what changes (install, remove, update, turn on/off) with Apply, Back and Quit.
-Keys are ↑/↓, enter and esc. Options that can't work on your OS or CPU (the sandbox and nix-lsp on Windows,
-tui-review where no `brv` build exists) are left off the pages unless they're already on; the review lists them.
-Plugins this repo no longer ships (dev-feature) are listed under Remove and uninstalled on every run.
-The installer has no npm dependencies: it uses only Node's standard library.
-
-The installer pins the marketplace to its own release: installer vX.Y.Z adds `deadmade/dead-claude-skills@vX.Y.Z`
-and sets that ref in the marketplace's `extraKnownMarketplaces` entry, so the plugins always match the installer that
-ran. `/plugin update` and auto-update stay on that tag; to update, run the command above again. The marketplace added
-by hand with `/plugin marketplace add` tracks main instead (one added while the branch was still `master` needs
-removing and adding once).
-
-The danger zone page has two options (also `--strip-defaults` / `--clean`) that take over the whole machine:
-
-- **strip-defaults** uninstalls every plugin and removes every marketplace not from here, keeping
-  `claude-plugins-official` and only the plugins above from it. It also sets `disableClaudeAiConnectors`,
-  `syncClaudeAiSkills: false` and `syncClaudeAiPlugins: false`, and turns off the `agents-md` and `telemetry`
-  builtins. Unchecking it later changes nothing.
-- **clean** does the same, then copies your config to `~/.claude.dead-backup-<time>/`, replaces `settings.json`
-  with only this installer's keys (plus enabled plugins and dcg's hook if dcg stays on), and deletes `CLAUDE.md`, `skills`, `agents`,
-  `commands`, `rules`, `output-styles`, `workflows` and `hooks`. Credentials, `~/.claude.json`, `projects/`,
-  `plugins/` and history are left alone, and symlinked paths (home-manager) are skipped. Asks you to type `clean`.
-
-## cswap
-
-Multi-account switching with [claude-swap](https://github.com/realiti4/claude-swap), from inside Claude Code:
-
-- `/swap` opens the accounts pane (5h/7d usage, a Switch button per account); `/swap next`, `/swap best` or
-  `/swap <num|email|alias>` switches. The status line shows the active account's usage.
-- Auto-switch is off by default: turn on `auto_switch` with `/plugin configure cswap`. It runs `cswap auto --once`
-  every 2 minutes; the threshold and strategy are cswap's own (`cswap config set autoswitch.threshold 80`).
-- Accounts are still added in a terminal: log in with Claude Code, then `cswap add`, once per account.
-
-On Windows the installer downloads `cswap.exe` (claude-swap at the tag pinned in `installer/cswap.json`, compiled
-with Nuitka by `build-cswap.yml` and attached to every release) to `%LOCALAPPDATA%\Programs\cswap` and puts it on
-your user PATH. Elsewhere the installer hides cswap (unless it is already installed); `uv tool install claude-swap`
-still works if you add the plugin by hand.
-
-## Releases
-
-Everything here ships as one version: `package.json`, the marketplace's `metadata.version`, every plugin under
-`plugins/` and tui-review's `brv` crate carry the same number, and the pre-commit checks fail if they drift. Claude Code
-only offers `/plugin update` when that number changes, so sync PRs and other commits on main reach machines with
-the next release.
-
-    npm run release -- patch    # or minor, major, X.Y.Z
-    git push --follow-tags origin main
-
-The script (main, clean tree only) bumps every version, runs the repo checks and installer tests, commits
-`Release vX.Y.Z` and tags it. The tag runs `release.yml`: checks again, builds cswap.exe (`build-cswap.yml`) and brv
-for every platform (`build-brv.yml`), and publishes the GitHub release `vX.Y.Z` with all of them attached. Pull
-requests that touch those workflows or the cswap pin build and smoke-test; merges to main run nothing, and only a
-`v*` tag publishes. Superpowers and ponytail are pinned to an upstream release tag and its commit in
-`marketplace.json`, so every machine gets the same copy; the weekly `sync-plugins.yml` opens a PR per plugin when
-upstream tags a new release (to decline one, leave its PR open). Atlassian follows its upstream main.
+Everything ships as one version, cut with `npm run release -- patch` and `git push --follow-tags origin main`; the
+tag builds the binaries and publishes the GitHub release the installer downloads from.
