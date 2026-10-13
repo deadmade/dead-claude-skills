@@ -47,9 +47,12 @@ not more color. The other hard requirement: **it stays usable** for all-day work
   MIT) and is pushed louder. Reference direction: mockup "Night City triad" / `alive.html`: Claude `#FF2E97`,
   cyan `#00F0FF`, yellow `#FCEE0A`, red `#FF003C`, purple `#B57CFF`/`#C04DFF`, user-message bar `#2b0a3d`, bash bar
   `#06213a`. Derived from MIT work → THIRD_PARTY.md entry.
-- **Intro in two sizes** (user picked B over band-only and band + `/night-city` command): the full pane scene when
-  the terminal is at least 144 columns wide, an animated `AbovePrompt` band (~6 rows, full width: skyline, rain,
-  sputtering sign) everywhere else, tmux splits included. Both play at session start and then go away.
+- **Intro in the full-width band above the prompt** (2026-10-13, deviation 2: the user first picked pane ≥144 +
+  band, then saw the pane dock beside the transcript and chose the band only): an animated `AbovePrompt` band as
+  tall as Claude Code allows (`maxRows`; up to half the terminal in fullscreen), full width, in every terminal. It
+  plays at session start and then goes away. It should read like the `alive.html` mockup: deep-purple sky fading
+  down, purple skyline with blinking cyan/yellow windows, cyan rain, a big hot-pink NIGHT CITY sign with a faked
+  glow (darker pink halo cells) and a sputtering letter, no box around it.
 - Status line keeps every ccstatusline item; only its look changes.
 
 ## Constraints (verified in this session)

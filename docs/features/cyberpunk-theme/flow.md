@@ -122,6 +122,13 @@ Decisions 2026-10-13: user accepted all recommendations ("yes to all"). Plan rew
    for `/plugin install` users); B mod writes settings.json itself; C drop auto-switch. Recommended A. Decision
    2026-10-13: **C** (user). Spec goal 6 and the auto-switch behaviour removed; plan Task 2 becomes mod scaffolding
    only; Task 6 keeps the removal reset of `theme` (spec, grill Q8) but drops the store flag.
+2. **Task 4: the pane shows on the side, and the scene doesn't match the mockup** (user, after watching it live).
+   In fullscreen from 110 columns Claude Code docks every pane beside the transcript (`Pane.placement: 'dock'`); no
+   component sits at the top of the screen. The `AbovePrompt` band is full width above the prompt, up to half the
+   terminal's rows in fullscreen. Proposed: drop the pane, always use the band at its full height. Decision
+   2026-10-13: **band only, full height** (user). Screenshot of the live pane: flat grey sky, black towers, the sign
+   boxed like a label, stray navy blocks; the mockup's deep-purple sky, purple skyline and glowing sign are missing.
+   Task 4 reworked to match `alive.html` as far as cells allow.
 
 ## Walkthrough
 
