@@ -140,9 +140,9 @@
     },
     {
       "name": "night-city",
-      "description": "Night City: a loud neon Claude Code theme (hot pink, cyan, signal yellow, purple). Opt-in.",
+      "description": "Night City: a loud neon Claude Code theme with an animated skyline intro, Night City spinner words and short status-line reactions. Opt-in.",
       "source": "./plugins/night-city",
-      "category": "security"
+      "category": "development"
     },
     {
       "name": "cswap",
