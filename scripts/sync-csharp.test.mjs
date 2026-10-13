@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { ROUTERS, assignRouter, isHidden, renderRouter } from './sync-csharp.mjs';
+import { ROUTERS, assignRouter, entrySummary, isHidden, renderRouter } from './sync-csharp.mjs';
 import { frontmatterDescription } from './sync-lib.mjs';
 
 test('assignRouter maps upstream plugins to routers, unknown ones to core', () => {
@@ -34,4 +34,12 @@ test('renderRouter sorts entries, escapes pipes and keeps the description parsea
 test('isHidden reads disable-model-invocation', () => {
   assert.equal(isHidden('---\nname: f\ndisable-model-invocation: true\nuser-invocable: false\n---'), true);
   assert.equal(isHidden('---\nname: f\nuser-invocable: false\n---'), false);
+});
+
+test('entrySummary overrides csharp-expert and summarizes the rest', () => {
+  assert.equal(
+    entrySummary('csharp-expert', 'Route C# requests to the smallest marketplace plugin. More.'),
+    'C# semantics, and routing to the right specialist skill in this plugin.',
+  );
+  assert.equal(entrySummary('other', 'First sentence. Second.'), 'First sentence.');
 });

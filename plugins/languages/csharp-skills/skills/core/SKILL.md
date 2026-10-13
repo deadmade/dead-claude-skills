@@ -25,7 +25,7 @@ SKILL.md with the Read tool, and follow it. When a skill names another skill, re
 | android-tombstone-symbolication | Symbolicate the .NET runtime frames in an Android tombstone file. | `${CLAUDE_PLUGIN_ROOT}/library/android-tombstone-symbolication/SKILL.md` |
 | apple-crash-symbolication | Symbolicate .NET runtime frames in Apple platform .ips crash logs (iOS, tvOS, Mac Catalyst, macOS). | `${CLAUDE_PLUGIN_ROOT}/library/apple-crash-symbolication/SKILL.md` |
 | clr-activation-debugging | Diagnoses .NET Framework CLR activation issues using CLR activation logs (CLRLoad logs) produced by mscoree.dll. | `${CLAUDE_PLUGIN_ROOT}/library/clr-activation-debugging/SKILL.md` |
-| csharp-expert | Route C# and .NET requests to the exact installed specialist or smallest dotnet/skills marketplace plugin. | `${CLAUDE_PLUGIN_ROOT}/library/csharp-expert/SKILL.md` |
+| csharp-expert | C# semantics, and routing to the right specialist skill in this plugin. | `${CLAUDE_PLUGIN_ROOT}/library/csharp-expert/SKILL.md` |
 | csharp-refactoring | Safely refactors C#/.NET code without changing behavior. | `${CLAUDE_PLUGIN_ROOT}/library/csharp-refactoring/SKILL.md` |
 | csharp-scripts | Run file-based C# apps with the .NET CLI when the user explicitly wants C#/.NET code without creating a project. | `${CLAUDE_PLUGIN_ROOT}/library/csharp-scripts/SKILL.md` |
 | dotnet-pinvoke | Correctly call native (C/C++) libraries from .NET using P/Invoke and LibraryImport. | `${CLAUDE_PLUGIN_ROOT}/library/dotnet-pinvoke/SKILL.md` |

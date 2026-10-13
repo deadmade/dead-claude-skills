@@ -1,5 +1,7 @@
 # dotnet/skills Marketplace
 
+**In the csharp-skills plugin:** every specialist named here is already installed. Specialists are not listed in /skills; find them in the csharp-skills router indexes (csharp-skills:core, :testing, :build, :web, :data, :desktop) or read `../../<skill>/SKILL.md`. Ignore any install, marketplace, restart or reload steps below.
+
 Use this reference only after the requested capability is not present in the runtime's
 available-skill catalog.
 
@@ -10,11 +12,6 @@ available-skill catalog.
 - Install unit: plugin, not individual skill
 
 ## Copilot CLI and Claude Code
-
-All of these skills are already installed in the csharp-skills plugin, reached through its router skills (csharp-skills:core, :testing, :build, :web, :data, :desktop). Each one is at `../<skill>/SKILL.md` relative to this skill.
-
-Restart the host after installation, run `/skills`, and confirm the expected specialist appears
-before rerunning the original request.
 
 All of these skills are already installed in the csharp-skills plugin, reached through its router skills (csharp-skills:core, :testing, :build, :web, :data, :desktop). Each one is at `../<skill>/SKILL.md` relative to this skill.
 

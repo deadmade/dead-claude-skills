@@ -10,7 +10,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ROOT, fail, finish, frontmatterDescription, git, sparseClone, summary } from './sync-lib.mjs';
 
@@ -105,8 +105,19 @@ const INSTALLED =
   'All of these skills are already installed in the csharp-skills plugin, reached through its router skills ' +
   '(csharp-skills:core, :testing, :build, :web, :data, :desktop). Each one is at `../<skill>/SKILL.md` relative to ' +
   'this skill.';
+// Prepended to csharp-expert, which upstream wrote as an install guide for a marketplace of separate plugins.
+const note = (path) =>
+  '**In the csharp-skills plugin:** every specialist named here is already installed. Specialists are not listed in ' +
+  '/skills; find them in the csharp-skills router indexes (csharp-skills:core, :testing, :build, :web, :data, ' +
+  `:desktop) or read \`${path}<skill>/SKILL.md\`. Ignore any install, marketplace, restart or reload steps below.`;
 // [file under library/, pattern, replacement]. Each must match, so an upstream rewording fails the sync.
 const REWRITES = [
+  ['csharp-expert/SKILL.md', /^---\n[\s\S]*?\n---\n/, (fm) => `${fm}\n${note('../')}\n`],
+  [
+    'csharp-expert/references/dotnet-skills-marketplace.md',
+    /^# dotnet\/skills Marketplace\n/,
+    (h) => `${h}\n${note('../../')}\n`,
+  ],
   [
     'csharp-expert/SKILL.md',
     /^([^\n]*:\n\n)?```text\n(\/plugin marketplace add dotnet\/skills\n)?\/plugin install <plugin>@dotnet-agent-skills\n```/gm,
@@ -124,8 +135,9 @@ const REWRITES = [
   ],
   [
     'csharp-expert/references/dotnet-skills-marketplace.md',
-    /^([^\n]*:\n\n)?```text\n\/plugin update <plugin>@dotnet-agent-skills\n```/gm,
-    INSTALLED,
+    // The "restart after installation" paragraph and the update block; INSTALLED already precedes them.
+    /^Restart the host after installation[\s\S]*?\n```text\n\/plugin update <plugin>@dotnet-agent-skills\n```\n\n/m,
+    '',
   ],
   [
     'csharp-expert/references/dotnet-skills-marketplace.md',
@@ -133,6 +145,12 @@ const REWRITES = [
     INSTALLED,
   ],
 ];
+// Index summaries that replace a skill's own description in the router.
+export const SUMMARY_OVERRIDES = {
+  'csharp-expert': 'C# semantics, and routing to the right specialist skill in this plugin.',
+};
+export const entrySummary = (name, desc) => SUMMARY_OVERRIDES[name] ?? summary(desc);
+
 // Upstream plugin.json keys for parts we don't vendor.
 const UNVENDORED = ['agents', 'mcpServers', 'lspServers', 'hooks', 'commands'];
 
@@ -214,7 +232,8 @@ function main() {
   const files = listFiles(LIBRARY).sort();
   for (const [a, re] of mentionPatterns)
     for (const f of files)
-      if (re.test(readFileSync(f, 'utf8'))) report(`mentions skipped agent ${a}: ${f.slice(PLUGIN.length + 1)}`);
+      if (re.test(readFileSync(f, 'utf8')))
+        report(`mentions skipped agent ${a}: ${relative(PLUGIN, f).split(sep).join('/')}`);
 
   // 8. Routers.
   for (const r of ROUTERS) {
@@ -222,7 +241,7 @@ function main() {
     for (const name of readdirSync(LIBRARY)) {
       if (assignRouter(skills.get(name).plugin) !== r.name) continue;
       const text = readFileSync(join(LIBRARY, name, 'SKILL.md'), 'utf8');
-      if (!isHidden(text)) entries.push({ name, summary: summary(frontmatterDescription(text)) });
+      if (!isHidden(text)) entries.push({ name, summary: entrySummary(name, frontmatterDescription(text)) });
     }
     mkdirSync(join(PLUGIN, 'skills', r.name), { recursive: true });
     writeFileSync(join(PLUGIN, 'skills', r.name, 'SKILL.md'), renderRouter({ ...r, entries }));

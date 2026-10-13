@@ -12,6 +12,8 @@ description: >-
 license: MIT
 ---
 
+**In the csharp-skills plugin:** every specialist named here is already installed. Specialists are not listed in /skills; find them in the csharp-skills router indexes (csharp-skills:core, :testing, :build, :web, :data, :desktop) or read `../<skill>/SKILL.md`. Ignore any install, marketplace, restart or reload steps below.
+
 # C# Expert
 
 ## Purpose
