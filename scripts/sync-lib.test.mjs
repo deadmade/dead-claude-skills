@@ -12,6 +12,12 @@ test('frontmatterDescription', () => {
   assert.equal(frontmatterDescription('no frontmatter'), '');
 });
 
+test('frontmatterDescription returns null for unhandled forms', () => {
+  assert.equal(frontmatterDescription('---\ndescription: "abc\n  def"\n---'), null);
+  assert.equal(frontmatterDescription('---\ndescription: abc\n  def\n---'), null);
+  assert.equal(frontmatterDescription('---\ndescription: "a \\"b\\" c"\n---'), null);
+});
+
 test('summary', () => {
   assert.equal(summary('ALWAYS USE before running tests. Trigger on x.'), 'ALWAYS USE before running tests.');
   const long = summary('word '.repeat(60).trim());

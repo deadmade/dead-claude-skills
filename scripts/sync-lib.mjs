@@ -43,7 +43,14 @@ export function frontmatterDescription(text) {
     return (n < 0 ? rest : rest.slice(0, n)).map((l) => l.trim()).filter(Boolean).join(' ');
   }
   if (/^[|>]/.test(v)) return null;
-  return v.replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1');
+  if (/^\s/.test(lines[i + 1] ?? '')) return null; // multi-line plain scalar
+  const q = v[0];
+  if (q === '"' || q === "'") {
+    if (v.length < 2 || !v.endsWith(q)) return null; // multi-line quoted
+    if (q === '"' && v.includes('\\')) return null; // escapes aren't unescaped
+    return v.slice(1, -1);
+  }
+  return v;
 }
 
 // First sentence of `desc`, cut at the last space before `max` with "…" when still too long.
