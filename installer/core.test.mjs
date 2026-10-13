@@ -61,6 +61,7 @@ test('opt-ins from the real manifests', () => {
         'mcp-github',
         'nix-lsp',
         'pstack-picks',
+        'rust-skills',
         'self-review',
         'tob-picks',
         'tui-review',

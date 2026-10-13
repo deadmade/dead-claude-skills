@@ -91,6 +91,12 @@
       "category": "development"
     },
     {
+      "name": "rust-skills",
+      "description": "Rust best practices from Apollo GraphQL's handbook (rust-best-practices): ownership, errors, clippy, testing, dispatch. Vendored, synced weekly. Opt-in.",
+      "source": "./plugins/languages/rust-skills",
+      "category": "development"
+    },
+    {
       "name": "graphify",
       "description": "Graphify: turn a codebase into a queryable knowledge graph (/graphify). Needs the graphify CLI (uv tool install graphifyy). Opt-in.",
       "source": "./plugins/graphify",
