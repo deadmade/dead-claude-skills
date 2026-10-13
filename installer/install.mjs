@@ -43,6 +43,7 @@ import {
   marketplaceArg,
   missingBinaries,
   nameOf,
+  manifestPath,
   needsToken,
   optIns,
   pathWith,
@@ -414,9 +415,10 @@ const rows = Array.isArray(plugins) ? plugins : (plugins.installed ?? []);
 const manifest = readJson(join(PKG, '.claude-plugin', 'marketplace.json'));
 const bundle = readJson(join(PKG, 'plugins', BUNDLE, '.claude-plugin', 'plugin.json'));
 const opts = optIns(manifest, bundle);
-const tokenPlugins = opts.filter((id) =>
-  needsToken(tryJson(join(PKG, 'plugins', nameOf(id), '.claude-plugin', 'plugin.json')) ?? {}),
-);
+const tokenPlugins = opts.filter((id) => {
+  const path = manifestPath(manifest, id);
+  return needsToken((path && tryJson(join(PKG, path))) || {});
+});
 const BUNDLE_ID = `${BUNDLE}@${MARKETPLACE}`;
 const managed = [...bundleIds(bundle), ...opts];
 

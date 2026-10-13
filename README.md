@@ -13,7 +13,10 @@ It's built for me; use it if it fits, but expect it to change without notice.
 - **Opt-in:** language servers (rust, csharp, typescript, pyright, nix), mcp-github, mcp-azure, atlassian,
   hallmark, feature-flow, self-review, mattpocock-picks, pstack-picks, tob-picks (Trail of Bits: property-based
   testing, spec compliance, sharp-edges, mutation-testing analysis), graphify, cswap, skill-creator, hookify,
-  tui-review (see [its README](plugins/tui-review/README.md); the installer downloads its `brv` binary).
+  tui-review (see [its README](plugins/tui-review/README.md); the installer downloads its `brv` binary), and the
+  language skill plugins rust-skills (Apollo's rust-best-practices) and csharp-skills (Microsoft's dotnet/skills).
+  csharp-skills ships its 102 skills in an unscanned `library/` behind six router skills (core, testing, build, web,
+  data, desktop) so only the routers' short descriptions load into context.
 - **Installer toggles:** ccstatusline, sandbox (Linux/macOS/WSL2, needs bubblewrap and socat), and
   [dcg](https://github.com/Dicklesworthstone/destructive_command_guard) (runs dcg's own installer). The installer
   always denies reading `.env` files and credential dirs (`~/.ssh`, `~/.aws`, `~/.azure`, `~/.config/gh`, `~/.gnupg`).

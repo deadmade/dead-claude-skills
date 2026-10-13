@@ -41,6 +41,26 @@ the Codex-only `agents/openai.yaml` and its icon are dropped, the `spec-to-code-
 `tob-picks:`, and `FsCheck|CsCheck` is added to property-based-testing's library detection command. Synced weekly via
 GitHub Actions; the synced upstream commit is in `plugins/tob-picks/UPSTREAM`.
 
+## rust-skills
+
+`plugins/languages/rust-skills/` vendors the rust-best-practices skill from
+[apollographql/skills](https://github.com/apollographql/skills) (MIT License; `plugins/languages/rust-skills/LICENSE`).
+Modified by `scripts/sync-rust.mjs`: a `paths:` block (`**/*.rs`, `**/Cargo.toml`, `**/Cargo.lock`) is added to
+SKILL.md's frontmatter. Synced weekly via GitHub Actions (`sync-rust.yml`); the synced upstream commit is in
+`plugins/languages/rust-skills/UPSTREAM`.
+
+## csharp-skills
+
+`plugins/languages/csharp-skills/` vendors the skills of [dotnet/skills](https://github.com/dotnet/skills) (MIT License,
+Copyright (c) .NET Foundation and Contributors; `plugins/languages/csharp-skills/LICENSE`). Modified by
+`scripts/sync-csharp.mjs`: the 102 skills are copied to `library/`, and six generated router skills in `skills/` (core,
+testing, build, web, data, desktop) index them; the four skills upstream marks `disable-model-invocation: true` are
+left out of the indexes. csharp-expert gets a note that its specialists are already installed in csharp-skills, its
+install, restart and update blocks are rewritten, and it gets a fixed index summary. Upstream's agents, binlog MCP
+server, bundled LSP and dotnet-experimental plugin are not vendored. Synced weekly via GitHub Actions
+(`sync-csharp.yml`), which lists added, removed, skipped and unmapped skills and agent mentions in the PR body; the
+synced upstream commit is in `plugins/languages/csharp-skills/UPSTREAM`.
+
 ## graphify
 
 `plugins/graphify/skills/graphify/` vendors the Claude Code skill (`graphify/skill.md`) and its `references/`

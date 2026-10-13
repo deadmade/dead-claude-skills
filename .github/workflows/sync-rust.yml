@@ -1,0 +1,40 @@
+name: Sync rust-skills
+
+on:
+  schedule:
+    - cron: '15 6 * * 1' # Mondays 06:15 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Sync skill from upstream
+        run: node scripts/sync-rust.mjs
+
+      - name: Sanity checks
+        run: |
+          jq empty .claude-plugin/marketplace.json plugins/languages/rust-skills/.claude-plugin/plugin.json
+          grep -q '^paths:' plugins/languages/rust-skills/skills/rust-best-practices/SKILL.md
+          echo "sha=$(cat plugins/languages/rust-skills/UPSTREAM)" >> "$GITHUB_OUTPUT"
+        id: check
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v8
+        with:
+          branch: sync/rust-skills
+          delete-branch: true
+          commit-message: 'Sync rust-skills to ${{ steps.check.outputs.sha }}'
+          title: 'Sync rust-skills to ${{ steps.check.outputs.sha }}'
+          body: |
+            Automated sync of `skills/rust-best-practices` from https://github.com/apollographql/skills at
+            https://github.com/apollographql/skills/commit/${{ steps.check.outputs.sha }}.
+
+            cc @deadmade
+          add-paths: plugins/languages/rust-skills

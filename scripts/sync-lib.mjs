@@ -28,14 +28,44 @@ export function sparseClone(url, patterns, { noCone = false } = {}) {
   return dir;
 }
 
+// `description:` from the first frontmatter block. Handles plain, "double"/'single'-quoted and folded (`>`, `>-`)
+// forms; "" when missing, null for any other form (e.g. `|`).
+export function frontmatterDescription(text) {
+  const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
+  if (!fm) return '';
+  const lines = fm[1].split(/\r?\n/);
+  const i = lines.findIndex((l) => l.startsWith('description:'));
+  if (i < 0) return '';
+  const v = lines[i].slice('description:'.length).trim();
+  if (/^>[-+]?$/.test(v)) {
+    const rest = lines.slice(i + 1);
+    const n = rest.findIndex((l) => l && !/^\s/.test(l));
+    return (n < 0 ? rest : rest.slice(0, n))
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .join(' ');
+  }
+  if (/^[|>]/.test(v)) return null;
+  if (/^\s/.test(lines[i + 1] ?? '')) return null; // multi-line plain scalar
+  const q = v[0];
+  if (q === '"' || q === "'") {
+    if (v.length < 2 || !v.endsWith(q)) return null; // multi-line quoted
+    if (q === '"' && v.includes('\\')) return null; // escapes aren't unescaped
+    return v.slice(1, -1);
+  }
+  return v;
+}
+
+// First sentence of `desc`, cut at the last space before `max` with "…" when still too long.
+export function summary(desc, max = 200) {
+  const dot = desc.indexOf('. ');
+  const s = dot < 0 ? desc : desc.slice(0, dot + 1);
+  return s.length <= max ? s : `${s.slice(0, s.lastIndexOf(' ', max))}…`;
+}
+
 // `description:` from a SKILL.md frontmatter, unquoted; "" when missing.
 export function description(skillMd) {
-  if (!existsSync(skillMd)) return '';
-  const line =
-    readFileSync(skillMd, 'utf8')
-      .split('\n')
-      .find((l) => l.startsWith('description:')) ?? '';
-  return line.replace(/^description:\s*/, '').replace(/^"|"$/g, '');
+  return existsSync(skillMd) ? (frontmatterDescription(readFileSync(skillMd, 'utf8')) ?? '') : '';
 }
 
 // Upstream skills that are neither vendored nor skipped. With NEW_SKILLS_FILE set (the workflows), each is

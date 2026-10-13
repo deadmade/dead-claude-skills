@@ -37,6 +37,7 @@ import {
   unavailable,
   outdated,
   shippedVersions,
+  manifestPath,
 } from './core.mjs';
 
 const json = (p) => JSON.parse(readFileSync(new URL(`../${p}`, import.meta.url), 'utf8'));
@@ -51,6 +52,7 @@ test('opt-ins from the real manifests', () => {
     [
       ...[
         'atlassian',
+        'csharp-skills',
         'cswap',
         'feature-flow',
         'graphify',
@@ -60,6 +62,7 @@ test('opt-ins from the real manifests', () => {
         'mcp-github',
         'nix-lsp',
         'pstack-picks',
+        'rust-skills',
         'self-review',
         'tob-picks',
         'tui-review',
@@ -384,6 +387,12 @@ test('an uncategorized plugin lands in Other, empty pages are dropped', () => {
   );
 });
 
+test('the language servers page is Languages and lists the language skills', () => {
+  const lang = CATEGORIES.find((c) => c.id === 'lsp');
+  assert.equal(lang.title, 'Languages');
+  for (const k of ['csharp-skills', 'rust-skills', 'csharp-lsp', 'rust-analyzer-lsp']) assert.ok(lang.keys.includes(k));
+});
+
 test('categorize keeps bulk:false on danger', () => {
   assert.equal(categorize(['strip-defaults', 'clean']).find((c) => c.id === 'danger').bulk, false);
 });
@@ -440,4 +449,19 @@ test('shippedVersions counts pinned url plugins and skips unpinned ones', () => 
   assert.deepEqual(outdated([{ id: `superpowers@${M}`, version: '6.4.2' }], shipped), [
     { id: `superpowers@${M}`, from: '6.4.2', to: '7.0.0' },
   ]);
+});
+
+test('manifestPath finds a local plugin manifest, null for url sources and unknown names', () => {
+  const m = {
+    plugins: [
+      { name: 'rust-skills', source: './plugins/languages/rust-skills' },
+      { name: 'superpowers', source: { source: 'url' } },
+    ],
+  };
+  assert.equal(
+    manifestPath(m, 'rust-skills@dead-claude-skills'),
+    'plugins/languages/rust-skills/.claude-plugin/plugin.json',
+  );
+  assert.equal(manifestPath(m, 'superpowers@dead-claude-skills'), null);
+  assert.equal(manifestPath(m, 'nope@dead-claude-skills'), null);
 });
