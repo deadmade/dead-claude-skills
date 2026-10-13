@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { frontmatterDescription, summary } from './sync-lib.mjs';
+import { addPaths, frontmatterDescription, summary } from './sync-lib.mjs';
 
 test('frontmatterDescription', () => {
   assert.equal(
@@ -25,4 +25,16 @@ test('summary', () => {
   assert.equal(summary('ALWAYS USE before running tests. Trigger on x.'), 'ALWAYS USE before running tests.');
   const long = summary('word '.repeat(60).trim());
   assert.ok(long.length <= 201 && long.endsWith('…'));
+});
+
+test('addPaths', () => {
+  const globs = ['**/*.sql', '**/migrations/**'];
+  const paths = 'paths:\n  - "**/*.sql"\n  - "**/migrations/**"\n';
+  assert.equal(addPaths('---\nname: x\n---\nbody\n', globs), `---\nname: x\n${paths}---\nbody\n`);
+  assert.equal(
+    addPaths('---\ndescription: |\n  a\n\n  b\n---\n', globs),
+    `---\ndescription: |\n  a\n\n  b\n${paths}---\n`,
+  );
+  assert.equal(addPaths('no frontmatter\n', globs), null);
+  assert.equal(addPaths('---\npaths:\n  - "*.x"\n---\n', globs), null);
 });

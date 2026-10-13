@@ -1,6 +1,12 @@
 ---
 name: postgres-best-practices
 description: Best practices and guidelines for working with Postgres. Covers schema design, indexing strategies, query optimization, migrations, and common pitfalls. Use when writing SQL, designing database schemas, optimizing queries, or setting up a Postgres database.
+paths:
+  - "**/*.sql"
+  - "**/migrations/**"
+  - "**/migrate/**"
+  - "**/*.prisma"
+  - "**/alembic/**"
 ---
 
 # Postgres Best Practices

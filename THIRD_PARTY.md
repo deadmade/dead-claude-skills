@@ -63,15 +63,17 @@ synced upstream commit is in `plugins/languages/csharp-skills/UPSTREAM`.
 
 ## postgres
 
-`plugins/database/postgres/skills/` vendors two skills, unmodified. Each folder carries its upstream's license and
-an `UPSTREAM` file with the synced commit:
+`plugins/database/postgres/skills/` vendors two skills. Each folder carries its upstream's license and an `UPSTREAM`
+file with the synced commit:
 
 - `postgres-best-practices/` from [neondatabase/postgres-skills](https://github.com/neondatabase/postgres-skills)
   (Apache License 2.0; `LICENSE` in the folder).
 - `postgres-database-migration/` from [timescale/pg-aiguide](https://github.com/timescale/pg-aiguide) (Apache License
   2.0; `LICENSE` and `NOTICE` in the folder).
 
-Synced by `scripts/sync-postgres.mjs` (weekly via GitHub Actions, `sync-postgres.yml`).
+Modified by `scripts/sync-postgres.mjs`: a `paths:` block (`**/*.sql`, `**/migrations/**`, `**/migrate/**`,
+`**/*.prisma`, `**/alembic/**`) is added to each SKILL.md's frontmatter. Synced weekly via GitHub Actions
+(`sync-postgres.yml`).
 
 ## graphify
 
