@@ -4,7 +4,7 @@
 > superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** An opt-in `night-city` plugin: a loud Night City color theme, a mod with an animated intro, reactions and
-flavor text that switches to the theme once, and installer support for a Night City ccstatusline config.
+flavor text, and installer support for a Night City ccstatusline config.
 
 **Architecture:** One plugin folder `plugins/night-city/` holding `themes/night-city.json` and a TypeScript mod
 (`hooks/`). The scene generator and word list are pure files with tests; `register.tsx` wires them to engine events.
@@ -29,7 +29,7 @@ API facts below cite `claude-code.d.ts` = `/tmp/claude-1000/bundled-skills/2.1.2
   cyan `#00F0FF`, yellow `#FCEE0A`, red `#FF003C`, purple `#B57CFF`/`#C04DFF`, user bar `#2b0a3d`, bash bar `#06213a`.
 - Intro: about 4 s, any keypress skips, fresh session start only (not `/clear`, resume, compact or fork). Pane when
   Claude Code places it (`isPlaced`), `AbovePrompt` band (~6 rows) otherwise.
-- Auto-switch the theme **once** per install, regardless of the previous theme; remembered in `$.store`.
+- No automatic theme switch: users pick Night City in `/theme` (Claude Code allows nothing else; deviation 1).
 - Glitch at most once per main turn on a tool result with `isError`; flare when a main turn ends (not a subagent's);
   both < 1 s.
 - Nothing in the transcript animates; no sound; no terminal escape sequences.
@@ -39,8 +39,8 @@ API facts below cite `claude-code.d.ts` = `/tmp/claude-1000/bundled-skills/2.1.2
 
 1. Terminal resized while the intro plays: no denied-blit errors, no crash, never both pane and band. → Task 4.
 2. User types immediately at startup: the first keypress skips the intro and still lands in the prompt. → Task 4.
-3. `-p` / SDK runs (`isInteractive: false`, `surface: null`): no intro, no theme switch, no errors. → Tasks 2 and 4.
-4. Theme switch refused or throwing: the mod records the attempt and doesn't retry every session. → Task 2.
+3. `-p` / SDK runs (`isInteractive: false`, `surface: null`): no intro, no errors. → Task 4.
+4. Night City removed while `theme` still says `custom:night-city:night-city`: the installer resets it. → Task 6.
 5. A turn with ten failing tool calls glitches once; the next main turn can glitch again; subagent turns don't
    flare. → Task 5.
 
@@ -68,50 +68,25 @@ API facts below cite `claude-code.d.ts` = `/tmp/claude-1000/bundled-skills/2.1.2
 
 ---
 
-### Task 2: Verify the undocumented facts, then switch to the theme once
+### Task 2: Verify the undocumented facts — done, no code
 
-Steps 1-4 are checks against this plugin, loaded with `claude --plugin-dir plugins/night-city` and a temporary
-logging hook that is deleted before the commit. Write the findings into `docs/features/cyberpunk-theme/flow.md`
-under **Grounding**; Tasks 4 and 6 depend on them. If Step 2 or 3 fails, stop and report: that's a deviation.
-
-**Files:**
-- Create: `plugins/night-city/hooks/hooks.json` (`{ "modules": ["./register.tsx"] }`),
-  `plugins/night-city/hooks/register.tsx`, `plugins/night-city/types/index.d.ts`,
-  `plugins/night-city/tsconfig.json` (copy of `plugins/tui-review/tsconfig.json`)
-- Modify: `plugins/night-city/.claude-plugin/plugin.json` (`"types": "./types/index.d.ts"`),
-  `.github/workflows/test.yml:35-37` (a `claude plugin test .` step in `plugins/night-city`, mirroring cswap's)
-- Test: `plugins/night-city/hooks/register.test.ts`
-
-**Interfaces:**
-- Produces: `export const THEME = '<value from Step 2>'`, `export const SWITCHED_KEY = 'theme-switched'` in
-  `register.tsx`; `register` as the module's `Register`.
-
-- [ ] **Step 1:** Pick Night City in `/theme`. Record the stored value (expected `custom:night-city:night-city`), the
-  file it lands in (`~/.claude/settings.json` `theme`, or `~/.claude.json`), and that a fresh start keeps it.
-- [ ] **Step 2:** From a hook, `$.config.set` that value (grep `set:` under `config` in `claude-code.d.ts`); record
-  whether it's accepted.
-- [ ] **Step 3:** Confirm the fresh-start signal: classic `SessionStart` `source` (`claude-code.d.ts:11653`,
-  `'startup' | 'resume' | 'clear' | 'compact' | 'fork'`) and its order relative to `session.start`.
-- [ ] **Step 4:** Find where `$.store` keeps this plugin's values (`claude-code.d.ts` ~3352: a JSON file under the
-  config dir): exact path and key layout, so the installer can delete `SWITCHED_KEY` on removal (Task 6).
-- [ ] **Step 5: Failing tests** (pattern: `plugins/cswap/hooks/register.test.ts`; mock `config.set`/`store.*`):
-  - `switches the theme on the first interactive session` — one `config.set` with `{ key: 'theme', value: THEME }`.
-  - `does not switch again once the store says so` — store holds `SWITCHED_KEY: true` → no `config.set`.
-  - `does nothing in a -p run` — `isInteractive: false` → no `config.set`.
-  - `a denied switch is remembered and not retried` — `config.set` answers `{ deny }` → flag set, no throw.
-  - `a throwing switch is remembered and not retried` — `config.set` rejects → flag set (in `finally`), no throw.
-- [ ] **Step 6:** `claude plugin test plugins/night-city` → FAIL. **Step 7:** implement in `session.start`.
-- [ ] **Step 8:** `claude plugin test plugins/night-city` and `tsc -p plugins/night-city` → PASS.
-- [ ] **Step 9:** Commit: `"Switch to the Night City theme once on the first session after install."`
+Ran 2026-10-13 (flow.md **Grounding** "Task 2 facts", **Deviations** 1). `$.config.set` can't select a custom theme,
+so the auto-switch was dropped (user chose C). Facts later tasks use: the theme is stored as
+`"theme": "custom:night-city:night-city"` in `~/.claude/settings.json`; a fresh start is classic `SessionStart` with
+`source === 'startup'`, which fires before `session.start`. The mod scaffolding moved to Task 3.
 
 ---
 
 ### Task 3: Mod: flavor text
 
 **Files:**
-- Create: `plugins/night-city/hooks/words.ts`
-- Modify: `plugins/night-city/hooks/register.tsx`
-- Test: `plugins/night-city/hooks/register.test.ts`
+- Create: `plugins/night-city/hooks/words.ts`, the mod scaffolding: `plugins/night-city/hooks/hooks.json`
+  (`{ "modules": ["./register.tsx"] }`), `plugins/night-city/hooks/register.tsx` (`register` as the module's
+  `Register`), `plugins/night-city/types/index.d.ts`, `plugins/night-city/tsconfig.json` (copy of
+  `plugins/tui-review/tsconfig.json`)
+- Modify: `plugins/night-city/.claude-plugin/plugin.json` (`"types": "./types/index.d.ts"`),
+  `.github/workflows/test.yml:35-37` (a `claude plugin test .` step in `plugins/night-city`, mirroring cswap's)
+- Test: `plugins/night-city/hooks/register.test.ts` (pattern: `plugins/cswap/hooks/register.test.ts`)
 
 **Interfaces:**
 - Produces: `export const SPINNER_WORDS: readonly string[]` (≥ 12, e.g. "Breaching ICE", "Jacking in", "Running the
@@ -190,39 +165,34 @@ the intro isn't playing. The art is original, not copied.
 
 ---
 
-### Task 6: Installer: Night City status line, theme reset and the switch flag
+### Task 6: Installer: Night City status line and theme reset
 
 **Files:**
 - Create: `installer/ccstatusline-night-city.json` (same `lines` as `installer/ccstatusline.json`, every widget
   kept, truecolor `colorLevel` and hex colors / gradient / powerline per ccstatusline's README:
   `$(dirname $(readlink -f $(command -v ccstatusline)))/../README.md`)
-- Modify: `installer/core.mjs` (`mergeSettings` :98, `resetSettings` :164), `installer/install.mjs`
-  (`applyCcstatusline` :173-188, toggles :579), `installer/files.mjs` if the flag delete needs a file helper
+- Modify: `installer/core.mjs` (`mergeSettings` :98), `installer/install.mjs` (`applyCcstatusline` :173-188,
+  toggles :579)
 - Test: `installer/core.test.mjs`
 
 **Interfaces:**
 - Produces in `core.mjs`:
-  - `export const NIGHT_CITY_THEME = '<Task 2 value>'`
+  - `export const NIGHT_CITY_THEME = 'custom:night-city:night-city'` (the `/theme` picker's value, Task 2).
   - `export const isShipped = (text, shippedTexts) => …` — true when `text` parses to JSON equal to any shipped one.
   - `mergeSettings(settings, { statusLine, sandbox, version, nightCity })`: when `nightCity === false` and
-    `settings.theme === NIGHT_CITY_THEME`, delete `theme`; otherwise leave `theme` alone. `resetSettings` keeps
-    `theme` when it is `NIGHT_CITY_THEME` and `nightCity` is true.
-  - Only if Task 2 found the theme in `settings.json`. If it lives in `~/.claude.json`, skip the theme reset and
-    instead add a summary line: "pick another theme in /theme".
+    `settings.theme === NIGHT_CITY_THEME`, delete `theme`; otherwise leave `theme` alone. `nightCity` undefined
+    behaves like true (no change), so existing callers are unaffected.
 
 - [ ] **Step 1: Failing tests:**
   - `isShipped`: equal to stock → true; equal to Night City → true; whitespace-only difference → true;
     customized → false.
   - `mergeSettings` with `nightCity: false` removes the Night City theme, keeps any other theme; with `nightCity:
-    true` keeps it.
-  - `resetSettings` with `nightCity: true` keeps the Night City theme (the `clean` path).
+    true` or omitted keeps it.
   - Night City config has the same widget `type`s, in the same order, as the stock one.
 - [ ] **Step 2:** `node --test installer/core.test.mjs` → FAIL.
 - [ ] **Step 3:** Implement. `applyCcstatusline` keeps its structure and its newer-version warning: the target file
   is `ccstatusline-night-city.json` when night-city is selected; a current file that `isShipped` (but isn't the
-  target) is replaced without asking. Pass `nightCity: selected night-city` in the toggles at :579. When night-city
-  goes from installed to not selected, delete `SWITCHED_KEY` from the store file Task 2 Step 4 found (atomic write
-  via `writeAtomic`); if Task 2 found no reliable path, skip it — the README covers it.
+  target) is replaced without asking. Pass `nightCity: <night-city selected>` in the toggles at :579.
 - [ ] **Step 4:** `npm test` → PASS.
 - [ ] **Step 5:** Commit: `"Write a Night City ccstatusline config and undo the theme when night-city is removed."`
 
@@ -233,8 +203,8 @@ the intro isn't playing. The art is original, not copied.
 **Files:**
 - Modify: `CLAUDE.md` (Layout: one line for `plugins/night-city/`, a theme + mod; its tests run with
   `claude plugin test .` there), `plugins/night-city/README.md` (what it does, the pane-or-band rule, the
-  diff-color limitation #57036, how to switch back, and that after `/plugin uninstall` + reinstall the theme must be
-  picked in `/theme` by hand)
+  diff-color limitation #57036, that the theme is picked in `/theme` (Claude Code doesn't let a plugin select it),
+  and how to switch back)
 
 - [ ] **Step 1:** Write both. **Step 2:** `npm test` → PASS.
 - [ ] **Step 3:** Commit: `"Document the night-city plugin."`

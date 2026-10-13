@@ -19,7 +19,9 @@ not more color. The other hard requirement: **it stays usable** for all-day work
 5. **Status line**: everything the installer's ccstatusline config shows today (`installer/ccstatusline.json`: model,
    thinking effort, context, cost, clock; cwd, branch, git changes, ahead/behind), restyled with Night City hex
    colors, gradient and/or powerline.
-6. Installing the plugin **switches to the theme automatically**.
+6. ~~Installing the plugin switches to the theme automatically.~~ Dropped 2026-10-13 (deviation 1, user chose C):
+   Claude Code lets only the `/theme` picker select a custom theme; users pick "Night City" there, as the README
+   says.
 7. Works on every platform the marketplace supports (Linux, macOS, Windows) and in any terminal, tmux included.
 
 ## Non-goals
@@ -60,8 +62,9 @@ not more color. The other hard requirement: **it stays usable** for all-day work
   ([#57036](https://github.com/anthropics/claude-code/issues/57036)).
 - Mod API (2.1.296, `claude-code.d.ts`): `$.ui.open` pane + `$.clock.every` + `$.ui.blit` support frame animation
   (the doc's own example is a 33 ms blit loop); `ui.render` on `Spinner` may rewrite `word`/`message`/`suffix`;
-  `TurnDuration` is renderable; `$.config.set` changes the `theme` row like `/config`; `$.store` persists across
-  sessions. **A pane opened unasked is placed only from 144 columns** (110 for an id the user once opened) and waits
+  `TurnDuration` is renderable; `$.store` persists across sessions. `$.config.set('theme', …)` accepts only the
+  built-in themes (verified at runtime, Task 2); `custom:` values come only from the `/theme` picker, which writes
+  `"theme": "custom:night-city:night-city"` to `~/.claude/settings.json`. **A pane opened unasked is placed only from 144 columns** (110 for an id the user once opened) and waits
   below that (`claude-code.d.ts:2490`, `:14132`).
 - Mods cannot write raw escape sequences to the terminal.
 - ccstatusline 2.2.32 (installed) supports truecolor hex, line gradients with hex stops, and powerline (its README).
@@ -74,8 +77,6 @@ not more color. The other hard requirement: **it stays usable** for all-day work
   **System** page next to ccstatusline.
 - Intro: about 4 s, any keypress skips it, plays only on a **fresh session start** (not `/clear`, not resume).
   Ideally both sizes share one scene generator drawn at two heights (builder's call).
-- Auto-switch happens **once**, whatever theme was set before: on the first session after install the mod sets the
-  theme and remembers that in `$.store`; if the user later picks another theme, it is left alone.
 - Reactions: glitch at most **once per turn** on a tool result with `isError` (failing greps and tests are common;
   firing on each would break "usable"); flare on every turn end. Both well under a second.
 - Flavor text always on: spinner words (`Spinner` `word`) and the turn-end line (`TurnDuration`: only its verb can change, e.g. "Jacked out

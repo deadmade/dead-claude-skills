@@ -37,6 +37,27 @@ could we design our own theme? Would be awesome to have like a cyberpunk style t
   `~/.claude/themes` or the `theme` setting.
 - Existing palette: `plugins/tui-review/hooks/theme.ts` (One Dark-ish, diff pane only); no Claude Code theme exists.
 - Docs to touch: README opt-in list (`README.md:6-11`); THIRD_PARTY.md only if the palette is derived from others.
+- Task 2 facts (Claude Code 2.1.296; "runtime" = a temporary probe hook in `plugins/night-city`, logged from both a
+  `claude -p --plugin-dir` run and an interactive `--plugin-dir` session; "binary" = the minified bundle):
+  - Theme value: `custom:night-city:night-city`. Binary: plugin themes get slug `${plugin.name}:${file basename}`
+    (`Kvt` → `kQn(themesPath, {plugin}, "<name>:")`), stored as `custom:<slug>` (`TX`).
+  - **`$.config.set` cannot set it (deviation).** Runtime, `-p` and interactive alike:
+    `$.config.set({ key: 'theme', value: 'custom:night-city:night-city' })` →
+    `{ deny: "takes one of: auto, dark, light, light-daltonized, dark-daltonized, light-ansi, dark-ansi" }`, theme
+    stays `dark`. Binary: the `theme` row is `options: Uxe` (built-ins only, `optionsHint: "For custom themes, use
+    /theme."`) and core's `config.set` bottom denies any `choice` value outside `options` before writing; only the
+    `/theme` picker's own writer (`commitTheme`/`themeWriter`) accepts `custom:`.
+  - Where it is stored: binary. `theme` is a user-intent setting: written with `saveUserIntentSetting` to
+    `userSettings` (`~/.claude/settings.json` `theme`), read via `resolveSetting` from the settings sources first,
+    then the legacy `~/.claude.json` value. The settings schema accepts `custom:*`; at startup a `custom:` value
+    triggers `loadCustomThemes`. Fresh-start persistence not observed at runtime (no `/theme` pick possible here).
+  - Fresh-start signal: runtime. `classic.SessionStart` fires with `source: 'startup'` **before** `session.start`
+    (both in `-p` and interactive); `session.start` itself has no source field (`isInteractive`, `surface`, `cwd`).
+  - `$.store` file: runtime + binary. `<config dir>/plugins/store/<file>.json`, one flat JSON object keyed by store
+    key (`{ "probe": true }`). `<file>` is the plugin id `<name>@<source>` with non-`[A-Za-z0-9_-]` replaced by `_`
+    plus `-` and the first 12 hex of its sha256: `night-city@inline` → `night-city_inline-b97a3b1f8941.json`;
+    installed from this marketplace, `night-city@dead-claude-skills` → `night-city_dead-claude-skills-9efd3f81de9d.json`
+    (computed, not observed).
 
 ## Prior art
 
@@ -93,6 +114,14 @@ spot-checked in claude-code.d.ts: TurnDuration props, turn.complete subagent id,
 Decisions 2026-10-13: user accepted all recommendations ("yes to all"). Plan rewritten: spike folded into Task 2, react.ts dropped, 7 tasks. Spec example changed to "Jacked out for 3s" (wording only; Gate 1 stands).
 
 ## Deviations
+
+1. **Task 2: a mod can't switch to a custom theme.** `$.config.set('theme', 'custom:night-city:night-city')` is
+   denied at runtime ("takes one of: auto, dark, light, light-daltonized, dark-daltonized, light-ansi, dark-ansi");
+   only the `/theme` picker writes `custom:` values. The theme lives in `~/.claude/settings.json` `theme` (from the
+   binary). Options: A installer writes `theme` into settings.json when night-city is selected (+ mod toast hint
+   for `/plugin install` users); B mod writes settings.json itself; C drop auto-switch. Recommended A. Decision
+   2026-10-13: **C** (user). Spec goal 6 and the auto-switch behaviour removed; plan Task 2 becomes mod scaffolding
+   only; Task 6 keeps the removal reset of `theme` (spec, grill Q8) but drops the store flag.
 
 ## Walkthrough
 
