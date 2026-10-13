@@ -95,8 +95,22 @@ export const isSandboxOn = (s) => s?.sandbox?.enabled === true;
 export const hasDcgHook = (s) =>
   (s?.hooks?.PreToolUse ?? []).some((e) => e?.hooks?.some((h) => /dcg(\.exe)?"?$/i.test(h?.command ?? '')));
 
-export function mergeSettings(settings, { statusLine, sandbox, version }) {
+// The value Claude Code stores when /theme picks the night-city plugin's theme.
+export const NIGHT_CITY_THEME = 'custom:night-city:night-city';
+
+// True when text is JSON equal to any shipped config text (whitespace-insensitive).
+export const isShipped = (text, shippedTexts) => {
+  try {
+    const cur = JSON.stringify(JSON.parse(text));
+    return shippedTexts.some((s) => JSON.stringify(JSON.parse(s)) === cur);
+  } catch {
+    return false;
+  }
+};
+
+export function mergeSettings(settings, { statusLine, sandbox, version, nightCity }) {
   const out = structuredClone(settings);
+  if (nightCity === false && out.theme === NIGHT_CITY_THEME) delete out.theme;
   const allow = out.permissions?.allow ?? [];
   const deny = out.permissions?.deny ?? [];
   out.permissions = {

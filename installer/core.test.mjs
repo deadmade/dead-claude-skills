@@ -7,6 +7,8 @@ import {
   planPlugins,
   duplicates,
   mergeSettings,
+  isShipped,
+  NIGHT_CITY_THEME,
   safeArg,
   missingBinaries,
   SECRET_DENIES,
@@ -475,4 +477,30 @@ test('manifestPath finds a local plugin manifest, null for url sources and unkno
   );
   assert.equal(manifestPath(m, 'superpowers@dead-claude-skills'), null);
   assert.equal(manifestPath(m, 'nope@dead-claude-skills'), null);
+});
+
+const shippedText = (f) => readFileSync(new URL(f, import.meta.url), 'utf8');
+
+test('isShipped matches shipped configs up to whitespace, not customized ones', () => {
+  const stock = shippedText('./ccstatusline.json');
+  const nc = shippedText('./ccstatusline-night-city.json');
+  const all = [stock, nc];
+  assert.equal(isShipped(stock, all), true);
+  assert.equal(isShipped(nc, all), true);
+  assert.equal(isShipped(JSON.stringify(JSON.parse(stock)), all), true);
+  assert.equal(isShipped(JSON.stringify({ ...JSON.parse(stock), flexMode: 'full' }), all), false);
+  assert.equal(isShipped('not json', all), false);
+});
+
+test('nightCity false removes only the Night City theme', () => {
+  const s = { theme: NIGHT_CITY_THEME };
+  assert.equal(mergeSettings(s, { nightCity: false }).theme, undefined);
+  assert.equal(mergeSettings({ theme: 'dark' }, { nightCity: false }).theme, 'dark');
+  assert.equal(mergeSettings(s, { nightCity: true }).theme, NIGHT_CITY_THEME);
+  assert.equal(mergeSettings(s, {}).theme, NIGHT_CITY_THEME);
+});
+
+test('Night City ccstatusline keeps the stock widgets in order', () => {
+  const types = (f) => JSON.parse(shippedText(f)).lines.map((l) => l.map((w) => w.type));
+  assert.deepEqual(types('./ccstatusline-night-city.json'), types('./ccstatusline.json'));
 });

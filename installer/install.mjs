@@ -40,6 +40,7 @@ import {
   isSandboxOn,
   isStripped,
   mergeSettings,
+  isShipped,
   marketplaceArg,
   missingBinaries,
   nameOf,
@@ -170,18 +171,21 @@ async function applySettings(toggles, { strip, reset }) {
 
 // Off only deletes the config when this installer's status line was on: the toggle also reads off for a ccstatusline
 // set up some other way, whose config isn't ours to delete.
-async function applyCcstatusline(was, on) {
+async function applyCcstatusline(was, on, nightCity) {
   if (!on) return was ? remove(CCSL, CCSL) : undefined;
-  const shipped = readFileSync(join(PKG, 'installer', 'ccstatusline.json'), 'utf8');
+  const shippedFile = (f) => readFileSync(join(PKG, 'installer', f), 'utf8');
+  const shipped = shippedFile(nightCity ? 'ccstatusline-night-city.json' : 'ccstatusline.json');
   if (!existsSync(CCSL)) {
     writeAtomic(CCSL, shipped);
     return done.push(`wrote ${CCSL}`);
   }
   const current = readFileSync(CCSL, 'utf8');
-  if (JSON.stringify(tryJson(CCSL)) === JSON.stringify(JSON.parse(shipped))) return;
+  if (isShipped(current, [shipped])) return;
   const newer = (tryJson(CCSL)?.version ?? 0) > JSON.parse(shipped).version;
   if (newer) log('warn', `${CCSL} has a newer config version than the shipped one; keeping it is safer.`);
-  if (await ask(`${CCSL} differs from the shipped config. Replace it?`, false)) {
+  // The other shipped config (stock vs Night City) is ours, not a customization: swap it without asking.
+  const ours = isShipped(current, [shippedFile('ccstatusline.json'), shippedFile('ccstatusline-night-city.json')]);
+  if (ours || (await ask(`${CCSL} differs from the shipped config. Replace it?`, false))) {
     writeAtomic(CCSL, shipped);
     done.push(`replaced ${CCSL}`);
   } else if (current) done.push(`kept your ${CCSL}`);
@@ -576,10 +580,11 @@ if (plan.uninstall.length || data.retired.length || dupes.length || foreign.leng
   await run('Pruning unused dependencies', 'pruned unused dependencies', 'plugin', 'prune', '-y');
 if (selected.includes(TUI_REVIEW)) await applyBrv();
 
-const toggles = { statusLine: on('ccstatusline'), sandbox: on('sandbox'), dcg: on('dcg'), version: VERSION };
+const nightCity = selected.some((id) => nameOf(id) === 'night-city');
+const toggles = { statusLine: on('ccstatusline'), sandbox: on('sandbox'), dcg: on('dcg'), version: VERSION, nightCity };
 await applySettings(toggles, { strip, reset: clean });
 const autoUpdate = tryJson(join(CONFIG, 'plugins', 'known_marketplaces.json'))?.[MARKETPLACE]?.autoUpdate;
-await applyCcstatusline(current.ccstatusline, on('ccstatusline'));
+await applyCcstatusline(current.ccstatusline, on('ccstatusline'), nightCity);
 await applyDcg(current.dcg, on('dcg'));
 await applyCswap(selected.some((id) => nameOf(id) === 'cswap'));
 if (clean) done.push(...clearTargets(CONFIG));
