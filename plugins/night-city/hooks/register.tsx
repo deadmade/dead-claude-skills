@@ -1,16 +1,14 @@
 // Flavor text: swaps the spinner and turn-line words for Night City ones. Changes only `word`.
-// The intro: about four seconds of the animated skyline at a fresh session start, in a pane where Claude Code places
-// one, else in the band above the prompt; any key ends it.
+// The intro: about four seconds of the animated skyline in the band above the prompt at a fresh session start; any
+// key ends it.
 import type { EngineInterface as $, Register, Timer } from 'claude-code';
 
 import { BAND_ROWS, INTRO_MS, frame } from './scene';
 import { SPINNER_WORDS, TURN_WORDS, pick } from './words';
 
-const PANE = 'night-city-intro';
 const KEY = 'scene';
 
 type Intro = {
-  form: 'pane' | 'band';
   startedAt: number;
   site?: { requestId: string; columns: number; rows: number };
   timer?: Timer;
@@ -25,12 +23,11 @@ const clamp = (n: number, max: number) => Math.max(1, Math.min(max, Math.floor(n
 
 async function play($: $) {
   const startedAt = await $.clock.now();
-  const opened = await $.ui.open({ id: PANE, title: 'Night City', rows: 24 });
-  if (!isPending) return void $.ui.close({ id: PANE });
+  if (!isPending) return;
   isPending = false;
-  const playing: Intro = { form: opened.isPlaced ? 'pane' : 'band', startedAt };
+  const playing: Intro = { startedAt };
   intro = playing;
-  if (!opened.isPlaced) $.ui.invalidate('ui.render');
+  $.ui.invalidate('ui.render');
   playing.timer = $.clock.every(66, async () => {
     const t = (await $.clock.now()) - startedAt;
     if (intro !== playing) return;
@@ -47,7 +44,6 @@ function end($: $) {
   if (intro === undefined) return;
   intro.timer?.cancel();
   intro = undefined;
-  void $.ui.close({ id: PANE });
   $.ui.invalidate('ui.render');
 }
 
@@ -92,17 +88,15 @@ export const register: Register = (on) => {
     return next(e);
   });
 
-  on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    if (intro?.form !== 'pane' || e.surface !== 'terminal') return $.ui.resolve(e).Box({});
-    const { Raster } = $.ui.resolve(e);
-    return <Raster {...await scene($, intro, e.requestId, e.props.bodyColumns, e.props.scroll.bodyRows)} />;
-  });
-
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (e.props.hasSurvey || intro?.form !== 'band' || e.surface !== 'terminal') return next(e);
+    if (e.props.hasSurvey || intro === undefined || e.surface !== 'terminal') return next(e);
+    // As tall as the band shows without scrolling, but at most half the terminal (outside fullscreen maxRows is all
+    // of it, which would push the prompt off screen), and at least BAND_ROWS where there is room for them.
+    const room = e.props.maxRows > 0 ? e.props.maxRows : BAND_ROWS;
+    const half = e.viewport ? Math.floor(e.viewport.rows / 2) : room;
     const { Raster } = $.ui.resolve(e);
     return (
-      <Raster {...await scene($, intro, e.requestId, e.props.bodyColumns, Math.min(BAND_ROWS, e.props.maxRows))} />
+      <Raster {...await scene($, intro, e.requestId, e.props.bodyColumns, Math.min(room, Math.max(BAND_ROWS, half)))} />
     );
   });
 };
