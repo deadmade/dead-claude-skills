@@ -144,6 +144,21 @@ test('the first keypress ends the intro and reaches the prompt', async ($, on) =
   expect(h.blits.length).toBe(after);
 });
 
+test('a keypress while the intro is starting skips it', async ($, on) => {
+  const h = host(on);
+  on('prompt.edit', () => ({ text: 'h', cursor: 1 }));
+  await $.classic.SessionStart({ source: 'startup' });
+  await $.session.start(START);
+  const prompt = $.prompt as unknown as { edit: (e: PromptEditInput) => Promise<PromptEditResult> };
+  const edit = { origin: { kind: 'composer' }, text: '', cursor: 0, start: 0, end: 0, inputText: 'h' } as const;
+  expect(await prompt.edit({ ...edit, key: { key: 'h' } })).toEqual({ text: 'h', cursor: 1 });
+  await h.clock.settle();
+  await $.ui.mount(pane(144));
+  await h.clock.advance(INTRO_MS);
+  expect(h.blits).toEqual([]);
+  expect(h.closed).toEqual([PANE]);
+});
+
 test('clear, resume, compact and fork play no intro', async ($, on) => {
   const h = host(on);
   for (const source of ['clear', 'resume', 'compact', 'fork'] as const) await startup($, h, source as never);

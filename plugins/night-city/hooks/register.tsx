@@ -18,6 +18,7 @@ type Intro = {
 
 // Module state, not $.state: the intro lives four seconds and a reload need not keep it.
 let isFresh = false;
+let isPending = false; // the intro is starting: a key now must still skip it
 let intro: Intro | undefined;
 
 const clamp = (n: number, max: number) => Math.max(1, Math.min(max, Math.floor(n)));
@@ -25,6 +26,8 @@ const clamp = (n: number, max: number) => Math.max(1, Math.min(max, Math.floor(n
 async function play($: $) {
   const startedAt = await $.clock.now();
   const opened = await $.ui.open({ id: PANE, title: 'Night City', rows: 24 });
+  if (!isPending) return void $.ui.close({ id: PANE });
+  isPending = false;
   const playing: Intro = { form: opened.isPlaced ? 'pane' : 'band', startedAt };
   intro = playing;
   if (!opened.isPlaced) $.ui.invalidate('ui.render');
@@ -58,6 +61,7 @@ async function scene($: $, playing: Intro, requestId: string, width: number, hei
 
 export const register: Register = (on) => {
   isFresh = false;
+  isPending = false;
   intro = undefined;
 
   on('ui.render', { component: 'Spinner' }, (_$, e, next) =>
@@ -73,14 +77,18 @@ export const register: Register = (on) => {
     return next(e);
   }).catch((_$, e, next) => next(e));
   on('session.start', async ($, e, next) => {
-    const started = await next(e);
-    if (isFresh && e.isInteractive && e.surface === 'terminal') void play($);
+    isPending = isFresh && e.isInteractive && e.surface === 'terminal';
     isFresh = false;
+    const started = await next(e);
+    if (isPending) void play($);
     return started;
   });
 
   on('prompt.edit', ($, e, next) => {
-    if (e.key !== undefined) end($);
+    if (e.key !== undefined) {
+      isPending = false;
+      end($);
+    }
     return next(e);
   });
 
