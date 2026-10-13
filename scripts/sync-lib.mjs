@@ -86,3 +86,18 @@ export function finish(label, sha, upstreamFile, dir) {
   else git('-C', ROOT, 'checkout', '--', rel);
   console.log(changed ? `${label} synced to ${sha} (changed)` : `${label} unchanged at ${sha} (no vendored changes)`);
 }
+
+// Insert a `paths:` list before the closing `---` of the first frontmatter block.
+// Returns null when there is no frontmatter or `paths:` is already present.
+export function addPaths(text, globs) {
+  const lines = text.split('\n');
+  if (lines[0] !== '---') return null;
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i] === '---') {
+      lines.splice(i, 0, 'paths:', ...globs.map((g) => `  - "${g}"`));
+      return lines.join('\n');
+    }
+    if (/^paths:/.test(lines[i])) return null;
+  }
+  return null;
+}

@@ -15,7 +15,7 @@
     "installer/",
     ".claude-plugin/marketplace.json",
     "plugins/*/.claude-plugin/plugin.json",
-    "plugins/languages/*/.claude-plugin/plugin.json"
+    "plugins/*/*/.claude-plugin/plugin.json"
   ],
   "engines": {
     "node": ">=20.12"

@@ -17,7 +17,7 @@
     forAllSystems = nixpkgs.lib.genAttrs ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
 
     # Upstream files copied by scripts/sync-*.mjs: fixing them here would churn every sync PR.
-    vendored = ["^plugins/(hallmark|mattpocock-picks|pstack-picks|tob-picks|graphify)/" "^plugins/languages/[^/]+/(library/|skills/|LICENSE$|UPSTREAM$)" "^plugins/self-review/(LICENSE|agents/|skills/self-review/references/upstream/)"];
+    vendored = ["^plugins/(hallmark|mattpocock-picks|pstack-picks|tob-picks|graphify)/" "^plugins/languages/[^/]+/(library/|skills/|LICENSE$|UPSTREAM$)" "^plugins/database/[^/]+/skills/" "^plugins/self-review/(LICENSE|agents/|skills/self-review/references/upstream/)"];
 
     # treefmt with the formatters treefmt.toml names: `nix fmt` and the pre-commit hook.
     treefmt = system: let

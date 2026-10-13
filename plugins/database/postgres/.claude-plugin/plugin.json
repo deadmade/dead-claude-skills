@@ -1,0 +1,11 @@
+{
+  "name": "postgres",
+  "version": "0.1.2",
+  "description": "Postgres best practices (Neon's postgres-best-practices) and safe, non-blocking migrations (Timescale pg-aiguide's postgres-database-migration). Vendored, synced weekly. Opt-in.",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "repository": "https://github.com/deadmade/dead-claude-skills",
+  "license": "Apache-2.0"
+}

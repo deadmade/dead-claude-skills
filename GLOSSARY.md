@@ -28,3 +28,8 @@ _Avoid_: default set
 
 **Opt-in**:
 A plugin the installer offers but doesn't install unless picked.
+
+**Database plugin**:
+A plugin for one database engine, living under `plugins/database/`. It can combine vendored skills with an MCP
+server.
+_Avoid_: DB pack, language plugin

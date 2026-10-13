@@ -61,6 +61,20 @@ server, bundled LSP and dotnet-experimental plugin are not vendored. Synced week
 (`sync-csharp.yml`), which lists added, removed, skipped and unmapped skills and agent mentions in the PR body; the
 synced upstream commit is in `plugins/languages/csharp-skills/UPSTREAM`.
 
+## postgres
+
+`plugins/database/postgres/skills/` vendors two skills. Each folder carries its upstream's license and an `UPSTREAM`
+file with the synced commit:
+
+- `postgres-best-practices/` from [neondatabase/postgres-skills](https://github.com/neondatabase/postgres-skills)
+  (Apache License 2.0; `LICENSE` in the folder).
+- `postgres-database-migration/` from [timescale/pg-aiguide](https://github.com/timescale/pg-aiguide) (Apache License
+  2.0; `LICENSE` and `NOTICE` in the folder).
+
+Modified by `scripts/sync-postgres.mjs`: a `paths:` block (`**/*.sql`, `**/migrations/**`, `**/migrate/**`,
+`**/*.prisma`, `**/alembic/**`) is added to each SKILL.md's frontmatter. Synced weekly via GitHub Actions
+(`sync-postgres.yml`).
+
 ## graphify
 
 `plugins/graphify/skills/graphify/` vendors the Claude Code skill (`graphify/skill.md`) and its `references/`

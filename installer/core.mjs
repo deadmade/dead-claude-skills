@@ -331,6 +331,12 @@ export const CATEGORIES = [
     ],
   },
   {
+    id: 'database',
+    title: 'Databases',
+    blurb: 'Best-practice skills for the databases you work with.',
+    keys: ['postgres'],
+  },
+  {
     id: 'mcp',
     title: 'Integrations',
     blurb: 'MCP servers for the services you work with.',

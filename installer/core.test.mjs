@@ -61,6 +61,7 @@ test('opt-ins from the real manifests', () => {
         'mcp-azure',
         'mcp-github',
         'nix-lsp',
+        'postgres',
         'pstack-picks',
         'rust-skills',
         'self-review',
@@ -391,6 +392,14 @@ test('the language servers page is Languages and lists the language skills', () 
   const lang = CATEGORIES.find((c) => c.id === 'lsp');
   assert.equal(lang.title, 'Languages');
   for (const k of ['csharp-skills', 'rust-skills', 'csharp-lsp', 'rust-analyzer-lsp']) assert.ok(lang.keys.includes(k));
+});
+
+test('the Databases page follows Languages and lists postgres', () => {
+  const i = CATEGORIES.findIndex((c) => c.id === 'database');
+  assert.ok(i > 0);
+  assert.equal(CATEGORIES[i].title, 'Databases');
+  assert.ok(CATEGORIES[i].keys.includes('postgres'));
+  assert.equal(CATEGORIES[i - 1].id, 'lsp');
 });
 
 test('categorize keeps bulk:false on danger', () => {

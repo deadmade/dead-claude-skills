@@ -103,6 +103,12 @@
       "category": "development"
     },
     {
+      "name": "postgres",
+      "description": "Postgres best practices (Neon's postgres-best-practices) and safe, non-blocking migrations (Timescale pg-aiguide's postgres-database-migration). Vendored, synced weekly. Opt-in.",
+      "source": "./plugins/database/postgres",
+      "category": "development"
+    },
+    {
       "name": "graphify",
       "description": "Graphify: turn a codebase into a queryable knowledge graph (/graphify). Needs the graphify CLI (uv tool install graphifyy). Opt-in.",
       "source": "./plugins/graphify",
