@@ -11,6 +11,7 @@ excludes = [
   "plugins/languages/*/skills/**",
   "plugins/languages/*/LICENSE",
   "plugins/languages/*/UPSTREAM",
+  "plugins/database/*/skills/**",
   "plugins/self-review/agents/**",
   "plugins/self-review/skills/self-review/references/upstream/**",
   ".pre-commit-config.yaml",
