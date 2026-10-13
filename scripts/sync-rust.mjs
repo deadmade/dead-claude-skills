@@ -1,4 +1,4 @@
-// Vendor apollographql/skills' rust-best-practices skill into its own plugin, scoped to Rust files via `paths:`.
+// Vendor apollographql/skills' rust-best-practices skill into its own plugin, adding `paths:` frontmatter (Claude Code currently ignores it for plugin skills; kept for when it does not).
 // Idempotent: re-running against the same upstream commit produces no diff.
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';

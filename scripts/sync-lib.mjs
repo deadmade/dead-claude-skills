@@ -40,7 +40,10 @@ export function frontmatterDescription(text) {
   if (/^>[-+]?$/.test(v)) {
     const rest = lines.slice(i + 1);
     const n = rest.findIndex((l) => l && !/^\s/.test(l));
-    return (n < 0 ? rest : rest.slice(0, n)).map((l) => l.trim()).filter(Boolean).join(' ');
+    return (n < 0 ? rest : rest.slice(0, n))
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .join(' ');
   }
   if (/^[|>]/.test(v)) return null;
   if (/^\s/.test(lines[i + 1] ?? '')) return null; // multi-line plain scalar

@@ -3,7 +3,10 @@ import { test } from 'node:test';
 import { frontmatterDescription, summary } from './sync-lib.mjs';
 
 test('frontmatterDescription', () => {
-  assert.equal(frontmatterDescription('---\nname: a\ndescription: >-\n  Route C# and\n  .NET requests.\nlicense: MIT\n---\nb'), 'Route C# and .NET requests.');
+  assert.equal(
+    frontmatterDescription('---\nname: a\ndescription: >-\n  Route C# and\n  .NET requests.\nlicense: MIT\n---\nb'),
+    'Route C# and .NET requests.',
+  );
   assert.equal(frontmatterDescription('---\ndescription: >\n  Guide for\n  Rust.\n---'), 'Guide for Rust.');
   assert.equal(frontmatterDescription('---\ndescription: "x: y"\n---'), 'x: y');
   assert.equal(frontmatterDescription("---\ndescription: 'x y'\n---"), 'x y');

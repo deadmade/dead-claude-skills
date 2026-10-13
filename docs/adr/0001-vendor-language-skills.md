@@ -5,7 +5,7 @@ Code marketplaces, but we copy them into `plugins/languages/` with sync scripts.
 and a weekly PR. We pay it because a direct `url`-sourced entry can't do either of these:
 
 - **Keep the listing small.** Claude Code lists every plugin skill in every project. `paths` frontmatter only gates
-  project skills: it was ignored for plugin skills on 2.1.272 and again on 2.1.296. So the sync moves Microsoft's 101
+  project skills: it was ignored for plugin skills on 2.1.272 and again on 2.1.296. So the sync moves Microsoft's 102
   skills into an unscanned `library/` folder, behind six generated router skills that index them.
 - **Drop parts.** The `dotnet` plugin bundles its own C# language server, which would run next to `csharp-lsp`.
   Microsoft's agents would be listed in every project.

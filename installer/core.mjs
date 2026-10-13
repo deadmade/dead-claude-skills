@@ -320,7 +320,15 @@ export const CATEGORIES = [
     id: 'lsp',
     title: 'Languages',
     blurb: 'Per-language code intelligence (servers must be on PATH) and best-practice skills.',
-    keys: ['rust-analyzer-lsp', 'rust-skills', 'csharp-lsp', 'csharp-skills', 'typescript-lsp', 'pyright-lsp', 'nix-lsp'],
+    keys: [
+      'rust-analyzer-lsp',
+      'rust-skills',
+      'csharp-lsp',
+      'csharp-skills',
+      'typescript-lsp',
+      'pyright-lsp',
+      'nix-lsp',
+    ],
   },
   {
     id: 'mcp',

@@ -2,7 +2,7 @@ name: Sync rust-skills
 
 on:
   schedule:
-    - cron: '15 6 * * 1' # Mondays 06:00 UTC
+    - cron: '15 6 * * 1' # Mondays 06:15 UTC
   workflow_dispatch:
 
 permissions:

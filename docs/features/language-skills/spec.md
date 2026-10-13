@@ -19,7 +19,7 @@ us.
    - `plugins/languages/rust-skills` holds Apollo's `rust-best-practices` with its reference chapters.
 2. The C# plugin costs almost nothing outside C# work. It uses **router skills**, because `paths` doesn't gate
    plugin skills (see Facts checked).
-   - Microsoft's 101 skills go into a **library** folder that Claude Code doesn't scan:
+   - Microsoft's 102 skills go into a **library** folder that Claude Code doesn't scan:
      `plugins/languages/csharp-skills/library/<skill>/`, with each skill's folder copied whole.
    - Six generated router skills under `skills/` are the only skills listed. Each router has a short "C#/.NET only"
      description, and its body indexes its area's library skills: name, a short summary, and the path
@@ -78,7 +78,7 @@ us.
 
 ## Anti-goals
 
-- 101 .NET skill descriptions in every project's skill listing. Outside C# work the cost must stay at the six router
+- 102 .NET skill descriptions in every project's skill listing. Outside C# work the cost must stay at the six router
   descriptions.
 - Two C# language servers running side by side.
 - A sync that silently drops an upstream skill, or copies one only partly.
@@ -179,7 +179,7 @@ us.
   - The [plugins reference](https://code.claude.com/docs/en/plugins-reference) has no conditional-activation field.
     The nearest is `defaultEnabled`.
 - **dotnet/skills:**
-  - 101 skills across the 16 marketplace plugins, each at `plugins/<p>/skills/<name>/SKILL.md`, with the frontmatter
+  - 102 skills across the 16 marketplace plugins, each at `plugins/<p>/skills/<name>/SKILL.md`, with the frontmatter
     `name` matching its folder.
   - No name collisions. None sets `paths`. The descriptions total 67 KB.
   - Non-skill components, all declared in each plugin's `plugin.json`:
