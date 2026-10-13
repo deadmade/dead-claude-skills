@@ -2,17 +2,16 @@
 // bundle agree on the plugin list, and everything carries package.json's version. Skips `claude plugin validate` when claude isn't on PATH
 // (nix flake check sandbox, CI).
 import { spawnSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { pluginDirs as findPluginDirs } from './plugin-dirs.mjs';
 
 process.chdir(join(import.meta.dirname, '..'));
 
 const MARKETPLACE = '.claude-plugin/marketplace.json';
 const BUNDLE = 'plugins/dead-skills/.claude-plugin/plugin.json';
 const problems = [];
-const pluginDirs = readdirSync('plugins', { withFileTypes: true })
-  .filter((d) => d.isDirectory())
-  .map((d) => `plugins/${d.name}`);
+const pluginDirs = findPluginDirs();
 
 // --- claude plugin validate ---
 for (const target of ['.', ...pluginDirs.map((d) => d + '/')]) {

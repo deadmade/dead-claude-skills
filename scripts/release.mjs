@@ -3,8 +3,9 @@
 // GitHub release. Claude Code only offers plugin updates when this version changes.
 // Usage: npm run release -- patch|minor|major|X.Y.Z
 import { spawnSync } from 'node:child_process';
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { pluginDirs } from './plugin-dirs.mjs';
 
 process.chdir(join(import.meta.dirname, '..'));
 
@@ -38,7 +39,7 @@ const json = /^( {2,4}"version": )"[^"]*"/m;
 const bumps = [
   ['package.json', json],
   ['.claude-plugin/marketplace.json', json],
-  ...readdirSync('plugins').map((p) => [`plugins/${p}/.claude-plugin/plugin.json`, json]),
+  ...pluginDirs().map((p) => [`${p}/.claude-plugin/plugin.json`, json]),
   ['plugins/tui-review/brv/Cargo.toml', /^(version = )"[^"]*"/m],
   ['plugins/tui-review/brv/Cargo.lock', /^(name = "brv"\r?\nversion = )"[^"]*"/m],
 ];

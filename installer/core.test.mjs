@@ -37,6 +37,7 @@ import {
   unavailable,
   outdated,
   shippedVersions,
+  manifestPath,
 } from './core.mjs';
 
 const json = (p) => JSON.parse(readFileSync(new URL(`../${p}`, import.meta.url), 'utf8'));
@@ -440,4 +441,19 @@ test('shippedVersions counts pinned url plugins and skips unpinned ones', () => 
   assert.deepEqual(outdated([{ id: `superpowers@${M}`, version: '6.4.2' }], shipped), [
     { id: `superpowers@${M}`, from: '6.4.2', to: '7.0.0' },
   ]);
+});
+
+test('manifestPath finds a local plugin manifest, null for url sources and unknown names', () => {
+  const m = {
+    plugins: [
+      { name: 'rust-skills', source: './plugins/languages/rust-skills' },
+      { name: 'superpowers', source: { source: 'url' } },
+    ],
+  };
+  assert.equal(
+    manifestPath(m, 'rust-skills@dead-claude-skills'),
+    'plugins/languages/rust-skills/.claude-plugin/plugin.json',
+  );
+  assert.equal(manifestPath(m, 'superpowers@dead-claude-skills'), null);
+  assert.equal(manifestPath(m, 'nope@dead-claude-skills'), null);
 });

@@ -40,6 +40,12 @@ const DCG = 'https://raw.githubusercontent.com/Dicklesworthstone/destructive_com
 
 export const nameOf = (id) => id.split('@')[0];
 
+// Repo-relative manifest path of a marketplace plugin with a local (string) source; null for url sources and unknown names.
+export function manifestPath(manifest, id) {
+  const source = manifest.plugins.find((p) => p.name === nameOf(id))?.source;
+  return typeof source === 'string' ? `${source.replace(/^\.\//, '')}/.claude-plugin/plugin.json` : null;
+}
+
 // Our marketplace at the release tag of the installer that runs, so the plugins always match it: updating means
 // running a newer installer. As `claude plugin marketplace add` takes it, and as its settings entry.
 const REPO = 'deadmade/dead-claude-skills';
