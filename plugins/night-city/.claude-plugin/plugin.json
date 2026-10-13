@@ -6,5 +6,6 @@
     "name": "deadmade",
     "url": "https://github.com/deadmade"
   },
-  "repository": "https://github.com/deadmade/dead-claude-skills"
+  "repository": "https://github.com/deadmade/dead-claude-skills",
+  "types": "./types/index.d.ts"
 }
