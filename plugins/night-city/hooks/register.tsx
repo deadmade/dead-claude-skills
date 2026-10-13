@@ -8,6 +8,25 @@ import { SPINNER_WORDS, TURN_WORDS, pick } from './words';
 
 const KEY = 'scene';
 
+export const GLITCH_MS = 400;
+export const FLARE_MS = 600;
+// Reactions go in the plugin's own status line, which sits beside the user's statusLine command, not over it. Plain
+// text: the status line takes no colors without escape sequences, which a mod doesn't write.
+const GLITCH = '▚▞ FLATLINE ▞▚';
+const FLARE = '◢◤ JACKED OUT ◢◤';
+
+let glitched = false; // one glitch per main turn
+let reaction: Timer | undefined;
+
+function react($: $, text: string, ms: number) {
+  reaction?.cancel();
+  $.ui.status(text);
+  const mine = $.clock.after(ms, () => {
+    if (reaction === mine) $.ui.status(undefined);
+  });
+  reaction = mine;
+}
+
 type Intro = {
   startedAt: number;
   site?: { requestId: string; columns: number; rows: number };
@@ -59,6 +78,25 @@ export const register: Register = (on) => {
   isFresh = false;
   isPending = false;
   intro = undefined;
+  glitched = false;
+  reaction = undefined;
+
+  on('turn.start', (_$, e, next) => {
+    glitched = false;
+    return next(e);
+  });
+  on('tool.call', async ($, e, next) => {
+    const ran = await next(e);
+    if (ran.isError === true && !glitched && e.agentId === undefined) {
+      glitched = true;
+      react($, GLITCH, GLITCH_MS);
+    }
+    return ran;
+  }).catch((_$, e, next) => next(e));
+  on('turn.complete', ($, e, next) => {
+    if (e.agentId === undefined) react($, FLARE, FLARE_MS);
+    return next(e);
+  });
 
   on('ui.render', { component: 'Spinner' }, (_$, e, next) =>
     next({ ...e, props: { ...e.props, word: pick(SPINNER_WORDS, e.props.word) } }),
