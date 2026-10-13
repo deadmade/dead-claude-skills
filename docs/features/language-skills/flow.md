@@ -42,6 +42,19 @@ phase: execute
 - The working tree sits on `feat/tob-picks` with staged, uncommitted changes, including unrelated hookify edits.
   This feature should get its own branch.
 
+**Router spike (Task 1, claude 2.1.296, `claude -p ... --plugin-dir`, scratch plugin `rprobe`):**
+
+- Listing: with `skills/area/`, `library/zebra-lib/` and `skills/area/lib/yak-lib/`, the model lists only `rprobe:area`
+  (checked twice, both layouts). Skills outside `skills/` are not listed, and neither is a nested `lib/` skill.
+- (a) No `--allowedTools`: fails twice. The router loads, but the read of
+  `${CLAUDE_PLUGIN_ROOT}/library/zebra-lib/SKILL.md` is denied.
+- (b) `--allowedTools "Read(<abs>/rprobe/**)"`: fails twice, because a single leading `/` means project-root-relative.
+  `Read(//<abs>/rprobe/**)` (absolute form) passes twice: reply `OKAPI`. The installer's `Read(~/.claude/plugins/**)`
+  rule uses the home-relative form instead.
+- In-skill alternative `skills/area/lib/yak-lib/`: fails (a) twice (read denied), so it gains nothing.
+- Decision: only (b) passes, so keep `library/` at the plugin root. The router skills depend on the installer's
+  `Read(~/.claude/plugins/**)` rule; without it the library read is denied in non-interactive runs. No deviation.
+
 ## Prior art
 
 Report from 2026-10-13. These sources were fetched by the research agent and have not been re-checked in this flow.
