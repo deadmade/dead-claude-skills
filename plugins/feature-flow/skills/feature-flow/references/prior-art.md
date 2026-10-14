@@ -27,8 +27,30 @@ what it's good at, what it costs, and what would make it a bad fit.
 Rules: cite only pages you actually fetched in this run, with a link to the section and one line on what it says.
 Never cite from memory and never construct a URL you didn't open. Prefer official docs and source code over blog
 posts; label blog posts as such. If you find nothing comparable, say so instead of padding.
-Return the report as markdown, under 800 words.
+Mark every trade-off and "bad fit" claim [source] (a page says it; link it) or [inferred] (your reasoning across
+sources). Never present an inference as what a source says.
+Write the report as markdown, under 800 words, to <report path>. Start it with what you couldn't research (a page
+that wouldn't open, docs for another version only), or "Gaps: none". Reply with the path, or with the report if
+you can't write files.
 ```
+
+## Source check
+
+Research agents misquote sources, cite a page that doesn't say it, or read docs for the wrong version. Once the
+report lands, give one fresh agent, on a different model where available (the Agent tool's `model`), only the
+report file and the codebase facts from the prompt above, with this prompt:
+
+```
+Check this prior-art report against its sources. Open every link it cites, at the version named. For each claim
+marked [source]: confirmed (the page says it), not supported (quote what the page says instead), or couldn't open.
+For each [inferred] claim an approach's trade-offs rest on: does it follow from the cited pages? List the claims
+that cite nothing. Don't add research of your own and don't rewrite the report. Return a table: claim, verdict,
+evidence.
+```
+
+Then fix the report yourself: drop or relabel every claim that isn't supported, mark unopened sources, and note the
+counts (confirmed / not supported / couldn't open) at its top. An approach whose case rests on unsupported claims
+is presented in Phase 2 as unverified, or not at all.
 
 ## Source rules
 
@@ -43,8 +65,8 @@ Return the report as markdown, under 800 words.
 ```
 **A – <name>** (used by: <project> [link], <project> [link])
 <shape in two lines>
-+ <what it's good at here>
-− <what it costs here>
++ <what it's good at here> (verified: [link] | inferred)
+− <what it costs here> (verified: [link] | inferred)
 Effort: S | M | L
 
 **B – …**

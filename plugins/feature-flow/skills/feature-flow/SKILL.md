@@ -34,6 +34,12 @@ Claude proposes and recommends; the user decides.
   never skip a gate.
 - Options always come with a recommendation and its reason. Every claim about another project or a library cites a
   source fetched in this session (rules in [references/prior-art.md](references/prior-art.md)).
+- **Say how you know.** A claim the user decides on (in options, gate summaries, plan findings) is _measured_ (you
+  ran it), _verified_ (a source or `file:line` says so), _inferred_ (your reasoning) or _assumed_. Check an inferred
+  or assumed claim an option rests on, or present it as a guess.
+- **Reviewers are independent.** Every checking agent (source check, plan reviewers, rulings, fix checks) is a fresh
+  subagent: never a fork, and no `name`. It gets only the files its prompt names, plus the findings it rules on or
+  checks: never this conversation, drafts, or which option the user leans to.
 - A missing skill: say which plugin provides it (superpowers, mattpocock-picks, pstack-picks) and use the fallback
   named in that phase. pstack skills can't be loaded with the Skill tool; read
   `${CLAUDE_SKILL_DIR}/../../../../pstack-picks/*/skills/<name>/SKILL.md` and follow it.
@@ -53,9 +59,12 @@ Ask nothing yet. In one message, start both:
 - **Codebase:** pstack `how` on the subsystems the feature touches (fallback: 1–3 Explore agents). Also read
   `CONTEXT.md`, `CONTEXT-MAP.md` and `docs/adr/` if they exist.
 - **Prior art:** one background `general-purpose` agent with the prompt in
-  [references/prior-art.md](references/prior-art.md). Don't wait for it; Phase 2 starts with questions anyway.
+  [references/prior-art.md](references/prior-art.md), writing `docs/features/<slug>/prior-art.md`. Don't wait for it;
+  Phase 2 starts with questions anyway. When it lands, start the **source check** from the same reference in the
+  background, and correct the report by its results before Phase 2 presents options from it.
 
-Write a short summary of each into flow.md under **Grounding** and **Prior art** as they land.
+Write a short summary of each into flow.md under **Grounding** and **Prior art** as they land, with the source
+check's counts.
 
 ## Phase 2: Brainstorm
 
@@ -103,7 +112,8 @@ flow.md and go to Phase 5.
 
 Follow [references/plan-review.md](references/plan-review.md): 2–3 reviewer subagents with different angles, then
 you synthesize and screen. Present the findings, each with options and a recommendation. The user decides each one;
-you edit the plan, and the spec too if a decision changes it (say so: that edit reopens Gate 1 for that item).
+you edit the plan, and the spec too if a decision changes it (say so: that edit reopens Gate 1 for that item). Then
+the edits get an independent fix check, and a plan whose shape changed gets fresh eyes, both per plan-review.md.
 
 Optional, for a large or ambiguous design, offer before the review: pstack `architect` (sketch types and signatures
 first) or `arena` (several models draft the plan, best one wins). Only on the user's yes.
@@ -125,6 +135,7 @@ needs their approval of that change before work continues. Private helpers and l
 
 1. Invoke superpowers `verification-before-completion`: run the tests and checks, read their output.
 2. Walkthrough table in flow.md: every spec goal → plan task → `file:line` → test. A goal with no code, or code with
-   no goal, is a deviation: report it.
+   no goal, is a deviation: report it. The test column is what you ran in step 1, not what an execution subagent
+   reported.
 3. If execution ran natively (no per-task reviews), offer `/code-review` or pstack `interrogate` on the branch.
 4. Invoke superpowers `finishing-a-development-branch` and let the user choose how to integrate. Set `phase: done`.

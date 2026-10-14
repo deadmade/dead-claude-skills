@@ -20,6 +20,7 @@ phase: ground
 
 ## Artifacts
 
+- Prior art:
 - Spec:
 - Plan:
 - ADRs:
@@ -40,7 +41,7 @@ phase: ground
 
 ## Prior art
 
-<!-- Approaches found, who uses them, key sources. -->
+<!-- Approaches found, who uses them, key sources; source check: confirmed / not supported / couldn't open. -->
 
 ## Options
 
@@ -48,7 +49,7 @@ phase: ground
 
 ## Plan review
 
-<!-- Round N: findings, the user's decision on each, what changed. -->
+<!-- Round N: findings, the user's decision on each, what changed, fix checks, fresh-eyes rounds. -->
 
 ## Deviations
 

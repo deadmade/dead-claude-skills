@@ -21,6 +21,13 @@ caller or input to the failure, reading the code. Drop what doesn't hold up, wha
 branch didn't touch (except the CLAUDE.md audit's, which looks at the whole file by design), and what lint, the
 typechecker or CI would catch anyway. Count what you dropped.
 
+- **Say how you know.** Each Fix before PR finding is either _read_ (you traced it in the code) or _ran_ (a test,
+  script or command showed it, with the output). When what code does at runtime is disputed and reading can't settle
+  it, run a check; if you can't, the finding says "unconfirmed" and why.
+- **Don't overrule a reviewer alone.** Before you dismiss a finding that a pass raised as a real bug or vulnerability,
+  or move it below Fix before PR, give it and the code to one fresh agent (never a fork, no `name`) to rule on. Its
+  ruling decides the bucket, and the line keeps both views: "pass said X; ruling: Y, because Z".
+
 ## Buckets
 
 - **Fix before PR:** a real bug, a security vulnerability, a breach of a documented standard, a silent failure, a
@@ -48,7 +55,7 @@ Passes: bugs, spec, standards, security, claude-md, silent-failure-hunter, pr-te
 
 ### Fix before PR
 
-3. **<one-line problem>** path/file.ts:120 (bugs, silent-failure-hunter)
+3. **<one-line problem>** path/file.ts:120 (bugs, silent-failure-hunter; read | ran | unconfirmed)
    <why it matters: the path from input to failure, in two lines>
    Fix: <the change>
 

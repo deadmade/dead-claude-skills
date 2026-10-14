@@ -1,6 +1,6 @@
 ---
 name: self-review
-description: 'Review your own branch before opening a PR: a confidence-scored bug pass, a spec pass, a standards pass, a security pass, a CLAUDE.md audit, and specialist agents for error handling, tests, types and comments, all in parallel, then one ranked report and fixes for the findings you pick. Never posts anything. Use for /self-review [base].'
+description: 'Review your own branch before opening a PR: a confidence-scored bug pass, a spec pass, a standards pass, a security pass, a CLAUDE.md audit, and specialist agents for error handling, tests, types and comments, all in parallel, then one ranked report, fixes for the findings you pick, and an independent check of each fix. Never posts anything. Use for /self-review [base].'
 disable-model-invocation: true
 argument-hint: '[base branch or commit]'
 ---
@@ -29,6 +29,11 @@ and the claude-md-management plugin:
 - **The diff is the working tree** against the merge-base, so uncommitted work counts: `git diff <merge-base>` plus
   untracked files (`git ls-files --others --exclude-standard`). Wherever an upstream file says `git diff X...HEAD` or
   `gh pr diff`, use this instead.
+- **Reviewers are independent.** Every agent this skill starts is a fresh subagent: never a fork, and no `name` (a
+  named agent can message its siblings). It gets only what its job needs: the diff command, the file list, the
+  intent, the standards, and the findings it is asked to rule on or check. Never this conversation's account of why
+  the code is right, or earlier drafts; a pass never sees another pass's findings. The session that wrote the code is
+  the author, not a reviewer.
 - Don't change code before the user picks findings in Phase 5.
 - Commit only when the user asks.
 
@@ -85,7 +90,8 @@ Tell the user which passes are running and which were skipped, and why, in one l
 **Small diff** (at most 3 files and about 50 changed lines of code): agents cost more than they find here. Run the
 passes yourself, one after another, each with its own checklist (the bug pass's angles and false-positive list, both
 upstream axes, each applicable specialist's agent file under `${CLAUDE_SKILL_DIR}/../../agents/`, and the security and
-CLAUDE.md skills loaded with the Skill tool), and say you did.
+CLAUDE.md skills loaded with the Skill tool), and say you did. If this session wrote the code, the bug pass still goes
+to one fresh agent: an author re-reading its own diff in the same context isn't a review.
 Everything else stays the same, the report format included.
 
 ## Phase 4: Report
@@ -96,8 +102,26 @@ Follow [references/synthesis.md](references/synthesis.md): merge, check, bucket,
 
 Ask which findings to fix: "all fix-before-PR", numbers, or none. Then:
 
-1. Fix them. A fix that would change the design or the spec goes back to the user first.
+1. Fix them, smallest change first: delete or narrow before adding code. A fix that would change the design or the
+   spec goes back to the user first.
 2. Run the repo's tests, lint and typecheck, and read the output. Report what passed and what didn't.
 3. Offer the `self-review:code-simplifier` agent on the changed files, as a last polish. Only on the user's yes.
-4. Re-run only the passes whose findings were fixed, if the user wants a check.
-5. Say when the branch is ready for a PR. Commit only when asked.
+4. **Check the fixes.** One fresh agent (it wrote none of them) gets each fixed finding (as reported), the fix diff
+   and the cited places, with this prompt:
+
+   ```
+   For each finding, check whether the fix resolves it at the cited place and wherever the same problem appears in
+   the diff. Look for regressions next to the change. Run a test or a command where reading can't settle it;
+   otherwise say what you couldn't check. Per finding: PASS or FAIL, with the line you read or the command you ran
+   and its output. Don't rewrite the code.
+   ```
+
+   A FAIL goes back to step 1. When the same finding fails twice, stop and hand it to the user with both attempts.
+
+5. **Fresh eyes**, offered; recommend it when a fix changed behavior beyond a few lines, or fixed a security finding.
+   Two new agents that took no part so far, one on a different model (the Agent tool's `model`), each get the final
+   diff, the intent and the standards, and the bug pass's angles and false-positive list. Not the report, the
+   findings or the fix history. Their findings go through the synthesis Check, then Phase 5 again. Stop when a round
+   raises nothing for Fix before PR.
+6. Say when the branch is ready for a PR, and which checks ran: fix check, fresh eyes (rounds), or neither. Commit
+   only when asked.
