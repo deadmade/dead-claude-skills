@@ -4,12 +4,6 @@
 
 Practical setup notes for [agent-review](../SKILL.md) in Claude Code and Codex.
 
-## Install options
-
-Copy this skill (or clone the repository for a user install) into `~/.claude/skills/agent-review/` (local Claude Code user), `<repo>/.claude/skills/agent-review/` (Claude Code project), `~/.agents/skills/agent-review/` (Codex user), or `<repo>/.agents/skills/agent-review/` (Codex project). Cowork and Claude Code cloud sessions do not read your local `~/.claude/skills/`; use a synced account skill or a committed project skill in cloud sessions. Copying avoids nesting another repository in a project. Keep `SKILL.md` and `references/` together.
-
-As shipped, Claude Code can invoke this skill automatically, and its `effort: high` overrides session effort while active. For work installs, we recommend `disable-model-invocation: true` and/or removing `effort` in local frontmatter, together with the instruction-file snippet in the README; invoke `/agent-review` for a full review. The loaded skill body uses context. In our codex-cli 0.156.1 checks, `when_to_use` and `effort` did not control selection or effort; Codex used session reasoning effort. For claude.ai or Skills API uploads, remove those two Claude Code fields from frontmatter.
-
 ## Independent reviewers
 
 Checked on Claude Code **2.1.296** and codex-cli **0.156.1** in October 2026; recheck on your version, for example with the marker test in [SKILL.md](../SKILL.md). These notes describe context isolation, not a guarantee of filesystem access control.

@@ -106,9 +106,10 @@ skill (MIT License, Copyright Matt Pocock; `LICENSE-MIT`), unmodified apart from
 (MIT License, Copyright (c) 2026 Corey Gallon; full text in `plugins/agent-review/LICENSE`). It is synced by
 `scripts/sync-agent-review.mjs` (weekly via GitHub Actions; the synced commit is in `plugins/agent-review/UPSTREAM`).
 The only local changes are in `SKILL.md`'s frontmatter (`disable-model-invocation: true` added, `effort` removed), one
-sentence pointing at the dead-skills `rules.md` instead of the upstream README, and a source comment in each file. The
-self-audit lines in `plugins/dead-skills/rules.md` and the review steps in self-review and feature-flow are adapted
-from its method.
+sentence pointing at the dead-skills `rules.md` instead of the upstream README, `references/tool-notes.md` without its
+install section (it describes the unmodified skill) and `SKILL.md`'s link to it no longer naming install options, and a
+source comment in each Markdown file. The self-audit lines in `plugins/dead-skills/rules.md` and the review steps in
+self-review and feature-flow are adapted from its method.
 
 ## Re-listed plugins
 

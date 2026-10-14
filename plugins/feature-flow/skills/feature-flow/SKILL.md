@@ -35,7 +35,8 @@ Claude proposes and recommends; the user decides.
 - Options always come with a recommendation and its reason. Every claim about another project or a library cites a
   source fetched in this session (rules in [references/prior-art.md](references/prior-art.md)).
 - **Say how you know.** A claim the user decides on (in options, gate summaries, plan findings) is _measured_ (you
-  ran it), _verified_ (a source or `file:line` says so), _inferred_ (your reasoning) or _assumed_. Check an inferred
+  ran it), _verified_ (a source or `file:line` says so; what code does, read but not run, is inferred), _inferred_ (your
+  reasoning) or _assumed_. Check an inferred
   or assumed claim an option rests on, or present it as a guess.
 - **Reviewers are independent.** Every checking agent (source check, plan reviewers, rulings, fix checks) is a fresh
   subagent: never a fork, and no `name`. It gets only the files its prompt names, plus the findings it rules on or
