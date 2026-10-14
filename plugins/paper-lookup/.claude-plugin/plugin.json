@@ -1,0 +1,11 @@
+{
+  "name": "paper-lookup",
+  "version": "0.2.0",
+  "description": "Paper lookup: search arXiv, Semantic Scholar, OpenAlex, Crossref, Unpaywall, CORE and 12 more scholarly APIs for papers, citations and open-access full text. Vendored from K-Dense-AI/scientific-agent-skills, synced weekly.",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "repository": "https://github.com/deadmade/dead-claude-skills",
+  "license": "MIT"
+}

@@ -133,6 +133,12 @@
       "category": "development"
     },
     {
+      "name": "paper-lookup",
+      "description": "Paper lookup: search arXiv, Semantic Scholar, OpenAlex, Crossref, Unpaywall and other scholarly APIs for papers, citations and open-access full text. Vendored from K-Dense-AI/scientific-agent-skills. Opt-in.",
+      "source": "./plugins/paper-lookup",
+      "category": "development"
+    },
+    {
       "name": "cswap",
       "description": "claude-swap in Claude Code: accounts pane, /swap, usage status line, opt-in auto-switch. The installer downloads cswap.exe on Windows. Opt-in.",
       "source": "./plugins/cswap",

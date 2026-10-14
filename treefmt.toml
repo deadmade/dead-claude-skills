@@ -3,6 +3,7 @@ on-unmatched = "debug"
 # Vendored upstream files and the generated hook config: reformatting them would churn every sync.
 excludes = [
   "plugins/hallmark/**",
+  "plugins/paper-lookup/skills/**",
   "plugins/mattpocock-picks/**",
   "plugins/pstack-picks/**",
   "plugins/tob-picks/**",
