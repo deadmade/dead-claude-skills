@@ -8,7 +8,7 @@ claude-security, superpowers, ponytail, mcp-basic (context7) and my global rules
 servers, language and database skills (rust, csharp, postgres), integrations (GitHub, Azure, Atlassian), skill packs
 like hallmark, self-review, graphify and the mattpocock/pstack/Trail of Bits picks, plus tools such as
 [tui-review](plugins/tui-review/README.md), cswap for multi-account switching and secret-scan, which blocks prompts
-and commits that contain secrets, and night-city, a loud neon theme with an animated intro.
+and commits that contain secrets, and night-city, a toned-down synthwave theme.
 
     npx --allow-git=root github:deadmade/dead-claude-skills#semver:*
 

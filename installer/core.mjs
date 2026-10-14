@@ -111,6 +111,18 @@ export const isShipped = (text, shippedTexts) => {
 export function mergeSettings(settings, { statusLine, sandbox, version, nightCity }) {
   const out = structuredClone(settings);
   if (nightCity === false && out.theme === NIGHT_CITY_THEME) delete out.theme;
+  // Claude Code colours code in a fixed Monokai a theme can't change; off, diffs take Night City's own diff colours.
+  // shortcut: deselecting also clears a `true` the user set themselves; remember who set it if anyone minds.
+  if (nightCity) out.syntaxHighlightingDisabled = true;
+  if (nightCity === false && out.syntaxHighlightingDisabled === true) delete out.syntaxHighlightingDisabled;
+  // Inside tmux Claude Code draws in 256 colours unless told otherwise, which turns the theme's indigos grey. Outside
+  // tmux (and on Windows, which has none) the variable does nothing.
+  if (nightCity) out.env = { ...out.env, CLAUDE_CODE_TMUX_TRUECOLOR: '1' };
+  if (nightCity === false && out.env?.CLAUDE_CODE_TMUX_TRUECOLOR === '1') {
+    const { CLAUDE_CODE_TMUX_TRUECOLOR, ...env } = out.env;
+    if (Object.keys(env).length) out.env = env;
+    else delete out.env;
+  }
   const allow = out.permissions?.allow ?? [];
   const deny = out.permissions?.deny ?? [];
   out.permissions = {

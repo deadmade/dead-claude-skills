@@ -4,7 +4,7 @@
 import type { EngineInterface as $ } from 'claude-code';
 
 // The theme's `background` token, so the empty cells match the painted ones.
-export const SET = ']11;#0A0612';
+export const SET = ']11;#1A1626';
 export const RESET = ']111';
 
 // The child has no tty of its own: walk up to the first ancestor with one (Claude's) and write there.

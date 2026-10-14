@@ -492,6 +492,23 @@ test('isShipped matches shipped configs up to whitespace, not customized ones', 
   assert.equal(isShipped('not json', all), false);
 });
 
+// Night City adds icons, a context bar and a sign, but shows every stock value, in the same order (git changes split
+// into insertions and deletions).
+test('Night City ccstatusline keeps the stock widgets in order', () => {
+  const split = { 'git-insertions': 'git-changes', 'git-deletions': null };
+  const types = (f) =>
+    JSON.parse(shippedText(f)).lines.map((l) =>
+      l.map((w) => (w.type in split ? split[w.type] : w.type)).filter((t) => t !== null),
+    );
+  const nc = types('./ccstatusline-night-city.json');
+  types('./ccstatusline.json').forEach((stock, i) =>
+    assert.deepEqual(
+      nc[i].filter((t) => stock.includes(t)),
+      stock.filter((t) => t !== 'separator'),
+    ),
+  );
+});
+
 test('nightCity false removes only the Night City theme', () => {
   const s = { theme: NIGHT_CITY_THEME };
   assert.equal(mergeSettings(s, { nightCity: false }).theme, undefined);
@@ -500,7 +517,22 @@ test('nightCity false removes only the Night City theme', () => {
   assert.equal(mergeSettings(s, {}).theme, NIGHT_CITY_THEME);
 });
 
-test('Night City ccstatusline keeps the stock widgets in order', () => {
-  const types = (f) => JSON.parse(shippedText(f)).lines.map((l) => l.map((w) => w.type));
-  assert.deepEqual(types('./ccstatusline-night-city.json'), types('./ccstatusline.json'));
+test('nightCity turns tmux truecolor on next to other env, and deselecting it removes only that', () => {
+  const on = mergeSettings({ env: { FOO: 'x' } }, { nightCity: true });
+  assert.deepEqual(on.env, { FOO: 'x', CLAUDE_CODE_TMUX_TRUECOLOR: '1' });
+  assert.deepEqual(mergeSettings(on, { nightCity: false }).env, { FOO: 'x' });
+  assert.equal(mergeSettings({ env: { CLAUDE_CODE_TMUX_TRUECOLOR: '1' } }, { nightCity: false }).env, undefined);
+  assert.deepEqual(mergeSettings({ env: { CLAUDE_CODE_TMUX_TRUECOLOR: '1' } }, {}).env, {
+    CLAUDE_CODE_TMUX_TRUECOLOR: '1',
+  });
+});
+
+test('nightCity turns syntax highlighting off, and deselecting it turns it back on', () => {
+  assert.equal(mergeSettings({}, { nightCity: true }).syntaxHighlightingDisabled, true);
+  assert.equal(
+    mergeSettings({ syntaxHighlightingDisabled: true }, { nightCity: false }).syntaxHighlightingDisabled,
+    undefined,
+  );
+  assert.equal(mergeSettings({ syntaxHighlightingDisabled: true }, {}).syntaxHighlightingDisabled, true);
+  assert.equal(mergeSettings({}, {}).syntaxHighlightingDisabled, undefined);
 });

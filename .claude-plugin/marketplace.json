@@ -140,7 +140,7 @@
     },
     {
       "name": "night-city",
-      "description": "Night City: a loud neon Claude Code theme with an animated skyline intro, Night City spinner words and short status-line reactions. Opt-in.",
+      "description": "Night City: a toned-down synthwave Claude Code theme with Night City spinner words and short status-line reactions. Opt-in.",
       "source": "./plugins/night-city",
       "category": "development"
     },
