@@ -1,6 +1,6 @@
 ---
 name: paper-lookup
-description: Searches 18 scholarly APIs for papers, preprints, citations, open-access full text, repository records, and journal OA status, and returns results with reproducible provenance. Covers PubMed, PMC, Europe PMC, bioRxiv, medRxiv, arXiv, OpenAlex, Crossref, Semantic Scholar, CORE, Unpaywall, OpenCitations, PubTator3, Zenodo, Figshare, ROR, BioStudies, and DOAJ. Use when searching for papers, citations, DOI/PMID/arXiv lookups, abstracts, full text, open-access PDFs, preprints, citation graphs, author publications, biomedical entity annotations, deposited records (Zenodo, Figshare, BioStudies), institution ROR IDs, or any scholarly literature query. Triggers on mentions of any supported database or requests like "find papers on X", "look up this DOI", "who cites this paper", or "get me the PDF".
+description: Searches scholarly APIs for computer-science papers, preprints, citations and open-access full text, with reproducible provenance. Covers arXiv, Semantic Scholar, OpenAlex, Crossref, OpenCitations, Unpaywall, CORE, DOAJ and Zenodo. Use when searching for papers, DOI or arXiv lookups, abstracts, full text, open-access PDFs, citation graphs, author publications, or research software and datasets on Zenodo. Triggers on requests like "find papers on X", "look up this DOI", "who cites this paper", or "get me the PDF".
 allowed-tools: Read Bash
 license: MIT
 compatibility: Needs network access and curl. The bundled scripts require Python 3.11+ and use only the standard library. No credentials are required; NCBI_API_KEY, S2_API_KEY, CORE_API_KEY, and OPENALEX_API_KEY raise rate limits or unlock full text where noted.
@@ -11,6 +11,8 @@ metadata:
 ---
 
 # Paper Lookup
+
+> **Trimmed for computer science.** This copy has no reference files for PubMed, PMC, Europe PMC, bioRxiv, medRxiv, PubTator3, BioStudies, ROR, Figshare. Any mention of them below is left over from upstream: don't call those services; use arXiv, Semantic Scholar, OpenAlex, Crossref, OpenCitations, Unpaywall, CORE, DOAJ or Zenodo.
 
 This skill gives you 18 scholarly APIs with documented endpoints. Your job is to turn the user's intent into a reproducible retrieval: pick the authoritative database(s), make bounded and rate-limited calls, and return an answer with enough provenance (endpoints, parameters, identifiers, access date) that a human or another agent can repeat it.
 
@@ -44,12 +46,6 @@ Match the user's intent to the right database(s).
 
 | User is asking about... | Primary database(s) | Also consider |
 |---|---|---|
-| Papers on a biomedical topic | PubMed | Europe PMC, Semantic Scholar, OpenAlex |
-| Full text of a biomedical article | Europe PMC | PMC, CORE |
-| Keyword search *inside* full text | Europe PMC | CORE |
-| Biology preprints, by topic | Europe PMC (`SRC:"PPR"`) | Semantic Scholar, OpenAlex |
-| Biology preprints, by date or DOI | bioRxiv | Europe PMC |
-| Health/medical preprints, by date or DOI | medRxiv | Europe PMC |
 | Physics, math, or CS preprints | arXiv | Semantic Scholar, OpenAlex |
 | Papers across all fields | OpenAlex | Semantic Scholar, Crossref |
 | A specific paper by DOI | Crossref | Unpaywall, Semantic Scholar |
@@ -61,12 +57,8 @@ Match the user's intent to the right database(s).
 | Full text (any field) | CORE | PMC, Europe PMC (biomedical only) |
 | Journal/publisher metadata | Crossref | OpenAlex |
 | Funder information | Crossref | OpenAlex |
-| Convert between PMID/PMCID/DOI | PMC (ID Converter) | Crossref, Europe PMC |
 | Is this paper retracted? | Crossref (`update-type:retraction`, inspect `update-to`) | PubMed publication types / publisher notices |
-| Genes/diseases/chemicals in a paper | PubTator3 | Europe PMC Annotations API |
-| Institution / affiliation → ROR ID | ROR | OpenAlex (already-linked ROR) |
 | Deposited dataset, software, or poster | Zenodo | Figshare, BioStudies |
-| EBI study package / supplementary archive | BioStudies | Zenodo, ArrayExpress via BioStudies |
 | Is this *journal* in DOAJ? | DOAJ | OpenAlex (`sources.is_in_doaj`) for the yes/no; Unpaywall (article-level OA) |
 
 ### Cross-Database Queries
@@ -74,11 +66,6 @@ Match the user's intent to the right database(s).
 | User is asking about... | Databases to query |
 |---|---|
 | Everything about a paper (metadata + citations + OA) | Crossref + Semantic Scholar + Unpaywall |
-| Entities mentioned in a paper | PubTator3 export + PubMed/Europe PMC for the record |
-| Affiliation string to a stable org ID | ROR (`affiliation=`), then OpenAlex for that org's works |
-| Comprehensive literature search | PubMed + Europe PMC + OpenAlex + Semantic Scholar |
-| Find and read a paper | PubMed (find) + Unpaywall (OA link) + Europe PMC or CORE (full text) |
-| Preprint and its published version | Europe PMC or bioRxiv/medRxiv + Crossref |
 | Author overview with citation metrics | Semantic Scholar + OpenAlex |
 
 **Preprint keyword search — use Europe PMC.** bioRxiv and medRxiv have *no keyword search* of their own: only date-range browsing and DOI lookup. Europe PMC indexes both and searches them directly:
@@ -103,17 +90,13 @@ Different databases use different identifier systems. When a lookup fails, a wro
 |---|---|---|---|
 | DOI | `10.xxxx/xxxxx` | `10.1038/nature12373` | All databases |
 | PMID | Integer | `34567890` | PubMed, PMC, Europe PMC, Semantic Scholar |
-| PMCID | `PMC` + digits | `PMC7029759` | PMC, Europe PMC |
 | arXiv ID | `YYMM.NNNNN` or legacy `archive/YYMMNNN` | `2103.15348`, `hep-th/9901001` | arXiv, Semantic Scholar |
 | OpenAlex ID | `W` + digits | `W2741809807` | OpenAlex |
 | Semantic Scholar ID | 40-char hex | `649def34f8be...` | Semantic Scholar |
-| Europe PMC ID | `{source}/{id}` pair | `MED/32117569`, `PPR1283561` | Europe PMC |
 | ORCID | `0000-XXXX-XXXX-XXXX` | `0000-0001-6187-6610` | OpenAlex, Crossref |
 | ISSN | `XXXX-XXXX` | `0028-0836` | Crossref, OpenAlex, DOAJ |
-| ROR ID | `https://ror.org/` + 9 chars | `https://ror.org/05a0ya142` | ROR, OpenAlex, Crossref |
 | OCI | `{citing}-{cited}` omid suffixes | `06101801781-06180334099` | OpenCitations |
 | Zenodo record | integer, concept ≠ version | `3246411` (version of `3246410`) | Zenodo |
-| BioStudies accession | `S-` / `E-` prefix | `S-BSST12345`, `E-MTAB-1234` | BioStudies |
 
 **Cross-referencing IDs:** Semantic Scholar accepts DOI, PMID, PMCID, and arXiv ID via prefixes (`DOI:10.1038/nature12373`, `PMID:34567890`, `ARXIV:2103.15348`). OpenAlex accepts DOI and PMID via prefixes (`doi:10.1038/...`, `pmid:34567890`). Use the PMC ID Converter to translate between PMID, PMCID, and DOI. When one database has no result for an identifier, converting it and trying another is usually faster than reformulating the query.
 
@@ -128,7 +111,6 @@ Most of these APIs are fully open. A few benefit from a key for higher rate limi
 
 | Database | Env Variable | Required? | Registration |
 |---|---|---|---|
-| NCBI (PubMed, PMC) | `NCBI_API_KEY` | No (3 req/s without, 10 with) | https://www.ncbi.nlm.nih.gov/account/settings/ |
 | CORE | `CORE_API_KEY` | Yes for full text | https://core.ac.uk/services/api |
 | Semantic Scholar | `S2_API_KEY` | No (shared pool without, often 429s) | https://www.semanticscholar.org/product/api#api-key-form |
 | OpenAlex | `OPENALEX_API_KEY` | Recommended | https://openalex.org/settings/api |
@@ -198,7 +180,6 @@ Standard library only, Python 3.11+. Each exists because the logic is fragile, r
 | Script | Use it for | Exit codes beyond 0/1 |
 |---|---|---|
 | `scripts/paginate.py` | Walking bioRxiv, medRxiv, Europe PMC, OpenAlex, or Crossref with the correct step, stop condition, rate limit, and count reconciliation | **4** = walk ended on its own but came up short (records missing) |
-| `scripts/jats_to_text.py` | PMC / Europe PMC JATS XML → sectioned text | **2** = no `<body>`: metadata only, not full text |
 | `scripts/arxiv_atom.py` | arXiv Atom XML → JSON records | **3** = arXiv error feed (arrives as HTTP 200); **5** = throttled (`Rate exceeded.`, plain text, not XML) |
 | `scripts/openalex_abstract.py` | Reconstructing abstracts from `abstract_inverted_index` | — |
 
@@ -263,15 +244,10 @@ Read the relevant reference file before making any API call.
 ### Biomedical Literature
 | Database | Reference File | What it covers |
 |---|---|---|
-| PubMed | `references/pubmed.md` | 37M+ biomedical citations, abstracts, MeSH terms (no full text) |
-| PMC | `references/pmc.md` | 10M+ full-text biomedical articles (JATS XML), BioC API, ID conversion; OA Web Service retired August 2026 |
-| Europe PMC | `references/europepmc.md` | PubMed + PMC + preprints in one index; full-text keyword search, citations, honest 404s |
 
 ### Preprint Servers
 | Database | Reference File | What it covers |
 |---|---|---|
-| bioRxiv | `references/biorxiv.md` | Biology preprints (browse by date/DOI — **no keyword search**; use Europe PMC) |
-| medRxiv | `references/medrxiv.md` | Health-sciences preprints (browse by date/DOI — **no keyword search**; use Europe PMC) |
 | arXiv | `references/arxiv.md` | Physics, math, CS, quant-bio, economics preprints (keyword search, Atom XML) |
 
 ### Multidisciplinary Indexes
@@ -281,7 +257,6 @@ Read the relevant reference file before making any API call.
 | Crossref | `references/crossref.md` | 150M+ DOI metadata, journals, funders, references |
 | Semantic Scholar | `references/semantic-scholar.md` | 200M+ papers, citation graphs, AI TLDRs, recommendations |
 | OpenCitations | `references/opencitations.md` | Open citation edges and counts (DOI/PMID/OMID; prefix required) |
-| PubTator3 | `references/pubtator.md` | Text-mined genes, chemicals, diseases, variants, relations |
 
 ### Open Access & Full Text
 | Database | Reference File | What it covers |
@@ -294,6 +269,3 @@ Read the relevant reference file before making any API call.
 | Database | Reference File | What it covers |
 |---|---|---|
 | Zenodo | `references/zenodo.md` | Deposited papers, software, data (concept DOI ≠ version DOI) |
-| Figshare | `references/figshare.md` | Deposited figures, data, media (search is POST, not GET) |
-| BioStudies | `references/biostudies.md` | EBI study packages and links to other archives |
-| ROR | `references/ror.md` | Research organization IDs from names or affiliation strings |
