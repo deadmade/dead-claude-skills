@@ -25,6 +25,12 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
 - `plugins/database/`: a second `GROUPS` folder; each folder under it is a database plugin. `postgres` vendors
   Neon's and Timescale's Postgres skills from two upstreams (`sync-postgres.mjs`), so each skill folder carries its
   own LICENSE, NOTICE and UPSTREAM instead of one set at the plugin root.
+- `plugins/night-city/`: a theme (`themes/night-city.json`) plus a mod. Claude Code hardcodes syntax colours per base
+  theme (Monokai for dark), so the installer turns highlighting off with night-city. It also sets `CLAUDE_CODE_TMUX_TRUECOLOR=1`: inside tmux Claude
+  Code otherwise draws in 256 colours and the theme's indigos turn grey.
+  With night-city it also writes `installer/ccstatusline-night-city.json` instead of the stock ccstatusline config:
+  Powerline (needs a Nerd Font), and since Powerline mode draws a gradient in its first colour only, the ナイトシティ
+  sign is one widget per glyph.
 - `plugins/dead-skills/`: the default bundle; its `dependencies` are the core plugins.
 - `scripts/`: `check-repo.mjs` (marketplace/bundle/version consistency), `release.mjs`, `sync-*.mjs` (vendoring),
   `sync-plugins.mjs` (re-pins url-sourced plugins).

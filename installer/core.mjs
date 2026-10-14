@@ -95,8 +95,34 @@ export const isSandboxOn = (s) => s?.sandbox?.enabled === true;
 export const hasDcgHook = (s) =>
   (s?.hooks?.PreToolUse ?? []).some((e) => e?.hooks?.some((h) => /dcg(\.exe)?"?$/i.test(h?.command ?? '')));
 
-export function mergeSettings(settings, { statusLine, sandbox, version }) {
+// The value Claude Code stores when /theme picks the night-city plugin's theme.
+export const NIGHT_CITY_THEME = 'custom:night-city:night-city';
+
+// True when text is JSON equal to any shipped config text (whitespace-insensitive).
+export const isShipped = (text, shippedTexts) => {
+  try {
+    const cur = JSON.stringify(JSON.parse(text));
+    return shippedTexts.some((s) => JSON.stringify(JSON.parse(s)) === cur);
+  } catch {
+    return false;
+  }
+};
+
+export function mergeSettings(settings, { statusLine, sandbox, version, nightCity }) {
   const out = structuredClone(settings);
+  if (nightCity === false && out.theme === NIGHT_CITY_THEME) delete out.theme;
+  // Claude Code colours code in a fixed Monokai a theme can't change; off, diffs take Night City's own diff colours.
+  // shortcut: deselecting also clears a `true` the user set themselves; remember who set it if anyone minds.
+  if (nightCity) out.syntaxHighlightingDisabled = true;
+  if (nightCity === false && out.syntaxHighlightingDisabled === true) delete out.syntaxHighlightingDisabled;
+  // Inside tmux Claude Code draws in 256 colours unless told otherwise, which turns the theme's indigos grey. Outside
+  // tmux (and on Windows, which has none) the variable does nothing.
+  if (nightCity) out.env = { ...out.env, CLAUDE_CODE_TMUX_TRUECOLOR: '1' };
+  if (nightCity === false && out.env?.CLAUDE_CODE_TMUX_TRUECOLOR === '1') {
+    const { CLAUDE_CODE_TMUX_TRUECOLOR, ...env } = out.env;
+    if (Object.keys(env).length) out.env = env;
+    else delete out.env;
+  }
   const allow = out.permissions?.allow ?? [];
   const deny = out.permissions?.deny ?? [];
   out.permissions = {
@@ -351,8 +377,8 @@ export const CATEGORIES = [
   {
     id: 'system',
     title: 'System',
-    blurb: 'Status line, sandbox and command guard in settings.json.',
-    keys: ['ccstatusline', 'sandbox', 'dcg'],
+    blurb: 'Status line, sandbox, command guard and the Night City theme.',
+    keys: ['ccstatusline', 'sandbox', 'dcg', 'night-city'],
   },
   // bulk: false, so no single key ticks every option here.
   {
