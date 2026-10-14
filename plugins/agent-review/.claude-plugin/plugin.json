@@ -1,0 +1,11 @@
+{
+  "name": "agent-review",
+  "version": "0.2.0",
+  "description": "/agent-review: check agent work at the level the stakes need. Level 1, a verified artifact or a named failure; Level 2, two independent extractions reconciled against the source; Level 3, self-audit, cold reviewers, then fresh eyes. Vendored from captivus/agent-review, synced weekly.",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "repository": "https://github.com/deadmade/dead-claude-skills",
+  "license": "MIT"
+}

@@ -1,0 +1,41 @@
+name: Sync agent-review
+
+on:
+  schedule:
+    - cron: '15 8 * * 1' # Mondays 08:15 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Sync skill from upstream
+        run: node scripts/sync-agent-review.mjs
+
+      - name: Sanity checks
+        run: |
+          jq empty .claude-plugin/marketplace.json plugins/agent-review/.claude-plugin/plugin.json
+          head -n 10 plugins/agent-review/skills/agent-review/SKILL.md | grep -q '^disable-model-invocation: true$'
+          test "$(find plugins/agent-review/skills/agent-review/references -maxdepth 1 -name '*.md' | wc -l)" -ge 4
+          echo "sha=$(cat plugins/agent-review/UPSTREAM)" >> "$GITHUB_OUTPUT"
+        id: check
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v8
+        with:
+          branch: sync/agent-review
+          delete-branch: true
+          commit-message: 'Sync agent-review to ${{ steps.check.outputs.sha }}'
+          title: 'Sync agent-review to ${{ steps.check.outputs.sha }}'
+          body: |
+            Automated sync of `plugins/agent-review` from https://github.com/captivus/agent-review at
+            https://github.com/captivus/agent-review/commit/${{ steps.check.outputs.sha }}.
+
+            cc @deadmade
+          add-paths: plugins/agent-review

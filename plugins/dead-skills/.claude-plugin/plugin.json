@@ -15,6 +15,7 @@
     "claude-security@claude-plugins-official",
     "superpowers",
     "ponytail",
+    "agent-review",
     "mcp-basic"
   ]
 }

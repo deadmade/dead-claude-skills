@@ -100,6 +100,16 @@ pr-review-toolkit agents (Apache License 2.0, Copyright Anthropic, PBC; `LICENSE
 `description:` rewritten, and [mattpocock/skills](https://github.com/mattpocock/skills)'s engineering code-review
 skill (MIT License, Copyright Matt Pocock; `LICENSE-MIT`), unmodified apart from a source comment.
 
+## agent-review
+
+`plugins/agent-review/skills/agent-review/` is vendored from [captivus/agent-review](https://github.com/captivus/agent-review)
+(MIT License, Copyright (c) 2026 Corey Gallon; full text in `plugins/agent-review/LICENSE`). It is synced by
+`scripts/sync-agent-review.mjs` (weekly via GitHub Actions; the synced commit is in `plugins/agent-review/UPSTREAM`).
+The only local changes are in `SKILL.md`'s frontmatter (`disable-model-invocation: true` added, `effort` removed), one
+sentence pointing at the dead-skills `rules.md` instead of the upstream README, and a source comment in each file. The
+self-audit lines in `plugins/dead-skills/rules.md` and the review steps in self-review and feature-flow are adapted
+from its method.
+
 ## Re-listed plugins
 
 The marketplace entries for superpowers and ponytail only point at their upstream repositories, pinned to a release

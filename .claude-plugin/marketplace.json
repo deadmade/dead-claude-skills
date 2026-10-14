@@ -40,6 +40,12 @@
       "category": "productivity"
     },
     {
+      "name": "agent-review",
+      "description": "/agent-review: check agent work at the level the stakes need: a verified artifact, two extractions reconciled against the source, or adversarial review with fresh eyes. Vendored from captivus/agent-review, synced weekly.",
+      "source": "./plugins/agent-review",
+      "category": "development"
+    },
+    {
       "name": "nix-lsp",
       "description": "Nix language server (nixd) for code intelligence (requires nixd on PATH)",
       "source": "./plugins/nix-lsp",
@@ -122,7 +128,7 @@
     },
     {
       "name": "self-review",
-      "description": "/self-review: review your branch before opening a PR. Bug pass, spec and standards pass, security-review, a CLAUDE.md audit, and specialist agents (vendored from code-review, pr-review-toolkit and mattpocock) in one command, then fixes what you pick. Opt-in.",
+      "description": "/self-review: review your branch before opening a PR. Bug pass, spec and standards pass, security-review, a CLAUDE.md audit, and specialist agents (vendored from code-review, pr-review-toolkit and mattpocock) in one command, then fixes what you pick and has a fresh agent check each fix. Opt-in.",
       "source": "./plugins/self-review",
       "category": "development"
     },

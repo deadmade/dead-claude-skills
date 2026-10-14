@@ -4,7 +4,7 @@ My personal Claude Code setup as a plugin marketplace, so every machine (Linux, 
 built for me; use it if it fits, but expect it to change without notice.
 
 The default bundle, **dead-skills**, pulls in code-review, claude-code-setup, claude-md-management, security-guidance,
-claude-security, superpowers, ponytail, mcp-basic (context7) and my global rules. Everything else is opt-in: language
+claude-security, superpowers, ponytail, agent-review, mcp-basic (context7) and my global rules. Everything else is opt-in: language
 servers, language and database skills (rust, csharp, postgres), integrations (GitHub, Azure, Atlassian), skill packs
 like hallmark, self-review, graphify and the mattpocock/pstack/Trail of Bits picks, plus tools such as
 [tui-review](plugins/tui-review/README.md) and cswap for multi-account switching.

@@ -1,3 +1,6 @@
 - Commit messages are one sentence.
 - Never add co-author lines (`Co-Authored-By:` or similar) to commits.
 - After finishing a feature, check whether the project's CLAUDE.md is still accurate and update it with anything a future session needs (`/revise-claude-md` from claude-md-management helps).
+- Before stating a claim as a conclusion, classify it as measured, verified against source, inferred, or assumed. Test the gaps the user would rely on when you can; otherwise label them as hypotheses.
+- A subagent's "done" or "tests pass" is a claim: check its artifact or rerun its check yourself before relying on it.
+- When a conclusion will drive a consequential decision or leave this session (a doc, a PR, a message), suggest `/agent-review` (Level 3) to the user.
