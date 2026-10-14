@@ -3,6 +3,7 @@
 // key ends it.
 import type { EngineInterface as $, Register, Timer } from 'claude-code';
 
+import { RESET, SET, isNightCity, paint } from './background';
 import { BAND_ROWS, INTRO_MS, frame } from './scene';
 import { SPINNER_WORDS, TURN_WORDS, pick } from './words';
 
@@ -37,6 +38,14 @@ type Intro = {
 let isFresh = false;
 let isPending = false; // the intro is starting: a key now must still skip it
 let intro: Intro | undefined;
+
+// The terminal background follows the theme: Night City selected paints it, anything else resets it.
+let isTerminal = false;
+let isPainted = false;
+
+async function background($: $, on: boolean) {
+  if (on !== isPainted && (await paint($, on ? SET : RESET))) isPainted = on;
+}
 
 const clamp = (n: number, max: number) => Math.max(1, Math.min(max, Math.floor(n)));
 
@@ -80,6 +89,8 @@ export const register: Register = (on) => {
   intro = undefined;
   glitched = false;
   reaction = undefined;
+  isTerminal = false;
+  isPainted = false;
 
   on('turn.start', (_$, e, next) => {
     glitched = false;
@@ -115,7 +126,24 @@ export const register: Register = (on) => {
     isFresh = false;
     const started = await next(e);
     if (isPending) void play($);
+    isTerminal = e.isInteractive && e.surface === 'terminal';
+    if (isTerminal) {
+      void $.config.list().then(
+        (rows) => background($, isNightCity(rows.find((row) => row.key === 'theme')?.value)),
+        () => {},
+      );
+    }
     return started;
+  });
+  on('config.set', { key: 'theme' }, async ($, e, next) => {
+    const set = await next(e);
+    if (isTerminal && set.deny === undefined) void background($, isNightCity(set.value));
+    return set;
+  }).catch((_$, e, next) => next(e));
+  // After a /clear or a resume the process, and the terminal, go on.
+  on('session.end', async ($, e, next) => {
+    if (isPainted && e.reason !== 'clear' && e.reason !== 'resume') await background($, false);
+    return next(e);
   });
 
   on('prompt.edit', ($, e, next) => {

@@ -184,7 +184,11 @@ test('the band yields to a survey', async ($, on) => {
 function reactions(on: On) {
   const clock = mock.clock(on);
   const status: (string | undefined)[] = [];
-  on('tool.call', (_$, e) => ((e as { command?: string }).command === 'fail' ? { isError: true, result: 'x' } : { result: 'ok' }) as never);
+  on(
+    'tool.call',
+    (_$, e) =>
+      ((e as { command?: string }).command === 'fail' ? { isError: true, result: 'x' } : { result: 'ok' }) as never,
+  );
   on('ui.status', (_$, e) => {
     status.push(e.text);
     return { value: undefined };

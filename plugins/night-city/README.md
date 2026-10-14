@@ -9,6 +9,9 @@ Beyond the theme:
   fresh session start only (not `/clear`, resume, compact or fork). Any key skips it. It runs in a terminal in
   interactive mode only, uses up to half the terminal's height and 256-colour-safe backgrounds. The block-letter sign
   needs about 32 terminal rows; shorter terminals get a one-row sign.
+- While Night City is the selected theme, the terminal's own background turns the theme's near-black purple, so
+  the empty space matches (OSC 11, reset when Claude exits or you pick another theme). Linux and macOS; Windows
+  Terminal untested. If Claude is killed, the color stays until you run `printf '\033]111\007'`.
 - Night City spinner words and turn-end verbs ("Jacked out for 3s").
 - Short status-line reactions: `▚▞ FLATLINE ▞▚` once per turn on a failing tool, `◢◤ JACKED OUT ◢◤` when a main turn
   ends.

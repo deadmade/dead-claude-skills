@@ -45,7 +45,7 @@ could we design our own theme? Would be awesome to have like a cyberpunk style t
     `$.config.set({ key: 'theme', value: 'custom:night-city:night-city' })` →
     `{ deny: "takes one of: auto, dark, light, light-daltonized, dark-daltonized, light-ansi, dark-ansi" }`, theme
     stays `dark`. Binary: the `theme` row is `options: Uxe` (built-ins only, `optionsHint: "For custom themes, use
-    /theme."`) and core's `config.set` bottom denies any `choice` value outside `options` before writing; only the
+/theme."`) and core's `config.set` bottom denies any `choice` value outside `options` before writing; only the
     `/theme` picker's own writer (`commitTheme`/`themeWriter`) accepts `custom:`.
   - Where it is stored: binary. `theme` is a user-intent setting: written with `saveUserIntentSetting` to
     `userSettings` (`~/.claude/settings.json` `theme`), read via `resolveSetting` from the settings sources first,
@@ -98,6 +98,7 @@ could we design our own theme? Would be awesome to have like a cyberpunk style t
 
 Round 1 (correctness, fit, simpler reviewers; 23 raw findings merged into 11, none dropped; key API claims
 spot-checked in claude-code.d.ts: TurnDuration props, turn.complete subagent id, prompt.edit `key`, hasSurvey):
+
 1. [blocking] TurnDuration has `{word, durationMs}`, no string → rewrite `word` only ("Jacked out for 3s").
 2. [should-fix] Task 5 rework: one Raster + blit loop for pane and band; choose by `isPlaced`, always close; skip
    via `prompt.edit` (pane unfocused); fresh start from classic `SessionStart` `source === 'startup'`; ignore
@@ -129,6 +130,12 @@ Decisions 2026-10-13: user accepted all recommendations ("yes to all"). Plan rew
    2026-10-13: **band only, full height** (user). Screenshot of the live pane: flat grey sky, black towers, the sign
    boxed like a label, stray navy blocks; the mockup's deep-purple sky, purple skyline and glowing sign are missing.
    Task 4 reworked to match `alive.html` as far as cells allow.
+3. **The terminal background after all** (2026-10-14, user asked why Claude Code can't paint the whole background).
+   No theme token reaches the empty cells, but OSC 11 sets the terminal's background (worked in Ghostty inside tmux
+   3.6a, per pane). A mod can't write to the terminal, but a `$.process.run` child can: `sh` walks up to the first
+   ancestor with a tty and writes there (verified live as a dev mod); on Windows a PowerShell child writes to
+   `CONOUT$` (untested). The plugin sets the theme's `background` while Night City is the selected theme and resets
+   with OSC 111 on exit or a theme switch. Non-goal "terminal background" narrowed to glow, shaders and profiles.
 
 ## Walkthrough
 

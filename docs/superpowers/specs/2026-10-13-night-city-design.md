@@ -26,10 +26,12 @@ not more color. The other hard requirement: **it stays usable** for all-day work
 
 ## Non-goals
 
-- Terminal background, glow, scanlines, shaders, terminal color schemes or a dedicated terminal profile/launcher.
-  Offered and rejected: "just stay in Claude Code".
+- Glow, scanlines, shaders, terminal color schemes or a dedicated terminal profile/launcher. Offered and rejected:
+  "just stay in Claude Code". The terminal's background color is in scope since 2026-10-14 (flow deviation 3): while
+  Night City is the selected theme the mod sets it with OSC 11 to the theme's `background` and resets it with OSC
+  111 on exit or a theme switch.
 - A custom QUEST / EDDIES / RAM band: rejected as a duplicate of ccstatusline.
-- Sound. *Claude's call; the user never asked for it.*
+- Sound. _Claude's call; the user never asked for it._
 
 ## Anti-goals
 
@@ -69,7 +71,8 @@ not more color. The other hard requirement: **it stays usable** for all-day work
   built-in themes (verified at runtime, Task 2); `custom:` values come only from the `/theme` picker, which writes
   `"theme": "custom:night-city:night-city"` to `~/.claude/settings.json`. **A pane opened unasked is placed only from 144 columns** (110 for an id the user once opened) and waits
   below that (`claude-code.d.ts:2490`, `:14132`).
-- Mods cannot write raw escape sequences to the terminal.
+- Mods cannot write raw escape sequences to the terminal themselves; a `$.process.run` child can, by writing to
+  Claude's tty (POSIX) or `CONOUT$` (Windows).
 - ccstatusline 2.2.32 (installed) supports truecolor hex, line gradients with hex stops, and powerline (its README).
 - Repo: new plugin needs a marketplace entry, version = package.json, a `CATEGORIES` key in `installer/core.mjs`
   (else `installer/core.test.mjs:372-379` fails), README opt-in list, THIRD_PARTY.md.
