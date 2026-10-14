@@ -25,6 +25,12 @@ $fs = New-Object IO.FileStream((New-Object Microsoft.Win32.SafeHandles.SafeFileH
 $b = [Text.Encoding]::ASCII.GetBytes([string][char]27 + $env:NIGHT_CITY_OSC + [char]7)
 $fs.Write($b, 0, $b.Length); $fs.Close()`;
 
+// Absolute paths: a bare name is looked up in the session's working directory first on Windows, so a project could
+// plant its own `sh.exe` or `powershell.exe`.
+// shortcut: assumes Windows lives in C:\Windows; read %SystemRoot% if someone installs it elsewhere.
+export const SH_PATH = '/bin/sh';
+export const PS_PATH = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
+
 // The plugin theme's stored value is `custom:night-city:night-city` (undocumented, read from the binary).
 export const isNightCity = (theme: unknown) => typeof theme === 'string' && theme.endsWith(':night-city');
 
@@ -33,10 +39,10 @@ export const isNightCity = (theme: unknown) => typeof theme === 'string' && them
 // Terminal may ignore OSC 111 (untested), then send the original color back with OSC 11 instead.
 export async function paint($: $, osc: string): Promise<boolean> {
   try {
-    if ((await $.process.run(['sh', '-c', SH, 'sh', osc])).exitCode === 0) return true;
+    if ((await $.process.run([SH_PATH, '-c', SH, 'sh', osc])).exitCode === 0) return true;
   } catch {}
   try {
-    const r = await $.process.run(['powershell', '-NoProfile', '-NonInteractive', '-Command', '-'], {
+    const r = await $.process.run([PS_PATH, '-NoProfile', '-NonInteractive', '-Command', '-'], {
       stdin: PS,
       env: { NIGHT_CITY_OSC: osc },
     });

@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing';
 import type { On } from 'claude-code';
 
-import { RESET, SET, isNightCity } from './background';
+import { PS_PATH, RESET, SET, SH_PATH, isNightCity } from './background';
 
 const NIGHT = 'custom:night-city:night-city';
 
@@ -14,7 +14,7 @@ function host(on: On, { theme = NIGHT, shExit = 0 } = {}) {
   on('config.list', () => ({ value: [{ key: 'theme', label: 'Theme', kind: 'text', value: theme }] as never }));
   on('config.set', (_$, e) => ({ value: e.value }) as never);
   on('process.run', (_$, e) => {
-    const sh = e.argv[0] === 'sh';
+    const sh = e.argv[0] === SH_PATH;
     runs.push({ argv0: e.argv[0]!, osc: sh ? e.argv[4]! : e.init!.env!.NIGHT_CITY_OSC! });
     return { value: { exitCode: sh ? shExit : 0, stdout: '', stderr: '' } as never };
   });
@@ -43,9 +43,9 @@ test('with Night City selected the terminal background is set at start and reset
   const h = host(on);
   await $.session.start(START);
   await h.clock.settle();
-  expect(h.runs).toEqual([{ argv0: 'sh', osc: SET }]);
+  expect(h.runs).toEqual([{ argv0: SH_PATH, osc: SET }]);
   await $.session.end({ reason: 'prompt_input_exit' } as never);
-  expect(h.runs.at(-1)).toEqual({ argv0: 'sh', osc: RESET });
+  expect(h.runs.at(-1)).toEqual({ argv0: SH_PATH, osc: RESET });
 });
 
 test('another theme leaves the terminal alone', async ($, on) => {
@@ -87,7 +87,7 @@ test('when sh finds no tty, PowerShell writes to the console instead', async ($,
   await $.session.start(START);
   await h.clock.settle();
   expect(h.runs).toEqual([
-    { argv0: 'sh', osc: SET },
-    { argv0: 'powershell', osc: SET },
+    { argv0: SH_PATH, osc: SET },
+    { argv0: PS_PATH, osc: SET },
   ]);
 });
