@@ -67,7 +67,6 @@ test('opt-ins from the real manifests', () => {
         'postgres',
         'pstack-picks',
         'rust-skills',
-        'secret-scan',
         'self-review',
         'tob-picks',
         'tui-review',

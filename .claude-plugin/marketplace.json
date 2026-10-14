@@ -133,12 +133,6 @@
       "category": "development"
     },
     {
-      "name": "secret-scan",
-      "description": "Blocks prompts and git commits that contain secrets (API keys, tokens, private keys, seed phrases). claude-guardrails' scanners, vendored. Needs bash and jq. Opt-in.",
-      "source": "./plugins/secret-scan",
-      "category": "security"
-    },
-    {
       "name": "night-city",
       "description": "Night City: a toned-down synthwave Claude Code theme with Night City spinner words and short status-line reactions. Opt-in.",
       "source": "./plugins/night-city",

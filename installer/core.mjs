@@ -377,8 +377,8 @@ export const CATEGORIES = [
   {
     id: 'system',
     title: 'System',
-    blurb: 'Status line, sandbox, command guard, secret scanners and the Night City theme.',
-    keys: ['ccstatusline', 'sandbox', 'dcg', 'secret-scan', 'night-city'],
+    blurb: 'Status line, sandbox, command guard and the Night City theme.',
+    keys: ['ccstatusline', 'sandbox', 'dcg', 'night-city'],
   },
   // bulk: false, so no single key ticks every option here.
   {
