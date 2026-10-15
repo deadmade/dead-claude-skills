@@ -1,5 +1,5 @@
 ---
-phase: execute
+phase: finish
 ---
 
 # Turn-done notifications: flow
@@ -96,5 +96,20 @@ the edit myself rather than a second review round, since each change is local to
 
 ## Walkthrough
 
-| spec goal | plan task | file:line | test |
-| --------- | --------- | --------- | ---- |
+| spec goal                                      | plan task         | file:line                                          | test                                                                             |
+| ---------------------------------------------- | ----------------- | -------------------------------------------------- | -------------------------------------------------------------------------------- |
+| 1 popup on turn end, permission, question      | T1, T2, deviation | `plugins/notify/hooks/hooks.json`, `lib.mjs:56`    | `plain stop message`, `plain waiting message`, `question message`                |
+| 2 quiet when looking (tmux / Windows Terminal) | T1, T2            | `lib.mjs:36`, `lib.mjs:171`, TOAST in `lib.mjs`    | `tmux focus needs…`, `tmux is asked for…`; Windows: manual (T4)                  |
+| 3 title + status + first line, truncated       | T1                | `lib.mjs:56`                                       | `plain stop message`, `empty answer…`, `truncation keeps whole characters`       |
+| 4 own icon                                     | T2                | `plugins/notify/icon.png`, `lib.mjs:165`           | manual (smoke test, T4)                                                          |
+| 5 night-city wording, new lines                | T1                | `lib.mjs:7`, `lib.mjs:41`                          | `night-city is on only…`, `night-city wording`                                   |
+| 6 one plugin, built-in off via installer       | T1, T3            | `installer/core.mjs:131`, `installer/core.mjs:390` | `notify turns the built-in notification off…`, `opt-ins from the real manifests` |
+| anti-goals: subagents, continuations, headless | T1 + final fix    | `lib.mjs:30`                                       | `skips continuations…`, `a subagent waiting… still notifies`                     |
+| text never executed                            | T2                | `lib.mjs:114`                                      | `linux tries busctl…`, `windows passes text by env…`, `mac passes raw text…`     |
+| never blocks/fails the turn                    | T2                | `lib.mjs:167`, hooks `async`                       | `main exits quietly on bad input`                                                |
+
+Code with no goal: none. Open: Linux smoke test and Windows check (T4) need the user's desktop; the sandbox blocks
+D-Bus and tmux sockets here.
+
+Final review (fresh reviewer, opus): 1 Critical (busctl read `-1` as an option, so no Linux popup) and 1 Important
+(agent_id silenced subagent waits) fixed test-first; 3 minors deferred (see ledger).
