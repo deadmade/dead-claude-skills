@@ -64,7 +64,7 @@ remove it on uninstall). No runtime check in the hook.
 - Night-city detection: night-city enabled in the user's `settings.json` `enabledPlugins` (respecting
   `CLAUDE_CONFIG_DIR`).
 - Installer: notify on the `system` page (next to night-city). Selected → `preferredNotifChannel:
-  "notifications_disabled"`; deselected → remove it only if it is that value. Pattern of `nightCity` in
+"notifications_disabled"`; deselected → remove it only if it is that value. Pattern of `nightCity` in
   `mergeSettings` (`installer/core.mjs:113-148`) with a test.
 - Marketplace entry + plugin.json at the shared version; README; THIRD_PARTY untouched (all own content);
   CLAUDE.md layout line.

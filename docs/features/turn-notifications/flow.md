@@ -24,7 +24,6 @@ phase: execute
 
 - Grill ran inline during brainstorming (plan mode); no separate grilling/domain-modeling pass.
 
-
 ## Brainstorm answers
 
 - Moment: other window, same machine, multi-monitor. Triggers: done + waiting. Platforms: Linux (Hyprland,

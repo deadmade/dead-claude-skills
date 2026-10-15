@@ -40,20 +40,21 @@ while the plugin is selected.
 ### Task 0: Record what the installed Claude Code sends (no code)
 
 - [ ] **Step 1:** In `$TMPDIR`, write a settings file with `Stop` and `Notification` (no matcher) command hooks
-  that append `$CLAUDE_CODE_ENTRYPOINT` and stdin to `$TMPDIR/hooklog`. Run it with `claude --settings <file>`:
-  `-p "say ok"`; once interactively, triggering a permission prompt, an AskUserQuestion, and a subagent (Task tool)
-  turn; and `claude plugin test` in `plugins/cswap` if it fires hooks.
+      that append `$CLAUDE_CODE_ENTRYPOINT` and stdin to `$TMPDIR/hooklog`. Run it with `claude --settings <file>`:
+      `-p "say ok"`; once interactively, triggering a permission prompt, an AskUserQuestion, and a subagent (Task tool)
+      turn; and `claude plugin test` in `plugins/cswap` if it fires hooks.
 - [ ] **Step 2:** Record in `docs/features/turn-notifications/flow.md` under Grounding: the entrypoint value per run
-  kind; the Stop fields (`last_assistant_message`, `stop_hook_active`, `cwd`, `agent_id` when in a subagent); the
-  Notification fields (`message`, `notification_type`) and which `notification_type` each wait raises; whether
-  `agent_needs_input` fires a second event for the same wait. Decide the matcher from it, starting from
-  `permission_prompt|elicitation_dialog` (add `agent_needs_input` only if it has no twin).
+      kind; the Stop fields (`last_assistant_message`, `stop_hook_active`, `cwd`, `agent_id` when in a subagent); the
+      Notification fields (`message`, `notification_type`) and which `notification_type` each wait raises; whether
+      `agent_needs_input` fires a second event for the same wait. Decide the matcher from it, starting from
+      `permission_prompt|elicitation_dialog` (add `agent_needs_input` only if it has no twin).
 - [ ] **Step 3:** If any value differs from Tasks 1–2 below, fix those tasks' tests in the plan before starting
-  Task 1 (that is a deviation: log it).
+      Task 1 (that is a deviation: log it).
 
 ### Task 1: Decisions: what to say and whether to say it
 
 **Files:**
+
 - Create: `plugins/notify/.claude-plugin/plugin.json` (name `notify`, version `0.2.0`, description, author and
   repository as `plugins/night-city/.claude-plugin/plugin.json`, no `types`)
 - Create: `plugins/notify/hooks/lib.mjs`
@@ -63,13 +64,14 @@ while the plugin is selected.
   `plugins/notify/hooks/`)
 - Modify: `.claude-plugin/marketplace.json`: entry after night-city: `name: notify`, `source: ./plugins/notify`,
   `category: development`, description `"Desktop notifications when a turn ends or Claude needs you, on Linux,
-  Windows and macOS; quiet while you're looking at the session. Opt-in."`
+Windows and macOS; quiet while you're looking at the session. Opt-in."`
 - Modify: `installer/core.mjs:385` system page: add `'notify'` to keys; blurb `'Status line, sandbox, command
-  guard, notifications and the Night City theme.'` (the test at `installer/core.test.mjs:376-383` requires every
+guard, notifications and the Night City theme.'` (the test at `installer/core.test.mjs:376-383` requires every
   marketplace plugin on a page)
 - Modify: `CLAUDE.md` Checks line for `npm test` (also runs `plugins/notify/hooks/*.test.mjs`)
 
 **Interfaces (all exported from `lib.mjs`):**
+
 - `DONE: string[]`, `WAITING: string[]`
 - `shouldNotify(input, env) -> boolean`: false when `input.stop_hook_active`, when `input.agent_id` is set, or when
   `env.CLAUDE_CODE_ENTRYPOINT` starts with `sdk` (values per Task 0).
@@ -77,7 +79,7 @@ while the plugin is selected.
   then one `#{client_flags}` line per client of the session. True only when the first line is `11` and any later
   line has `focused` as a comma-separated item.
 - `nightCityEnabled(settingsText: string | undefined) -> boolean`: `enabledPlugins['night-city@dead-claude-skills']
-  === true`; false on undefined or invalid JSON.
+=== true`; false on undefined or invalid JSON.
 - `message(input, { nightCity: boolean, pick: (list: string[]) => string }) -> { title: string, body: string }`:
   raw text, no escaping.
 
@@ -91,7 +93,7 @@ while the plugin is selected.
   - `night-city is on only when enabled in settings`: `'{"enabledPlugins":{"night-city@dead-claude-skills":true}}'`
     true; same with `false` → false; `undefined` false; `'{oops'` false.
   - `plain stop message`: `message({hook_event_name:'Stop', cwd:'/home/u/dead-claude-skills',
-    last_assistant_message:'\nAll tests pass.\nDetails'}, {nightCity:false, pick:(l)=>l[0]})` deep-equals
+last_assistant_message:'\nAll tests pass.\nDetails'}, {nightCity:false, pick:(l)=>l[0]})` deep-equals
     `{title:'Claude Code · dead-claude-skills', body:'Done\nAll tests pass.'}`.
   - `plain waiting message`: `{hook_event_name:'Notification', message:'Claude needs your permission to use Bash'}`
     → body `'Needs your input\nClaude needs your permission to use Bash'`.
@@ -106,40 +108,42 @@ while the plugin is selected.
     (`!/[\uD800-\uDFFF]/.test(s.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, ''))`).
 - [ ] **Step 2: Run** `node --test plugins/notify/hooks/lib.test.mjs`. Expected: FAIL, module not found.
 - [ ] **Step 3: Implement** the exports. Title uses `path.basename(input.cwd ?? process.cwd())`. Truncate with
-  `[...line]` (code points). Word lists (new lines, none from night-city's `words.ts`):
+      `[...line]` (code points). Word lists (new lines, none from night-city's `words.ts`):
   - `DONE`: `Come look at your Agent`, `Gig's done, choom`, `Eddies are in your account`, `Run complete. ICE is
-    clean`, `Your fixer left a message`, `Job's wrapped. Jack back in`, `Braindance is ready to play`, `Delta's
-    done. Back to you`.
+clean`, `Your fixer left a message`, `Job's wrapped. Jack back in`, `Braindance is ready to play`, `Delta's
+done. Back to you`.
   - `WAITING`: `Songbird requests your help`, `Incoming call on your Agent`, `Your fixer's on the holo`, `Need your
-    eyes on this, choom`, `Netrunner awaits your authorization`, `The daemon won't move without you`.
+eyes on this, choom`, `Netrunner awaits your authorization`, `The daemon won't move without you`.
 - [ ] **Step 4: Run** `npm test`. Expected: PASS.
 - [ ] **Step 5: Commit** `git add plugins/notify package.json flake.nix .claude-plugin/marketplace.json
-  installer/core.mjs CLAUDE.md && git commit -m "Add the notify plugin's message and focus decisions."`
+installer/core.mjs CLAUDE.md && git commit -m "Add the notify plugin's message and focus decisions."`
 
 ### Task 2: Delivery: hooks.json, notifiers, icon
 
 **Files:**
+
 - Create: `plugins/notify/hooks/hooks.json`, `plugins/notify/hooks/notify.mjs`, `plugins/notify/icon.png`
 - Modify: `plugins/notify/hooks/lib.mjs`, `plugins/notify/hooks/lib.test.mjs`
 
 **Interfaces:**
+
 - Consumes: Task 1's exports.
 - Produces (exported from `lib.mjs`):
   - `notifiers(platform: string, msg: {title, body}, icon: string) -> Array<{ argv: string[], env?: object }>`:
     commands to try in order; empty for an unknown platform.
   - `TMUX_ARGV(pane: string) -> string[]`: `['tmux','display-message','-p','-t',pane,'#{pane_active}#{window_active}',
-    ';','list-clients','-t',pane,'-F','#{client_flags}']`.
+';','list-clients','-t',pane,'-F','#{client_flags}']`.
   - `main({ stdin: string, env, platform }) -> Promise<void>`; never rejects.
 
 - [ ] **Step 1: Write the failing tests:**
   - `linux tries busctl then notify-send and escapes markup`: `notifiers('linux', {title:'T', body:'a <b> & c'},
-    '/p/icon.png')` → two entries; `[0].argv` deep-equals `['busctl','--user','call','org.freedesktop.Notifications',
-    '/org/freedesktop/Notifications','org.freedesktop.Notifications','Notify','susssasa{sv}i','Claude Code','0',
-    '/p/icon.png','T','a &lt;b&gt; &amp; c','0','0','-1']`; `[1].argv` deep-equals `['notify-send','-a','Claude
-    Code','-i','/p/icon.png','T','a &lt;b&gt; &amp; c']`.
+'/p/icon.png')` → two entries; `[0].argv` deep-equals `['busctl','--user','call','org.freedesktop.Notifications',
+'/org/freedesktop/Notifications','org.freedesktop.Notifications','Notify','susssasa{sv}i','Claude Code','0',
+'/p/icon.png','T','a &lt;b&gt; &amp; c','0','0','-1']`; `[1].argv` deep-equals `['notify-send','-a','Claude
+Code','-i','/p/icon.png','T','a &lt;b&gt; &amp; c']`.
   - `windows passes text by env, never in the script`: `notifiers('win32', {title:'$(x)', body:'"; rm <b>'},
-    'C:\\Users\\A B\\icon.png')` → one entry; `argv` starts `['powershell','-NoProfile','-NonInteractive',
-    '-WindowStyle','Hidden','-Command']`; no argv element contains `$(x)` or `rm`; `env.NOTIFY_TITLE === '$(x)'`,
+'C:\\Users\\A B\\icon.png')` → one entry; `argv` starts `['powershell','-NoProfile','-NonInteractive',
+'-WindowStyle','Hidden','-Command']`; no argv element contains `$(x)` or `rm`; `env.NOTIFY_TITLE === '$(x)'`,
     `env.NOTIFY_BODY === '"; rm <b>'` (raw; the script escapes), `env.NOTIFY_ICON === 'C:\\Users\\A B\\icon.png'`;
     `env.PATH === process.env.PATH` (the full environment is merged in).
   - `mac passes raw text as argv`: one entry, `argv` is `['osascript','-e', <fixed script>, 'T', 'a <b> & c']`.
@@ -168,45 +172,47 @@ while the plugin is selected.
     the PNG is committed.
 - [ ] **Step 4: Run** `npm test` and `claude plugin validate plugins/notify`. Expected: PASS.
 - [ ] **Step 5: Smoke test here:** `echo '{"hook_event_name":"Stop","cwd":"'$PWD'","last_assistant_message":"hi <b>&</b> 😀"}' | env -u TMUX_PANE node plugins/notify/hooks/notify.mjs`.
-  Expected: a noctalia popup with the icon, title `Claude Code · dead-claude-skills`, body `Done` / `hi <b>&</b> 😀`
-  shown literally. With `focus-events on` and `TMUX_PANE` kept, from the focused pane: no popup; from an unfocused
-  pane (`sleep 3; …` then switch): popup.
+      Expected: a noctalia popup with the icon, title `Claude Code · dead-claude-skills`, body `Done` / `hi <b>&</b> 😀`
+      shown literally. With `focus-events on` and `TMUX_PANE` kept, from the focused pane: no popup; from an unfocused
+      pane (`sleep 3; …` then switch): popup.
 - [ ] **Step 6: Commit** `git add plugins/notify && git commit -m "Deliver notify's popups via D-Bus, a Windows
-  toast or osascript."`
+toast or osascript."`
 
 ### Task 3: Installer toggle and docs
 
 **Files:**
+
 - Modify: `installer/core.mjs:113` `mergeSettings` (new option `notify`), `installer/install.mjs:583-584`
 - Test: `installer/core.test.mjs` (next to the nightCity tests, ~:513)
 - Create: `plugins/notify/README.md`
 - Modify: `README.md` (plugin list), `CLAUDE.md` (Layout: one line on `plugins/notify/`)
 
 **Interfaces:**
+
 - Produces: `mergeSettings(settings, { …, notify: boolean })`.
 
 - [ ] **Step 1: Write the failing test** `notify turns the built-in notification off, and deselecting restores it`:
-  `mergeSettings({}, {notify:true}).preferredNotifChannel === 'notifications_disabled'`;
-  `mergeSettings({preferredNotifChannel:'notifications_disabled'}, {notify:false}).preferredNotifChannel ===
-  undefined`; `({preferredNotifChannel:'kitty'}, {notify:false})` keeps `'kitty'`; `({preferredNotifChannel:'kitty'},
-  {notify:true})` gives `'notifications_disabled'`.
+      `mergeSettings({}, {notify:true}).preferredNotifChannel === 'notifications_disabled'`;
+      `mergeSettings({preferredNotifChannel:'notifications_disabled'}, {notify:false}).preferredNotifChannel ===
+undefined`; `({preferredNotifChannel:'kitty'}, {notify:false})` keeps `'kitty'`; `({preferredNotifChannel:'kitty'},
+{notify:true})` gives `'notifications_disabled'`.
 - [ ] **Step 2: Run** `node --test installer/core.test.mjs`. Expected: the new test FAILS.
 - [ ] **Step 3: Implement** beside the nightCity block: a one-line why comment, a `shortcut:` comment like the
-  syntax-highlighting one (deselecting clears a `notifications_disabled` the user set themselves), and a comment that
-  retiring notify from the marketplace leaves the setting behind. In `install.mjs` pass
-  `notify: selected.some((id) => nameOf(id) === 'notify')`.
+      syntax-highlighting one (deselecting clears a `notifications_disabled` the user set themselves), and a comment that
+      retiring notify from the marketplace leaves the setting behind. In `install.mjs` pass
+      `notify: selected.some((id) => nameOf(id) === 'notify')`.
 - [ ] **Step 4: Write `plugins/notify/README.md`:** what fires (Stop, the matched Notification types); when it stays
-  quiet (focused tmux pane with `focus-events on`, any attached client counts; Windows Terminal in front;
-  continuations; subagents; headless runs); delivery and requirements per platform (Linux: `busctl` or `notify-send`
-  and a notification daemon; Windows PowerShell 5.1; macOS best effort, no icon); night-city wording; install note:
-  the installer sets `preferredNotifChannel: "notifications_disabled"`, installing or uninstalling via `/plugin`
-  means setting or removing it by hand. Add the plugin to the root README's list and the CLAUDE.md Layout.
+      quiet (focused tmux pane with `focus-events on`, any attached client counts; Windows Terminal in front;
+      continuations; subagents; headless runs); delivery and requirements per platform (Linux: `busctl` or `notify-send`
+      and a notification daemon; Windows PowerShell 5.1; macOS best effort, no icon); night-city wording; install note:
+      the installer sets `preferredNotifChannel: "notifications_disabled"`, installing or uninstalling via `/plugin`
+      means setting or removing it by hand. Add the plugin to the root README's list and the CLAUDE.md Layout.
 - [ ] **Step 5: Run** `npm test`. Expected: PASS.
 - [ ] **Step 6: Commit** `git add installer README.md CLAUDE.md plugins/notify/README.md && git commit -m "Offer
-  notify in the installer and turn the built-in notification off with it."`
+notify in the installer and turn the built-in notification off with it."`
 
 ### Task 4: Manual check on Windows (user)
 
 - [ ] **Step 1:** On Windows native in Windows Terminal, install from the branch, finish a turn with another app in
-  front: a toast with the icon appears. With Windows Terminal in front: none. Record in flow.md. If silent, check
-  Focus Assist and that Windows PowerShell has notifications on in Windows Settings.
+      front: a toast with the icon appears. With Windows Terminal in front: none. Record in flow.md. If silent, check
+      Focus Assist and that Windows PowerShell has notifications on in Windows Settings.

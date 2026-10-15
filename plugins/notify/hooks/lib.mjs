@@ -113,7 +113,24 @@ export function notifiers(platform, { title, body }, icon) {
     const b = markup(body);
     const dbus = ['org.freedesktop.Notifications', '/org/freedesktop/Notifications', 'org.freedesktop.Notifications'];
     return [
-      { argv: ['busctl', '--user', 'call', ...dbus, 'Notify', 'susssasa{sv}i', 'Claude Code', '0', icon, title, b, '0', '0', '-1'] },
+      {
+        argv: [
+          'busctl',
+          '--user',
+          'call',
+          ...dbus,
+          'Notify',
+          'susssasa{sv}i',
+          'Claude Code',
+          '0',
+          icon,
+          title,
+          b,
+          '0',
+          '0',
+          '-1',
+        ],
+      },
       { argv: ['notify-send', '-a', 'Claude Code', '-i', icon, title, b] },
     ];
   }

@@ -10,7 +10,8 @@ const plain = { nightCity: false, pick: first };
 test('skips continuations, subagents and headless runs', () => {
   assert.equal(shouldNotify({ stop_hook_active: true }, {}), false);
   assert.equal(shouldNotify({ agent_id: 'a1' }, {}), false);
-  for (const ep of ['sdk-cli', 'sdk-ts', 'sdk-py']) assert.equal(shouldNotify({}, { CLAUDE_CODE_ENTRYPOINT: ep }), false);
+  for (const ep of ['sdk-cli', 'sdk-ts', 'sdk-py'])
+    assert.equal(shouldNotify({}, { CLAUDE_CODE_ENTRYPOINT: ep }), false);
   assert.equal(shouldNotify({}, { CLAUDE_CODE_ENTRYPOINT: 'cli' }), true);
   assert.equal(shouldNotify({}, {}), true);
 });
@@ -94,14 +95,29 @@ test('linux tries busctl then notify-send and escapes markup', () => {
     '0',
     '-1',
   ]);
-  assert.deepEqual(notifySend.argv, ['notify-send', '-a', 'Claude Code', '-i', '/p/icon.png', 'T', 'a &lt;b&gt; &amp; c']);
+  assert.deepEqual(notifySend.argv, [
+    'notify-send',
+    '-a',
+    'Claude Code',
+    '-i',
+    '/p/icon.png',
+    'T',
+    'a &lt;b&gt; &amp; c',
+  ]);
 });
 
 test('windows passes text by env, never in the script', () => {
   const list = notifiers('win32', { title: '$(x)', body: '"; rm <b>' }, 'C:\\Users\\A B\\icon.png');
   assert.equal(list.length, 1);
   const [{ argv, env }] = list;
-  assert.deepEqual(argv.slice(0, 6), ['powershell', '-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command']);
+  assert.deepEqual(argv.slice(0, 6), [
+    'powershell',
+    '-NoProfile',
+    '-NonInteractive',
+    '-WindowStyle',
+    'Hidden',
+    '-Command',
+  ]);
   assert.ok(!argv.some((a) => a.includes('$(x)') || a.includes('"; rm <b>')));
   assert.equal(env.NOTIFY_TITLE, '$(x)');
   assert.equal(env.NOTIFY_BODY, '"; rm <b>');
