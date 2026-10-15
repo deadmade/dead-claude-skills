@@ -9,11 +9,16 @@ const plain = { nightCity: false, pick: first };
 
 test('skips continuations, subagents and headless runs', () => {
   assert.equal(shouldNotify({ stop_hook_active: true }, {}), false);
-  assert.equal(shouldNotify({ agent_id: 'a1' }, {}), false);
+  assert.equal(shouldNotify({ hook_event_name: 'Stop', agent_id: 'a1' }, {}), false);
   for (const ep of ['sdk-cli', 'sdk-ts', 'sdk-py'])
     assert.equal(shouldNotify({}, { CLAUDE_CODE_ENTRYPOINT: ep }), false);
   assert.equal(shouldNotify({}, { CLAUDE_CODE_ENTRYPOINT: 'cli' }), true);
   assert.equal(shouldNotify({}, {}), true);
+});
+
+test('a subagent waiting on a permission or question still notifies', () => {
+  assert.equal(shouldNotify({ hook_event_name: 'Notification', agent_id: 'a1' }, {}), true);
+  assert.equal(shouldNotify({ hook_event_name: 'PreToolUse', agent_id: 'a1' }, {}), true);
 });
 
 test('tmux focus needs active pane, active window and a focused client', () => {
@@ -81,6 +86,7 @@ test('linux tries busctl then notify-send and escapes markup', () => {
     'busctl',
     '--user',
     'call',
+    '--',
     'org.freedesktop.Notifications',
     '/org/freedesktop/Notifications',
     'org.freedesktop.Notifications',

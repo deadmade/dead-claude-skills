@@ -25,9 +25,12 @@ export const WAITING = [
 
 const MAX = 120;
 
-// Continuations, subagents/teammates and headless runs (-p and the SDKs report sdk-*) stay quiet.
+// Continuations, headless runs (-p and the SDKs report sdk-*) and a teammate's end of turn stay quiet; a subagent
+// blocked on a permission or a question still notifies, since it blocks the user too.
 export const shouldNotify = (input, env) =>
-  !input.stop_hook_active && input.agent_id === undefined && !env.CLAUDE_CODE_ENTRYPOINT?.startsWith('sdk');
+  !input.stop_hook_active &&
+  !(input.hook_event_name === 'Stop' && input.agent_id !== undefined) &&
+  !env.CLAUDE_CODE_ENTRYPOINT?.startsWith('sdk');
 
 // Line 1: our pane's #{pane_active}#{window_active}; then #{client_flags} for each client on the session.
 export function tmuxFocused(output) {
@@ -118,6 +121,8 @@ export function notifiers(platform, { title, body }, icon) {
           'busctl',
           '--user',
           'call',
+          // '--' so busctl doesn't read the expire timeout -1 as an option.
+          '--',
           ...dbus,
           'Notify',
           'susssasa{sv}i',
