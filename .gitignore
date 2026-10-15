@@ -9,3 +9,4 @@ plugins/tui-review/brv/target/
 plugins/tui-review/tests/fixture.gen.ts
 plugins/*/.claude-plugin/types/
 node_modules/
+.superpowers/

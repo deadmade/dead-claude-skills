@@ -111,6 +111,12 @@ pr-review-toolkit agents (Apache License 2.0, Copyright Anthropic, PBC; `LICENSE
 `description:` rewritten, and [mattpocock/skills](https://github.com/mattpocock/skills)'s engineering code-review
 skill (MIT License, Copyright Matt Pocock; `LICENSE-MIT`), unmodified apart from a source comment.
 
+## night-city
+
+The palette of `plugins/night-city/themes/night-city.json` is derived from the Cyberpunk Neon theme
+(`plugins/theme-gallery/themes/cyberpunk.json`) of [livlign/ccthemes](https://github.com/livlign/ccthemes) (MIT
+License, Copyright its authors), with changed and added colors. Nothing is vendored or synced.
+
 ## Re-listed plugins
 
 The marketplace entries for superpowers and ponytail only point at their upstream repositories, pinned to a release

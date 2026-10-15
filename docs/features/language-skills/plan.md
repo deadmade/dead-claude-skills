@@ -4,12 +4,14 @@
 > superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Two opt-in vendored plugins:
+
 - `plugins/languages/csharp-skills`: Microsoft's dotnet/skills behind six router skills.
 - `plugins/languages/rust-skills`: Apollo's rust-best-practices.
 
 They come with weekly syncs, a "Languages" page in the installer, and a one-off before/after consistency test.
 
 **Architecture:**
+
 - Two new sync scripts follow the existing `scripts/sync-*.mjs` pattern, with `sync-tob.mjs` as the template.
 - `scripts/sync-lib.mjs` gets two shared, tested helpers: frontmatter description parsing and summaries.
 - `scripts/plugin-dirs.mjs` teaches check-repo and release about the `plugins/languages/` grouping folder.
@@ -65,6 +67,7 @@ are there. Also read `docs/adr/0001-vendor-language-skills.md` and `GLOSSARY.md`
 Nothing from this task is committed except a note in flow.md.
 
 **Files:**
+
 - Scratch only: `$TMPDIR/router-spike/`. Use `mktemp -d`, no `rm -rf`.
 - Modify: `docs/features/language-skills/flow.md` (Grounding: the result).
 
@@ -81,6 +84,7 @@ Nothing from this task is committed except a note in flow.md.
   ```
 
   Pass: only `rprobe:area` appears.
+
 - [ ] **Step 3: Substitution and read access.** Run this twice and record both results:
 
   ```bash
@@ -92,6 +96,7 @@ Nothing from this task is committed except a note in flow.md.
     rule.
 
   Pass: the reply contains OKAPI.
+
 - [ ] **Step 4: Decide.**
   - **(a) passes:** keep `library/` at the plugin root.
   - **Only (b) passes:** keep `library/`, and note in flow.md that it relies on the installer's Read rule. Check
@@ -104,6 +109,7 @@ Nothing from this task is committed except a note in flow.md.
 ### Task 2: Plugins one folder down (`plugins/languages/`)
 
 **Files:**
+
 - Create: `scripts/plugin-dirs.mjs`, `scripts/plugin-dirs.test.mjs`.
 - Modify:
   - `scripts/check-repo.mjs:12-14`: `pluginDirs()`.
@@ -115,6 +121,7 @@ Nothing from this task is committed except a note in flow.md.
   - `package.json` `files`: add `"plugins/languages/*/.claude-plugin/plugin.json"`.
 
 **Interfaces:**
+
 - Produces:
   - `export const GROUPS = ['languages']`.
   - `export function pluginDirs(root = '.'): string[]`:
@@ -140,8 +147,16 @@ Nothing from this task is committed except a note in flow.md.
   `installer/core.test.mjs`:
 
   ```js
-  const m = { plugins: [{ name: 'rust-skills', source: './plugins/languages/rust-skills' }, { name: 'superpowers', source: { source: 'url' } }] };
-  assert.equal(manifestPath(m, 'rust-skills@dead-claude-skills'), 'plugins/languages/rust-skills/.claude-plugin/plugin.json');
+  const m = {
+    plugins: [
+      { name: 'rust-skills', source: './plugins/languages/rust-skills' },
+      { name: 'superpowers', source: { source: 'url' } },
+    ],
+  };
+  assert.equal(
+    manifestPath(m, 'rust-skills@dead-claude-skills'),
+    'plugins/languages/rust-skills/.claude-plugin/plugin.json',
+  );
   assert.equal(manifestPath(m, 'superpowers@dead-claude-skills'), null);
   assert.equal(manifestPath(m, 'nope@dead-claude-skills'), null);
   ```
@@ -168,10 +183,12 @@ Nothing from this task is committed except a note in flow.md.
 ### Task 3: Shared description helpers in `scripts/sync-lib.mjs`
 
 **Files:**
+
 - Modify: `scripts/sync-lib.mjs`.
 - Create: `scripts/sync-lib.test.mjs`.
 
 **Interfaces:**
+
 - Produces:
   - `frontmatterDescription(text: string): string | null`. Reads the description from the first `---` block. It
     handles only the forms upstream uses:
@@ -181,6 +198,7 @@ Nothing from this task is committed except a note in flow.md.
 
     It returns `''` when there is no description and `null` for any other form, such as `|`. Callers `fail` on
     `null`.
+
   - `summary(desc: string, max = 200): string`. Returns the text up to and including the first `. `, or the whole
     text. If that is longer than `max`, it cuts at the last space before `max` and appends `…`.
   - The existing `description(skillMd)` keeps its signature. It now returns
@@ -189,7 +207,10 @@ Nothing from this task is committed except a note in flow.md.
 - [ ] **Step 1: Failing tests.**
 
   ```js
-  assert.equal(frontmatterDescription('---\nname: a\ndescription: >-\n  Route C# and\n  .NET requests.\nlicense: MIT\n---\nb'), 'Route C# and .NET requests.');
+  assert.equal(
+    frontmatterDescription('---\nname: a\ndescription: >-\n  Route C# and\n  .NET requests.\nlicense: MIT\n---\nb'),
+    'Route C# and .NET requests.',
+  );
   assert.equal(frontmatterDescription('---\ndescription: >\n  Guide for\n  Rust.\n---'), 'Guide for Rust.');
   assert.equal(frontmatterDescription('---\ndescription: "x: y"\n---'), 'x: y');
   assert.equal(frontmatterDescription('---\ndescription: |\n  a\n---'), null);
@@ -221,6 +242,7 @@ This lands before the plugins, because `installer/core.test.mjs` requires every 
 `assert.ok(!pages.some((p) => p.id === 'other'))`. `categorize` ignores keys that don't exist yet.
 
 **Files:**
+
 - Modify: `installer/core.mjs` (the `lsp` entry of `CATEGORIES`) and `installer/core.test.mjs`.
 
 - [ ] **Step 1: Failing test.**
@@ -248,6 +270,7 @@ This lands before the plugins, because `installer/core.test.mjs` requires every 
 ### Task 5: `rust-skills` plugin and its sync
 
 **Files:**
+
 - Create:
   - `scripts/sync-rust.mjs`
   - `.github/workflows/sync-rust.yml`
@@ -260,6 +283,7 @@ This lands before the plugins, because `installer/core.test.mjs` requires every 
   - `installer/core.test.mjs` opt-ins list: add `rust-skills`.
 
 **Interfaces:**
+
 - Consumes: `sparseClone`, `fail`, `finish`, `git`, `ROOT` from sync-lib.
 
 - [ ] **Step 1: `plugin.json`.**
@@ -283,6 +307,7 @@ This lands before the plugins, because `installer/core.test.mjs` requires every 
 
   Expect `skills/rust-best-practices/references/chapter_01.md` … `chapter_09.md`, and a `paths:` block in
   SKILL.md.
+
 - [ ] **Step 4: `.github/workflows/sync-rust.yml`.** Copy of `sync-hallmark.yml` with:
   - cron `'15 6 * * 1'`, script `sync-rust.mjs`.
   - Sanity checks:
@@ -302,13 +327,14 @@ This lands before the plugins, because `installer/core.test.mjs` requires every 
   ```
 
 - [ ] **Step 7: Idempotence.** Run `node scripts/sync-rust.mjs` again. Expect "unchanged" and an empty
-  `git status --porcelain -- plugins/languages/rust-skills`.
+      `git status --porcelain -- plugins/languages/rust-skills`.
 
 ---
 
 ### Task 6: `csharp-skills` plugin and its sync
 
 **Files:**
+
 - Create:
   - `scripts/sync-csharp.mjs`
   - `scripts/sync-csharp.test.mjs`
@@ -322,6 +348,7 @@ This lands before the plugins, because `installer/core.test.mjs` requires every 
   - `installer/core.test.mjs` opt-ins list: add `csharp-skills`.
 
 **Interfaces:**
+
 - Consumes: `frontmatterDescription`, `summary` (Task 3), plus `sparseClone`, `fail`, `finish`, `git` and `ROOT`.
 - Produces: exports for the test. The script body runs only when the file is executed directly
   (`import.meta.url === pathToFileURL(process.argv[1]).href`).
@@ -341,9 +368,9 @@ This lands before the plugins, because `installer/core.test.mjs` requires every 
     ```markdown
     ---
     name: <name>
-    description: "<description>"
+    description: '<description>'
     paths:
-      - "<each C# glob>"
+      - '<each C# glob>'
     ---
 
     # C#/.NET skills: <name>
@@ -352,12 +379,13 @@ This lands before the plugins, because `installer/core.test.mjs` requires every 
     SKILL.md with the Read tool, and follow it. When a skill names another skill, read
     `${CLAUDE_PLUGIN_ROOT}/library/<that-name>/SKILL.md`.
 
-    | Skill | Use for | Path |
-    | --- | --- | --- |
+    | Skill        | Use for         | Path                                                  |
+    | ------------ | --------------- | ----------------------------------------------------- |
     | <entry.name> | <entry.summary> | `${CLAUDE_PLUGIN_ROOT}/library/<entry.name>/SKILL.md` |
     ```
 
     If Task 1 chose the in-skill layout, the paths change to match.
+
   - `isHidden(skillMdText: string): boolean`. True when the frontmatter has `disable-model-invocation: true`.
 
 - [ ] **Step 1: Failing tests** in `scripts/sync-csharp.test.mjs`.
@@ -405,6 +433,7 @@ This lands before the plugins, because `installer/core.test.mjs` requires every 
      router skills (csharp-skills:core, :testing, :build, :web, :data, :desktop). Each one is at
      `../<skill>/SKILL.md` relative to this skill." Use the relative path because `${CLAUDE_PLUGIN_ROOT}` isn't
      substituted in files read with Read. Write the exact patterns after reading the cloned text.
+
   7. **Agent mentions.** Take agent names from each agent file's frontmatter `name`; the file names end in
      `.agent.md`. Print `mentions skipped agent <name>: <library file>` for word-boundary matches. For `msbuild`,
      match only `` `msbuild` agent `` and `dotnet-msbuild:msbuild`.
@@ -414,6 +443,7 @@ This lands before the plugins, because `installer/core.test.mjs` requires every 
 
   Print every report line, including the `added:`, `removed:`, `skipped:`, `unmapped` and `mentions` lines, to
   stdout and to `process.env.SYNC_REPORT` when that variable is set.
+
 - [ ] **Step 4: Run tests, expect PASS.**
 - [ ] **Step 5: Run the sync.**
 
@@ -429,6 +459,7 @@ This lands before the plugins, because `installer/core.test.mjs` requires every 
   - No `unmapped` lines.
   - The testing router doesn't list `code-testing-agent`, `code-testing-extensions`, `filter-syntax` or
     `test-analysis-extensions`.
+
 - [ ] **Step 6: Listing check.** From an empty dir, run:
 
   ```bash
@@ -436,6 +467,7 @@ This lands before the plugins, because `installer/core.test.mjs` requires every 
   ```
 
   Expect the six routers only.
+
 - [ ] **Step 7: `plugin.json` and the workflow.**
   - `plugin.json`: `license: "MIT"`. Description: "Microsoft's .NET skills (dotnet/skills) behind six C#-only router skills. Vendored from dotnet/skills, synced weekly."
   - `.github/workflows/sync-csharp.yml`, like the Rust one, with:
@@ -459,13 +491,14 @@ This lands before the plugins, because `installer/core.test.mjs` requires every 
   ```
 
 - [ ] **Step 10: Idempotence.** Rerun the sync. Expect "unchanged" and an empty
-  `git status --porcelain -- plugins/languages/csharp-skills`.
+      `git status --porcelain -- plugins/languages/csharp-skills`.
 
 ---
 
 ### Task 7: Docs and tooling excludes
 
 **Files:**
+
 - Modify:
   - `README.md`: the opt-in list, plus one line on the router design.
   - `THIRD_PARTY.md`: a section for rust-skills and one for csharp-skills. Each covers:
@@ -497,6 +530,7 @@ This lands before the plugins, because `installer/core.test.mjs` requires every 
 ### Task 8: Before/after consistency test (one-off)
 
 **Files:**
+
 - Create:
   - `plugins/languages/rust-skills/evals/q01..q06/prompt.md` and `graders/*.md`.
   - `plugins/languages/csharp-skills/evals/q07..q12/prompt.md` and `graders/*.md`.
@@ -504,6 +538,7 @@ This lands before the plugins, because `installer/core.test.mjs` requires every 
   - `docs/features/language-skills/eval-results.md`.
 
 **Interfaces:**
+
 - Produces: `node docs/features/language-skills/agreement.mjs <result.json>…`. It prints, per question, the
   agreeing pairs in the with-arm (0–3) and in the without-arm (0–3).
 
@@ -534,6 +569,7 @@ This lands before the plugins, because `installer/core.test.mjs` requires every 
   - If neither has it, stop and report.
 
   In `q07`, `library-read` must pass. If the library isn't readable in eval runs, stop and report.
+
 - [ ] **Step 3: `agreement.mjs`.**
   - For each case and arm, take the 3 replies and judge the 3 pairs. For each pair, one `claude -p` call: "Do these
     two answers recommend the same approach? First line AGREE or DIFFER, second line the point of difference."
@@ -546,6 +582,7 @@ This lands before the plugins, because `installer/core.test.mjs` requires every 
   ```
 
   Then run `agreement.mjs` over both outputs. Report the cost from the JSON.
+
 - [ ] **Step 5: `eval-results.md`.**
   - The table: per question, with and without agreeing pairs, plus eval's WITH, W/OUT and Δ, and the cost.
   - The keep bar from the spec: count only questions where the without-arm has fewer than 3 agreeing pairs. "With"
