@@ -132,6 +132,7 @@ us.
 
   In the listing they show up as `csharp-skills:testing` and so on. Each description starts with "C#/.NET only."
   and names the area's topics.
+
 - **Index entries:** the skill name, the first sentence of its upstream description (capped at 200 characters), and
   its path, sorted by name.
 - **Hidden skills** (decided in plan review, 2026-10-13): skills upstream marks `disable-model-invocation: true` stay
@@ -152,14 +153,8 @@ us.
     4. Where do unit and integration tests go in a Rust crate, and how should they be named?
     5. I need a `Vec` of different shape types that I call `area()` on. Generics or trait objects?
     6. When is `unwrap()` or `expect()` acceptable in Rust code?
-  - **C#**
-    7. Which test framework for a new .NET 10 library, and what exact command runs only the tests of one class?
-    8. How should a new C# service class handle nullable reference types and async methods?
-    9. Load orders with their customers through EF Core for a read-only report: how should the query look?
-    10. A new ASP.NET Core API with about 10 endpoints: minimal APIs or controllers?
-    11. How should 8 projects in one solution share build settings (target framework, warnings as errors,
-        analyzers)?
-    12. How should NuGet package versions be managed across those projects?
+  - **C#** 7. Which test framework for a new .NET 10 library, and what exact command runs only the tests of one class? 8. How should a new C# service class handle nullable reference types and async methods? 9. Load orders with their customers through EF Core for a read-only report: how should the query look? 10. A new ASP.NET Core API with about 10 endpoints: minimal APIs or controllers? 11. How should 8 projects in one solution share build settings (target framework, warnings as errors,
+    analyzers)? 12. How should NuGet package versions be managed across those projects?
 - **Keep bar** (revised in plan review, 2026-10-13):
   - Each question runs 3 times with and 3 times without the skills. Agreement is scored per pair of answers: 3
     pairs, so 0–3 per arm.
@@ -218,6 +213,7 @@ us.
 
   Check both with `--plugin-dir` on a small sample before generating all six routers. If either fails, stop and
   report.
+
 - **Flattening the 16 upstream plugins into `library/`:**
   - Fail on a skill name collision across upstream plugins.
   - Only skills are vendored. The sync output reports agents, MCP servers (`dotnet-msbuild`'s `binlog`), hooks and
