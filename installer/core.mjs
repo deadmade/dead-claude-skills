@@ -95,6 +95,8 @@ export const isSandboxOn = (s) => s?.sandbox?.enabled === true;
 export const hasDcgHook = (s) =>
   (s?.hooks?.PreToolUse ?? []).some((e) => e?.hooks?.some((h) => /dcg(\.exe)?"?$/i.test(h?.command ?? '')));
 
+const KEEP_SESSIONS_DAYS = 36500;
+
 export function mergeSettings(settings, { statusLine, sandbox, version }) {
   const out = structuredClone(settings);
   const allow = out.permissions?.allow ?? [];
@@ -108,6 +110,8 @@ export function mergeSettings(settings, { statusLine, sandbox, version }) {
     ...out.extraKnownMarketplaces,
     [MARKETPLACE]: { source: marketplaceSource(version), autoUpdate: true },
   };
+  // Claude Code deletes session transcripts after 30 days by default; a value set by hand wins.
+  out.cleanupPeriodDays ??= KEEP_SESSIONS_DAYS;
   if (statusLine && !isOurStatusLine(out.statusLine)) out.statusLine = STATUS_LINE;
   if (!statusLine && isOurStatusLine(out.statusLine)) delete out.statusLine;
   if (sandbox) out.sandbox = { ...out.sandbox, ...SANDBOX };

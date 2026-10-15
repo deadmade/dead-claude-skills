@@ -117,6 +117,8 @@ test('merge adds owned keys and keeps foreign ones', () => {
   assert.equal(out.extraKnownMarketplaces[M].autoUpdate, true);
   assert.equal(out.extraKnownMarketplaces[M].source.ref, 'v1.2.3');
   assert.match(out.statusLine.command, /ccstatusline/);
+  assert.equal(out.cleanupPeriodDays, 36500);
+  assert.equal(mergeSettings({ cleanupPeriodDays: 7 }, {}).cleanupPeriodDays, 7);
 });
 
 test('the marketplace is pinned to the installer version', () => {
