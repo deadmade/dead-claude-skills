@@ -347,6 +347,7 @@ export const CATEGORIES = [
       'pstack-picks',
       'tob-picks',
       'hallmark',
+      'paper-lookup',
       'skill-creator',
       'hookify',
     ],

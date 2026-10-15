@@ -43,7 +43,8 @@ Claude proposes and recommends; the user decides.
 
 - **With an argument:** derive a kebab-case slug (`checkout-webhooks`), create `docs/features/<slug>/flow.md` from
   [references/flow-template.md](references/flow-template.md), then Phase 1.
-- **Without one:** find `docs/features/*/flow.md` files whose `phase:` isn't `done`. One: read it and the artifacts
+- **Without one:** find `docs/features/*/flow.md` files whose `phase:` isn't `done`, skipping those with
+  `flow: research` (they belong to `/research-flow`). One: read it and the artifacts
   it links, then continue at its phase. Several: ask which. None: ask what to build.
 
 ## Phase 1: Ground

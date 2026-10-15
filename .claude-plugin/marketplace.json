@@ -116,7 +116,7 @@
     },
     {
       "name": "feature-flow",
-      "description": "/feature-flow: brainstorm with prior art, grill with domain docs, plan, have Claude evaluate the plan, then execute and finish through superpowers. Two approval gates, no lock. Opt-in.",
+      "description": "/feature-flow: brainstorm with prior art, grill with domain docs, plan, have Claude evaluate the plan, then execute and finish through superpowers. /research-flow does the same grounded in papers via paper-lookup, with a hypothesis measured before finishing. Two approval gates, no lock. Opt-in.",
       "source": "./plugins/feature-flow",
       "category": "development"
     },
@@ -130,6 +130,12 @@
       "name": "hallmark",
       "description": "Hallmark: anti-AI-slop design skill for web frontends, scoped to browser UI work. Vendored from nutlope/hallmark. Opt-in.",
       "source": "./plugins/hallmark",
+      "category": "development"
+    },
+    {
+      "name": "paper-lookup",
+      "description": "Paper lookup: search arXiv, Semantic Scholar, OpenAlex, Crossref, Unpaywall and other scholarly APIs (trimmed for computer science) for papers, citations and open-access full text. Vendored from K-Dense-AI/scientific-agent-skills. Opt-in.",
+      "source": "./plugins/paper-lookup",
       "category": "development"
     },
     {

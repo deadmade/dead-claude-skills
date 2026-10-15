@@ -1,5 +1,7 @@
 # night-city
 
+<img src="assets/mascot-512.png" width="192" align="right" alt="Onibi: a hooded netrunner in a respirator, her chrome cybereye a glowing eight-point spark">
+
 A toned-down synthwave Claude Code theme, "Night City": a dusk-indigo background, lavender text, dusty-pink Claude,
 peach inline code and permission prompts, soft teal suggestions and bash, muted violet instead of grey for dim text. Opt-in; pick it in `/theme` (Claude Code does not let a plugin select a custom theme).
 
@@ -26,6 +28,15 @@ With it off (ctrl+t in `/theme`), diffs use Night City's mint and coral and code
 
 The palette starts from the Cyberpunk Neon theme of [ccthemes](https://github.com/livlign/ccthemes) (MIT) and is
 retuned to softer synthwave colours; see `THIRD_PARTY.md` in the repository root.
+
+## Mascot
+
+**Onibi** (鬼火, "demon fire": the ghost lights of Japanese folklore that drift through the dark and lead people to
+their end). The netrunner above is the theme's mascot, an original 64×64 pixel-art character in the theme's palette: a
+respirator with an LED bar, an undercut with a circuit tattoo, and a chrome plate whose cybereye is an eight-point
+spark, a nod to Claude rather than Anthropic's logo. `assets/mascot.png` is the 1x original, `assets/mascot-512.png`
+the 8x nearest-neighbour scale. Both are drawn by `scripts/draw-mascot.mjs` in the repository root; edit the drawing
+there and rerun it rather than editing the PNGs.
 
 ## Contrast (WCAG)
 
