@@ -1,6 +1,6 @@
 {
   "name": "csharp-skills",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Microsoft's .NET skills (dotnet/skills) behind six C#-only router skills. Vendored from dotnet/skills, synced weekly.",
   "author": {
     "name": "deadmade",

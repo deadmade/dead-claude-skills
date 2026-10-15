@@ -1,6 +1,6 @@
 {
   "name": "notify",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Desktop notifications when a turn ends or Claude needs you, on Linux, Windows and macOS; quiet while you are looking at the session.",
   "author": {
     "name": "deadmade",
