@@ -37,7 +37,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   WinRT toast, focus comes from tmux. With notify the installer sets `preferredNotifChannel: "notifications_disabled"`.
 - `plugins/dead-skills/`: the default bundle; its `dependencies` are the core plugins.
 - `scripts/`: `check-repo.mjs` (marketplace/bundle/version consistency), `release.mjs`, `sync-*.mjs` (vendoring),
-  `sync-plugins.mjs` (re-pins url-sourced plugins), `draw-mascot.mjs` (Onibi, night-city's pixel-art mascot).
+  `sync-plugins.mjs` (re-pins url-sourced plugins), `draw-mascot.mjs` (Onibi, night-city's pixel-art mascot, also notify's `icon.png`).
 
 The url-sourced marketplace entries superpowers and ponytail are pinned by `ref` (release tag) and `sha` (its commit);
 `sync-plugins.yml` opens a PR per plugin when upstream tags a newer `vX.Y.Z`. The installer reads the version from

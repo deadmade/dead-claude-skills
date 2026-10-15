@@ -10,7 +10,8 @@ It fires on:
 - a question from Claude (`PreToolUse` on `AskUserQuestion`, which raises no notification of its own): "Needs your
   input" and the question.
 
-The title is `Claude Code · <project folder>`. With the night-city plugin enabled, the status line is a Night City
+The icon is Onibi, night-city's pixel-art netrunner (`icon.png`, a 4x copy written by `scripts/draw-mascot.mjs`; never
+edit it by hand). The title is `Claude Code · <project folder>`. With the night-city plugin enabled, the status line is a Night City
 line instead ("Come look at your Agent", "Songbird requests your help").
 
 It stays quiet:

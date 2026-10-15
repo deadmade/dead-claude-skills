@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { inflateSync } from 'node:zlib';
-import { ASSETS, SCALE, SIZE, drawMascot, encodePng, scanlines } from './draw-mascot.mjs';
+import { OUTPUTS, SIZE, drawMascot, encodePng, scanlines } from './draw-mascot.mjs';
 
 // Size and decompressed scanlines of a PNG written by encodePng (one IDAT, filter 0), so the check doesn't depend
 // on the zlib build's exact deflate output.
@@ -29,12 +29,21 @@ test('encodePng round-trips through decode', () => {
 
 test('the committed mascot PNGs match the drawing', () => {
   const rgb = drawMascot();
-  for (const [file, scale] of [
-    ['mascot.png', 1],
-    ['mascot-512.png', SCALE],
-  ]) {
-    const { width, height, raw } = decode(readFileSync(join(ASSETS, file)));
+  for (const { file, scale } of OUTPUTS) {
+    const { width, height, raw } = decode(readFileSync(file));
     assert.deepEqual([width, height], [SIZE * scale, SIZE * scale], file);
     assert.ok(raw.equals(scanlines(rgb, scale)), `${file} is stale: run node scripts/draw-mascot.mjs`);
   }
+});
+
+test("Onibi is night-city's mascot and notify's icon", () => {
+  const rel = (f) => relative(join(import.meta.dirname, '..'), f).replaceAll('\\', '/');
+  assert.deepEqual(
+    OUTPUTS.map(({ file, scale }) => [rel(file), scale]),
+    [
+      ['plugins/night-city/assets/mascot.png', 1],
+      ['plugins/night-city/assets/mascot-512.png', 8],
+      ['plugins/notify/icon.png', 4],
+    ],
+  );
 });
