@@ -1,6 +1,8 @@
 declare module 'claude-code' {
-  // No $.state: the words only rewrite props.
-  interface PluginState {}
+  interface PluginState {
+    // The line Onibi says while she visits, else null.
+    'night-city': { onibi: string | null };
+  }
 }
 
 export type {};

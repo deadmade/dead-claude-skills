@@ -1,11 +1,20 @@
 {
   "name": "night-city",
   "version": "0.3.0",
-  "description": "Night City: a toned-down synthwave Claude Code theme with a matching terminal background, Night City spinner words and short status-line reactions.",
+  "description": "Night City: a toned-down synthwave Claude Code theme with a matching terminal background, Night City spinner words, short status-line reactions and Onibi dropping by with a one-liner.",
   "author": {
     "name": "deadmade",
     "url": "https://github.com/deadmade"
   },
   "repository": "https://github.com/deadmade/dead-claude-skills",
-  "types": "./types/index.d.ts"
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "onibi": {
+      "type": "string",
+      "title": "Onibi",
+      "description": "How often Onibi drops by above the prompt: sometimes (about one turn in five, at most every three minutes), always (every turn) or off.",
+      "default": "sometimes",
+      "options": ["sometimes", "always", "off"]
+    }
+  }
 }
