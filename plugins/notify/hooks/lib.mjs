@@ -138,7 +138,7 @@ export function notifiers(platform, { title, status, detail }, icon) {
           '-1',
         ],
       },
-      { argv: ['notify-send', '-a', SENDER, '-i', icon, title, b] },
+      { argv: ['notify-send', '-a', SENDER, '-i', icon, '--', title, b] },
     ];
   }
   if (platform === 'win32') {
@@ -149,7 +149,8 @@ export function notifiers(platform, { title, status, detail }, icon) {
       },
     ];
   }
-  if (platform === 'darwin') return [{ argv: ['osascript', '-e', OSASCRIPT, title, body] }];
+  // '--' here and in notify-send: a project folder named like an option stays the title.
+  if (platform === 'darwin') return [{ argv: ['osascript', '-e', OSASCRIPT, '--', title, body] }];
   return [];
 }
 

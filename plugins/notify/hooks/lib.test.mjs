@@ -114,6 +114,7 @@ test('linux tries busctl then notify-send and escapes markup', () => {
     'Onibi',
     '-i',
     '/p/icon.png',
+    '--',
     'T',
     '<b>Done</b>\na &lt;b&gt; &amp; c',
   ]);
@@ -143,13 +144,23 @@ test('mac passes raw text as argv', () => {
   assert.deepEqual(rest, []);
   assert.equal(argv[0], 'osascript');
   assert.equal(argv[1], '-e');
-  assert.deepEqual(argv.slice(3), ['T', 'Done\na <b> & c']);
+  assert.deepEqual(argv.slice(3), ['--', 'T', 'Done\na <b> & c']);
 });
 
 test('no detail leaves the status alone', () => {
   const msg = { title: 'T', status: 'Done', detail: '' };
   assert.equal(notifiers('linux', msg, '/i')[0].argv[13], '<b>Done</b>');
   assert.equal(notifiers('win32', msg, '/i')[0].env.NOTIFY_BODY, 'Done');
+});
+
+test('a title starting with a dash is never read as an option', () => {
+  const msg = { title: '-u', status: 'Done', detail: '' };
+  for (const platform of ['linux', 'darwin']) {
+    for (const { argv } of notifiers(platform, msg, '/i')) {
+      const at = argv.indexOf('-u');
+      assert.ok(argv.indexOf('--') !== -1 && argv.indexOf('--') < at, `${argv[0]}: -- before the title`);
+    }
+  }
 });
 
 test('unknown platform gives nothing', () => {
