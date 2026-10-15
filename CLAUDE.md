@@ -61,7 +61,7 @@ plugins of ours that the manifest no longer lists.
 
 ## Checks
 
-- `npm test`: repo checks plus all `installer/*.test.mjs` and `scripts/*.test.mjs` (`claude plugin validate` is skipped when `claude` isn't
+- `npm test`: repo checks plus all `installer/*.test.mjs`, `scripts/*.test.mjs` and `plugins/notify/hooks/*.test.mjs` (`claude plugin validate` is skipped when `claude` isn't
   on PATH).
 - brv: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `plugins/tui-review/brv`.
 - tui-review mod tests need a generated fixture first, from `plugins/tui-review/brv`:

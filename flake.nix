@@ -41,7 +41,7 @@
       installer-test = pkgs.writeShellApplication {
         name = "installer-test";
         runtimeInputs = [pkgs.nodejs];
-        text = ''exec node --test 'installer/*.test.mjs' 'scripts/*.test.mjs' '';
+        text = ''exec node --test 'installer/*.test.mjs' 'scripts/*.test.mjs' 'plugins/notify/hooks/*.test.mjs' '';
       };
     in
       git-hooks.lib.${system}.run {
@@ -68,7 +68,7 @@
             enable = true;
             name = "installer tests";
             entry = "${installer-test}/bin/installer-test";
-            files = "^(installer/|scripts/|\\.claude-plugin/marketplace\\.json$|package\\.json$)";
+            files = "^(installer/|scripts/|plugins/notify/hooks/|\\.claude-plugin/marketplace\\.json$|package\\.json$)";
             pass_filenames = false;
           };
         };
