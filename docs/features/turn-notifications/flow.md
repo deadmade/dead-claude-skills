@@ -108,7 +108,7 @@ the edit myself rather than a second review round, since each change is local to
 | text never executed                            | T2                | `lib.mjs:114`                                      | `linux tries busctl…`, `windows passes text by env…`, `mac passes raw text…`     |
 | never blocks/fails the turn                    | T2                | `lib.mjs:167`, hooks `async`                       | `main exits quietly on bad input`                                                |
 
-Code with no goal: none. Open: Linux smoke test and Windows check (T4) need the user's desktop; the sandbox blocks
+Linux smoke test: popup shown on the user's desktop (2026-10-15). Code with no goal: none. Open: Windows check (T4) needs the user's machine; the sandbox blocks
 D-Bus and tmux sockets here.
 
 Final review (fresh reviewer, opus): 1 Critical (busctl read `-1` as an option, so no Linux popup) and 1 Important
