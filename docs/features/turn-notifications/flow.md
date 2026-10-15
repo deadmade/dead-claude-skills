@@ -94,6 +94,12 @@ the edit myself rather than a second review round, since each change is local to
   (2026-10-15). Plan: `message` handles `PreToolUse` (status = waiting line, detail = first question's text);
   hooks.json adds `PreToolUse`/`AskUserQuestion`, async.
 
+- After the Linux smoke test (user, 2026-10-15): icon is Onibi (night-city's mascot from main) as a brightened face
+  crop written by `scripts/draw-mascot.mjs`; popup reworked to "Onibi as sender": title = project folder, bold
+  status + Claude's line, app name "Onibi" on Linux. Spec goal 3's `Claude Code · <project>` title is replaced by the
+  project alone. Title kept as the bare folder name (user: "fine as is"). Security review: `--` added before
+  positional args of notify-send and osascript.
+
 ## Walkthrough
 
 | spec goal                                      | plan task         | file:line                                          | test                                                                             |
