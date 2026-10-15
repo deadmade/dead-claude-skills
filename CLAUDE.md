@@ -34,7 +34,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   hand.
 - `plugins/dead-skills/`: the default bundle; its `dependencies` are the core plugins.
 - `scripts/`: `check-repo.mjs` (marketplace/bundle/version consistency), `release.mjs`, `sync-*.mjs` (vendoring),
-  `sync-plugins.mjs` (re-pins url-sourced plugins), `draw-mascot.mjs` (night-city's pixel-art mascot).
+  `sync-plugins.mjs` (re-pins url-sourced plugins), `draw-mascot.mjs` (Onibi, night-city's pixel-art mascot).
 
 The url-sourced marketplace entries superpowers and ponytail are pinned by `ref` (release tag) and `sha` (its commit);
 `sync-plugins.yml` opens a PR per plugin when upstream tags a newer `vX.Y.Z`. The installer reads the version from

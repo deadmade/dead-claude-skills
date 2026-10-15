@@ -1,6 +1,6 @@
 # dead-claude-skills
 
-<p align="center"><a href="plugins/night-city/README.md"><img src="plugins/night-city/assets/mascot-512.png" width="192" alt="night-city's mascot: a hooded netrunner in a respirator, her chrome cybereye a glowing eight-point spark"></a></p>
+<p align="center"><a href="plugins/night-city/README.md"><img src="plugins/night-city/assets/mascot-512.png" width="192" alt="Onibi, night-city's mascot: a hooded netrunner in a respirator, her chrome cybereye a glowing eight-point spark"></a></p>
 
 My personal Claude Code setup as a plugin marketplace, so every machine (Linux, Windows) gets the same skills. It's
 built for me; use it if it fits, but expect it to change without notice.
