@@ -7,6 +7,8 @@ import {
   planPlugins,
   duplicates,
   mergeSettings,
+  isShipped,
+  NIGHT_CITY_THEME,
   safeArg,
   missingBinaries,
   SECRET_DENIES,
@@ -60,6 +62,7 @@ test('opt-ins from the real manifests', () => {
         'mattpocock-picks',
         'mcp-azure',
         'mcp-github',
+        'night-city',
         'nix-lsp',
         'postgres',
         'pstack-picks',
@@ -475,4 +478,62 @@ test('manifestPath finds a local plugin manifest, null for url sources and unkno
   );
   assert.equal(manifestPath(m, 'superpowers@dead-claude-skills'), null);
   assert.equal(manifestPath(m, 'nope@dead-claude-skills'), null);
+});
+
+const shippedText = (f) => readFileSync(new URL(f, import.meta.url), 'utf8');
+
+test('isShipped matches shipped configs up to whitespace, not customized ones', () => {
+  const stock = shippedText('./ccstatusline.json');
+  const nc = shippedText('./ccstatusline-night-city.json');
+  const all = [stock, nc];
+  assert.equal(isShipped(stock, all), true);
+  assert.equal(isShipped(nc, all), true);
+  assert.equal(isShipped(JSON.stringify(JSON.parse(stock)), all), true);
+  assert.equal(isShipped(JSON.stringify({ ...JSON.parse(stock), flexMode: 'full' }), all), false);
+  assert.equal(isShipped('not json', all), false);
+});
+
+// Night City adds icons, a context bar and a sign, but shows every stock value, in the same order (git changes split
+// into insertions and deletions).
+test('Night City ccstatusline keeps the stock widgets in order', () => {
+  const split = { 'git-insertions': 'git-changes', 'git-deletions': null };
+  const types = (f) =>
+    JSON.parse(shippedText(f)).lines.map((l) =>
+      l.map((w) => (w.type in split ? split[w.type] : w.type)).filter((t) => t !== null),
+    );
+  const nc = types('./ccstatusline-night-city.json');
+  types('./ccstatusline.json').forEach((stock, i) =>
+    assert.deepEqual(
+      nc[i].filter((t) => stock.includes(t)),
+      stock.filter((t) => t !== 'separator'),
+    ),
+  );
+});
+
+test('nightCity false removes only the Night City theme', () => {
+  const s = { theme: NIGHT_CITY_THEME };
+  assert.equal(mergeSettings(s, { nightCity: false }).theme, undefined);
+  assert.equal(mergeSettings({ theme: 'dark' }, { nightCity: false }).theme, 'dark');
+  assert.equal(mergeSettings(s, { nightCity: true }).theme, NIGHT_CITY_THEME);
+  assert.equal(mergeSettings(s, {}).theme, NIGHT_CITY_THEME);
+});
+
+test('nightCity turns tmux truecolor on next to other env, and deselecting it removes only that', () => {
+  const on = mergeSettings({ env: { FOO: 'x' } }, { nightCity: true });
+  assert.deepEqual(on.env, { FOO: 'x', CLAUDE_CODE_TMUX_TRUECOLOR: '1' });
+  assert.deepEqual(mergeSettings(on, { nightCity: false }).env, { FOO: 'x' });
+  assert.equal(mergeSettings({ env: { CLAUDE_CODE_TMUX_TRUECOLOR: '1' } }, { nightCity: false }).env, undefined);
+  assert.deepEqual(mergeSettings({ env: { CLAUDE_CODE_TMUX_TRUECOLOR: '1' } }, {}).env, {
+    CLAUDE_CODE_TMUX_TRUECOLOR: '1',
+  });
+});
+
+test('nightCity turns syntax highlighting off, and deselecting it turns it back on', () => {
+  assert.equal(mergeSettings({}, { nightCity: true }).syntaxHighlightingDisabled, true);
+  assert.equal(
+    mergeSettings({ syntaxHighlightingDisabled: true }, { nightCity: false }).syntaxHighlightingDisabled,
+    undefined,
+  );
+  assert.equal(mergeSettings({ syntaxHighlightingDisabled: true }, {}).syntaxHighlightingDisabled, true);
+  assert.equal(mergeSettings({}, {}).syntaxHighlightingDisabled, undefined);
 });

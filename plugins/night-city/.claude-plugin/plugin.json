@@ -1,0 +1,11 @@
+{
+  "name": "night-city",
+  "version": "0.2.0",
+  "description": "Night City: a toned-down synthwave Claude Code theme with a matching terminal background, Night City spinner words and short status-line reactions.",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "repository": "https://github.com/deadmade/dead-claude-skills",
+  "types": "./types/index.d.ts"
+}
