@@ -1,4 +1,7 @@
-import { basename } from 'node:path';
+import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { basename, join } from 'node:path';
 
 // Night City lines for a finished turn and for Claude waiting on you; deliberately not night-city's own words.
 export const DONE = [
@@ -61,4 +64,106 @@ export function message(input, { nightCity, pick }) {
     title: `Claude Code · ${basename(input.cwd ?? process.cwd())}`,
     body: detail ? `${status}\n${detail}` : status,
   };
+}
+
+export const TMUX_ARGV = (pane) => [
+  'tmux',
+  'display-message',
+  '-p',
+  '-t',
+  pane,
+  '#{pane_active}#{window_active}',
+  ';',
+  'list-clients',
+  '-t',
+  pane,
+  '-F',
+  '#{client_flags}',
+];
+
+// freedesktop servers render a subset of HTML in the body.
+const markup = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+// Fixed script: the text arrives in env vars only. Stays quiet when Windows Terminal is the foreground app.
+const TOAST = `
+$ErrorActionPreference = 'Stop'
+Add-Type -Namespace Notify -Name User32 -MemberDefinition @'
+[DllImport("user32.dll")] public static extern System.IntPtr GetForegroundWindow();
+[DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(System.IntPtr hWnd, out uint pid);
+'@
+$fgPid = 0
+[void][Notify.User32]::GetWindowThreadProcessId([Notify.User32]::GetForegroundWindow(), [ref]$fgPid)
+if ((Get-Process -Id $fgPid -ErrorAction SilentlyContinue).ProcessName -eq 'WindowsTerminal') { exit 0 }
+[void][Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]
+[void][Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime]
+$icon = [Security.SecurityElement]::Escape(([Uri]$env:NOTIFY_ICON).AbsoluteUri)
+$title = [Security.SecurityElement]::Escape($env:NOTIFY_TITLE)
+$body = [Security.SecurityElement]::Escape($env:NOTIFY_BODY)
+$xml = New-Object Windows.Data.Xml.Dom.XmlDocument
+$xml.LoadXml("<toast><visual><binding template='ToastGeneric'><image placement='appLogoOverride' src='$icon'/><text>$title</text><text>$body</text></binding></visual></toast>")
+$app = '{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe'
+[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($app).Show([Windows.UI.Notifications.ToastNotification]::new($xml))
+`;
+
+const OSASCRIPT = 'on run argv\ndisplay notification (item 2 of argv) with title (item 1 of argv)\nend run';
+
+// Commands to try in order; the next one runs only when the previous binary is missing.
+export function notifiers(platform, { title, body }, icon) {
+  if (platform === 'linux') {
+    const b = markup(body);
+    const dbus = ['org.freedesktop.Notifications', '/org/freedesktop/Notifications', 'org.freedesktop.Notifications'];
+    return [
+      { argv: ['busctl', '--user', 'call', ...dbus, 'Notify', 'susssasa{sv}i', 'Claude Code', '0', icon, title, b, '0', '0', '-1'] },
+      { argv: ['notify-send', '-a', 'Claude Code', '-i', icon, title, b] },
+    ];
+  }
+  if (platform === 'win32') {
+    return [
+      {
+        argv: ['powershell', '-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', TOAST],
+        env: { ...process.env, NOTIFY_TITLE: title, NOTIFY_BODY: body, NOTIFY_ICON: icon },
+      },
+    ];
+  }
+  if (platform === 'darwin') return [{ argv: ['osascript', '-e', OSASCRIPT, title, body] }];
+  return [];
+}
+
+// Resolves with stdout; rejects with the spawn error (code ENOENT when the binary is missing) or a non-zero exit.
+function run(argv, env) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(argv[0], argv.slice(1), { env, stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true });
+    let out = '';
+    child.stdout.on('data', (d) => (out += d));
+    child.on('error', reject);
+    child.on('close', (code) => (code === 0 ? resolve(out) : reject(new Error(`exit ${code}`))));
+  });
+}
+
+const ICON = join(import.meta.dirname, '..', 'icon.png');
+
+export async function main({ stdin, env, platform }) {
+  try {
+    const input = JSON.parse(stdin);
+    if (!shouldNotify(input, env)) return;
+    if (platform !== 'win32' && env.TMUX_PANE) {
+      // A failing tmux counts as not focused: better a popup too many than a missed one.
+      const focused = await run(TMUX_ARGV(env.TMUX_PANE), env).then(tmuxFocused, () => false);
+      if (focused) return;
+    }
+    let settings;
+    try {
+      settings = readFileSync(join(env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.claude'), 'settings.json'), 'utf8');
+    } catch {}
+    const pick = (list) => list[Math.floor(Math.random() * list.length)];
+    const msg = message(input, { nightCity: nightCityEnabled(settings), pick });
+    for (const { argv, env: childEnv } of notifiers(platform, msg, ICON)) {
+      try {
+        await run(argv, childEnv ?? env);
+        return;
+      } catch (e) {
+        if (e.code !== 'ENOENT') return;
+      }
+    }
+  } catch {}
 }

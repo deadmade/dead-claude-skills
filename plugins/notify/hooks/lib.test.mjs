@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DONE, WAITING, shouldNotify, tmuxFocused, nightCityEnabled, message } from './lib.mjs';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { DONE, WAITING, shouldNotify, tmuxFocused, nightCityEnabled, message, notifiers, TMUX_ARGV } from './lib.mjs';
 
 const first = (l) => l[0];
 const plain = { nightCity: false, pick: first };
@@ -69,4 +71,77 @@ test('truncation keeps whole characters', () => {
   const emoji = line('x'.repeat(118) + '😀'.repeat(10));
   const lone = emoji.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '');
   assert.ok(!/[\uD800-\uDFFF]/.test(lone));
+});
+
+test('linux tries busctl then notify-send and escapes markup', () => {
+  const [busctl, notifySend, ...rest] = notifiers('linux', { title: 'T', body: 'a <b> & c' }, '/p/icon.png');
+  assert.deepEqual(rest, []);
+  assert.deepEqual(busctl.argv, [
+    'busctl',
+    '--user',
+    'call',
+    'org.freedesktop.Notifications',
+    '/org/freedesktop/Notifications',
+    'org.freedesktop.Notifications',
+    'Notify',
+    'susssasa{sv}i',
+    'Claude Code',
+    '0',
+    '/p/icon.png',
+    'T',
+    'a &lt;b&gt; &amp; c',
+    '0',
+    '0',
+    '-1',
+  ]);
+  assert.deepEqual(notifySend.argv, ['notify-send', '-a', 'Claude Code', '-i', '/p/icon.png', 'T', 'a &lt;b&gt; &amp; c']);
+});
+
+test('windows passes text by env, never in the script', () => {
+  const list = notifiers('win32', { title: '$(x)', body: '"; rm <b>' }, 'C:\\Users\\A B\\icon.png');
+  assert.equal(list.length, 1);
+  const [{ argv, env }] = list;
+  assert.deepEqual(argv.slice(0, 6), ['powershell', '-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command']);
+  assert.ok(!argv.some((a) => a.includes('$(x)') || a.includes('"; rm <b>')));
+  assert.equal(env.NOTIFY_TITLE, '$(x)');
+  assert.equal(env.NOTIFY_BODY, '"; rm <b>');
+  assert.equal(env.NOTIFY_ICON, 'C:\\Users\\A B\\icon.png');
+  assert.equal(env.PATH, process.env.PATH);
+});
+
+test('mac passes raw text as argv', () => {
+  const [{ argv }, ...rest] = notifiers('darwin', { title: 'T', body: 'a <b> & c' }, '/p/icon.png');
+  assert.deepEqual(rest, []);
+  assert.equal(argv[0], 'osascript');
+  assert.equal(argv[1], '-e');
+  assert.deepEqual(argv.slice(3), ['T', 'a <b> & c']);
+});
+
+test('unknown platform gives nothing', () => {
+  assert.deepEqual(notifiers('aix', { title: 'T', body: 'B' }, '/p/icon.png'), []);
+});
+
+test('tmux is asked for our pane and every client of its session', () => {
+  assert.deepEqual(TMUX_ARGV('%3'), [
+    'tmux',
+    'display-message',
+    '-p',
+    '-t',
+    '%3',
+    '#{pane_active}#{window_active}',
+    ';',
+    'list-clients',
+    '-t',
+    '%3',
+    '-F',
+    '#{client_flags}',
+  ]);
+});
+
+test('main exits quietly on bad input', () => {
+  const script = fileURLToPath(new URL('./notify.mjs', import.meta.url));
+  for (const input of ['not json', '{}']) {
+    const r = spawnSync(process.execPath, [script], { input, env: { ...process.env, PATH: '' }, timeout: 10000 });
+    assert.equal(r.status, 0, String(r.stderr));
+  }
 });

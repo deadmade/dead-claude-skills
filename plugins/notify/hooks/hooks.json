@@ -1,0 +1,22 @@
+{
+  "description": "Desktop notification when a turn ends or Claude waits for you.",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/notify.mjs\"", "async": true }]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "permission_prompt|elicitation_dialog",
+        "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/notify.mjs\"", "async": true }]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/notify.mjs\"", "async": true }]
+      }
+    ]
+  }
+}
