@@ -1,5 +1,5 @@
 ---
-phase: finish
+phase: done
 ---
 
 # Turn-done notifications: flow
