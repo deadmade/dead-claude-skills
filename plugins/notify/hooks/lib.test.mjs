@@ -43,34 +43,37 @@ test('plain stop message', () => {
     cwd: '/home/u/dead-claude-skills',
     last_assistant_message: '\nAll tests pass.\nDetails',
   };
-  assert.deepEqual(message(input, plain), { title: 'Claude Code · dead-claude-skills', body: 'Done\nAll tests pass.' });
+  assert.deepEqual(message(input, plain), { title: 'dead-claude-skills', status: 'Done', detail: 'All tests pass.' });
 });
 
 test('plain waiting message', () => {
   const input = { hook_event_name: 'Notification', message: 'Claude needs your permission to use Bash' };
-  assert.equal(message(input, plain).body, 'Needs your input\nClaude needs your permission to use Bash');
+  assert.deepEqual(
+    [message(input, plain).status, message(input, plain).detail],
+    ['Needs your input', 'Claude needs your permission to use Bash'],
+  );
 });
 
 test('question message', () => {
   const ask = (tool_input) => ({ hook_event_name: 'PreToolUse', tool_name: 'AskUserQuestion', tool_input });
-  assert.equal(message(ask({ questions: [{ question: 'Which DB?' }] }), plain).body, 'Needs your input\nWhich DB?');
-  assert.equal(message(ask({}), plain).body, 'Needs your input');
+  assert.equal(message(ask({ questions: [{ question: 'Which DB?' }] }), plain).detail, 'Which DB?');
+  assert.equal(message(ask({}), plain).detail, '');
 });
 
 test('night-city wording', () => {
   const nc = { nightCity: true, pick: first };
-  assert.equal(message({ hook_event_name: 'Stop' }, nc).body, DONE[0]);
-  assert.equal(message({ hook_event_name: 'Notification', message: 'x' }, nc).body.split('\n')[0], WAITING[0]);
-  assert.equal(message({ hook_event_name: 'PreToolUse', tool_input: {} }, nc).body, WAITING[0]);
+  assert.equal(message({ hook_event_name: 'Stop' }, nc).status, DONE[0]);
+  assert.equal(message({ hook_event_name: 'Notification', message: 'x' }, nc).status, WAITING[0]);
+  assert.equal(message({ hook_event_name: 'PreToolUse', tool_input: {} }, nc).status, WAITING[0]);
 });
 
-test('empty answer gives the status line alone', () => {
-  assert.equal(message({ hook_event_name: 'Stop' }, plain).body, 'Done');
-  assert.equal(message({ hook_event_name: 'Stop', last_assistant_message: '\n\n' }, plain).body, 'Done');
+test('empty answer gives no detail', () => {
+  assert.equal(message({ hook_event_name: 'Stop' }, plain).detail, '');
+  assert.equal(message({ hook_event_name: 'Stop', last_assistant_message: '\n\n' }, plain).detail, '');
 });
 
 test('truncation keeps whole characters', () => {
-  const line = (s) => message({ hook_event_name: 'Stop', last_assistant_message: s }, plain).body.split('\n')[1];
+  const line = (s) => message({ hook_event_name: 'Stop', last_assistant_message: s }, plain).detail;
   const long = line('x'.repeat(300));
   assert.equal([...long].length, 120);
   assert.ok(long.endsWith('…'));
@@ -80,7 +83,11 @@ test('truncation keeps whole characters', () => {
 });
 
 test('linux tries busctl then notify-send and escapes markup', () => {
-  const [busctl, notifySend, ...rest] = notifiers('linux', { title: 'T', body: 'a <b> & c' }, '/p/icon.png');
+  const [busctl, notifySend, ...rest] = notifiers(
+    'linux',
+    { title: 'T', status: 'Done', detail: 'a <b> & c' },
+    '/p/icon.png',
+  );
   assert.deepEqual(rest, []);
   assert.deepEqual(busctl.argv, [
     'busctl',
@@ -92,11 +99,11 @@ test('linux tries busctl then notify-send and escapes markup', () => {
     'org.freedesktop.Notifications',
     'Notify',
     'susssasa{sv}i',
-    'Claude Code',
+    'Onibi',
     '0',
     '/p/icon.png',
     'T',
-    'a &lt;b&gt; &amp; c',
+    '<b>Done</b>\na &lt;b&gt; &amp; c',
     '0',
     '0',
     '-1',
@@ -104,16 +111,16 @@ test('linux tries busctl then notify-send and escapes markup', () => {
   assert.deepEqual(notifySend.argv, [
     'notify-send',
     '-a',
-    'Claude Code',
+    'Onibi',
     '-i',
     '/p/icon.png',
     'T',
-    'a &lt;b&gt; &amp; c',
+    '<b>Done</b>\na &lt;b&gt; &amp; c',
   ]);
 });
 
 test('windows passes text by env, never in the script', () => {
-  const list = notifiers('win32', { title: '$(x)', body: '"; rm <b>' }, 'C:\\Users\\A B\\icon.png');
+  const list = notifiers('win32', { title: '$(x)', status: 'Done', detail: '"; rm <b>' }, 'C:\\Users\\A B\\icon.png');
   assert.equal(list.length, 1);
   const [{ argv, env }] = list;
   assert.deepEqual(argv.slice(0, 6), [
@@ -126,21 +133,27 @@ test('windows passes text by env, never in the script', () => {
   ]);
   assert.ok(!argv.some((a) => a.includes('$(x)') || a.includes('"; rm <b>')));
   assert.equal(env.NOTIFY_TITLE, '$(x)');
-  assert.equal(env.NOTIFY_BODY, '"; rm <b>');
+  assert.equal(env.NOTIFY_BODY, 'Done\n"; rm <b>');
   assert.equal(env.NOTIFY_ICON, 'C:\\Users\\A B\\icon.png');
   assert.equal(env.PATH, process.env.PATH);
 });
 
 test('mac passes raw text as argv', () => {
-  const [{ argv }, ...rest] = notifiers('darwin', { title: 'T', body: 'a <b> & c' }, '/p/icon.png');
+  const [{ argv }, ...rest] = notifiers('darwin', { title: 'T', status: 'Done', detail: 'a <b> & c' }, '/p/icon.png');
   assert.deepEqual(rest, []);
   assert.equal(argv[0], 'osascript');
   assert.equal(argv[1], '-e');
-  assert.deepEqual(argv.slice(3), ['T', 'a <b> & c']);
+  assert.deepEqual(argv.slice(3), ['T', 'Done\na <b> & c']);
+});
+
+test('no detail leaves the status alone', () => {
+  const msg = { title: 'T', status: 'Done', detail: '' };
+  assert.equal(notifiers('linux', msg, '/i')[0].argv[13], '<b>Done</b>');
+  assert.equal(notifiers('win32', msg, '/i')[0].env.NOTIFY_BODY, 'Done');
 });
 
 test('unknown platform gives nothing', () => {
-  assert.deepEqual(notifiers('aix', { title: 'T', body: 'B' }, '/p/icon.png'), []);
+  assert.deepEqual(notifiers('aix', { title: 'T', status: 'S', detail: 'D' }, '/p/icon.png'), []);
 });
 
 test('tmux is asked for our pane and every client of its session', () => {

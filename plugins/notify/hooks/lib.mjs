@@ -63,10 +63,7 @@ export function message(input, { nightCity, pick }) {
         ? input.tool_input?.questions?.[0]?.question
         : input.message,
   );
-  return {
-    title: `Claude Code · ${basename(input.cwd ?? process.cwd())}`,
-    body: detail ? `${status}\n${detail}` : status,
-  };
+  return { title: basename(input.cwd ?? process.cwd()), status, detail };
 }
 
 export const TMUX_ARGV = (pane) => [
@@ -110,10 +107,15 @@ $app = '{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powersh
 
 const OSASCRIPT = 'on run argv\ndisplay notification (item 2 of argv) with title (item 1 of argv)\nend run';
 
+// Onibi, night-city's mascot and the icon, signs the popups where the server shows an app name.
+const SENDER = 'Onibi';
+
 // Commands to try in order; the next one runs only when the previous binary is missing.
-export function notifiers(platform, { title, body }, icon) {
+export function notifiers(platform, { title, status, detail }, icon) {
+  const body = detail ? `${status}\n${detail}` : status;
   if (platform === 'linux') {
-    const b = markup(body);
+    // Our status in bold; Claude's text escaped so it shows literally.
+    const b = detail ? `<b>${markup(status)}</b>\n${markup(detail)}` : `<b>${markup(status)}</b>`;
     const dbus = ['org.freedesktop.Notifications', '/org/freedesktop/Notifications', 'org.freedesktop.Notifications'];
     return [
       {
@@ -126,7 +128,7 @@ export function notifiers(platform, { title, body }, icon) {
           ...dbus,
           'Notify',
           'susssasa{sv}i',
-          'Claude Code',
+          SENDER,
           '0',
           icon,
           title,
@@ -136,7 +138,7 @@ export function notifiers(platform, { title, body }, icon) {
           '-1',
         ],
       },
-      { argv: ['notify-send', '-a', 'Claude Code', '-i', icon, title, b] },
+      { argv: ['notify-send', '-a', SENDER, '-i', icon, title, b] },
     ];
   }
   if (platform === 'win32') {

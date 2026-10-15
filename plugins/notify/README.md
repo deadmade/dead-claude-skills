@@ -10,9 +10,11 @@ It fires on:
 - a question from Claude (`PreToolUse` on `AskUserQuestion`, which raises no notification of its own): "Needs your
   input" and the question.
 
-The icon is Onibi, night-city's pixel-art netrunner (`icon.png`, a 4x copy written by `scripts/draw-mascot.mjs`; never
-edit it by hand). The title is `Claude Code · <project folder>`. With the night-city plugin enabled, the status line is a Night City
-line instead ("Come look at your Agent", "Songbird requests your help").
+The popup comes from Onibi, night-city's pixel-art netrunner: her face is the icon (`icon.png`, a brightened crop
+written by `scripts/draw-mascot.mjs`; never edit it by hand) and, on Linux, she is the sender. The title is the
+project folder, then the status in bold and Claude's line below it. With the night-city plugin enabled, the status is a
+Night City line ("Come look at your Agent", "Songbird requests your help"). Windows shows "Windows PowerShell" as the
+sender, since the toast borrows PowerShell's app id.
 
 It stays quiet:
 
