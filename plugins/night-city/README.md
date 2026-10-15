@@ -13,6 +13,10 @@ Beyond the theme:
 - Night City spinner words and turn-end verbs ("Jacked out for 3s").
 - Short status-line reactions: `▚▞ FLATLINE ▞▚` once per turn on a failing tool, `◢◤ JACKED OUT ◢◤` when a main turn
   ends.
+- Onibi drops by: after about one main turn in five (never more than once every three minutes) she pops up above the
+  prompt for six seconds with a one-liner ("good work, choom.", "what are you even doing?"), a sorrier one after a
+  failing tool, an impatient one after a turn over two minutes. The `Onibi` setting in `/config` makes her come
+  `always` (every turn) or turns her `off`.
 - A Night City ccstatusline config: Powerline segments with slanted edges in the theme's colours, icons, context as tokens
   and percent, the cost in eddies (`€$1.23`) and a ナイトシティ sign fading pink to teal. It needs a Nerd Font in the terminal. The installer writes it when night-city and the ccstatusline toggle are both
   on, and switches back to the stock config when night-city is deselected.

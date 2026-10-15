@@ -32,8 +32,10 @@ export const TURN_WORDS: readonly string[] = [
 ];
 
 // FNV-1a over the seed, so one seed always lands on one word.
-export function pick(words: readonly string[], seed: string): string {
+export function hash(seed: string): number {
   let h = 0x811c9dc5;
   for (const c of seed) h = Math.imul(h ^ c.codePointAt(0)!, 0x01000193) >>> 0;
-  return words[h % words.length]!;
+  return h;
 }
+
+export const pick = (words: readonly string[], seed: string) => words[hash(seed) % words.length]!;
