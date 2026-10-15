@@ -581,7 +581,15 @@ if (plan.uninstall.length || data.retired.length || dupes.length || foreign.leng
 if (selected.includes(TUI_REVIEW)) await applyBrv();
 
 const nightCity = selected.some((id) => nameOf(id) === 'night-city');
-const toggles = { statusLine: on('ccstatusline'), sandbox: on('sandbox'), dcg: on('dcg'), version: VERSION, nightCity };
+const notify = selected.some((id) => nameOf(id) === 'notify');
+const toggles = {
+  statusLine: on('ccstatusline'),
+  sandbox: on('sandbox'),
+  dcg: on('dcg'),
+  version: VERSION,
+  nightCity,
+  notify,
+};
 await applySettings(toggles, { strip, reset: clean });
 const autoUpdate = tryJson(join(CONFIG, 'plugins', 'known_marketplaces.json'))?.[MARKETPLACE]?.autoUpdate;
 await applyCcstatusline(current.ccstatusline, on('ccstatusline'), nightCity);

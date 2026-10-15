@@ -31,6 +31,9 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   With night-city it also writes `installer/ccstatusline-night-city.json` instead of the stock ccstatusline config:
   Powerline (needs a Nerd Font), and since Powerline mode draws a gradient in its first colour only, the ナイトシティ
   sign is one widget per glyph.
+- `plugins/notify/`: plain `hooks.json` (Stop, Notification, PreToolUse on AskUserQuestion) running one stdlib Node
+  script, async. Logic and tests in `hooks/lib.mjs`; Linux talks D-Bus via `busctl`, Windows runs an inline PowerShell
+  WinRT toast, focus comes from tmux. With notify the installer sets `preferredNotifChannel: "notifications_disabled"`.
 - `plugins/dead-skills/`: the default bundle; its `dependencies` are the core plugins.
 - `scripts/`: `check-repo.mjs` (marketplace/bundle/version consistency), `release.mjs`, `sync-*.mjs` (vendoring),
   `sync-plugins.mjs` (re-pins url-sourced plugins).

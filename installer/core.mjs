@@ -110,7 +110,7 @@ export const isShipped = (text, shippedTexts) => {
   }
 };
 
-export function mergeSettings(settings, { statusLine, sandbox, version, nightCity }) {
+export function mergeSettings(settings, { statusLine, sandbox, version, nightCity, notify }) {
   const out = structuredClone(settings);
   if (nightCity === false && out.theme === NIGHT_CITY_THEME) delete out.theme;
   // Claude Code colours code in a fixed Monokai a theme can't change; off, diffs take Night City's own diff colours.
@@ -125,6 +125,11 @@ export function mergeSettings(settings, { statusLine, sandbox, version, nightCit
     if (Object.keys(env).length) out.env = env;
     else delete out.env;
   }
+  // The notify plugin raises its own popups; Claude Code's built-in one would double them.
+  // shortcut: deselecting also clears a `notifications_disabled` the user set themselves, and retiring notify from
+  // the marketplace leaves the setting behind; remember who set it if anyone minds.
+  if (notify) out.preferredNotifChannel = 'notifications_disabled';
+  if (notify === false && out.preferredNotifChannel === 'notifications_disabled') delete out.preferredNotifChannel;
   const allow = out.permissions?.allow ?? [];
   const deny = out.permissions?.deny ?? [];
   out.permissions = {
