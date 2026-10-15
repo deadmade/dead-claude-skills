@@ -8,6 +8,17 @@ It is synced by `scripts/sync-hallmark.mjs` (weekly via GitHub Actions); the onl
 "WEB FRONTEND ONLY" prefix on the frontmatter `description`. The synced upstream commit is in
 `skills/hallmark/UPSTREAM`.
 
+## paper-lookup
+
+`plugins/paper-lookup/skills/paper-lookup/` is vendored from the paper-lookup skill of
+[K-Dense-AI/scientific-agent-skills](https://github.com/K-Dense-AI/scientific-agent-skills) (MIT License, Copyright (c)
+2025 K-Dense Inc.; full text in `skills/paper-lookup/LICENSE.md`). It is synced by `scripts/sync-paper-lookup.mjs`
+(weekly via GitHub Actions), which trims it for computer science: the reference files for PubMed, PMC, Europe PMC,
+bioRxiv, medRxiv, PubTator3, BioStudies, ROR and Figshare are deleted along with SKILL.md table rows naming them, a
+note under the title covers leftover mentions, the frontmatter `description` is replaced, and the "Citing Scientific
+Agent Skills" section is removed.
+The synced upstream commit is in `skills/paper-lookup/UPSTREAM`.
+
 ## MCP servers (mcp-basic, mcp-github, mcp-azure)
 
 - **Context7**: hosted service by Upstash (https://context7.com), used over HTTP; nothing vendored.

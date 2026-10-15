@@ -1,0 +1,41 @@
+name: Sync paper-lookup
+
+on:
+  schedule:
+    - cron: '30 6 * * 1' # Mondays 06:30 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Sync skill from upstream
+        run: node scripts/sync-paper-lookup.mjs
+
+      - name: Sanity checks
+        run: |
+          jq empty .claude-plugin/marketplace.json plugins/paper-lookup/.claude-plugin/plugin.json
+          test -s plugins/paper-lookup/skills/paper-lookup/SKILL.md
+          ! grep -q "Citing Scientific Agent Skills" plugins/paper-lookup/skills/paper-lookup/SKILL.md
+          echo "sha=$(cat plugins/paper-lookup/skills/paper-lookup/UPSTREAM)" >> "$GITHUB_OUTPUT"
+        id: check
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v8
+        with:
+          branch: sync/paper-lookup
+          delete-branch: true
+          commit-message: 'Sync paper-lookup to ${{ steps.check.outputs.sha }}'
+          title: 'Sync paper-lookup to ${{ steps.check.outputs.sha }}'
+          body: |
+            Automated sync of `skills/paper-lookup` from https://github.com/K-Dense-AI/scientific-agent-skills at
+            https://github.com/K-Dense-AI/scientific-agent-skills/commit/${{ steps.check.outputs.sha }}.
+
+            cc @deadmade
+          add-paths: plugins/paper-lookup/skills/paper-lookup

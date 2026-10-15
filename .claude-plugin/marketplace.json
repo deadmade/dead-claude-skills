@@ -133,6 +133,12 @@
       "category": "development"
     },
     {
+      "name": "paper-lookup",
+      "description": "Paper lookup: search arXiv, Semantic Scholar, OpenAlex, Crossref, Unpaywall and other scholarly APIs (trimmed for computer science) for papers, citations and open-access full text. Vendored from K-Dense-AI/scientific-agent-skills. Opt-in.",
+      "source": "./plugins/paper-lookup",
+      "category": "development"
+    },
+    {
       "name": "night-city",
       "description": "Night City: a toned-down synthwave Claude Code theme with Night City spinner words and short status-line reactions. Opt-in.",
       "source": "./plugins/night-city",
