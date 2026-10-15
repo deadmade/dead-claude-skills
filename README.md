@@ -13,7 +13,7 @@ like hallmark, self-review, graphify and the mattpocock/pstack/Trail of Bits pic
 
 The installer (Node standard library only) shows one page per category where you pick what to install, remove or
 update, then applies only the changes. It pins the marketplace to its own release so plugins match the installer, and
-it always denies Claude reading `.env` files and credential dirs. Optional toggles add ccstatusline, the Bash sandbox
+it always denies Claude reading `.env` files and credential dirs and keeps session transcripts (Claude Code deletes them after 30 days unless `cleanupPeriodDays` is set). Optional toggles add ccstatusline, the Bash sandbox
 and dcg; the danger zone can strip all foreign plugins or reset `~/.claude` to a clean slate (after a backup). Without
 the installer, `/plugin marketplace add deadmade/dead-claude-skills` and `/plugin install dead-skills@dead-claude-skills`
 work too, but track main.
