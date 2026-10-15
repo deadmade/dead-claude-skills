@@ -1,13 +1,28 @@
 // Draws Onibi, night-city's mascot: a masked netrunner whose cybereye is the eight-point spark, as 64x64 pixel art and
-// writes plugins/night-city/assets/mascot.png plus an 8x nearest-neighbour mascot-512.png. The PNGs are generated:
+// writes plugins/night-city/assets/mascot.png plus an 8x nearest-neighbour mascot-512.png, and a brightened crop of her
+// face as the notify plugin's icon (a plugin can't read another plugin's files once installed). The PNGs are generated:
 // change the drawing here and rerun `node scripts/draw-mascot.mjs`; draw-mascot.test.mjs fails on drift.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { deflateSync } from 'node:zlib';
 
-export const ASSETS = join(import.meta.dirname, '..', 'plugins', 'night-city', 'assets');
+const PLUGINS = join(import.meta.dirname, '..', 'plugins');
+export const ASSETS = join(PLUGINS, 'night-city', 'assets');
 export const SIZE = 64;
 export const SCALE = 8;
+
+// Notifications show the icon at about 48px, where the full drawing is mostly dark hood: crop to her face, eye and
+// mask and lift the colours 8% towards white.
+export const notifyIcon = (rgb) =>
+  rgb.slice(6, 52).map((row) => row.slice(10, 56).map((p) => p.map((v) => Math.round(v + (255 - v) * 0.08))));
+
+// Every PNG this script writes; `pixels` turns the drawing into that file's art. 6x keeps the icon's pixels sharp
+// when the notification server scales it down.
+export const OUTPUTS = [
+  { file: join(ASSETS, 'mascot.png'), scale: 1 },
+  { file: join(ASSETS, 'mascot-512.png'), scale: SCALE },
+  { file: join(PLUGINS, 'notify', 'icon.png'), scale: 6, pixels: notifyIcon },
+];
 
 const PAL = {
   // background
@@ -491,7 +506,8 @@ export function encodePng(rgb, scale = 1) {
 
 if (import.meta.main ?? process.argv[1] === import.meta.filename) {
   const rgb = drawMascot();
-  writeFileSync(join(ASSETS, 'mascot.png'), encodePng(rgb));
-  writeFileSync(join(ASSETS, 'mascot-512.png'), encodePng(rgb, SCALE));
-  console.log(`wrote ${ASSETS}/mascot.png and mascot-512.png`);
+  for (const { file, scale, pixels = (p) => p } of OUTPUTS) {
+    writeFileSync(file, encodePng(pixels(rgb), scale));
+    console.log(`wrote ${file}`);
+  }
 }

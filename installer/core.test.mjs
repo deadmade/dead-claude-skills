@@ -64,6 +64,7 @@ test('opt-ins from the real manifests', () => {
         'mcp-github',
         'night-city',
         'nix-lsp',
+        'notify',
         'paper-lookup',
         'postgres',
         'pstack-picks',
@@ -537,4 +538,12 @@ test('nightCity turns syntax highlighting off, and deselecting it turns it back 
   );
   assert.equal(mergeSettings({ syntaxHighlightingDisabled: true }, {}).syntaxHighlightingDisabled, true);
   assert.equal(mergeSettings({}, {}).syntaxHighlightingDisabled, undefined);
+});
+
+test('notify turns the built-in notification off, and deselecting restores it', () => {
+  const channel = (s, notify) => mergeSettings(s, { notify }).preferredNotifChannel;
+  assert.equal(channel({}, true), 'notifications_disabled');
+  assert.equal(channel({ preferredNotifChannel: 'notifications_disabled' }, false), undefined);
+  assert.equal(channel({ preferredNotifChannel: 'kitty' }, false), 'kitty');
+  assert.equal(channel({ preferredNotifChannel: 'kitty' }, true), 'notifications_disabled');
 });

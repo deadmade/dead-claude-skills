@@ -145,6 +145,12 @@
       "category": "development"
     },
     {
+      "name": "notify",
+      "description": "Desktop notifications when a turn ends or Claude needs you, on Linux, Windows and macOS; quiet while you are looking at the session. Opt-in.",
+      "source": "./plugins/notify",
+      "category": "development"
+    },
+    {
       "name": "cswap",
       "description": "claude-swap in Claude Code: accounts pane, /swap, usage status line, opt-in auto-switch. The installer downloads cswap.exe on Windows. Opt-in.",
       "source": "./plugins/cswap",
