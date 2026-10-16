@@ -1,0 +1,70 @@
+{
+  "queries": [
+    "rmcp rust mcp sdk stdio server example",
+    "tokio spawn vs spawn_blocking when to use",
+    "searxng json api format settings.yml",
+    "readability algorithm main content extraction benchmark",
+    "reciprocal rank fusion bm25 dense retrieval",
+    "agent-browser vercel snapshot refs",
+    "rust html to markdown crate",
+    "claude code mcp tool output token limit",
+    "tantivy query parser fuzzy search example",
+    "arxiv api rate limit"
+  ],
+  "urls": [
+    "https://raw.githubusercontent.com/vercel-labs/agent-browser/main/README.md",
+    "https://raw.githubusercontent.com/quickwit-oss/tantivy/main/README.md",
+    "https://raw.githubusercontent.com/modelcontextprotocol/rust-sdk/main/README.md",
+    "https://pypi.org/project/requests/",
+    "https://code.claude.com/docs/en/mcp",
+    "https://docs.searxng.org/dev/search_api.html",
+    "https://doc.rust-lang.org/book/ch16-01-threads.html",
+    "https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Caching",
+    "https://en.wikipedia.org/wiki/Okapi_BM25",
+    "https://arxiv.org/abs/1706.03762"
+  ],
+  "parallel_urls": [
+    "https://raw.githubusercontent.com/vercel-labs/agent-browser/main/README.md",
+    "https://raw.githubusercontent.com/quickwit-oss/tantivy/main/README.md",
+    "https://raw.githubusercontent.com/modelcontextprotocol/rust-sdk/main/README.md",
+    "https://pypi.org/project/requests/"
+  ],
+  "papers": [
+    {
+      "name": "arxiv id",
+      "url": "https://export.arxiv.org/api/query?id_list=1706.03762",
+      "script": "arxiv_atom.py",
+      "host": "arxiv"
+    },
+    {
+      "name": "arxiv search",
+      "url": "https://export.arxiv.org/api/query?search_query=all:%22hybrid%20retrieval%22&max_results=10",
+      "script": "arxiv_atom.py",
+      "host": "arxiv"
+    },
+    {
+      "name": "openalex doi + abstract",
+      "url": "https://api.openalex.org/works/doi:10.7717/peerj.4375",
+      "script": "openalex_abstract.py",
+      "host": "openalex"
+    },
+    {
+      "name": "openalex search",
+      "url": "https://api.openalex.org/works?search=web%20content%20extraction&per-page=10",
+      "script": "openalex_abstract.py",
+      "host": "openalex"
+    },
+    {
+      "name": "crossref doi",
+      "url": "https://api.crossref.org/works/10.1038/nature12373",
+      "script": null,
+      "host": "crossref"
+    },
+    {
+      "name": "semantic scholar arxiv id",
+      "url": "https://api.semanticscholar.org/graph/v1/paper/ARXIV:1706.03762?fields=title,year,externalIds",
+      "script": null,
+      "host": "s2"
+    }
+  ]
+}
