@@ -39,8 +39,10 @@ retuned to softer synthwave colours; see `THIRD_PARTY.md` in the repository root
 their end). The netrunner above is the theme's mascot, an original 64×64 pixel-art character in the theme's palette: a
 respirator with an LED bar, an undercut with a circuit tattoo, and a chrome plate whose cybereye is an eight-point
 spark, a nod to Claude rather than Anthropic's logo. `assets/mascot.png` is the 1x original, `assets/mascot-512.png`
-the 8x nearest-neighbour scale; she is also the notify plugin's notification icon. All are drawn by `scripts/draw-mascot.mjs` in the repository root; edit the drawing
-there and rerun it rather than editing the PNGs.
+the 8x nearest-neighbour scale; she is also the notify plugin's notification icon. She is the first of the
+[night-city-cast](../night-city-cast/skills/night-city-cast/SKILL.md), one character per project in this style; her
+drawing is `cast/onibi.mjs` there, and `scripts/draw-mascot.mjs` in the repository root renders all these PNGs from
+it. Edit the drawing and rerun the script rather than editing the PNGs.
 
 ## Contrast (WCAG)
 

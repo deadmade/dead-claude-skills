@@ -36,9 +36,14 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
 - `plugins/notify/`: plain `hooks.json` (Stop, Notification, PreToolUse on AskUserQuestion) running one stdlib Node
   script, async. Logic and tests in `hooks/lib.mjs`; Linux talks D-Bus via `busctl`, Windows runs an inline PowerShell
   WinRT toast, focus comes from tmux. With notify the installer sets `preferredNotifChannel: "notifications_disabled"`.
+- `plugins/night-city-cast/`: the `/night-city-cast` skill, one pixel-art character per project in night-city's style.
+  `scripts/pixel-kit.mjs` is the shared kit (palette, primitives, finish, PNG), `scripts/cast/<handle>.mjs` one drawing
+  per character (Onibi is `cast/onibi.mjs`, which `scripts/draw-mascot.mjs` renders), `references/cast.md` the roster.
+  Handles only: characters' real names never go into the repo.
 - `plugins/dead-skills/`: the default bundle; its `dependencies` are the core plugins.
 - `scripts/`: `check-repo.mjs` (marketplace/bundle/version consistency), `release.mjs`, `sync-*.mjs` (vendoring),
-  `sync-plugins.mjs` (re-pins url-sourced plugins), `draw-mascot.mjs` (Onibi, night-city's pixel-art mascot, also notify's `icon.png`).
+  `sync-plugins.mjs` (re-pins url-sourced plugins), `draw-mascot.mjs` (renders Onibi as night-city's mascot and
+  notify's `icon.png`).
 
 The url-sourced marketplace entries superpowers and ponytail are pinned by `ref` (release tag) and `sha` (its commit);
 `sync-plugins.yml` opens a PR per plugin when upstream tags a newer `vX.Y.Z`. The installer reads the version from

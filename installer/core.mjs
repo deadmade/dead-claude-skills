@@ -342,6 +342,7 @@ export const CATEGORIES = [
     blurb: 'Slash commands and skills that shape how Claude works.',
     keys: [
       'feature-flow',
+      'night-city-cast',
       'self-review',
       'mattpocock-picks',
       'pstack-picks',

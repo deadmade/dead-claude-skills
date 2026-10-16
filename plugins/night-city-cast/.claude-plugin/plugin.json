@@ -1,0 +1,10 @@
+{
+  "name": "night-city-cast",
+  "version": "0.3.0",
+  "description": "/night-city-cast: a character for each of your projects, all residents of the same Night City in one 64x64 pixel-art style (Onibi, night-city's mascot, is the first). Concepts with a signature hook, a shared drawing kit, previews at icon sizes, names, and shipping the PNGs.",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "repository": "https://github.com/deadmade/dead-claude-skills"
+}
