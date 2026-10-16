@@ -14,6 +14,8 @@ use rmcp::{ServiceExt, transport::stdio};
 pub struct Ctx {
     pub cfg: config::Config,
     pub http: reqwest::Client,
+    /// Same, but its resolver never hands out private addresses: for fetches that may not reach them.
+    pub http_public: reqwest::Client,
     pub limits: limits::HostLimits,
     pub archive: archive::Archive,
     pub inflight: fetch::Inflight,
@@ -29,11 +31,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ring, not aws-lc-rs: no cmake or C toolchain needed to build.
     let _ = rustls::crypto::ring::default_provider().install_default();
     let ctx = Ctx {
-        http: reqwest::Client::builder()
-            .user_agent(concat!("web-mcp/", env!("CARGO_PKG_VERSION")))
-            // fetch follows redirects itself, checking every hop for private targets.
-            .redirect(reqwest::redirect::Policy::none())
-            .build()?,
+        http: fetch::client(false)?,
+        http_public: fetch::client(true)?,
         limits: limits::HostLimits::default(),
         archive: archive::Archive::open(&cfg.project, &jiff::Zoned::now())?,
         inflight: fetch::Inflight::default(),

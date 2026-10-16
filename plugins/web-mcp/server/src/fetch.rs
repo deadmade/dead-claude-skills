@@ -17,6 +17,7 @@ use crate::Ctx;
 use crate::archive::{Archived, Item, is_private, is_private_ip};
 use crate::extract::{Page, extract_html, extract_pdf};
 use crate::images;
+use crate::limits::HostPermit;
 
 pub const MAX_BODY: usize = 20 * 1024 * 1024;
 const ACCEPT_VALUE: &str = "text/markdown, text/html;q=0.9, */*;q=0.8";
@@ -85,8 +86,69 @@ fn net(e: impl fmt::Display) -> FetchError {
     FetchError::Network(e.to_string())
 }
 
+/// The HTTP client. It follows no redirects (`send` does, checking each hop). With `public_only`
+/// its resolver drops private addresses, so a host that rebinds to one between our check and the
+/// connect still can't be reached.
+///
+/// # Errors
+/// When reqwest can't build the client (no TLS provider).
+pub fn client(public_only: bool) -> reqwest::Result<reqwest::Client> {
+    let b = reqwest::Client::builder()
+        .user_agent(concat!("web-mcp/", env!("CARGO_PKG_VERSION")))
+        .redirect(reqwest::redirect::Policy::none());
+    if public_only {
+        b.dns_resolver(Arc::new(PublicOnly))
+    } else {
+        b
+    }
+    .build()
+}
+
+struct PublicOnly;
+
+/// The resolver's refusal; `send` turns it into `FetchError::Blocked`.
+#[derive(Debug)]
+struct OnlyPrivate(String);
+
+impl fmt::Display for OnlyPrivate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} resolves only to private addresses", self.0)
+    }
+}
+
+impl std::error::Error for OnlyPrivate {}
+
+impl reqwest::dns::Resolve for PublicOnly {
+    fn resolve(&self, name: reqwest::dns::Name) -> reqwest::dns::Resolving {
+        let host = name.as_str().to_owned();
+        Box::pin(async move {
+            let public: Vec<_> = tokio::net::lookup_host((host.as_str(), 0))
+                .await?
+                .filter(|a| !is_private_ip(a.ip()))
+                .collect();
+            if public.is_empty() {
+                return Err(Box::new(OnlyPrivate(host)) as Box<dyn std::error::Error + Send + Sync>);
+            }
+            Ok(Box::new(public.into_iter()) as reqwest::dns::Addrs)
+        })
+    }
+}
+
+/// `Blocked` when the public-only resolver refused the host, otherwise a network error.
+fn send_error(url: &Url, e: &reqwest::Error) -> FetchError {
+    let mut src: Option<&(dyn std::error::Error + 'static)> = Some(e);
+    while let Some(err) = src {
+        if err.is::<OnlyPrivate>() {
+            return FetchError::Blocked(url.to_string());
+        }
+        src = err.source();
+    }
+    net(e)
+}
+
 type Flight = Shared<BoxFuture<'static, Result<Fetched, FetchError>>>;
-pub type Inflight = Mutex<HashMap<Url, Flight>>;
+/// Keyed by URL and `allow_private`, so a restricted caller never joins a fetch it couldn't make.
+pub type Inflight = Mutex<HashMap<(Url, bool), Flight>>;
 
 /// One page, from this run's cache or downloaded once however many callers ask at the same time.
 /// The work runs in its own task: once started it finishes (and archives) even if every caller is gone.
@@ -101,7 +163,8 @@ pub async fn get(
 ) -> Result<Fetched, FetchError> {
     let hit = {
         let mut map = ctx.inflight.lock().unwrap_or_else(PoisonError::into_inner);
-        if let Some(f) = map.get(url) {
+        let key = (url.clone(), opts.allow_private);
+        if let Some(f) = map.get(&key) {
             Err(f.clone())
         } else if let Some(hit) = ctx.archive.cached(url).filter(|a| {
             // A page cached without its images is fetched again when images are asked for.
@@ -115,16 +178,16 @@ pub async fn get(
         }) {
             Ok(hit)
         } else {
-            let guard = Unflight(Arc::clone(ctx), url.clone());
+            let guard = Unflight(Arc::clone(ctx), key.clone());
             // The guard's removal waits for this lock, so it can't run before the insert below.
             let task = tokio::spawn(async move {
                 let guard = guard;
-                run(&guard.0, &guard.1, deadline, opts).await
+                run(&guard.0, &guard.1.0, deadline, opts).await
             });
             let f = async move { task.await.unwrap_or_else(|e| Err(net(e))) }
                 .boxed()
                 .shared();
-            map.insert(url.clone(), f.clone());
+            map.insert(key, f.clone());
             Err(f)
         }
     };
@@ -135,7 +198,7 @@ pub async fn get(
 }
 
 /// Removes the in-flight entry when the fetch task ends, also by panic, so no caller inherits a stale result.
-struct Unflight(Arc<Ctx>, Url);
+struct Unflight(Arc<Ctx>, (Url, bool));
 
 impl Drop for Unflight {
     fn drop(&mut self) {
@@ -290,8 +353,7 @@ async fn run(
 async fn download(ctx: &Ctx, url: &Url, allow_private: bool) -> Result<Download, FetchError> {
     let mut retried = false;
     loop {
-        let permit = ctx.limits.acquire(url).await;
-        let (resp, final_url, private) = send(ctx, url, allow_private).await?;
+        let (resp, final_url, private, permit) = send(ctx, url, allow_private).await?;
         let status = resp.status().as_u16();
         if !retried && matches!(status, 429 | 503) {
             retried = true;
@@ -318,12 +380,13 @@ async fn download(ctx: &Ctx, url: &Url, allow_private: bool) -> Result<Download,
 
 /// GET following redirects by hand (the client follows none), so every hop is checked: with
 /// `allow_private` false a private hop, by URL, resolved address or peer, is refused before or as it
-/// connects. Returns the response, the final URL and whether any hop was private.
+/// connects. Each hop takes its host's limit; the last hop's permit is returned with the response, to
+/// hold while the body is read. Returns the response, the final URL and whether any hop was private.
 async fn send(
     ctx: &Ctx,
     url: &Url,
     allow_private: bool,
-) -> Result<(reqwest::Response, Url, bool), FetchError> {
+) -> Result<(reqwest::Response, Url, bool, HostPermit), FetchError> {
     let proxy = proxied();
     let (mut url, mut private) = (url.clone(), false);
     for _ in 0..=MAX_REDIRECTS {
@@ -341,13 +404,19 @@ async fn send(
         if !allow_private && blocked(resolved.as_deref()) {
             return Err(FetchError::Blocked(url.to_string()));
         }
-        let resp = ctx
-            .http
+        let permit = ctx.limits.acquire(&url).await;
+        // shortcut: behind a proxy the proxy resolves the name, so DNS rebinding isn't closed there.
+        let http = if allow_private {
+            &ctx.http
+        } else {
+            &ctx.http_public
+        };
+        let resp = http
             .get(url.clone())
             .header(ACCEPT, ACCEPT_VALUE)
             .send()
             .await
-            .map_err(net)?;
+            .map_err(|e| send_error(&url, &e))?;
         let peer = resp.remote_addr().map(|a| a.ip());
         let hop_private = private_target(&url, peer, resolved.as_deref(), proxy);
         if hop_private && !allow_private {
@@ -363,7 +432,7 @@ async fn send(
             .and_then(|l| url.join(l).ok());
         match next {
             Some(n) => url = n,
-            None => return Ok((resp, url, private)),
+            None => return Ok((resp, url, private, permit)),
         }
     }
     Err(net(format!("more than {MAX_REDIRECTS} redirects")))
@@ -452,8 +521,7 @@ async fn download_images(
         let u = u.clone();
         async move {
             let get = async {
-                let _permit = ctx.limits.acquire(&u).await;
-                let (resp, _, _) = send(ctx, &u, allow_private).await.ok()?;
+                let (resp, _, _, _permit) = send(ctx, &u, allow_private).await.ok()?;
                 if !resp.status().is_success() {
                     return None;
                 }
@@ -521,17 +589,22 @@ pub async fn render(ctx: &Ctx, f: &Fetched, with_images: bool) -> CallToolResult
     } else {
         format!("\n\nOther images: {}", others.join(", "))
     };
-    let limit = if blocks.is_empty() {
+    let cap = if blocks.is_empty() {
         // The whole text block stays within the tool's maxResultSizeChars.
-        200_000 - source.chars().count() - 2
+        200_000
     } else {
         // Keep chars / 4 + 1,600 per image under Claude Code's 25,000-token MCP output cap, with margin.
-        ((24_000 - 1_600 * blocks.len()) * 4 - 1)
-            .saturating_sub(source.chars().count() + 2 + other_line.chars().count())
+        (24_000 - 1_600 * blocks.len()) * 4 - 1
     };
+    let limit = cap.saturating_sub(source.chars().count() + 2 + other_line.chars().count());
     let note = format!("[… truncated: the full page is at .web/{full}]");
     let md = truncate(&f.page.markdown, limit, &note);
-    let mut content = vec![ContentBlock::text(format!("{source}\n\n{md}{other_line}"))];
+    let mut text = format!("{source}\n\n{md}{other_line}");
+    // Only an absurdly long URL gets here: cut the block hard rather than break the cap.
+    if let Some((i, _)) = text.char_indices().nth(cap) {
+        text.truncate(i);
+    }
+    let mut content = vec![ContentBlock::text(text)];
     content.extend(blocks);
     CallToolResult::success(content)
 }
@@ -588,6 +661,110 @@ mod tests {
         assert!(!private_target(&url, Some(public), None, false));
         let local = Url::parse("http://localhost/").unwrap();
         assert!(private_target(&local, Some(public), Some(&[public]), true));
+    }
+
+    fn test_ctx() -> Arc<Ctx> {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        let project = std::env::temp_dir().join(format!(
+            "web-mcp-fetch-unit-{}-{}",
+            std::process::id(),
+            jiff::Timestamp::now().as_nanosecond()
+        ));
+        std::fs::create_dir_all(&project).unwrap();
+        Arc::new(Ctx {
+            archive: crate::archive::Archive::open(&project, &jiff::Zoned::now()).unwrap(),
+            cfg: crate::config::Config {
+                project,
+                searxng: Url::parse("http://127.0.0.1:8888").unwrap(),
+                agent_browser: "agent-browser".into(),
+            },
+            http: client(false).unwrap(),
+            http_public: client(true).unwrap(),
+            limits: crate::limits::HostLimits::default(),
+            inflight: Inflight::default(),
+        })
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn restricted_caller_cannot_join_private_flight() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            for mut c in listener.incoming().flatten() {
+                let _ = c.read(&mut [0; 4096]);
+                std::thread::sleep(Duration::from_millis(500));
+                let body = "# hi\n";
+                let _ = write!(
+                    c,
+                    "HTTP/1.1 200 OK\r\nContent-Type: text/markdown\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+            }
+        });
+        let ctx = test_ctx();
+        let url = Url::parse(&format!("http://localhost:{port}/slow")).unwrap();
+        let direct = GetOpts {
+            allow_private: true,
+            ..GetOpts::default()
+        };
+        let (c, u) = (Arc::clone(&ctx), url.clone());
+        let first = tokio::spawn(async move { get(&c, &u, Duration::from_secs(10), direct).await });
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        let restricted = get(&ctx, &url, Duration::from_secs(10), GetOpts::default()).await;
+        assert!(matches!(restricted, Err(FetchError::Blocked(_))));
+        let ok = first.await.unwrap().map_err(|e| e.to_string()).unwrap();
+        assert_eq!(ok.page.markdown, "# hi\n");
+    }
+
+    #[tokio::test]
+    async fn absurd_url_still_fits_the_cap() {
+        let ctx = test_ctx();
+        let f = Fetched {
+            final_url: Url::parse(&format!("https://example.com/{}", "a".repeat(250_000))).unwrap(),
+            private: false,
+            archived: Archived {
+                url: String::new(),
+                path: "run/pages/x/page.md".into(),
+                sha256: String::new(),
+                time: "2026-10-17T00:00:00Z".into(),
+            },
+            page: Page {
+                title: String::new(),
+                markdown: "hi".into(),
+                images: Vec::new(),
+            },
+        };
+        let r = render(&ctx, &f, false).await;
+        let t = &r.content[0].as_text().unwrap().text;
+        assert!(t.chars().count() <= 200_000);
+    }
+
+    #[tokio::test]
+    async fn rebinding_resolver_never_connects_to_private() {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let accepted = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let a = Arc::clone(&accepted);
+        std::thread::spawn(move || {
+            for _ in listener.incoming() {
+                a.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            }
+        });
+        let url = Url::parse(&format!("http://localhost:{port}/")).unwrap();
+        let e = client(true)
+            .unwrap()
+            .get(url.clone())
+            .send()
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(send_error(&url, &e), FetchError::Blocked(_)),
+            "{e:?}"
+        );
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert_eq!(accepted.load(std::sync::atomic::Ordering::SeqCst), 0);
     }
 
     #[test]
