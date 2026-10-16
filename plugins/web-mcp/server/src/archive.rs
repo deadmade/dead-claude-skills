@@ -87,14 +87,24 @@ impl Archive {
     /// When the folders or files under `.web` can't be created.
     pub fn open(project: &Path, now: &jiff::Zoned) -> io::Result<Self> {
         let web = std::path::absolute(project)?.join(".web");
-        std::fs::create_dir_all(&web)?;
+        match std::fs::symlink_metadata(&web) {
+            Ok(m) if !m.is_dir() => {
+                return Err(io::Error::other(format!(
+                    "{} is not a real directory",
+                    web.display()
+                )));
+            }
+            Ok(_) => {}
+            Err(e) if e.kind() == io::ErrorKind::NotFound => std::fs::create_dir_all(&web)?,
+            Err(e) => return Err(e),
+        }
         let ignore = web.join(".gitignore");
         if !ignore.exists() {
             std::fs::write(ignore, "*\n")?;
         }
         let name = format!("{}-{}", now.strftime("%Y-%m-%d_%H%M%S"), std::process::id());
         let run = web.join(name);
-        std::fs::create_dir_all(&run)?;
+        std::fs::create_dir(&run)?;
         let index = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
@@ -136,11 +146,16 @@ impl Inner {
     }
 
     async fn write(path: &Path, bytes: &[u8]) -> io::Result<()> {
+        static TMP: AtomicU64 = AtomicU64::new(0);
         if let Some(dir) = path.parent() {
             fs::create_dir_all(dir).await?;
         }
         let mut tmp = path.as_os_str().to_owned();
-        tmp.push(".tmp");
+        tmp.push(format!(
+            ".{}-{}.tmp",
+            std::process::id(),
+            TMP.fetch_add(1, Ordering::Relaxed)
+        ));
         fs::write(&tmp, bytes).await?;
         fs::rename(&tmp, path).await
     }
@@ -312,9 +327,10 @@ pub fn is_private(url: &Url) -> bool {
             let d = d.trim_end_matches('.').to_lowercase();
             d == "localhost" || d.ends_with(".localhost")
         }
-        Some(Host::Ipv4(ip)) => ip.is_loopback() || ip.is_private() || ip.is_link_local(),
+        Some(Host::Ipv4(ip)) => is_private_ip(IpAddr::V4(ip)),
         Some(Host::Ipv6(ip)) => {
             ip.is_loopback()
+                || ip.is_unspecified()
                 || ip.is_unique_local()
                 || ip.is_unicast_link_local()
                 || ip
@@ -326,7 +342,13 @@ pub fn is_private(url: &Url) -> bool {
 
 fn is_private_ip(ip: IpAddr) -> bool {
     match ip {
-        IpAddr::V4(v) => v.is_loopback() || v.is_private() || v.is_link_local(),
+        IpAddr::V4(v) => {
+            v.is_loopback()
+                || v.is_private()
+                || v.is_link_local()
+                || v.is_unspecified()
+                || (v.octets()[0] == 100 && v.octets()[1] & 0xc0 == 64) // CGNAT 100.64.0.0/10
+        }
         IpAddr::V6(_) => false,
     }
 }
@@ -497,6 +519,55 @@ mod tests {
                 && s.chars()
                     .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
         );
+    }
+
+    #[tokio::test]
+    async fn same_url_put_8_times_in_parallel() {
+        let d = tempdir();
+        let a = open(&d);
+        let hs: Vec<_> = (0..8)
+            .map(|_| {
+                let a = a.clone();
+                tokio::spawn(async move { a.put(page("https://example.com/same", None)).await })
+            })
+            .collect();
+        for h in hs {
+            h.await.unwrap().unwrap();
+        }
+        assert_eq!(index_lines(&a).len(), 16); // page + image line per put
+        let mut files = Vec::new();
+        walk(&a.0.run, &mut files);
+        assert!(
+            files
+                .iter()
+                .all(|f| f.extension().is_none_or(|e| e != "tmp"))
+        );
+        let dir = files
+            .iter()
+            .find(|f| f.ends_with("raw.html"))
+            .unwrap()
+            .parent()
+            .unwrap()
+            .to_owned();
+        assert_eq!(std::fs::read(dir.join("raw.html")).unwrap(), b"<p>hi</p>");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlinked_web_dir_is_refused() {
+        let d = tempdir();
+        let target = tempdir();
+        std::os::unix::fs::symlink(&target, d.join(".web")).unwrap();
+        assert!(Archive::open(&d, &jiff::Zoned::now()).is_err());
+        assert!(std::fs::read_dir(&target).unwrap().next().is_none());
+    }
+
+    #[test]
+    fn existing_run_dir_name_is_refused() {
+        let d = tempdir();
+        let now = jiff::Zoned::now();
+        Archive::open(&d, &now).unwrap();
+        assert!(Archive::open(&d, &now).is_err());
     }
 
     fn walk(p: &Path, out: &mut Vec<PathBuf>) {
