@@ -11,14 +11,19 @@ use sha2::{Digest, Sha256};
 use tantivy::collector::TopDocs;
 use tantivy::directory::MmapDirectory;
 use tantivy::directory::error::LockError;
+use tantivy::merge_policy::LogMergePolicy;
 use tantivy::query::QueryParser;
 use tantivy::schema::{Field, STORED, STRING, Schema, TEXT, Value as _};
 use tantivy::{IndexReader, IndexWriter, ReloadPolicy, TantivyDocument, TantivyError, Term};
+use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::{mpsc, oneshot};
 
 /// tantivy's smallest writer arena (`MEMORY_BUDGET_NUM_BYTES_MIN`, not exported); one per batch.
 const ARENA: usize = 15_000_000;
 const LOCK_WAIT: Duration = Duration::from_secs(5);
+/// Measured: merging 8 × 4,000 passages took 0.45 s (8 × 16,000: 1.7 s) in release on an SSD.
+const MAX_MERGE_DOCS: usize = 4_000;
+const MIN_LAYER_DOCS: u32 = 100;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PassageDoc {
@@ -57,6 +62,9 @@ pub struct Index {
     /// Commits made by this index's writer task.
     #[allow(dead_code)] // read by the tests
     commits: Arc<AtomicUsize>,
+    /// Times the writer task waited for merges (only ever with an empty queue).
+    #[allow(dead_code)] // read by the tests
+    merge_waits: Arc<AtomicUsize>,
 }
 
 impl Index {
@@ -81,12 +89,13 @@ impl Index {
             .reload_policy(ReloadPolicy::OnCommitWithDelay)
             .try_into()?;
         let (jobs, rx) = mpsc::unbounded_channel();
-        let commits = Arc::new(AtomicUsize::new(0));
+        let (commits, merge_waits) = (Arc::default(), Arc::default());
         let w = Writer {
             index: index.clone(),
             reader: Clone::clone(&reader),
             f,
             commits: Arc::clone(&commits),
+            merge_waits: Arc::clone(&merge_waits),
         };
         std::thread::Builder::new()
             .name("web-mcp-index".into())
@@ -97,6 +106,7 @@ impl Index {
             f,
             jobs,
             commits,
+            merge_waits,
         })
     }
 
@@ -177,42 +187,95 @@ fn hash(d: &PassageDoc) -> String {
     format!("{:x}", h.finalize())
 }
 
-/// The one writer task: a writer per batch, so other processes can take the lock between batches.
+/// Merges stop at segments of `MAX_MERGE_DOCS` passages, so the biggest merge (about eight such
+/// segments) takes ~0.45 s on an SSD: well inside the 5 s another process waits for the lock.
+fn merge_policy() -> LogMergePolicy {
+    let mut p = LogMergePolicy::default();
+    p.set_max_docs_before_merge(MAX_MERGE_DOCS);
+    // Small first layer: merges of a few pages' passages stay cheap instead of rewriting every
+    // segment under tantivy's default 10,000-doc layer.
+    p.set_min_layer_size(MIN_LAYER_DOCS);
+    p
+}
+
+/// The one writer task: the writer is held only while batches are queued, so other processes can
+/// take the lock in between.
 struct Writer {
     index: tantivy::Index,
     reader: IndexReader,
     f: Fields,
     commits: Arc<AtomicUsize>,
+    merge_waits: Arc<AtomicUsize>,
 }
 
 impl Writer {
     fn run(self, mut rx: mpsc::UnboundedReceiver<Job>) {
-        while let Some(first) = rx.blocking_recv() {
+        // Kept open while batches are queued, so queued work never waits behind a merge.
+        let mut open: Option<IndexWriter> = None;
+        loop {
+            let first = match rx.try_recv() {
+                Ok(job) => job,
+                Err(TryRecvError::Disconnected) => break,
+                Err(TryRecvError::Empty) => {
+                    if let Some(w) = open.take() {
+                        // Queue drained: let merges finish, then release the lock for other processes.
+                        self.merge_waits.fetch_add(1, Ordering::SeqCst);
+                        let _ = w.wait_merging_threads();
+                        continue;
+                    }
+                    match rx.blocking_recv() {
+                        Some(job) => job,
+                        None => break,
+                    }
+                }
+            };
             let mut batch = vec![first];
             while let Ok(job) = rx.try_recv() {
                 batch.push(job);
             }
             let docs = batch.iter().flat_map(|(d, _)| d);
-            let (result, writer) = match self.commit(docs) {
-                Ok(w) => (Ok(()), w),
-                Err(e) => (Err(format!("{e:#}")), None),
+            let result = match self.commit(open.take(), docs) {
+                Ok(w) => {
+                    open = Some(w);
+                    Ok(())
+                }
+                Err(e) => Err(format!("{e:#}")),
             };
             for (_, tx) in batch {
                 let _ = tx.send(result.clone());
             }
-            // Merges run after the callers are answered; the lock is held until they finish.
-            if let Some(w) = writer {
-                let _ = w.wait_merging_threads();
+        }
+        if let Some(w) = open {
+            let _ = w.wait_merging_threads();
+        }
+    }
+
+    /// Adds the passages not yet indexed and commits, with `open` or a newly locked writer; returns
+    /// the writer, whose merges may still be running. On failure the batch is discarded and the
+    /// writer's merges finish before its lock is released.
+    fn commit<'a>(
+        &self,
+        open: Option<IndexWriter>,
+        docs: impl Iterator<Item = &'a PassageDoc>,
+    ) -> anyhow::Result<IndexWriter> {
+        let mut writer = match open {
+            Some(w) => w,
+            None => self.lock()?,
+        };
+        match self.add_and_commit(&mut writer, docs) {
+            Ok(()) => Ok(writer),
+            Err(e) => {
+                let _ = writer.wait_merging_threads();
+                Err(e)
             }
         }
     }
 
-    /// Adds the passages not yet indexed and commits; returns the writer so its merges can finish.
-    fn commit<'a>(
+    fn add_and_commit<'a>(
         &self,
+        writer: &mut IndexWriter,
         docs: impl Iterator<Item = &'a PassageDoc>,
-    ) -> anyhow::Result<Option<IndexWriter>> {
-        let mut writer = self.lock()?;
+    ) -> anyhow::Result<()> {
         // Under the lock, so every other process's commit is visible to the duplicate check.
         self.reader.reload()?;
         let searcher = self.reader.searcher();
@@ -234,12 +297,12 @@ impl Writer {
             writer.add_document(doc)?;
         }
         if added.is_empty() {
-            return Ok(None);
+            return Ok(());
         }
         writer.commit()?;
         self.commits.fetch_add(1, Ordering::SeqCst);
         self.reader.reload()?;
-        Ok(Some(writer))
+        Ok(())
     }
 
     /// The index writer, waiting with backoff while another process holds the lock.
@@ -247,7 +310,14 @@ impl Writer {
         let start = Instant::now();
         let mut wait = Duration::from_millis(10);
         loop {
-            match self.index.writer_with_num_threads(1, ARENA) {
+            match self
+                .index
+                .writer_with_num_threads::<TantivyDocument>(1, ARENA)
+            {
+                Ok(w) => {
+                    w.set_merge_policy(Box::new(merge_policy()));
+                    return Ok(w);
+                }
                 Err(TantivyError::LockFailure(LockError::LockBusy, _))
                     if start.elapsed() < LOCK_WAIT =>
                 {
@@ -360,6 +430,59 @@ mod tests {
         for i in 0..16 {
             assert_eq!(idx.search(&format!("group{i}"), 5).unwrap().len(), 1);
         }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn queued_batches_dont_wait_for_merges() {
+        let idx = Arc::new(Index::open(&temp_web("merges")).unwrap());
+        // An add every 200 µs for 1 s: the queue refills during every commit, and the many small
+        // segments push the merge policy (layer of 100 docs, 8 segments) into merging.
+        let handle = tokio::runtime::Handle::current();
+        let producer = {
+            let idx = Arc::clone(&idx);
+            std::thread::spawn(move || {
+                let start = Instant::now();
+                let mut adds = Vec::new();
+                for i in 0.. {
+                    if start.elapsed() > Duration::from_secs(1) {
+                        break;
+                    }
+                    let idx = Arc::clone(&idx);
+                    adds.push(handle.spawn(async move {
+                        idx.add(vec![doc(&format!("burst{i}"), "https://m/")]).await
+                    }));
+                    std::thread::sleep(Duration::from_micros(200));
+                }
+                adds
+            })
+        };
+        let adds = producer.join().unwrap();
+        let n = adds.len();
+        for a in adds {
+            a.await.unwrap().unwrap();
+        }
+        let commits = idx.commits.load(Ordering::SeqCst);
+        let waits = idx.merge_waits.load(Ordering::SeqCst);
+        assert!(commits >= 4, "{commits} commits for {n} adds");
+        // Waiting for merges happens only once the queue is empty, not between queued batches.
+        assert!(
+            waits * 4 <= commits,
+            "{waits} merge waits over {commits} commits"
+        );
+        // Merges finish after the last batch is answered.
+        let start = Instant::now();
+        let segments = loop {
+            let n = idx.tantivy.searchable_segment_ids().unwrap().len();
+            if n < commits || start.elapsed() > Duration::from_secs(10) {
+                break n;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        };
+        assert!(
+            segments < commits,
+            "no merges ran: {segments} segments, {commits} commits"
+        );
+        assert_eq!(idx.search("burst7", 5).unwrap().len(), 1);
     }
 
     #[tokio::test]

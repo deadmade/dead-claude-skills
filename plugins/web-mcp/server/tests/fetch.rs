@@ -92,6 +92,18 @@ fn markdown_response_passed_through() {
 
 #[cfg(debug_assertions)]
 #[test]
+fn public_pages_are_indexed() {
+    let fx = Fixture::start(PUBLIC);
+    let mut mcp = Mcp::start();
+    let r = fetch(&mut mcp, &fx.url("/article.html"));
+    assert!(!is_error(&r), "{r}");
+    // Indexed before the fetch answers.
+    let index = tantivy::Index::open_in_dir(mcp.project.join(".web/index")).unwrap();
+    assert!(index.reader().unwrap().searcher().num_docs() > 0);
+}
+
+#[cfg(debug_assertions)]
+#[test]
 fn second_fetch_same_run_hits_cache() {
     let fx = Fixture::start(PUBLIC);
     let mut mcp = Mcp::start();

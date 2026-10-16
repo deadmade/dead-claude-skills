@@ -246,6 +246,17 @@ spec; screenshots through `Archive::put`; SearXNG steps printed without Docker.
   every column), with the mean reported beside it. Tabbed or collapsed doc sections become a tracked follow-up for the
   final review, not a blocker for Task 7.
 
+**Index add cost (Task 7), 2026-10-17** (deadPc, `cargo bench --bench rank -- --quick`, one add of 20 passages on a
+10,000-passage index, measured from the caller). It is on `fetch`'s path now and will be on `search`'s.
+
+- **Before the fix:** criterion ~90 ms; caller p50 49 ms, p90 317 ms. About 10% of adds waited ~270 ms behind a merge
+  that rewrote the 10,000-passage segment.
+- **After the fix** (merges capped at 4,000-passage segments with a 100-passage first layer; queued batches reuse the
+  open writer, and merges are only waited for once the queue is empty): criterion ~45 ms; caller p50 47 ms, p90
+  109 ms, max 230 ms.
+- **Cause:** fsync inside tantivy's `commit()`, 40–50 ms per batch on this disk, plus merges. Budget was 50 ms p50;
+  p50 sits just under it, the tail does not.
+
 **Baseline on the user's machine, 2026-10-16** (deadPc, Linux, harness at 8c82945, 3 runs per item; raw numbers in
 [bench/results/deadPc-2026-10-16/](bench/results/deadPc-2026-10-16/summary.md)). This is the Gate 1 baseline.
 

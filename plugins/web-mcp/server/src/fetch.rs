@@ -342,7 +342,10 @@ async fn run(
         .put(item)
         .await
         .map_err(|e| net(format!("could not archive the page: {e}")))?;
-    index(ctx, &final_url, &page, &archived).await;
+    // Private pages skip the cache because they change; indexed, they'd surface stale passages later.
+    if !private {
+        index(ctx, &final_url, &page, &archived).await;
+    }
     Ok(Fetched {
         final_url,
         private,
@@ -752,9 +755,36 @@ mod tests {
         assert!(matches!(restricted, Err(FetchError::Blocked(_))));
         let ok = first.await.unwrap().map_err(|e| e.to_string()).unwrap();
         assert_eq!(ok.page.markdown, "# hi\n");
-        // Every fetched page lands in the passage index before the fetch answers.
-        let hits = ctx.index.search("hi", 5).unwrap();
-        assert_eq!(hits[0].doc.url, url.as_str());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn private_pages_are_not_indexed() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            for mut c in listener.incoming().flatten() {
+                let _ = c.read(&mut [0; 4096]);
+                let body = "# devsite\n\nchanging local content\n";
+                let _ = write!(
+                    c,
+                    "HTTP/1.1 200 OK\r\nContent-Type: text/markdown\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+            }
+        });
+        let ctx = test_ctx();
+        let url = Url::parse(&format!("http://localhost:{port}/")).unwrap();
+        let opts = GetOpts {
+            allow_private: true,
+            ..GetOpts::default()
+        };
+        let f = get(&ctx, &url, Duration::from_secs(10), opts)
+            .await
+            .map_err(|e| e.to_string())
+            .unwrap();
+        assert!(f.private);
+        assert!(ctx.index.search("devsite changing", 5).unwrap().is_empty());
     }
 
     #[tokio::test]

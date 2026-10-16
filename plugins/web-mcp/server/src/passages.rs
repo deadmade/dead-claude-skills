@@ -29,10 +29,21 @@ pub fn split(markdown: &str) -> Vec<String> {
                     queue.push_front((p, if i == 0 { glue } else { " " }));
                 }
             } else {
-                let room = if n == 0 { MAX } else { MAX - n - glue.len() };
-                let cut = unit.char_indices().nth(room).map_or(unit.len(), |(i, _)| i);
-                queue.push_front((unit[cut..].to_owned(), ""));
-                queue.push_front((unit[..cut].to_owned(), glue));
+                // No sentence end: fill `cur`, then cut the rest into MAX-sized pieces in one pass.
+                let mut pieces = Vec::new();
+                let (mut rest, mut size) = (
+                    unit.as_str(),
+                    if n == 0 { MAX } else { MAX - n - glue.len() },
+                );
+                while !rest.is_empty() {
+                    let cut = rest.char_indices().nth(size).map_or(rest.len(), |(i, _)| i);
+                    pieces.push(rest[..cut].to_owned());
+                    rest = &rest[cut..];
+                    size = MAX;
+                }
+                for (i, p) in pieces.into_iter().enumerate().rev() {
+                    queue.push_front((p, if i == 0 { glue } else { "" }));
+                }
             }
         }
     }
@@ -87,6 +98,7 @@ fn sentences(text: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{Duration, Instant};
 
     fn tokens(s: &str) -> usize {
         s.chars().count() / 4
@@ -116,6 +128,21 @@ mod tests {
         // Nothing lost: the same words in the same order.
         let words = |s: &str| s.split_whitespace().map(str::to_owned).collect::<Vec<_>>();
         assert_eq!(words(&out.join(" ")), words(&md));
+    }
+
+    #[test]
+    fn split_is_linear_on_huge_unbroken_text() {
+        // 8 MB with no sentence end, and 8 MB of one "sentence" whose dots aren't followed by spaces.
+        let bound = Duration::from_secs(if cfg!(debug_assertions) { 10 } else { 1 });
+        for md in ["x".repeat(8 << 20), "a.b".repeat((8 << 20) / 3)] {
+            let start = Instant::now();
+            let out = split(&md);
+            assert!(start.elapsed() < bound, "{:?}", start.elapsed());
+            let (last, rest) = out.split_last().unwrap();
+            assert!(rest.iter().all(|p| (256..=512).contains(&tokens(p))));
+            assert!(tokens(last) <= 512);
+            assert_eq!(out.concat(), md);
+        }
     }
 
     #[test]
