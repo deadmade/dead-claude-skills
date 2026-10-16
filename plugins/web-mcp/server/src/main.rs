@@ -1,6 +1,7 @@
 // The stub tools read none of the config or arguments yet; later tasks do. Remove this then.
 #![allow(dead_code)]
 
+mod archive;
 mod config;
 mod tools;
 
