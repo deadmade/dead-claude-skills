@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import test from 'node:test';
-import { norm } from './baseline.mjs';
+import { claudeArgs, claudeEnv, norm } from './baseline.mjs';
 import { ids, primaryIds } from './ids.mjs';
 
 test('ids', () => {
@@ -30,4 +31,12 @@ test('primaryIds takes the first record only', () => {
 
 test('norm strips markdown link targets', () => {
   assert.equal(norm('see [the docs](https://x.y/z) now'), 'see the docs now');
+});
+
+test('web-mcp target loads the plugin and puts the binary on PATH', () => {
+  assert.deepEqual(claudeArgs('web-mcp', '/r'), ['--plugin-dir', '/r/plugins/web-mcp']);
+  assert.deepEqual(claudeArgs('builtin', '/r'), []);
+  assert.equal(claudeEnv('web-mcp', '/x/bin/web-mcp', { PATH: '/usr/bin' }).PATH, `/x/bin${path.delimiter}/usr/bin`);
+  const env = { PATH: '/usr/bin' };
+  assert.equal(claudeEnv('builtin', null, env), env);
 });

@@ -41,6 +41,12 @@ function verbatimRecall(text, result) {
   return sample.filter((s) => r.includes(norm(s))).length / sample.length;
 }
 
+// Extra `claude` flags and env so the spawned session loads this checkout's web-mcp plugin and finds the dev binary.
+export const claudeArgs = (target, repo) =>
+  target === 'web-mcp' ? ['--plugin-dir', path.join(repo, 'plugins/web-mcp')] : [];
+export const claudeEnv = (target, bin, env) =>
+  target === 'web-mcp' ? { ...env, PATH: path.dirname(path.resolve(bin)) + path.delimiter + (env.PATH ?? '') } : env;
+
 const fail = (m) => {
   throw new Error(m);
 };
@@ -60,6 +66,10 @@ async function main() {
   if (!['builtin', 'web-mcp'].includes(target)) throw new Error(`--target must be builtin or web-mcp, got ${target}`);
   const bin = opt('bin', null);
   const mcp = target === 'web-mcp';
+  if (mcp && !(bin && fs.existsSync(bin) && fs.statSync(bin).isFile())) {
+    console.error('--target web-mcp needs --bin <path to an existing web-mcp binary>');
+    process.exit(1);
+  }
   const SEARCH = mcp ? 'mcp__plugin_web-mcp_web__search' : 'WebSearch';
   const FETCH = mcp ? 'mcp__plugin_web-mcp_web__fetch' : 'WebFetch';
   const runs = Number(opt('runs', 3));
@@ -104,8 +114,19 @@ process.stdin.on("data", (c) => (d += c)).on("end", () => {
     const t0 = Date.now();
     const p = spawnSync(
       'claude',
-      ['-p', prompt, '--settings', settings, '--allowedTools', SEARCH, FETCH, '--output-format', 'json'],
-      { env: { ...process.env, BL_LOG: log }, encoding: 'utf8', timeout: 300_000 },
+      [
+        '-p',
+        prompt,
+        '--settings',
+        settings,
+        '--allowedTools',
+        SEARCH,
+        FETCH,
+        '--output-format',
+        'json',
+        ...claudeArgs(target, repo),
+      ],
+      { env: { ...claudeEnv(target, bin, process.env), BL_LOG: log }, encoding: 'utf8', timeout: 300_000 },
     );
     const wall = Date.now() - t0;
     const lines = fs.existsSync(log) ? fs.readFileSync(log, 'utf8').trim().split('\n').filter(Boolean) : [];
