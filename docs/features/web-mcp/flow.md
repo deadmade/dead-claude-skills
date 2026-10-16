@@ -223,11 +223,30 @@ spec; screenshots through `Archive::put`; SearXNG steps printed without Docker.
 
 ## Results
 
-| run                       | command                                                  | numbers   | date       |
-| ------------------------- | -------------------------------------------------------- | --------- | ---------- |
-| baseline (cloud, partial) | `node docs/features/web-mcp/bench/baseline.mjs --runs 3` | see below | 2026-10-16 |
-| baseline (your machine)   | same                                                     |           |            |
-| feature                   |                                                          |           |            |
+| run                       | command                                                                                                              | numbers   | date       |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------- | --------- | ---------- |
+| baseline (cloud, partial) | `node docs/features/web-mcp/bench/baseline.mjs --runs 3`                                                             | see below | 2026-10-16 |
+| baseline (your machine)   | `node docs/features/web-mcp/bench/baseline.mjs --runs 3 --out docs/features/web-mcp/bench/results/deadPc-2026-10-16` | see below | 2026-10-16 |
+| feature                   |                                                                                                                      |           |            |
+
+**Baseline on the user's machine, 2026-10-16** (deadPc, Linux, harness at 8c82945, 3 runs per item; raw numbers in
+[bench/results/deadPc-2026-10-16/](bench/results/deadPc-2026-10-16/summary.md)). This is the Gate 1 baseline.
+
+- **WebSearch:** 30/30 ok, p50 **6,888 ms**, p95 8,323 ms; about 9 results, about 2,800 characters of titles and URLs.
+  H3 target: web-mcp `search` p50 ≤ 6,888 ms.
+- **WebFetch:** 30/30 ok, p50 **7,123 ms**, p95 11,327 ms; about 1,765 characters back for pages of 8,000–121,000.
+  Verbatim recall **0** on all 10 URLs; several replies refused outright ("I can't reproduce the full page
+  verbatim"). H2 target: web-mcp `fetch` p50 ≤ 1,425 ms (20%). H1 target: recall ≥ 0.9.
+- **4 WebFetch calls in one message:** span p50 8,384 ms against 26,771 ms summed.
+- **paper-lookup pipelines** (wall clock, curl + script): arxiv id p50 85 ms, arxiv search 76 ms, openalex doi 547 ms,
+  openalex search 1,048 ms, crossref doi 452 ms. Identifier found in the first record: arxiv id 3/3, openalex doi
+  3/3, crossref doi 3/3.
+- **Semantic Scholar row invalid:** HTTP 429 on all 3 runs (no API key), so its 504 ms is a refusal and it found no
+  identifier. The harness counted it "ok" because curl exited 0 (deferred harness fix: treat non-2xx as failed).
+  H6 for that row compares against nothing; threat recorded.
+- **Expected H6 latency miss, noted before any web-mcp number:** papers mode queries two sources per identifier and
+  waits for both (plan Task 9), so arXiv-id lookups inherit OpenAlex's ~550 ms against arXiv's 85 ms. Kept for complete
+  records (abstracts); H6 isn't among H1, H2, H5.
 
 **Cloud baseline, 2026-10-16** (claude 2.1.301, Linux container behind the egress proxy, 3 runs per item; raw
 numbers in [bench/results/cloud-2026-10-16/raw.jsonl](bench/results/cloud-2026-10-16/raw.jsonl)). Not the Gate 1
