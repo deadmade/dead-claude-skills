@@ -34,37 +34,47 @@
       "name": "arxiv id",
       "url": "https://export.arxiv.org/api/query?id_list=1706.03762",
       "script": "arxiv_atom.py",
-      "host": "arxiv"
+      "host": "arxiv",
+      "query": "arXiv:1706.03762",
+      "asked": "1706.03762"
     },
     {
       "name": "arxiv search",
       "url": "https://export.arxiv.org/api/query?search_query=all:%22hybrid%20retrieval%22&max_results=10",
       "script": "arxiv_atom.py",
-      "host": "arxiv"
+      "host": "arxiv",
+      "query": "hybrid retrieval"
     },
     {
       "name": "openalex doi + abstract",
       "url": "https://api.openalex.org/works/doi:10.7717/peerj.4375",
       "script": "openalex_abstract.py",
-      "host": "openalex"
+      "host": "openalex",
+      "query": "doi:10.7717/peerj.4375",
+      "asked": "10.7717/peerj.4375"
     },
     {
       "name": "openalex search",
       "url": "https://api.openalex.org/works?search=web%20content%20extraction&per-page=10",
       "script": "openalex_abstract.py",
-      "host": "openalex"
+      "host": "openalex",
+      "query": "web content extraction"
     },
     {
       "name": "crossref doi",
       "url": "https://api.crossref.org/works/10.1038/nature12373",
       "script": null,
-      "host": "crossref"
+      "host": "crossref",
+      "query": "10.1038/nature12373",
+      "asked": "10.1038/nature12373"
     },
     {
       "name": "semantic scholar arxiv id",
       "url": "https://api.semanticscholar.org/graph/v1/paper/ARXIV:1706.03762?fields=title,year,externalIds",
       "script": null,
-      "host": "s2"
+      "host": "s2",
+      "query": "1706.03762",
+      "asked": "1706.03762"
     }
   ]
 }
