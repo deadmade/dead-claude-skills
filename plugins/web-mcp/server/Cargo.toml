@@ -25,6 +25,8 @@ reqwest = { version = "=0.13.5", default-features = false, features = ["rustls-n
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 futures = { version = "0.3", default-features = false, features = ["std"] }
 base64 = "0.23"
+# Without zstd: no C toolchain needed to build.
+tantivy = { version = "=0.26.2", default-features = false, features = ["mmap", "lz4-compression"] }
 
 [dev-dependencies]
 criterion = { version = "=0.8.2", default-features = false }
@@ -32,6 +34,10 @@ tokio = { version = "1", features = ["test-util"] }
 
 [[bench]]
 name = "extract"
+harness = false
+
+[[bench]]
+name = "rank"
 harness = false
 
 [lints.clippy]

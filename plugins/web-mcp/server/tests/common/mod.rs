@@ -271,7 +271,7 @@ impl Mcp {
             .unwrap()
             .flatten()
             .map(|e| e.path())
-            .find(|p| p.is_dir())
+            .find(|p| p.is_dir() && !p.ends_with("index")) // index/ is the passage index
             .unwrap()
     }
 }

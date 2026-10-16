@@ -18,6 +18,7 @@ use crate::archive::{Archived, Item, is_private, is_private_ip};
 use crate::extract::{Page, extract_html, extract_pdf};
 use crate::images;
 use crate::limits::HostPermit;
+use crate::rank::PassageDoc;
 
 pub const MAX_BODY: usize = 20 * 1024 * 1024;
 const ACCEPT_VALUE: &str = "text/markdown, text/html;q=0.9, */*;q=0.8";
@@ -341,12 +342,46 @@ async fn run(
         .put(item)
         .await
         .map_err(|e| net(format!("could not archive the page: {e}")))?;
+    index(ctx, &final_url, &page, &archived).await;
     Ok(Fetched {
         final_url,
         private,
         archived,
         page,
     })
+}
+
+/// Adds the page's passages to the archive index. A failure only costs search recall, so it is
+/// reported on stderr and the fetch still succeeds.
+async fn index(ctx: &Ctx, url: &Url, page: &Page, archived: &Archived) {
+    let (markdown, title) = (page.markdown.clone(), page.title.clone());
+    let (url, path, fetched) = (
+        url.to_string(),
+        archived.path.to_string_lossy().into_owned(),
+        archived.time.clone(),
+    );
+    let docs = tokio::task::spawn_blocking(move || {
+        crate::passages::split(&markdown)
+            .into_iter()
+            .map(|text| PassageDoc {
+                text,
+                url: url.clone(),
+                title: title.clone(),
+                path: path.clone(),
+                fetched: fetched.clone(),
+            })
+            .collect()
+    })
+    .await;
+    if let Err(e) = match docs {
+        Ok(docs) => ctx.index.add(docs).await,
+        Err(e) => Err(e.into()),
+    } {
+        eprintln!(
+            "web-mcp: could not index {}: {e:#}",
+            archived.path.display()
+        );
+    }
 }
 
 /// GET with the per-host limits, retrying a 429 or 503 once after its `Retry-After` (at most 10 s).
@@ -671,8 +706,10 @@ mod tests {
             jiff::Timestamp::now().as_nanosecond()
         ));
         std::fs::create_dir_all(&project).unwrap();
+        let archive = crate::archive::Archive::open(&project, &jiff::Zoned::now()).unwrap();
         Arc::new(Ctx {
-            archive: crate::archive::Archive::open(&project, &jiff::Zoned::now()).unwrap(),
+            index: crate::rank::Index::open(archive.web()).unwrap(),
+            archive,
             cfg: crate::config::Config {
                 project,
                 searxng: Url::parse("http://127.0.0.1:8888").unwrap(),
@@ -715,6 +752,9 @@ mod tests {
         assert!(matches!(restricted, Err(FetchError::Blocked(_))));
         let ok = first.await.unwrap().map_err(|e| e.to_string()).unwrap();
         assert_eq!(ok.page.markdown, "# hi\n");
+        // Every fetched page lands in the passage index before the fetch answers.
+        let hits = ctx.index.search("hi", 5).unwrap();
+        assert_eq!(hits[0].doc.url, url.as_str());
     }
 
     #[tokio::test]

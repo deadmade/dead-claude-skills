@@ -4,6 +4,8 @@ mod extract;
 mod fetch;
 mod images;
 mod limits;
+mod passages;
+mod rank;
 mod tools;
 
 use std::sync::Arc;
@@ -19,6 +21,7 @@ pub struct Ctx {
     pub limits: limits::HostLimits,
     pub archive: archive::Archive,
     pub inflight: fetch::Inflight,
+    pub index: rank::Index,
 }
 
 #[tokio::main]
@@ -30,11 +33,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cfg = config::Config::from_env()?;
     // ring, not aws-lc-rs: no cmake or C toolchain needed to build.
     let _ = rustls::crypto::ring::default_provider().install_default();
+    let archive = archive::Archive::open(&cfg.project, &jiff::Zoned::now())?;
     let ctx = Ctx {
+        index: rank::Index::open(archive.web())?,
+        archive,
         http: fetch::client(false)?,
         http_public: fetch::client(true)?,
         limits: limits::HostLimits::default(),
-        archive: archive::Archive::open(&cfg.project, &jiff::Zoned::now())?,
         inflight: fetch::Inflight::default(),
         cfg,
     };
