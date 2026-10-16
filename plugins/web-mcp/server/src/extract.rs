@@ -1,6 +1,7 @@
 use dom_smoothie::Readability;
 use url::Url;
 
+#[derive(Clone)]
 pub struct Page {
     pub title: String,
     pub markdown: String,
@@ -54,6 +55,7 @@ pub fn extract_pdf(bytes: &[u8]) -> anyhow::Result<String> {
 }
 
 /// Pages with less text than this are probably client-rendered shells.
+#[allow(dead_code)] // used by the browser fallback (Task 10)
 pub fn near_empty(page: &Page) -> bool {
     page.markdown.chars().count() < 200
 }

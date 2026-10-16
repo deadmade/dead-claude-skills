@@ -6,10 +6,19 @@ use rmcp::{ServerHandler, tool, tool_handler, tool_router};
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::config::Config;
+use std::sync::Arc;
+use std::time::Duration;
+
+use url::Url;
+
+use crate::Ctx;
+use crate::fetch::{self, GetOpts};
+
+const FETCH_DEADLINE: Duration = Duration::from_secs(30);
 
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "schemars")]
+#[allow(dead_code)] // read once search is implemented (Task 8)
 pub struct SearchArgs {
     pub query: String,
     pub papers: Option<bool>,
@@ -43,6 +52,7 @@ pub enum BrowserAction {
 
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "schemars")]
+#[allow(dead_code)] // read once browser is implemented (Task 10)
 pub struct BrowserArgs {
     pub action: BrowserAction,
     pub session: String,
@@ -54,24 +64,28 @@ pub struct BrowserArgs {
 }
 
 pub struct Server {
-    config: Config,
+    ctx: Arc<Ctx>,
     router: ToolRouter<Self>,
 }
 
+fn error(msg: impl Into<String>) -> CallToolResult {
+    CallToolResult::error(vec![ContentBlock::text(msg)])
+}
+
 fn not_implemented() -> CallToolResult {
-    CallToolResult::error(vec![ContentBlock::text("not implemented")])
+    error("not implemented")
 }
 
 impl Server {
     #[must_use]
-    pub fn new(config: Config) -> Self {
+    pub fn new(ctx: Arc<Ctx>) -> Self {
         let mut router = Self::tool_router();
         if let Some(fetch) = router.map.get_mut("fetch") {
             // Claude Code's per-tool cap on result size; whole pages need more than the default.
             let meta = json!({"anthropic/maxResultSizeChars": 200_000});
             fetch.attr.meta = serde_json::from_value(meta).ok();
         }
-        Self { config, router }
+        Self { ctx, router }
     }
 }
 
@@ -90,9 +104,20 @@ impl Server {
         description = "Fetch a whole page as markdown, optionally with its images.",
         annotations(read_only_hint = true)
     )]
-    #[allow(clippy::unused_async)]
-    async fn fetch(&self, _args: Parameters<FetchArgs>) -> CallToolResult {
-        not_implemented()
+    async fn fetch(&self, Parameters(args): Parameters<FetchArgs>) -> CallToolResult {
+        let url = match Url::parse(&args.url) {
+            Ok(u) if matches!(u.scheme(), "http" | "https") => u,
+            _ => return error(format!("{} is not an http(s) URL", args.url)),
+        };
+        let images = args.images.unwrap_or(false);
+        let opts = GetOpts {
+            images,
+            ..GetOpts::default()
+        };
+        match fetch::get(&self.ctx, &url, FETCH_DEADLINE, opts).await {
+            Ok(f) => fetch::render(&self.ctx, &f, images).await,
+            Err(e) => error(format!("Fetching {url} failed: {e}")),
+        }
     }
 
     #[tool(description = "Drive a browser session through agent-browser.")]

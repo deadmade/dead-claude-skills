@@ -1,11 +1,22 @@
 use anyhow::Result;
-use image::{DynamicImage, ImageFormat, imageops::FilterType};
+use image::{DynamicImage, ImageFormat, ImageReader, Limits, imageops::FilterType};
 use std::io::Cursor;
 
+/// Larger inputs are refused unread.
+pub const MAX_BYTES: usize = 10 * 1024 * 1024;
+
 /// Shrinks so the longest side is at most `max_side` (never enlarges), keeping the
-/// aspect ratio. JPEG, or PNG when the source has an alpha channel.
+/// aspect ratio. JPEG, or PNG when the source has an alpha channel. Refuses inputs over
+/// `MAX_BYTES` or 8192 px a side, and caps decoder memory, so a decompression bomb fails.
 pub fn downscale(bytes: &[u8], max_side: u32) -> Result<(Vec<u8>, &'static str)> {
-    let mut img = image::load_from_memory(bytes)?;
+    anyhow::ensure!(bytes.len() <= MAX_BYTES, "image over 10 MB");
+    let mut limits = Limits::default();
+    limits.max_image_width = Some(8192);
+    limits.max_image_height = Some(8192);
+    limits.max_alloc = Some(256 * 1024 * 1024);
+    let mut reader = ImageReader::new(Cursor::new(bytes)).with_guessed_format()?;
+    reader.limits(limits);
+    let mut img = reader.decode()?;
     if img.width().max(img.height()) > max_side {
         img = img.resize(max_side, max_side, FilterType::Lanczos3);
     }
@@ -44,6 +55,12 @@ mod tests {
         assert_eq!((dims(&out), mime), ((1024, 512), "image/jpeg"));
         let (out, _) = downscale(&png(&DynamicImage::new_rgb8(300, 200)), 1024).unwrap();
         assert_eq!(dims(&out), (300, 200));
+    }
+
+    #[test]
+    fn oversized_dimensions_are_refused() {
+        assert!(downscale(&png(&DynamicImage::new_luma8(9000, 1)), 1024).is_err());
+        assert!(downscale(&vec![0; MAX_BYTES + 1], 1024).is_err());
     }
 
     #[test]

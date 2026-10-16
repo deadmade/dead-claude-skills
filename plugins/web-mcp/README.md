@@ -6,7 +6,10 @@ A stdio MCP server (`web-mcp`, Rust) with three tools, available to Claude as `m
 - `fetch`: a whole page as markdown, optionally with its images.
 - `browser`: a browser session driven through `agent-browser`.
 
-Everything is archived in `.web/` in the project. The tools are stubs in this version: they answer "not implemented".
+Everything is archived in `.web/` in the project before Claude sees it. `fetch` works: HTML pages come back as their
+main content in markdown, PDFs as text, with up to six images on request; a URL fetched earlier in the run comes from
+the archive (except localhost and private-network addresses). `search` and `browser` are still stubs that answer "not
+implemented".
 
 ## Install
 

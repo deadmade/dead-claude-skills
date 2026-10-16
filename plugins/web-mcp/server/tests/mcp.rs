@@ -5,7 +5,10 @@ use serde_json::{Value, json};
 
 #[test]
 fn lists_three_tools() {
+    let project = std::env::temp_dir().join(format!("web-mcp-mcp-{}", std::process::id()));
+    std::fs::create_dir_all(&project).unwrap();
     let mut child = Command::new(env!("CARGO_BIN_EXE_web-mcp"))
+        .env("CLAUDE_PROJECT_DIR", &project)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()

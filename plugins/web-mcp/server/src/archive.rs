@@ -28,11 +28,15 @@ pub enum Item {
         rendered: Option<String>,
         markdown: String,
         images: Vec<(String, Vec<u8>)>,
+        /// False for private pages (e.g. a private peer address), so `cached` never serves them.
+        cache: bool,
     },
     Pdf {
         url: Url,
+        final_url: Url,
         bytes: Vec<u8>,
         text: String,
+        cache: bool,
     },
     Screenshot {
         session: String,
@@ -42,6 +46,8 @@ pub enum Item {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Archived {
+    /// The page's or PDF's final URL; empty for searches and screenshots.
+    pub url: String,
     /// Relative to `.web`.
     pub path: PathBuf,
     pub sha256: String,
@@ -137,7 +143,13 @@ impl Archive {
             .map_err(io::Error::other)?
     }
 
-    /// The latest page put for this URL in this run. Never for private URLs.
+    /// The absolute `.web` folder that `Archived::path` is relative to.
+    #[must_use]
+    pub fn web(&self) -> &Path {
+        &self.0.web
+    }
+
+    /// The latest page or PDF put for this URL in this run. Never for private URLs.
     #[must_use]
     pub fn cached(&self, url: &Url) -> Option<Archived> {
         if is_private(url) {
@@ -172,6 +184,7 @@ impl Inner {
         let time = jiff::Timestamp::now().to_string();
         let mut lines: Vec<IndexEntry> = Vec::new();
         let mut keys: Vec<String> = Vec::new();
+        let mut url_out = String::new();
         let entry = |url: String, query, kind, sha256, path: &Path| IndexEntry {
             url,
             query,
@@ -202,6 +215,7 @@ impl Inner {
                 rendered,
                 markdown,
                 images,
+                cache,
             } => {
                 let dir = self.run.join("pages").join(slug(&final_url));
                 Self::write(&dir.join(format!("raw.{raw_ext}")), &raw).await?;
@@ -229,11 +243,20 @@ impl Inner {
                     raw_sha.clone(),
                     &md,
                 ));
-                keys = vec![url.to_string(), final_url.to_string()];
+                if cache {
+                    keys = vec![url.to_string(), final_url.to_string()];
+                }
+                url_out = final_url.to_string();
                 (md, raw_sha)
             }
-            Item::Pdf { url, bytes, text } => {
-                let s = slug(&url);
+            Item::Pdf {
+                url,
+                final_url,
+                bytes,
+                text,
+                cache,
+            } => {
+                let s = slug(&final_url);
                 let path = self.run.join("pdfs").join(format!("{s}.pdf"));
                 Self::write(&path, &bytes).await?;
                 Self::write(
@@ -241,7 +264,17 @@ impl Inner {
                     text.as_bytes(),
                 )
                 .await?;
-                lines.push(entry(url.to_string(), None, Kind::Pdf, sha(&bytes), &path));
+                lines.push(entry(
+                    final_url.to_string(),
+                    None,
+                    Kind::Pdf,
+                    sha(&bytes),
+                    &path,
+                ));
+                if cache {
+                    keys = vec![url.to_string(), final_url.to_string()];
+                }
+                url_out = final_url.to_string();
                 (path, sha(&bytes))
             }
             Item::Screenshot { session, jpeg } => {
@@ -271,6 +304,7 @@ impl Inner {
             index.flush().await?;
         }
         let archived = Archived {
+            url: url_out,
             path: self.rel(&main.0),
             sha256: main.1,
             time,
@@ -335,19 +369,17 @@ pub fn is_private(url: &Url) -> bool {
             d == "localhost" || d.ends_with(".localhost")
         }
         Some(Host::Ipv4(ip)) => is_private_ip(IpAddr::V4(ip)),
-        Some(Host::Ipv6(ip)) => {
-            ip.is_loopback()
-                || ip.is_unspecified()
-                || ip.is_unique_local()
-                || ip.is_unicast_link_local()
-                || ip
-                    .to_ipv4_mapped()
-                    .is_some_and(|v4| is_private_ip(IpAddr::V4(v4)))
-        }
+        Some(Host::Ipv6(ip)) => is_private_ip(IpAddr::V6(ip)),
     }
 }
 
-fn is_private_ip(ip: IpAddr) -> bool {
+#[must_use]
+pub fn is_private_ip(ip: IpAddr) -> bool {
+    // Integration tests serve "public" pages from loopback; release builds never read this.
+    #[cfg(debug_assertions)]
+    if std::env::var("WEB_MCP_TEST_PUBLIC_IP").is_ok_and(|v| v == ip.to_string()) {
+        return false;
+    }
     match ip {
         IpAddr::V4(v) => {
             v.is_loopback()
@@ -356,7 +388,15 @@ fn is_private_ip(ip: IpAddr) -> bool {
                 || v.is_unspecified()
                 || (v.octets()[0] == 100 && v.octets()[1] & 0xc0 == 64) // CGNAT 100.64.0.0/10
         }
-        IpAddr::V6(_) => false,
+        IpAddr::V6(ip) => {
+            ip.is_loopback()
+                || ip.is_unspecified()
+                || ip.is_unique_local()
+                || ip.is_unicast_link_local()
+                || ip
+                    .to_ipv4_mapped()
+                    .is_some_and(|v4| is_private_ip(IpAddr::V4(v4)))
+        }
     }
 }
 
@@ -382,6 +422,7 @@ mod tests {
             rendered: rendered.map(Into::into),
             markdown: "hi".into(),
             images: vec![("a.png".into(), vec![1, 2, 3])],
+            cache: true,
         }
     }
 
@@ -487,6 +528,32 @@ mod tests {
         )
         .unwrap();
         assert!(b.cached(&url).is_none());
+    }
+
+    #[tokio::test]
+    async fn pdfs_and_uncacheable_pages() {
+        let d = tempdir();
+        let a = open(&d);
+        let (url, fin) = (u("https://example.com/p"), u("https://example.com/p.pdf"));
+        let got = a
+            .put(Item::Pdf {
+                url: url.clone(),
+                final_url: fin.clone(),
+                bytes: b"%PDF".to_vec(),
+                text: "t".into(),
+                cache: true,
+            })
+            .await
+            .unwrap();
+        assert_eq!(got.url, fin.as_str());
+        assert_eq!(a.cached(&url), Some(got.clone()));
+        assert_eq!(a.cached(&fin), Some(got));
+        let mut p = page("https://example.com/no", None);
+        if let Item::Page { cache, .. } = &mut p {
+            *cache = false;
+        }
+        a.put(p).await.unwrap();
+        assert!(a.cached(&u("https://example.com/no")).is_none());
     }
 
     #[tokio::test]
