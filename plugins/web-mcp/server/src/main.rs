@@ -3,6 +3,8 @@
 
 mod archive;
 mod config;
+mod extract;
+mod images;
 mod tools;
 
 use rmcp::{ServiceExt, transport::stdio};

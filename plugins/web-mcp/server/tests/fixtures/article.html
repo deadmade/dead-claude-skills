@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Why Teams Adopt Rust - Example Engineering Blog</title>
+<link rel="stylesheet" href="/site.css"></head>
+<body>
+<header class="site-header"><a href="/"><img src="/assets/logo.svg" alt="Example Engineering logo" class="logo"></a>
+<nav><ul><li><a href="/">Home</a></li><li><a href="/archive">Archive</a></li><li><a href="/about">About</a></li><li><a href="/subscribe">Subscribe</a></li></ul></nav></header>
+<main><article>
+<h1>Why Teams Adopt Rust</h1>
+<p class="byline">By Jane Doe</p>
+<p>Rust's ownership model moves checks that other languages defer to runtime into the compiler, so a whole class of memory bugs never reaches production. Teams adopting it report a steep first month followed by far fewer incident pages.</p>
+<p>The borrow checker is the part newcomers fight with. It enforces that a value has either many shared readers or exactly one writer at any moment, and it does so without a garbage collector pausing the program at inconvenient times.</p>
+<figure><img src="/img/borrow-checker.png" alt="Borrow checker diagram"><figcaption>How borrows nest.</figcaption></figure>
+<p>Tooling matters as much as the language. Cargo builds, tests, formats and publishes with one command set, and the standard lints catch a surprising number of logic slips before review even starts.</p>
+<p>Interoperability is pragmatic: the foreign function interface lets existing C libraries be wrapped one at a time, so migrations can proceed module by module instead of through a risky rewrite.</p>
+<img src="https://cdn.example.org/charts/adoption.jpg" alt="Adoption chart">
+<img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="">
+<p>None of this makes the language a silver bullet. Compile times are real, async ergonomics are still maturing, and some domains simply have better-established ecosystems elsewhere.</p>
+</article></main>
+<footer><p>Copyright Example Engineering. <a href="/privacy">Privacy</a> <a href="/terms">Terms</a></p></footer>
+</body></html>
