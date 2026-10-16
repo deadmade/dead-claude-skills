@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "web": {
+      "command": "${user_config.binPath}",
+      "env": {
+        "CLAUDE_PROJECT_DIR": "${CLAUDE_PROJECT_DIR}",
+        "WEB_MCP_SEARXNG_URL": "http://127.0.0.1:8888",
+        "WEB_MCP_AGENT_BROWSER": "agent-browser"
+      }
+    }
+  }
+}

@@ -72,6 +72,7 @@ test('opt-ins from the real manifests', () => {
         'self-review',
         'tob-picks',
         'tui-review',
+        'web-mcp',
       ].map((n) => `${n}@${M}`),
       ...['csharp-lsp', 'hookify', 'pyright-lsp', 'rust-analyzer-lsp', 'skill-creator', 'typescript-lsp'].map(
         (n) => `${n}@${O}`,

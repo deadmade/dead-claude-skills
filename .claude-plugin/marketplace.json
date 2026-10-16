@@ -161,6 +161,12 @@
       "description": "/tui-review: a fast, stacked-branch-aware diff pane beside the chat, so you can ask Claude about what you read. Needs the brv binary, which the installer downloads. Opt-in.",
       "source": "./plugins/tui-review",
       "category": "development"
+    },
+    {
+      "name": "web-mcp",
+      "description": "Web research tools for Claude: search (self-hosted SearXNG and the archive), fetch (whole pages as markdown, optionally with images) and browser (via agent-browser). Everything is archived in .web/. Needs the web-mcp binary, which the installer downloads. Opt-in.",
+      "source": "./plugins/web-mcp",
+      "category": "development"
     }
   ]
 }
