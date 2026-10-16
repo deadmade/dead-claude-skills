@@ -223,11 +223,28 @@ spec; screenshots through `Archive::put`; SearXNG steps printed without Docker.
 
 ## Results
 
-| run                       | command                                                                                                              | numbers   | date       |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------- | --------- | ---------- |
-| baseline (cloud, partial) | `node docs/features/web-mcp/bench/baseline.mjs --runs 3`                                                             | see below | 2026-10-16 |
-| baseline (your machine)   | `node docs/features/web-mcp/bench/baseline.mjs --runs 3 --out docs/features/web-mcp/bench/results/deadPc-2026-10-16` | see below | 2026-10-16 |
-| feature                   |                                                                                                                      |           |            |
+| run                       | command                                                                                                                                                                                                            | numbers   | date       |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------- | ---------- |
+| baseline (cloud, partial) | `node docs/features/web-mcp/bench/baseline.mjs --runs 3`                                                                                                                                                           | see below | 2026-10-16 |
+| baseline (your machine)   | `node docs/features/web-mcp/bench/baseline.mjs --runs 3 --out docs/features/web-mcp/bench/results/deadPc-2026-10-16`                                                                                               | see below | 2026-10-16 |
+| early fetch (Task 6)      | `node docs/features/web-mcp/bench/baseline.mjs --target web-mcp --bin plugins/web-mcp/server/target/release/web-mcp --only fetch --runs 3 --out docs/features/web-mcp/bench/results/deadPc-2026-10-17-fetch-early` | see below | 2026-10-17 |
+| feature                   |                                                                                                                                                                                                                    |           |            |
+
+**Early fetch measurement (Task 6), 2026-10-17** (deadPc, same machine and harness as the baseline, binary at
+9f082de; [summary](bench/results/deadPc-2026-10-17-fetch-early/summary.md)). Early, not the verdict.
+
+- **H2:** `fetch` p50 **442 ms**, p95 583 ms, 30/30 ok, against the 1,425 ms target (WebFetch 7,123 ms). Holds by a
+  wide margin.
+- **H1:** per-URL recall 1, 1, 1, 0.30 (pypi), 0.70 (code.claude.com), 1, 0.95, 0.95, 0.90, 0.50 (arXiv). The
+  harness summary's aggregate (p50 over all calls, as for every column) is **0.95**; the plain mean is **0.83**. The
+  spec says "≥ 0.9 on the URL set" without naming the aggregate.
+- **What the misses are** (sampled sentences not found, checked one by one): pypi 14/20 and arXiv 7/14 are all page
+  chrome (file hashes, provenance boilerplate, "unsupported browser", arXivLabs, "View a PDF"), the threat already
+  listed. code.claude.com 6/20 includes real body text, likely tabbed or collapsed sections the readability pass
+  drops, plus fragments cut at inline code by the metric's tag stripping.
+- **The user's decisions, 2026-10-17:** H1 is judged by the harness's own aggregate (median over all calls, as for
+  every column), with the mean reported beside it. Tabbed or collapsed doc sections become a tracked follow-up for the
+  final review, not a blocker for Task 7.
 
 **Baseline on the user's machine, 2026-10-16** (deadPc, Linux, harness at 8c82945, 3 runs per item; raw numbers in
 [bench/results/deadPc-2026-10-16/](bench/results/deadPc-2026-10-16/summary.md)). This is the Gate 1 baseline.
