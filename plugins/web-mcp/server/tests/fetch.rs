@@ -90,6 +90,7 @@ fn markdown_response_passed_through() {
     assert_eq!(text(&r).split_once("\n\n").unwrap().1, md);
 }
 
+#[cfg(debug_assertions)]
 #[test]
 fn second_fetch_same_run_hits_cache() {
     let fx = Fixture::start(PUBLIC);
@@ -188,6 +189,12 @@ fn long_page_truncated_with_archive_path() {
     assert!(path.ends_with("/page.md"), "{path}");
     let full = std::fs::read_to_string(mcp.project.join(".web").join(path)).unwrap();
     assert!(full.chars().count() > 290_000);
+    assert!(t.chars().count() <= 200_000, "{}", t.chars().count());
+    // Markdown just under 200,000 chars still has to leave room for the source line.
+    let md = "word word word.\n\n".repeat(199_990 / 17);
+    fx.route("/near", vec![Resp::new(200, "text/markdown", md)]);
+    let t = text(&fetch(&mut mcp, &fx.url("/near"))).to_owned();
+    assert!(t.chars().count() <= 200_000, "{}", t.chars().count());
 }
 
 fn gallery(fx: &Fixture, n: usize, chars: usize) {
@@ -258,6 +265,7 @@ fn oversize_body_is_too_large() {
     assert!(stored_files(&mcp).is_empty());
 }
 
+#[cfg(debug_assertions)]
 #[test]
 fn pdf_url_returns_text() {
     let fx = Fixture::start(PUBLIC);
@@ -289,4 +297,56 @@ fn retry_after_429_once() {
     let r = fetch(&mut mcp, &fx.url("/busy"));
     assert!(text(&r).contains("borrow checker"), "{r}");
     assert_eq!(fx.hits("/busy"), 2);
+}
+
+// The tests below need 127.0.0.2 to count as public, which only debug builds allow.
+
+#[cfg(debug_assertions)]
+#[test]
+fn public_page_images_skip_private_targets() {
+    let public = Fixture::start(PUBLIC);
+    let private = Fixture::start("127.0.0.1");
+    private.route("/secret.jpg", vec![Resp::new(200, "image/jpeg", photo())]);
+    public.route(
+        "/p",
+        vec![Resp::html(long_html(3_000, &[private.url("/secret.jpg")]))],
+    );
+    let mut mcp = Mcp::start();
+    let r = mcp.call("fetch", json!({ "url": public.url("/p"), "images": true }));
+    assert!(!is_error(&r), "{r}");
+    assert_eq!(private.hits("/secret.jpg"), 0);
+    assert_eq!(images(&r), 0);
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn redirect_to_private_blocked_when_not_allowed() {
+    let public = Fixture::start(PUBLIC);
+    let private = Fixture::start("127.0.0.1");
+    private.route("/secret.jpg", vec![Resp::new(200, "image/jpeg", photo())]);
+    public.route(
+        "/img.jpg",
+        vec![Resp::redirect(&private.url("/secret.jpg"))],
+    );
+    public.route(
+        "/p",
+        vec![Resp::html(long_html(3_000, &["/img.jpg".into()]))],
+    );
+    let mut mcp = Mcp::start();
+    let r = mcp.call("fetch", json!({ "url": public.url("/p"), "images": true }));
+    assert_eq!(public.hits("/img.jpg"), 1);
+    assert_eq!(private.hits("/secret.jpg"), 0);
+    assert_eq!(images(&r), 0);
+}
+
+#[test]
+fn direct_fetch_of_localhost_still_works() {
+    let fx = Fixture::start("127.0.0.1");
+    gallery(&fx, 1, 3_000);
+    let mut mcp = Mcp::start();
+    let url = format!("http://localhost:{}/gallery", fx.addr.port());
+    let r = mcp.call("fetch", json!({ "url": url, "images": true }));
+    assert!(!is_error(&r), "{r}");
+    assert_eq!(fx.hits("/img/1.jpg"), 1);
+    assert_eq!(images(&r), 1);
 }

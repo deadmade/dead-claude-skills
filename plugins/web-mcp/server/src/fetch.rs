@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::fmt;
+use std::net::IpAddr;
 use std::path::Path;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
@@ -10,7 +11,7 @@ use base64::Engine as _;
 use futures::future::{BoxFuture, FutureExt as _, Shared};
 use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderMap, RETRY_AFTER};
 use rmcp::model::{CallToolResult, ContentBlock};
-use url::Url;
+use url::{Host, Url};
 
 use crate::Ctx;
 use crate::archive::{Archived, Item, is_private, is_private_ip};
@@ -22,6 +23,7 @@ const ACCEPT_VALUE: &str = "text/markdown, text/html;q=0.9, */*;q=0.8";
 // shortcut: pages with more content images than this archive only the first ones; raise if that bites.
 const MAX_IMAGES: usize = 24;
 const SHOWN_IMAGES: usize = 6;
+const MAX_REDIRECTS: usize = 10;
 
 #[derive(Clone, Copy)]
 pub struct GetOpts {
@@ -29,6 +31,9 @@ pub struct GetOpts {
     pub browser_fallback: bool,
     /// Also download and archive the page's content images.
     pub images: bool,
+    /// May the page be on a private address (the user's own fetch of a dev site: yes; a search result: no)?
+    /// Its images may only when the page itself is private, so a public page can't point us inward.
+    pub allow_private: bool,
 }
 
 impl Default for GetOpts {
@@ -36,6 +41,7 @@ impl Default for GetOpts {
         Self {
             browser_fallback: true,
             images: false,
+            allow_private: false,
         }
     }
 }
@@ -55,6 +61,8 @@ pub enum FetchError {
     UnsupportedType(String),
     Timeout,
     Network(String),
+    /// A private-network target that this fetch may not reach.
+    Blocked(String),
 }
 
 impl fmt::Display for FetchError {
@@ -65,6 +73,10 @@ impl fmt::Display for FetchError {
             Self::UnsupportedType(t) => write!(f, "unsupported content type: {t}"),
             Self::Timeout => write!(f, "the download timed out"),
             Self::Network(m) => f.write_str(m),
+            Self::Blocked(u) => write!(
+                f,
+                "{u} is a private-network address, which this fetch may not reach"
+            ),
         }
     }
 }
@@ -103,15 +115,11 @@ pub async fn get(
         }) {
             Ok(hit)
         } else {
-            let (c, u) = (Arc::clone(ctx), url.clone());
-            // The task's removal waits for this lock, so it can't run before the insert below.
+            let guard = Unflight(Arc::clone(ctx), url.clone());
+            // The guard's removal waits for this lock, so it can't run before the insert below.
             let task = tokio::spawn(async move {
-                let r = run(&c, &u, deadline, opts).await;
-                c.inflight
-                    .lock()
-                    .unwrap_or_else(PoisonError::into_inner)
-                    .remove(&u);
-                r
+                let guard = guard;
+                run(&guard.0, &guard.1, deadline, opts).await
             });
             let f = async move { task.await.unwrap_or_else(|e| Err(net(e))) }
                 .boxed()
@@ -123,6 +131,19 @@ pub async fn get(
     match hit {
         Ok(archived) => from_cache(ctx, archived).await,
         Err(flight) => flight.await,
+    }
+}
+
+/// Removes the in-flight entry when the fetch task ends, also by panic, so no caller inherits a stale result.
+struct Unflight(Arc<Ctx>, Url);
+
+impl Drop for Unflight {
+    fn drop(&mut self) {
+        self.0
+            .inflight
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(&self.1);
     }
 }
 
@@ -174,7 +195,7 @@ fn classify(headers: &HeaderMap) -> Result<Kind, FetchError> {
 
 struct Download {
     final_url: Url,
-    peer_private: bool,
+    private: bool,
     kind: Kind,
     body: Vec<u8>,
 }
@@ -185,11 +206,11 @@ async fn run(
     deadline: Duration,
     opts: GetOpts,
 ) -> Result<Fetched, FetchError> {
-    let dl = tokio::time::timeout(deadline, download(ctx, url))
+    let dl = tokio::time::timeout(deadline, download(ctx, url, opts.allow_private))
         .await
         .map_err(|_| FetchError::Timeout)??;
     let final_url = dl.final_url;
-    let private = dl.peer_private || is_private(url) || is_private(&final_url);
+    let private = dl.private;
     let blocking = |f: Box<dyn FnOnce() -> Page + Send>| async move {
         tokio::task::spawn_blocking(f).await.map_err(net)
     };
@@ -230,7 +251,7 @@ async fn run(
                 }
             };
             let images = if opts.images {
-                download_images(ctx, &page.images, deadline).await
+                download_images(ctx, &page.images, deadline, opts.allow_private && private).await
             } else {
                 Vec::new()
             };
@@ -266,17 +287,11 @@ async fn run(
 }
 
 /// GET with the per-host limits, retrying a 429 or 503 once after its `Retry-After` (at most 10 s).
-async fn download(ctx: &Ctx, url: &Url) -> Result<Download, FetchError> {
+async fn download(ctx: &Ctx, url: &Url, allow_private: bool) -> Result<Download, FetchError> {
     let mut retried = false;
     loop {
         let permit = ctx.limits.acquire(url).await;
-        let resp = ctx
-            .http
-            .get(url.clone())
-            .header(ACCEPT, ACCEPT_VALUE)
-            .send()
-            .await
-            .map_err(net)?;
+        let (resp, final_url, private) = send(ctx, url, allow_private).await?;
         let status = resp.status().as_u16();
         if !retried && matches!(status, 429 | 503) {
             retried = true;
@@ -289,18 +304,108 @@ async fn download(ctx: &Ctx, url: &Url) -> Result<Download, FetchError> {
             return Err(FetchError::Status(status));
         }
         let kind = classify(resp.headers())?;
-        let final_url = resp.url().clone();
-        let peer_private = resp.remote_addr().is_some_and(|a| is_private_ip(a.ip()));
         let body = read_capped(resp, MAX_BODY)
             .await?
             .ok_or(FetchError::TooLarge)?;
         return Ok(Download {
             final_url,
-            peer_private,
+            private,
             kind,
             body,
         });
     }
+}
+
+/// GET following redirects by hand (the client follows none), so every hop is checked: with
+/// `allow_private` false a private hop, by URL, resolved address or peer, is refused before or as it
+/// connects. Returns the response, the final URL and whether any hop was private.
+async fn send(
+    ctx: &Ctx,
+    url: &Url,
+    allow_private: bool,
+) -> Result<(reqwest::Response, Url, bool), FetchError> {
+    let proxy = proxied();
+    let (mut url, mut private) = (url.clone(), false);
+    for _ in 0..=MAX_REDIRECTS {
+        if !matches!(url.scheme(), "http" | "https") {
+            return Err(net(format!("refusing to follow a redirect to {url}")));
+        }
+        let resolved = if proxy || !allow_private {
+            resolve(&url).await
+        } else {
+            None
+        };
+        let blocked = |r: Option<&[IpAddr]>| {
+            is_private(&url) || r.is_none_or(|r| r.iter().any(|ip| is_private_ip(*ip)))
+        };
+        if !allow_private && blocked(resolved.as_deref()) {
+            return Err(FetchError::Blocked(url.to_string()));
+        }
+        let resp = ctx
+            .http
+            .get(url.clone())
+            .header(ACCEPT, ACCEPT_VALUE)
+            .send()
+            .await
+            .map_err(net)?;
+        let peer = resp.remote_addr().map(|a| a.ip());
+        let hop_private = private_target(&url, peer, resolved.as_deref(), proxy);
+        if hop_private && !allow_private {
+            return Err(FetchError::Blocked(url.to_string()));
+        }
+        private |= hop_private;
+        let next = resp
+            .status()
+            .is_redirection()
+            .then(|| resp.headers().get(reqwest::header::LOCATION))
+            .flatten()
+            .and_then(|l| l.to_str().ok())
+            .and_then(|l| url.join(l).ok());
+        match next {
+            Some(n) => url = n,
+            None => return Ok((resp, url, private)),
+        }
+    }
+    Err(net(format!("more than {MAX_REDIRECTS} redirects")))
+}
+
+/// A proxy in the environment (any case), which makes the connected peer the proxy, not the server.
+// shortcut: NO_PROXY is ignored, so a bypassed host is judged by its resolved address too; that's still right.
+fn proxied() -> bool {
+    ["http_proxy", "https_proxy", "all_proxy"].iter().any(|k| {
+        [k.to_string(), k.to_uppercase()]
+            .iter()
+            .any(|k| std::env::var(k).is_ok_and(|v| !v.is_empty()))
+    })
+}
+
+/// The host's addresses, or `None` when it doesn't resolve.
+async fn resolve(url: &Url) -> Option<Vec<IpAddr>> {
+    match url.host()? {
+        Host::Ipv4(ip) => Some(vec![IpAddr::V4(ip)]),
+        Host::Ipv6(ip) => Some(vec![IpAddr::V6(ip)]),
+        Host::Domain(d) => {
+            let port = url.port_or_known_default().unwrap_or(80);
+            let addrs = tokio::net::lookup_host((d, port)).await.ok()?;
+            Some(addrs.map(|a| a.ip()).collect())
+        }
+    }
+}
+
+/// Whether one hop's target is private: by its URL, then by the connected peer, or, behind a proxy
+/// (where the peer is the proxy), by the host's resolved addresses, unresolvable counting as private.
+fn private_target(
+    url: &Url,
+    peer: Option<IpAddr>,
+    resolved: Option<&[IpAddr]>,
+    proxy: bool,
+) -> bool {
+    is_private(url)
+        || if proxy {
+            resolved.is_none_or(|r| r.iter().any(|ip| is_private_ip(*ip)))
+        } else {
+            peer.is_some_and(is_private_ip)
+        }
 }
 
 /// Seconds or an HTTP date; 1 s when absent or unreadable.
@@ -335,17 +440,20 @@ async fn read_capped(
     Ok(Some(body))
 }
 
-/// Content images as `(NN-name, bytes)`, in page order; failures and images over 10 MB are left out.
-async fn download_images(ctx: &Ctx, urls: &[Url], deadline: Duration) -> Vec<(String, Vec<u8>)> {
+/// Content images as `(NN-name, bytes)`, in page order; failures, blocked private targets and
+/// images over 10 MB are left out.
+async fn download_images(
+    ctx: &Ctx,
+    urls: &[Url],
+    deadline: Duration,
+    allow_private: bool,
+) -> Vec<(String, Vec<u8>)> {
     let one = |i: usize, u: &Url| {
         let u = u.clone();
         async move {
-            if !matches!(u.scheme(), "http" | "https") {
-                return None;
-            }
             let get = async {
                 let _permit = ctx.limits.acquire(&u).await;
-                let resp = ctx.http.get(u.clone()).send().await.ok()?;
+                let (resp, _, _) = send(ctx, &u, allow_private).await.ok()?;
                 if !resp.status().is_success() {
                     return None;
                 }
@@ -414,7 +522,8 @@ pub async fn render(ctx: &Ctx, f: &Fetched, with_images: bool) -> CallToolResult
         format!("\n\nOther images: {}", others.join(", "))
     };
     let limit = if blocks.is_empty() {
-        200_000
+        // The whole text block stays within the tool's maxResultSizeChars.
+        200_000 - source.chars().count() - 2
     } else {
         // Keep chars / 4 + 1,600 per image under Claude Code's 25,000-token MCP output cap, with margin.
         ((24_000 - 1_600 * blocks.len()) * 4 - 1)
@@ -461,6 +570,24 @@ mod tests {
         assert_eq!(truncate(&md, 2_000, "N"), md);
         let t = truncate(&md, 1_700, "N");
         assert_eq!(t, "a".repeat(600) + "\n\nN");
+    }
+
+    #[test]
+    fn proxy_env_uses_resolved_host_not_peer() {
+        let url = Url::parse("https://example.com/").unwrap();
+        let (lan, public): (IpAddr, IpAddr) = (
+            "10.0.0.1".parse().unwrap(),
+            "93.184.215.14".parse().unwrap(),
+        );
+        // Behind a proxy the peer is the proxy: its address says nothing about the page.
+        assert!(!private_target(&url, Some(lan), Some(&[public]), true));
+        assert!(private_target(&url, Some(public), Some(&[lan]), true));
+        assert!(private_target(&url, Some(public), None, true));
+        // Without one the peer is the server.
+        assert!(private_target(&url, Some(lan), Some(&[public]), false));
+        assert!(!private_target(&url, Some(public), None, false));
+        let local = Url::parse("http://localhost/").unwrap();
+        assert!(private_target(&local, Some(public), Some(&[public]), true));
     }
 
     #[test]

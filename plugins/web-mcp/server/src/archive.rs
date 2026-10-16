@@ -342,15 +342,40 @@ fn sanitize(s: &str, max: usize) -> String {
     out
 }
 
-/// A file name from the outside: no path parts, no leading dot.
+/// A file name from the outside, valid on Windows too: no path parts, no leading dot, no trailing dot
+/// or space, `_` for control and reserved characters, at most 100 bytes with the extension kept.
 fn sanitize_file(name: &str) -> String {
+    const MAX: usize = 100;
     let base = name.rsplit(['/', '\\']).next().unwrap_or("");
-    let base = base.trim_start_matches('.');
+    let base: String = base
+        .trim_start_matches('.')
+        .chars()
+        .map(|c| {
+            if c.is_control() || r#"<>:"|?*"#.contains(c) {
+                '_'
+            } else {
+                c
+            }
+        })
+        .collect();
+    let base = base.trim_end_matches(['.', ' ']);
     if base.is_empty() {
-        "image".into()
-    } else {
-        base.replace(['\0', ':'], "_")
+        return "image".into();
     }
+    if base.len() <= MAX {
+        return base.to_owned();
+    }
+    let ext = Path::new(base)
+        .extension()
+        .and_then(|e| e.to_str())
+        .filter(|e| e.len() < 10)
+        .map(|e| format!(".{e}"))
+        .unwrap_or_default();
+    let mut end = MAX - ext.len();
+    while !base.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}{ext}", &base[..end])
 }
 
 #[must_use]
@@ -601,6 +626,19 @@ mod tests {
         std::os::unix::fs::symlink(&outside, d.join(".web/.gitignore")).unwrap();
         Archive::open(&d, &jiff::Zoned::now()).unwrap();
         assert!(!outside.exists());
+    }
+
+    #[test]
+    fn long_and_illegal_image_names_are_sanitized() {
+        let long = format!("{}.png", "a".repeat(300));
+        let got = sanitize_file(&long);
+        assert_eq!(got, format!("{}.png", "a".repeat(96)));
+        assert_eq!(
+            sanitize_file("a<b>c:d\"e|f?g*h\u{1}.jpg."),
+            "a_b_c_d_e_f_g_h_.jpg"
+        );
+        assert_eq!(sanitize_file("dir\\..\\.x"), "x");
+        assert!(sanitize_file(&"é".repeat(80)).len() <= 100);
     }
 
     #[test]

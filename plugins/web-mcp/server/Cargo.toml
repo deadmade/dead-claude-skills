@@ -13,7 +13,7 @@ jiff = "0.2"
 sha2 = "0.10"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std", "fs", "sync", "io-util", "time"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std", "fs", "sync", "io-util", "time", "net"] }
 url = "2"
 anyhow = "1"
 dom_smoothie = "=0.18.2"

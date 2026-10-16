@@ -100,6 +100,8 @@
         inherit (webMcp) version;
         src = ./plugins/web-mcp/server;
         cargoLock.lockFile = ./plugins/web-mcp/server/Cargo.lock;
+        # Debug checks: the fetch tests' WEB_MCP_TEST_PUBLIC_IP hook exists only in debug builds.
+        checkType = "debug";
         meta = {
           inherit (webMcp) description;
           mainProgram = "web-mcp";

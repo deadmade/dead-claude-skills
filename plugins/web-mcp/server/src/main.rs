@@ -31,6 +31,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = Ctx {
         http: reqwest::Client::builder()
             .user_agent(concat!("web-mcp/", env!("CARGO_PKG_VERSION")))
+            // fetch follows redirects itself, checking every hop for private targets.
+            .redirect(reqwest::redirect::Policy::none())
             .build()?,
         limits: limits::HostLimits::default(),
         archive: archive::Archive::open(&cfg.project, &jiff::Zoned::now())?,

@@ -112,6 +112,7 @@ impl Server {
         let images = args.images.unwrap_or(false);
         let opts = GetOpts {
             images,
+            allow_private: true, // the user's own localhost sites are fair game
             ..GetOpts::default()
         };
         match fetch::get(&self.ctx, &url, FETCH_DEADLINE, opts).await {
