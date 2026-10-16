@@ -99,8 +99,15 @@ impl Archive {
             Err(e) => return Err(e),
         }
         let ignore = web.join(".gitignore");
-        if !ignore.exists() {
-            std::fs::write(ignore, "*\n")?;
+        // create_new (O_EXCL) never follows a symlink, even a dangling one.
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&ignore)
+        {
+            Ok(mut f) => std::io::Write::write_all(&mut f, b"*\n")?,
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {}
+            Err(e) => return Err(e),
         }
         let name = format!("{}-{}", now.strftime("%Y-%m-%d_%H%M%S"), std::process::id());
         let run = web.join(name);
@@ -502,6 +509,9 @@ mod tests {
             "http://192.168.1.5/",
             "http://[::1]/",
             "http://a.localhost/",
+            "http://0.0.0.0:3000/",
+            "http://[::]/",
+            "http://100.64.1.1/",
         ] {
             let url = u(s);
             assert!(is_private(&url), "{s}");
@@ -509,6 +519,21 @@ mod tests {
             assert!(a.cached(&url).is_none(), "{s}");
         }
         assert!(!is_private(&u("https://example.com/")));
+        let outside = u("http://100.128.0.1/");
+        assert!(!is_private(&outside));
+        let got = a.put(page(outside.as_str(), None)).await.unwrap();
+        assert_eq!(a.cached(&outside), Some(got));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn gitignore_symlink_is_not_followed() {
+        let d = tempdir();
+        let outside = tempdir().join("victim");
+        std::fs::create_dir_all(d.join(".web")).unwrap();
+        std::os::unix::fs::symlink(&outside, d.join(".web/.gitignore")).unwrap();
+        Archive::open(&d, &jiff::Zoned::now()).unwrap();
+        assert!(!outside.exists());
     }
 
     #[test]
