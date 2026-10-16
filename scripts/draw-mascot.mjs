@@ -1,11 +1,11 @@
-// Renders Onibi, night-city's mascot, to plugins/night-city/assets/mascot.png plus an 8x nearest-neighbour
+// Renders Onibi, the dead-claude-skills mascot, to plugins/night-city/assets/mascot.png plus an 8x nearest-neighbour
 // mascot-512.png, and a brightened crop of her face as the notify plugin's icon (a plugin can't read another plugin's
-// files once installed). Her drawing and the kit live in the night-city-cast skill (cast/onibi.mjs, pixel-kit.mjs);
+// files once installed). Her drawing and the kit live in night-city's night-city-cast skill (cast/onibi.mjs, pixel-kit.mjs);
 // change the drawing there and rerun `node scripts/draw-mascot.mjs`. draw-mascot.test.mjs fails when the PNGs drift.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import drawOnibi from '../plugins/night-city-cast/skills/night-city-cast/scripts/cast/onibi.mjs';
-import { encodePng } from '../plugins/night-city-cast/skills/night-city-cast/scripts/pixel-kit.mjs';
+import drawOnibi from '../plugins/night-city/skills/night-city-cast/scripts/cast/onibi.mjs';
+import { encodePng } from '../plugins/night-city/skills/night-city-cast/scripts/pixel-kit.mjs';
 
 const PLUGINS = join(import.meta.dirname, '..', 'plugins');
 export const ASSETS = join(PLUGINS, 'night-city', 'assets');

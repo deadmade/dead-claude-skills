@@ -1,6 +1,6 @@
 ---
 name: night-city-cast
-description: "Create a new character for the Night City cast: one resident per project, all in the same world and the same 64x64 pixel-art style as Onibi, night-city's mascot. Grounds in the project, proposes concepts with a signature hook, draws with the shared kit, checks the art at icon sizes, names the character (a public handle; any real name stays private) and, when asked, ships the PNGs into the project. Use for /night-city-cast <project>, or when the user wants a mascot, avatar or character for one of their projects."
+description: 'Create a new character for the Night City cast: one resident per project, all in the same world and the same 64x64 pixel-art style as Onibi, the dead-claude-skills mascot. Grounds in the project, proposes concepts with a signature hook, draws with the shared kit, checks the art at icon sizes, names the character (a public handle; any real name stays private) and, when asked, ships the PNGs into the project. Use for /night-city-cast <project>, or when the user wants a mascot, avatar or character for one of their projects.'
 argument-hint: 'Which project is the character for?'
 ---
 
@@ -76,7 +76,7 @@ public.
 
 ## Phase 6: Ship (when asked)
 
-- **The cast:** move the drawing to `scripts/cast/<handle>.mjs` in dead-claude-skills (lowercase handle, kit import
+- **The cast:** move the drawing to `plugins/night-city/skills/night-city-cast/scripts/cast/<handle>.mjs` in dead-claude-skills (lowercase handle, kit import
   `../pixel-kit.mjs`, a header comment with the handle, its meaning, the project and the hook; never the real name) and
   add a row to [references/cast.md](references/cast.md). If you're not in that repo, give the user both and offer to
   open a PR there.

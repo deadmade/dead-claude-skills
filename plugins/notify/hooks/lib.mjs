@@ -107,7 +107,7 @@ $app = '{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powersh
 
 const OSASCRIPT = 'on run argv\ndisplay notification (item 2 of argv) with title (item 1 of argv)\nend run';
 
-// Onibi, night-city's mascot and the icon, signs the popups where the server shows an app name.
+// Onibi, the marketplace's mascot and the icon, signs the popups where the server shows an app name.
 const SENDER = 'Onibi';
 
 // Commands to try in order; the next one runs only when the previous binary is missing.

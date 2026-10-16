@@ -121,12 +121,6 @@
       "category": "development"
     },
     {
-      "name": "night-city-cast",
-      "description": "/night-city-cast: design a character for one of your projects, a resident of the same Night City as night-city's mascot Onibi, in the same 64x64 pixel-art style. Concepts, a shared drawing kit, icon-size previews, names. Opt-in.",
-      "source": "./plugins/night-city-cast",
-      "category": "productivity"
-    },
-    {
       "name": "self-review",
       "description": "/self-review: review your branch before opening a PR. Bug pass, spec and standards pass, security-review, a CLAUDE.md audit, and specialist agents (vendored from code-review, pr-review-toolkit and mattpocock) in one command, then fixes what you pick. Opt-in.",
       "source": "./plugins/self-review",
@@ -146,7 +140,7 @@
     },
     {
       "name": "night-city",
-      "description": "Night City: a toned-down synthwave Claude Code theme with Night City spinner words, short status-line reactions and Onibi dropping by with a one-liner. Opt-in.",
+      "description": "Night City: a toned-down synthwave Claude Code theme with Night City spinner words, short status-line reactions and Onibi, the marketplace's mascot, dropping by with a one-liner. /night-city-cast designs a Night City character for each of your projects in her pixel-art style. Opt-in.",
       "source": "./plugins/night-city",
       "category": "development"
     },

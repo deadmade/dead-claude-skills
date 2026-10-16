@@ -1,4 +1,4 @@
-// Onibi (鬼火, "demon fire"), the cast's first character and night-city's mascot: a masked netrunner whose chrome
+// Onibi (鬼火, "demon fire"), the cast's first character and the dead-claude-skills mascot: a masked netrunner whose chrome
 // cybereye is the eight-point spark. The reference drawing for new characters: same kit, same framing, same finish.
 // dead-claude-skills renders her with scripts/draw-mascot.mjs; `node preview.mjs cast/onibi.mjs <prefix>` previews her.
 import {

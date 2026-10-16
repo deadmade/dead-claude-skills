@@ -1,6 +1,6 @@
 # dead-claude-skills
 
-<p align="center"><a href="plugins/night-city/README.md"><img src="plugins/night-city/assets/mascot-512.png" width="192" alt="Onibi, night-city's mascot: a hooded netrunner in a respirator, her chrome cybereye a glowing eight-point spark"></a></p>
+<p align="center"><a href="plugins/night-city/README.md"><img src="plugins/night-city/assets/mascot-512.png" width="192" alt="Onibi, the dead-claude-skills mascot: a hooded netrunner in a respirator, her chrome cybereye a glowing eight-point spark"></a></p>
 
 My personal Claude Code setup as a plugin marketplace, so every machine (Linux, Windows) gets the same skills. It's
 built for me; use it if it fits, but expect it to change without notice.
@@ -11,8 +11,8 @@ servers, language and database skills (rust, csharp, postgres), integrations (Gi
 like hallmark, paper-lookup, self-review, graphify and the mattpocock/pstack/Trail of Bits picks, plus tools such as
 [tui-review](plugins/tui-review/README.md), cswap for multi-account switching, [notify](plugins/notify/README.md) for
 desktop notifications when a turn ends and [night-city](plugins/night-city/README.md), a toned-down synthwave theme.
-night-city-cast gives each of your projects its own Night City character in the theme's pixel-art style, starting with
-night-city's mascot, Onibi.
+Onibi, the netrunner above, is the marketplace's mascot; night-city's `/night-city-cast` skill gives each of your
+projects its own Night City character in her pixel-art style.
 
     npx --allow-git=root github:deadmade/dead-claude-skills#semver:*
 

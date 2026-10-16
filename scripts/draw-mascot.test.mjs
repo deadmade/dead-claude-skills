@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { OUTPUTS, drawMascot, notifyIcon } from './draw-mascot.mjs';
-import { decodePng, scanlines } from '../plugins/night-city-cast/skills/night-city-cast/scripts/pixel-kit.mjs';
+import { decodePng, scanlines } from '../plugins/night-city/skills/night-city-cast/scripts/pixel-kit.mjs';
 
 // decodePng compares decompressed scanlines, so the check doesn't depend on the zlib build's exact deflate output.
 test('the committed mascot PNGs match the drawing', () => {
@@ -16,7 +16,7 @@ test('the committed mascot PNGs match the drawing', () => {
   }
 });
 
-test("Onibi is night-city's mascot and notify's icon", () => {
+test("Onibi is the marketplace's mascot in night-city and notify's icon", () => {
   const rel = (f) => relative(join(import.meta.dirname, '..'), f).replaceAll('\\', '/');
   assert.deepEqual(
     OUTPUTS.map(({ file, scale }) => [rel(file), scale]),

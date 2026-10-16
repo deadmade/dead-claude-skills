@@ -17,6 +17,10 @@ Beyond the theme:
   prompt for six seconds with a one-liner ("good work, choom.", "what are you even doing?"), a sorrier one after a
   failing tool, an impatient one after a turn over two minutes. The `Onibi` setting in `/config` makes her come
   `always` (every turn) or turns her `off`.
+- `/night-city-cast`, a skill that designs a character for one of your projects: another resident of Onibi's Night
+  City in her 64×64 pixel-art style, with a signature hook for what the project does, a handle, previews at icon sizes
+  and the PNGs shipped when you ask. See [the skill](skills/night-city-cast/SKILL.md) and its
+  [roster](skills/night-city-cast/references/cast.md).
 - A Night City ccstatusline config: Powerline segments with slanted edges in the theme's colours, icons, context as tokens
   and percent, the cost in eddies (`€$1.23`) and a ナイトシティ sign fading pink to teal. It needs a Nerd Font in the terminal. The installer writes it when night-city and the ccstatusline toggle are both
   on, and switches back to the stock config when night-city is deselected.
@@ -36,13 +40,14 @@ retuned to softer synthwave colours; see `THIRD_PARTY.md` in the repository root
 ## Mascot
 
 **Onibi** (鬼火, "demon fire": the ghost lights of Japanese folklore that drift through the dark and lead people to
-their end). The netrunner above is the theme's mascot, an original 64×64 pixel-art character in the theme's palette: a
-respirator with an LED bar, an undercut with a circuit tattoo, and a chrome plate whose cybereye is an eight-point
-spark, a nod to Claude rather than Anthropic's logo. `assets/mascot.png` is the 1x original, `assets/mascot-512.png`
-the 8x nearest-neighbour scale; she is also the notify plugin's notification icon. She is the first of the
-[night-city-cast](../night-city-cast/skills/night-city-cast/SKILL.md), one character per project in this style; her
-drawing is `cast/onibi.mjs` there, and `scripts/draw-mascot.mjs` in the repository root renders all these PNGs from
-it. Edit the drawing and rerun the script rather than editing the PNGs.
+their end), the netrunner above, is the mascot of dead-claude-skills and lives here: an original 64×64 pixel-art
+character in the theme's palette, with a respirator with an LED bar, an undercut with a circuit tattoo, and a chrome
+plate whose cybereye is an eight-point spark, a nod to Claude rather than Anthropic's logo. `assets/mascot.png` is the
+1x original, `assets/mascot-512.png` the 8x nearest-neighbour scale; she is also the notify plugin's notification
+icon. She is the first of the night-city-cast; her drawing is
+[`skills/night-city-cast/scripts/cast/onibi.mjs`](skills/night-city-cast/scripts/cast/onibi.mjs), and
+`scripts/draw-mascot.mjs` in the repository root renders all these PNGs from it. Edit the drawing and rerun the script
+rather than editing the PNGs.
 
 ## Contrast (WCAG)
 

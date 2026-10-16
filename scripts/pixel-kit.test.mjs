@@ -14,18 +14,9 @@ import {
   previewSheet,
   resize,
   toRgb,
-} from '../plugins/night-city-cast/skills/night-city-cast/scripts/pixel-kit.mjs';
+} from '../plugins/night-city/skills/night-city-cast/scripts/pixel-kit.mjs';
 
-const CAST = join(
-  import.meta.dirname,
-  '..',
-  'plugins',
-  'night-city-cast',
-  'skills',
-  'night-city-cast',
-  'scripts',
-  'cast',
-);
+const CAST = join(import.meta.dirname, '..', 'plugins', 'night-city', 'skills', 'night-city-cast', 'scripts', 'cast');
 
 test('interp spans every row between key rows, rounding half to even', () => {
   assert.deepEqual(

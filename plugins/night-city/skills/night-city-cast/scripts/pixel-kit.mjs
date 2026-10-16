@@ -1,4 +1,4 @@
-// Pixel-art kit for the night-city-cast skill: the grid primitives, the cast's shared palette and finishing effects,
+// Pixel-art kit for night-city's night-city-cast skill: the grid primitives, the cast's shared palette and finishing effects,
 // PNG output and a preview sheet. Node's standard library only.
 //
 // A drawing is a grid of palette keys (one character per colour). Draw the figure on its own canvas, compose it over

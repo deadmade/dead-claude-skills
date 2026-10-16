@@ -10,7 +10,7 @@ It fires on:
 - a question from Claude (`PreToolUse` on `AskUserQuestion`, which raises no notification of its own): "Needs your
   input" and the question.
 
-The popup comes from Onibi, night-city's pixel-art netrunner: her face is the icon (`icon.png`, a brightened crop
+The popup comes from Onibi, the marketplace's pixel-art netrunner mascot: her face is the icon (`icon.png`, a brightened crop
 written by `scripts/draw-mascot.mjs`; never edit it by hand) and, on Linux, she is the sender. The title is the
 project folder, then the status in bold and Claude's line below it. With the night-city plugin enabled, the status is a
 Night City line ("Come look at your Agent", "Songbird requests your help"). Windows shows "Windows PowerShell" as the
