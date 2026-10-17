@@ -1,5 +1,5 @@
 ---
-phase: ground
+phase: brainstorm
 ---
 
 # Flow pane: flow
