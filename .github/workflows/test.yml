@@ -1,4 +1,4 @@
-# Repo checks, installer tests and cswap's mod tests on every PR and push to main; tui-review has its own workflow.
+# Repo checks, installer tests and the mods' tests on every PR and push to main; tui-review has its own workflow.
 name: test
 
 on:
@@ -39,4 +39,8 @@ jobs:
 
       - name: night-city mod tests
         working-directory: plugins/night-city
+        run: claude plugin test .
+
+      - name: feature-flow mod tests
+        working-directory: plugins/feature-flow
         run: claude plugin test .

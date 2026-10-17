@@ -11,7 +11,9 @@ servers, language and database skills (rust, csharp, postgres), integrations (Gi
 like hallmark, paper-lookup, self-review, graphify and the mattpocock/pstack/Trail of Bits picks, plus tools such as
 [tui-review](plugins/tui-review/README.md), cswap for multi-account switching, [notify](plugins/notify/README.md) for
 desktop notifications when a turn ends, [web-mcp](plugins/web-mcp/README.md) for web search, page fetching,
-passive lookups and a browser with an archive of everything it pulled, and [night-city](plugins/night-city/README.md), a toned-down synthwave theme.
+passive lookups and a browser with an archive of everything it pulled, [night-city](plugins/night-city/README.md), a
+toned-down synthwave theme, and feature-flow, whose band above the prompt shows the current run's phase, gates and
+deviations (`1` resumes it from an idle prompt).
 
     npx --allow-git=root github:deadmade/dead-claude-skills#semver:*
 
