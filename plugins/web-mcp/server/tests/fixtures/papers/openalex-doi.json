@@ -1,0 +1,16 @@
+{
+  "id": "https://openalex.org/W2741809807",
+  "doi": "https://doi.org/10.7717/peerj.4375",
+  "title": "The state of OA",
+  "publication_year": 2018,
+  "open_access": { "is_oa": true, "oa_url": "https://peerj.com/articles/4375.pdf" },
+  "abstract_inverted_index": {
+    "Despite": [0],
+    "growing": [1],
+    "interest": [2],
+    "in": [3, 6],
+    "Open": [4],
+    "Access": [5],
+    "OA": [7]
+  }
+}

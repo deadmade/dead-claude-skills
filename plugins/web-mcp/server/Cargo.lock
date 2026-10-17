@@ -3680,6 +3680,7 @@ dependencies = [
  "image",
  "jiff",
  "pdf_oxide",
+ "quick-xml",
  "reqwest",
  "rmcp",
  "rustls",

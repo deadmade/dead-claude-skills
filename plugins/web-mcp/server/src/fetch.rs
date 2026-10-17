@@ -516,7 +516,7 @@ fn private_target(
 }
 
 /// Seconds or an HTTP date; 1 s when absent or unreadable.
-fn retry_after(h: &HeaderMap) -> Duration {
+pub(crate) fn retry_after(h: &HeaderMap) -> Duration {
     let Some(v) = h.get(RETRY_AFTER).and_then(|v| v.to_str().ok()) else {
         return Duration::from_secs(1);
     };
@@ -714,6 +714,11 @@ mod tests {
             index: crate::rank::Index::open(archive.web()).unwrap(),
             archive,
             cfg: crate::config::Config {
+                papers: crate::config::PaperUrls {
+                    arxiv: Url::parse("https://export.arxiv.org/api/query").unwrap(),
+                    openalex: Url::parse("https://api.openalex.org/works").unwrap(),
+                    crossref: Url::parse("https://api.crossref.org/works").unwrap(),
+                },
                 project,
                 searxng: Url::parse("http://127.0.0.1:8888").unwrap(),
                 agent_browser: "agent-browser".into(),

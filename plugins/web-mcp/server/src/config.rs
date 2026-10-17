@@ -2,20 +2,35 @@ use std::path::PathBuf;
 
 use url::Url;
 
+/// Where the paper APIs live: the real ones unless a test points them at a stub.
+pub struct PaperUrls {
+    pub arxiv: Url,
+    pub openalex: Url,
+    pub crossref: Url,
+}
+
 pub struct Config {
+    pub papers: PaperUrls,
     pub project: PathBuf,
     pub searxng: Url,
     pub agent_browser: String,
 }
 
 impl Config {
-    /// Reads `CLAUDE_PROJECT_DIR`, `WEB_MCP_SEARXNG_URL` and `WEB_MCP_AGENT_BROWSER`, each with its default.
+    /// Reads `CLAUDE_PROJECT_DIR`, `WEB_MCP_SEARXNG_URL`, `WEB_MCP_AGENT_BROWSER` and
+    /// `WEB_MCP_{ARXIV,OPENALEX,CROSSREF}_URL`, each with its default.
     ///
     /// # Errors
-    /// When `WEB_MCP_SEARXNG_URL` is not a URL.
+    /// When one of the URL variables is not a URL.
     pub fn from_env() -> Result<Self, url::ParseError> {
         let var = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
+        let url = |k: &str, default: &str| Url::parse(&var(k).unwrap_or_else(|| default.into()));
         Ok(Self {
+            papers: PaperUrls {
+                arxiv: url("WEB_MCP_ARXIV_URL", "https://export.arxiv.org/api/query")?,
+                openalex: url("WEB_MCP_OPENALEX_URL", "https://api.openalex.org/works")?,
+                crossref: url("WEB_MCP_CROSSREF_URL", "https://api.crossref.org/works")?,
+            },
             project: var("CLAUDE_PROJECT_DIR").map_or_else(|| PathBuf::from("."), PathBuf::from),
             searxng: Url::parse(
                 &var("WEB_MCP_SEARXNG_URL").unwrap_or_else(|| "http://127.0.0.1:8888".into()),

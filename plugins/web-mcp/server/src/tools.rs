@@ -13,7 +13,7 @@ use url::Url;
 
 use crate::Ctx;
 use crate::fetch::{self, GetOpts};
-use crate::search;
+use crate::{papers, search};
 
 const FETCH_DEADLINE: Duration = Duration::from_secs(30);
 
@@ -92,12 +92,18 @@ impl Server {
 #[tool_router]
 impl Server {
     #[tool(
-        description = "Search the web (self-hosted SearXNG) and the local archive.",
+        description = "Search the web (self-hosted SearXNG) and the local archive; with papers: true, search OpenAlex, arXiv and Crossref instead.",
         annotations(read_only_hint = true)
     )]
     async fn search(&self, Parameters(args): Parameters<SearchArgs>) -> CallToolResult {
         if args.papers == Some(true) {
-            return error("papers mode is not implemented yet");
+            let out = papers::search(&self.ctx, &args.query).await;
+            let text = out.to_string();
+            return if out.papers.is_empty() && !out.failed.is_empty() {
+                error(text)
+            } else {
+                CallToolResult::success(vec![ContentBlock::text(text)])
+            };
         }
         let n = args.max_passages.map_or(8, |n| n.clamp(1, 20)) as usize;
         match search::web(&self.ctx, &args.query, n).await {
