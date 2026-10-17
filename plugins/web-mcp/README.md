@@ -30,7 +30,8 @@ The installer downloads the `web-mcp` binary from the release and sets `binPath`
 or set its path with `/plugin configure web-mcp`.
 
 - **SearXNG** (for `search`): with Docker, the installer starts it on 127.0.0.1:8888 with
-  `~/.claude/searxng/settings.yml`, which turns on the JSON format. Without Docker it prints what to run. If you
+  `~/.claude/searxng/settings.yml`, which turns on the JSON format and searches Bing and Yahoo (SearXNG's default engines
+  CAPTCHA or rate-limit a scraper). Without Docker it prints what to run. If you
   accept the `web-builtins-off` toggle, WebSearch and WebFetch are denied, but only when SearXNG answers.
 - **agent-browser** (for `browser` and `fetch`'s fallback): the installer offers to install the version pinned in
   `installer/agent-browser.json`, which `sync-agent-browser.yml` bumps weekly. Without it, `browser` and the fallback

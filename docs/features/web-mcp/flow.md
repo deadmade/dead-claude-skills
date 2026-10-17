@@ -221,6 +221,21 @@ spec; screenshots through `Archive::put`; SearXNG steps printed without Docker.
 
 ## Deviations
 
+- **2026-10-17, SearXNG template returns nothing (decided: (a)).** `installer/searxng.yml` keeps SearXNG's
+  default engines. On deadPc (SearXNG 2026.10.17) the default general engines are duckduckgo (CAPTCHA), brave (429,
+  suspended) and google cse (timeout), so every search answers 0 results after 3 s and `search` finds no pages. Probed
+  one engine at a time: bing 10 results in 0.42 s, yahoo 7 in 0.94 s; startpage, mojeek and presearch suspended (429),
+  qwant access denied. Options: (a) template enables bing and yahoo and disables duckduckgo, brave and google cse
+  (recommended: fast and answers on this machine; users can re-enable engines); (b) only enable bing and yahoo, keep the
+  defaults (a blocked engine still holds every search to the 3 s timeout); (c) leave the template, fix only deadPc's
+  file (fresh installs stay broken). Either way the installer keeps an existing settings.yml, so deadPc's file is
+  replaced by hand.
+  Decision 2026-10-17: (a). On the way the user weighed and rejected: a browser fallback (agent-browser got
+  DuckDuckGo's CAPTCHA too, 4.3 s), Qwant and Ecosia (bot-protected; no SearXNG engine for Ecosia), Staan (trial needs
+  a company), Rust scraping crates (young, scrape the same page), Bing directly in web-mcp (kept as an option to drop
+  Docker). Yahoo serves Bing's index, so it is a second site, not a second source. A paid API (Brave, Mojeek) is a
+  follow-up.
+
 ## Results
 
 | run                       | command                                                                                                                                                                                                            | numbers   | date       |
@@ -229,7 +244,7 @@ spec; screenshots through `Archive::put`; SearXNG steps printed without Docker.
 | baseline (your machine)   | `node docs/features/web-mcp/bench/baseline.mjs --runs 3 --out docs/features/web-mcp/bench/results/deadPc-2026-10-16`                                                                                               | see below | 2026-10-16 |
 | early fetch (Task 6)      | `node docs/features/web-mcp/bench/baseline.mjs --target web-mcp --bin plugins/web-mcp/server/target/release/web-mcp --only fetch --runs 3 --out docs/features/web-mcp/bench/results/deadPc-2026-10-17-fetch-early` | see below | 2026-10-17 |
 | H4 (Task 11)              | `cargo run --release --example h4 --features h4 -- --data /tmp/claude-1000/h4data` and the same with `--sweep` (in `plugins/web-mcp/server`)                                                                       | see below | 2026-10-17 |
-| feature                   |                                                                                                                                                                                                                    |           |            |
+| feature (Task 18)         | `docs/features/web-mcp/bench/final.sh` (baseline.mjs `--target web-mcp --runs 3 --only search,fetch,parallel,papers`, then concurrency.mjs on the test-hooks build)                                                | see below | 2026-10-17 |
 
 **Early fetch measurement (Task 6), 2026-10-17** (deadPc, same machine and harness as the baseline, binary at
 9f082de; [summary](bench/results/deadPc-2026-10-17-fetch-early/summary.md)). Early, not the verdict.
@@ -330,9 +345,61 @@ writes to `~/.cache/huggingface`. Recall@5 is BEIR's: per query the share of its
 - Caveat: FiQA has 39 documents with a text identical to another's; the index stores each text once, so those ids
   can't be hit (at most 39 of 57,638 docs).
 
-Verdict: supported | not supported | inconclusive. Threats that showed up. The user's decision.
+**Feature measurement (Task 18), 2026-10-17** (deadPc, binary at 24fdb9b, SearXNG 2026.10.17 with the fixed
+template: bing + yahoo; [summary](bench/results/deadPc-2026-10-17-web-mcp/summary.md), log
+`bench/results/deadPc-2026-10-17-final.log`). A first run the same day searched an empty SearXNG (every default engine
+blocked, 30/30 searches with 0 passages) and is kept in `bench/results/deadPc-2026-10-17-empty-searxng/`, not judged;
+see Deviations.
+
+| hypothesis | target                                    | web-mcp                                                                         | verdict              |
+| ---------- | ----------------------------------------- | ------------------------------------------------------------------------------- | -------------------- |
+| H1         | recall ≥ 0.9 (WebFetch: 0 on all 10 URLs) | **0.95** (harness aggregate, as decided); mean 0.83                             | holds                |
+| H2         | fetch p50 ≤ 1,425 ms (20% of 7,123)       | **452 ms** (6.3%), p95 617 ms, 30/30                                            | holds                |
+| H3         | search p50 ≤ 6,888 ms, with passages      | **2,078 ms**, p95 4,231 ms, 30/30, 8 passages and ~16,000 characters per search | holds                |
+| H4         | hybrid ≥ BM25 + 0.02 recall@5             | −0.0064 (Task 11)                                                               | not supported        |
+| H5         | p95 of 16 parallel ≤ 1.5× p95 of one      | 341 ms against 325 ms, **1.05**, 480 + 30 calls on the stub                     | holds                |
+| H6         | asked id in first record; p50 no higher   | ids **4/4** rows 3/3 (pipelines 3/4, S2 refused); p50 481 ms against 452 ms     | ids hold, p50 misses |
+
+- **H1 per URL:** unchanged from Task 6 (1, 1, 1, 0.30 pypi, 0.70 code.claude.com, 1, 0.95, 0.95, 0.90, 0.50 arXiv).
+- **4 searches or fetches in one message:** span p50 1,683 ms against WebFetch's 8,384 ms.
+- **H6 latency:** identifier lookups are faster than the pipelines on 3 of 4 rows (openalex doi 408 vs 547, crossref
+  311 vs 452, S2-as-arXiv 159 vs 504) and slower on arxiv id (374 vs 85, the expected two-source wait). The miss is the
+  two phrase searches: **20,003 ms** p50 (pipelines 76 and 1,048). Phrase searches ask OpenAlex and arXiv together and
+  wait for both; arXiv's search request ran into the 20 s `REQUEST_TIMEOUT` (`papers.rs:20`) on 5 of 6 calls while
+  OpenAlex had answered. Not investigated why arXiv stalled; a per-source deadline is a follow-up.
+- **Threats that showed up:** SearXNG's default engines blocked this machine outright (fixed in the template, see
+  Deviations); H3 rests on bing and yahoo, which serve one index. The user's binary and the measured one are the same
+  commit; only the SearXNG template changed after it.
+
+Verdict: **supported.** H1, H2 and H5 hold, which is the spec's bar; H3 holds too. H4 is not supported, so no
+embeddings ship. H6 finds the asked identifier every time but misses on latency, through the arXiv phrase-search stall.
+The user's decision: pending.
 
 ## Walkthrough
 
 | spec goal | plan task | file:line | test |
 | --------- | --------- | --------- | ---- |
+
+## Follow-ups
+
+Agreed with the user on 2026-10-17, out of scope for this branch:
+
+- **SearXNG category, engine and time filters on `search`**: optional `category`, `engines` and `since` arguments passed
+  through as SearXNG's `categories`, `engines` and `time_range` (today only `q` is sent).
+- **`lookup` tool, passive sources only, no keys**: `dns` (DNS over HTTPS), `whois` (RDAP), `certs` (crt.sh),
+  `wayback` (archive.org snapshots, a snapshot read like `fetch`), `ip` (Shodan InternetDB). Archived in `.web/`. No
+  active probing (port scans, brute-force, zone transfers). Its own `/feature-flow web-mcp-lookup`; endpoints to be
+  verified in its prior-art phase.
+- **`searxngUrl` user config** for a self-hosted remote instance: `.mcp.json` hardcodes `http://127.0.0.1:8888`, and
+  the installer's health check (`install.mjs`) only probes that address. Wanted later, not now.
+- **`archive` tool**: list and search what is already in `.web/` across sessions (the BM25 index exists).
+- **Site-specific extraction** for GitHub, docs.rs, MDN and Stack Overflow; **`fetch` of one section** (heading
+  anchor or pattern).
+- **`--direct` bench mode**: call web-mcp's tools over stdio without `claude -p`, as a quick repeatable check beside
+  the official run.
+- **Papers phrase search waits 20 s for arXiv**: give each source its own deadline (OpenAlex answers in ~1 s) and
+  return what arrived, noting the source that timed out; find out why arXiv's search request stalled (Task 18).
+- **Paid search API backend** (Brave or Mojeek, key in a sensitive user config) in front of SearXNG, if Bing starts
+  blocking too.
+- **Staan (EUSP, Ecosia + Qwant) as a search source** once individuals can use it: it has API docs and a sign-up, but as of 2026-10-17 even the free trial asks for company and billing details (the user checked).
+- **agent-browser on NixOS**: the installer runs `npm i -g agent-browser && agent-browser install`, which fails on NixOS (npm prefix in the read-only store, downloaded Chrome needs nix-ld). Verified working on deadPc: `npx -y agent-browser@0.39.1` with `AGENT_BROWSER_EXECUTABLE_PATH` set to nixpkgs `chromium` (155.0.8059.39).

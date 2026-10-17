@@ -591,6 +591,9 @@ test('searxng binds loopback, mounts the config dir and takes the secret', () =>
   assert.match(out, /secret_key: "abc123"/);
   assert.doesNotMatch(out, /changeme/);
   assert.match(out, /- json/);
+  assert.match(out, /name: bing\n\s+disabled: false/);
+  for (const e of ['duckduckgo', 'brave', 'google cse'])
+    assert.match(out, new RegExp(`name: ${e}\\n\\s+disabled: true`));
 });
 
 test('web builtins: tri-state merge keeps other denies, toggle reads deny', () => {
