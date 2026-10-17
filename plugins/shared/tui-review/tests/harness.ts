@@ -1,4 +1,4 @@
-// Stands in for the engine under the plugin: answers its file reads from the `brv gen` fixture (any chunk index gets
+// Stands in for the engine under the plugin: answers its file reads from the `tui-review gen` fixture (any chunk index gets
 // one of the fixture's chunks, so a 100k-line review needs only three of them) and records what it paints.
 
 import type { On } from 'claude-code';
@@ -32,7 +32,7 @@ export type Recorded = {
 /** The session directory the plugin sees. */
 export const CWD = '/work/repo';
 
-/** brv's progress lines per run: the same for every run, or chosen by its argv. */
+/** tui-review's progress lines per run: the same for every run, or chosen by its argv. */
 export type Script = readonly string[] | ((argv: readonly string[]) => readonly string[]);
 
 /** Chunks read from "disk" per scroll, and how many are resident, read off the plugin's status line. */
@@ -71,7 +71,7 @@ export function engine(on: On, progress: Script, store: Record<string, unknown> 
   const fileOf = (path: string) => {
     // By file name: on Windows the engine hands the hook `/fixture/x` resolved, as `D:\fixture\x`.
     const name = path.split(/[\\/]/).at(-1) ?? '';
-    if (name === 'manifest.brv') return manifest;
+    if (name === 'manifest.bin') return manifest;
     const match = /^(\d{4})\.(lines|hl)$/.exec(name);
     if (match === null) return undefined;
     const list = match[2] === 'lines' ? lines : hl;

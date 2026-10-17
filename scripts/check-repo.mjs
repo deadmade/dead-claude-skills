@@ -71,7 +71,7 @@ for (const dir of pluginDirs) {
   if (v !== version) problems.push(`${manifest}: version is ${v}, package.json has ${version}`);
 }
 const CRATES = [
-  { cargo: 'crates/brv/Cargo.toml', lock: 'crates/brv/Cargo.lock', name: 'brv' },
+  { cargo: 'crates/tui-review/Cargo.toml', lock: 'crates/tui-review/Cargo.lock', name: 'tui-review' },
   { cargo: 'crates/web-mcp/Cargo.toml', lock: 'crates/web-mcp/Cargo.lock', name: 'web-mcp' },
 ];
 for (const { cargo, lock, name } of CRATES) {

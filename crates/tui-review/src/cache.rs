@@ -1,5 +1,5 @@
-//! Writing a review cache: the progress lines the mod reads on stdout, and the chunk files they announce. `brv gen`
-//! and `brv review` both write through here, so the mod cannot tell them apart.
+//! Writing a review cache: the progress lines the mod reads on stdout, and the chunk files they announce. `tui-review gen`
+//! and `tui-review review` both write through here, so the mod cannot tell them apart.
 
 use std::io::{self, Write};
 use std::path::Path;
@@ -20,12 +20,12 @@ impl<W: Write> Progress<W> {
     }
 }
 
-/// Writes `manifest.brv` and announces the cache.
+/// Writes `manifest.bin` and announces the cache.
 ///
 /// # Errors
 /// When the file cannot be written or stdout is closed.
 pub fn write_manifest<W: Write>(dir: &Path, manifest: &Manifest, progress: &mut Progress<W>) -> io::Result<()> {
-    write_atomic(&dir.join("manifest.brv"), &manifest.encode())?;
+    write_atomic(&dir.join("manifest.bin"), &manifest.encode())?;
     progress.say(format_args!("manifest {}", dir.display()))
 }
 
@@ -39,7 +39,7 @@ pub fn finish<W: Write>(dir: &Path, progress: &mut Progress<W>) -> io::Result<()
 }
 
 /// Fills `NNNN.lines` chunks in order and writes each as it fills. With `hl`, each line's spans are written alongside
-/// into `NNNN.hl` (what `brv gen` does); without, colours come later through [`HlWriter`].
+/// into `NNNN.hl` (what `tui-review gen` does); without, colours come later through [`HlWriter`].
 pub struct LinesWriter<'a, W: Write> {
     dir: &'a Path,
     progress: &'a mut Progress<W>,

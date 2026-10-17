@@ -71,7 +71,7 @@ Say which plugin provides it, then use the fallback:
 
 The argument is `branch` (default) or `all`.
 
-- **branch:** the base is a named base, else `git config branch.<current>.brvBase` (tui-review's remembered base),
+- **branch:** the base is a named base, else `git config branch.<current>.tuiReviewBase` (tui-review's remembered base),
   else `origin/HEAD`, else `origin/main` or `origin/master`. The scope is the working tree against
   `git merge-base <base> HEAD`, untracked files included, plus what the change should have touched and didn't: the
   tests of changed code, the docs that describe it.

@@ -6,10 +6,10 @@ use std::process::ExitCode;
 static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 const USAGE: &str = "\
-usage: brv review [--base REF] [--repo DIR] [--cache DIR]   review HEAD against the branch it is stacked on
-       brv gen [--lines N] [--seed N] [--out DIR]           write a synthetic review cache (default 100000 lines)
-       brv bench [--base REF] [--repo DIR]                  time a review of a real repository, cold and cached
-       brv --version
+usage: tui-review review [--base REF] [--repo DIR] [--cache DIR]   review HEAD against the branch it is stacked on
+       tui-review gen [--lines N] [--seed N] [--out DIR]           write a synthetic review cache (default 100000 lines)
+       tui-review bench [--base REF] [--repo DIR]                  time a review of a real repository, cold and cached
+       tui-review --version
 ";
 
 fn main() -> ExitCode {
@@ -30,7 +30,7 @@ fn main() -> ExitCode {
         Some("gen") => gen_command(&args[1..]),
         Some("bench") => bench_command(&args[1..]),
         Some("--version" | "-V") => {
-            println!("brv {}", env!("CARGO_PKG_VERSION"));
+            println!("tui-review {}", env!("CARGO_PKG_VERSION"));
             return ExitCode::SUCCESS;
         }
         Some("help" | "--help" | "-h") => {
@@ -67,7 +67,7 @@ fn flags<'a>(args: &'a [String], known: &[&str]) -> anyhow::Result<Vec<(&'a str,
 }
 
 fn review_command(args: &[String]) -> anyhow::Result<()> {
-    let mut options = brv::review::Options { repo: PathBuf::from("."), base: None, cache: None };
+    let mut options = tui_review::review::Options { repo: PathBuf::from("."), base: None, cache: None };
     for (flag, value) in flags(args, &["--base", "--repo", "--cache"])? {
         match flag {
             "--base" => options.base = Some(value.to_owned()).filter(|b| !b.is_empty()),
@@ -75,12 +75,12 @@ fn review_command(args: &[String]) -> anyhow::Result<()> {
             _ => options.cache = Some(std::path::absolute(value)?),
         }
     }
-    let summary = brv::review::run(&options, std::io::stdout().lock())?;
+    let summary = tui_review::review::run(&options, std::io::stdout().lock())?;
     if summary.cached {
-        eprintln!("brv review: cached, {:?}", summary.resolve);
+        eprintln!("tui-review review: cached, {:?}", summary.resolve);
     } else {
         eprintln!(
-            "brv review: {} files, {} lines against {}; base {:?}, text {:?}, colour {:?}",
+            "tui-review review: {} files, {} lines against {}; base {:?}, text {:?}, colour {:?}",
             summary.files, summary.lines, summary.base, summary.resolve, summary.text, summary.colour
         );
     }
@@ -89,23 +89,23 @@ fn review_command(args: &[String]) -> anyhow::Result<()> {
 
 /// Reviews a real repository into a throwaway cache twice, cold then cached, and prints how long each part took.
 fn bench_command(args: &[String]) -> anyhow::Result<()> {
-    let cache = std::env::temp_dir().join(format!("brv-bench-{}", std::process::id()));
-    let mut options = brv::review::Options { repo: PathBuf::from("."), base: None, cache: Some(cache.clone()) };
+    let cache = std::env::temp_dir().join(format!("tui-review-bench-{}", std::process::id()));
+    let mut options = tui_review::review::Options { repo: PathBuf::from("."), base: None, cache: Some(cache.clone()) };
     for (flag, value) in flags(args, &["--base", "--repo"])? {
         match flag {
             "--base" => options.base = Some(value.to_owned()),
             _ => options.repo = PathBuf::from(value),
         }
     }
-    let cold = brv::review::run(&options, std::io::sink());
+    let cold = tui_review::review::run(&options, std::io::sink());
     let started = std::time::Instant::now();
-    let warm = brv::review::run(&options, std::io::sink());
+    let warm = tui_review::review::run(&options, std::io::sink());
     let reopen = started.elapsed();
     let _ = std::fs::remove_dir_all(&cache);
     let (cold, warm) = (cold?, warm?);
     let threads = std::thread::available_parallelism().map_or(1, std::num::NonZero::get);
     println!(
-        "brv {} · {} files, {} diff lines against {} · {threads} threads",
+        "tui-review {} · {} files, {} diff lines against {} · {threads} threads",
         env!("CARGO_PKG_VERSION"),
         cold.files,
         cold.lines,
@@ -129,7 +129,7 @@ fn gen_command(args: &[String]) -> anyhow::Result<()> {
             _ => out = Some(PathBuf::from(value)),
         }
     }
-    let out = out.unwrap_or_else(|| std::env::temp_dir().join(format!("brv-demo-{lines}")));
+    let out = out.unwrap_or_else(|| std::env::temp_dir().join(format!("tui-review-demo-{lines}")));
     let out = std::path::absolute(out)?;
-    brv::generate::run(&out, lines, seed)
+    tui_review::generate::run(&out, lines, seed)
 }

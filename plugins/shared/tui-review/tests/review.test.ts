@@ -20,7 +20,7 @@ const firstCode = (() => {
   throw new Error('no code line in the fixture');
 })();
 
-/** brv answers each run with the review in `dirs[n]`, the last one again once they run out. */
+/** tui-review answers each run with the review in `dirs[n]`, the last one again once they run out. */
 function reviews(dirs: string[]) {
   let n = 0;
   return (argv: readonly string[]) => {
@@ -40,12 +40,12 @@ test('/tui-review reviews the branch in the session directory; a base given goes
   const answer = await $.command.run(branch(''));
   expect(JSON.stringify(answer)).toContain('stacked on');
   await recorded.opened;
-  expect(recorded.spawns[0]).toEqual(['brv', 'review', '--repo', CWD]);
+  expect(recorded.spawns[0]).toEqual(['tui-review', 'review', '--repo', CWD]);
   expect(recorded.opens[0]).toEqual({ id: 'review', focus: true });
 
   await $.command.run(branch('origin/main'));
   await clock.settle();
-  expect(recorded.spawns[1]).toEqual(['brv', 'review', '--repo', CWD, '--base', 'origin/main']);
+  expect(recorded.spawns[1]).toEqual(['tui-review', 'review', '--repo', CWD, '--base', 'origin/main']);
 });
 
 test('each prompt tells Claude which diff is open and where the cursor is', async ($, on) => {
@@ -87,8 +87,8 @@ test('a Bash call runs the review again without re-saving the base; unchanged, t
   await $.tool.call({ tool: 'Bash', input: { command: 'git status' } } as never);
   await clock.settle();
   expect(recorded.spawns).toHaveLength(2);
-  // brv saved b1 on the first run; passing it again would save it for whatever branch is checked out now.
-  expect(recorded.spawns[1]).toEqual(['brv', 'review', '--repo', CWD]);
+  // tui-review saved b1 on the first run; passing it again would save it for whatever branch is checked out now.
+  expect(recorded.spawns[1]).toEqual(['tui-review', 'review', '--repo', CWD]);
   expect(recorded.opens).toHaveLength(1);
   await ui.press({ key: 'j' });
   await ui.press({ key: 'k' });

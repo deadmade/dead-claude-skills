@@ -34,7 +34,7 @@ and the claude-md-management plugin:
 
 ## Phase 1: Scope
 
-1. The base is the argument if given. Otherwise `git config branch.<current>.brvBase` (tui-review's remembered base).
+1. The base is the argument if given. Otherwise `git config branch.<current>.tuiReviewBase` (tui-review's remembered base).
    Otherwise the default branch: `origin/HEAD`, else `origin/main` or `origin/master`.
 2. Run `git merge-base <base> HEAD`. If that fails, say why and stop.
 3. List the changed and untracked files, with their `+/−` counts and the commits (`git log <merge-base>..HEAD

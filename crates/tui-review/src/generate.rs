@@ -1,5 +1,5 @@
-//! `brv gen`: a synthetic review cache, for the mod's spike and its budget tests. It writes the same files and prints
-//! the same progress lines as `brv review`, with code-like text and highlight spans of a realistic density.
+//! `tui-review gen`: a synthetic review cache, for the mod's spike and its budget tests. It writes the same files and prints
+//! the same progress lines as `tui-review review`, with code-like text and highlight spans of a realistic density.
 
 use std::fmt::Write as _;
 use std::io::{self, Write};
@@ -196,7 +196,7 @@ pub fn run(dir: &Path, lines: usize, seed: u64) -> Result<()> {
     out.flush()?;
     finish(dir, &mut progress)?;
     eprintln!(
-        "brv gen: {} lines, {} files in {:?}",
+        "tui-review gen: {} lines, {} files in {:?}",
         manifest.meta.total_lines,
         manifest.files.len(),
         started.elapsed()

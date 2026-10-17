@@ -1,4 +1,4 @@
-//! Speed and memory budgets for `brv review` on a large synthetic repository. Ignored by default, since they want a
+//! Speed and memory budgets for `tui-review review` on a large synthetic repository. Ignored by default, since they want a
 //! release build: `cargo test --release --test perf -- --ignored --nocapture`. A slower change fails CI instead of
 //! slipping in. Measured on a 4-core Linux container (base 19 ms, first chunk 50 ms, plain 60 ms, colours 2.7 s,
 //! reopen 19 ms, 19 MB heap); each budget leaves 3-5x headroom (8x for the git-bound ones) for slower CI runners,
@@ -15,7 +15,7 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
-use brv::review::{Options, run};
+use tui_review::review::{Options, run};
 
 /// Counts live heap bytes and the peak, so the memory budget is measured rather than guessed.
 struct Counting;
@@ -103,8 +103,8 @@ fn commit(out: &mut impl Write, branch: &str, mark: usize, from: Option<usize>, 
 
 /// Builds the fixture once; later runs reuse it.
 fn fixture() -> PathBuf {
-    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("brv-perf-v3");
-    if dir.join(".git/brv-fixture-done").exists() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("tui-review-perf-v3");
+    if dir.join(".git/tui-review-fixture-done").exists() {
         return dir;
     }
     let _ = std::fs::remove_dir_all(&dir);
@@ -150,7 +150,7 @@ fn fixture() -> PathBuf {
     assert!(child.wait().unwrap().success());
     git(&["symbolic-ref", "HEAD", "refs/heads/feature"]);
     git(&["commit-graph", "write", "--reachable"]);
-    std::fs::write(dir.join(".git/brv-fixture-done"), "").unwrap();
+    std::fs::write(dir.join(".git/tui-review-fixture-done"), "").unwrap();
     eprintln!("fixture built in {:?}", started.elapsed());
     dir
 }
@@ -192,8 +192,8 @@ fn review_budgets() {
     let options = Options { repo: repo.clone(), base: None, cache: Some(cache.path().to_owned()) };
 
     let started = Instant::now();
-    let git = brv::git::open(&repo).unwrap();
-    let range = brv::git::resolve(&git, None).unwrap();
+    let git = tui_review::git::open(&repo).unwrap();
+    let range = tui_review::git::resolve(&git, None).unwrap();
     let detect = started.elapsed();
     assert_eq!(range.base_name, "main");
 

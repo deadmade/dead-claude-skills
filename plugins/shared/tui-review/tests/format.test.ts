@@ -1,4 +1,4 @@
-// The cache format is written in Rust and read here: these hold the two to the same layout, on real `brv gen` output.
+// The cache format is written in Rust and read here: these hold the two to the same layout, on real `tui-review gen` output.
 
 import { expect, test } from 'claude-code/testing';
 
@@ -7,7 +7,7 @@ import * as fixture from './fixture.gen';
 
 const manifest = () => new Manifest(fromBase64(fixture.manifest));
 
-test('the manifest reads brv gen output', async () => {
+test('the manifest reads tui-review gen output', async () => {
   const m = manifest();
   expect(m.totalLines).toBeGreaterThanOrEqual(100_000);
   expect(m.chunkLines).toBe(1024);

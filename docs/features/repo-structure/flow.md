@@ -124,6 +124,10 @@ too). Findings, recommendation in brackets. **User: "apply all of them"** (2026-
   Pre-existing, out of scope; follow-up.
 - Review fix not in the plan: `pluginDirs()` skips folders without a manifest (ignored leftovers of old groups in other
   checkouts would count as plugins).
+- Asked after the PR (2026-10-18): `brv` renamed to `tui-review` (crate, binary, release archives, flake package,
+  `build-tui-review.yml`). The userConfig key is `binPath`, like web-mcp's; the remembered base is `tuiReviewBase`, with
+  `brvBase` still read; the cache moves to `<git common dir>/tui-review/` and its format to version 2 (magic `TRV*`,
+  `manifest.bin`).
 
 ## Walkthrough
 

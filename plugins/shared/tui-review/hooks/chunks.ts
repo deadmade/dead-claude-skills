@@ -1,7 +1,7 @@
-// Views over brv's cache files (layout: crates/brv/src/format.rs). Nothing is parsed: the bytes `$.fs.read` hands back
+// Views over tui-review's cache files (layout: crates/tui-review/src/format.rs). Nothing is parsed: the bytes `$.fs.read` hands back
 // get typed-array views laid over them, so any line is a direct lookup and no per-line objects are made.
 
-export const VERSION = 1;
+export const VERSION = 2;
 
 export const Kind = { File: 0, Hunk: 1, Context: 2, Add: 3, Del: 4, Note: 5 } as const;
 
@@ -32,7 +32,8 @@ function header(bytes: Bytes, magic: string): { n: number; m: number } {
   if (tag !== magic) throw new Error(`not a ${magic} file (${tag})`);
   const head = new DataView(bytes.buffer, bytes.byteOffset, HEADER);
   const version = head.getUint16(4, true);
-  if (version !== VERSION) throw new Error(`cache format ${version}, this mod reads ${VERSION}: update brv or the mod`);
+  if (version !== VERSION)
+    throw new Error(`cache format ${version}, this mod reads ${VERSION}: update tui-review or the mod`);
   return { n: head.getUint32(8, true), m: head.getUint32(12, true) };
 }
 
@@ -64,7 +65,7 @@ export class Manifest {
   private readonly strings: Uint16Array;
 
   constructor(bytes: Bytes) {
-    const { n, m } = header(bytes, 'BRVM');
+    const { n, m } = header(bytes, 'TRVM');
     const meta = u32(bytes, HEADER, META_U32);
     this.files = n;
     this.records = u32(bytes, HEADER + META_U32 * 4, n * FILE_U32);
@@ -142,7 +143,7 @@ export class Lines {
   readonly text: Uint16Array;
 
   constructor(bytes: Bytes) {
-    const { n, m } = header(bytes, 'BRVL');
+    const { n, m } = header(bytes, 'TRVL');
     let at = HEADER;
     this.n = n;
     this.kind = bytes.subarray(at, at + n);
@@ -166,7 +167,7 @@ export class Highlights {
   readonly spans: Uint32Array;
 
   constructor(bytes: Bytes) {
-    const { n, m } = header(bytes, 'BRVH');
+    const { n, m } = header(bytes, 'TRVH');
     this.start = u32(bytes, HEADER, n + 1);
     this.spans = u32(bytes, HEADER + (n + 1) * 4, m);
   }

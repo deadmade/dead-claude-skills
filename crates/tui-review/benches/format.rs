@@ -1,6 +1,6 @@
-//! Chunk encoding: what `brv` pays per 1,024 diff lines on the way to disk.
+//! Chunk encoding: what `tui-review` pays per 1,024 diff lines on the way to disk.
 
-use brv::format::{CHUNK_LINES, HlChunk, Kind, LinesChunk, span};
+use tui_review::format::{CHUNK_LINES, HlChunk, Kind, LinesChunk, span};
 
 fn main() {
     divan::main();

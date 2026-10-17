@@ -1,10 +1,10 @@
 //! Diff and highlight throughput, for digging into a failed `tests/perf.rs` budget: `cargo bench --bench review`.
 
-use brv::diff::{FileDiff, hunk_lines};
-use brv::format::{Kind, LinesChunk};
-use brv::highlight::row_spans;
 use divan::Bencher;
 use tree_sitter_highlight::Highlighter;
+use tui_review::diff::{FileDiff, hunk_lines};
+use tui_review::format::{Kind, LinesChunk};
+use tui_review::highlight::row_spans;
 
 fn main() {
     divan::main();

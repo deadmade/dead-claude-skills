@@ -1,11 +1,11 @@
-//! `brv review` against real repositories built with the git CLI: which base it picks, and what it writes.
+//! `tui-review review` against real repositories built with the git CLI: which base it picks, and what it writes.
 
 use std::path::Path;
 use std::process::Command;
 
-use brv::diff::FileDiff;
-use brv::format::{Kind, file_flags};
-use brv::review::{Options, run};
+use tui_review::diff::FileDiff;
+use tui_review::format::{Kind, file_flags};
+use tui_review::review::{Options, run};
 
 struct Repo(tempfile::TempDir);
 
@@ -46,14 +46,14 @@ impl Repo {
     }
 
     fn base(&self, base: Option<&str>) -> String {
-        let repo = brv::git::open(self.path()).unwrap();
-        brv::git::resolve(&repo, base).unwrap().base_name
+        let repo = tui_review::git::open(self.path()).unwrap();
+        tui_review::git::resolve(&repo, base).unwrap().base_name
     }
 
     fn files(&self) -> Vec<FileDiff> {
-        let repo = brv::git::open(self.path()).unwrap();
-        let range = brv::git::resolve(&repo, None).unwrap();
-        brv::diff::review(&repo, &range).unwrap()
+        let repo = tui_review::git::open(self.path()).unwrap();
+        let range = tui_review::git::resolve(&repo, None).unwrap();
+        tui_review::diff::review(&repo, &range).unwrap()
     }
 }
 
@@ -141,12 +141,19 @@ fn branches_stacked_on_top_and_this_branchs_remote_copy_are_not_bases() {
 fn a_given_base_is_remembered_and_wins() {
     let repo = stack();
     assert_eq!(repo.base(Some("main")), "main");
-    assert_eq!(repo.git(&["config", "branch.b2.brvBase"]), "main");
+    assert_eq!(repo.git(&["config", "branch.b2.tuiReviewBase"]), "main");
     assert_eq!(repo.base(None), "main");
     assert_eq!(paths(&repo.files()), ["b1.txt", "b2.txt"]);
     // A remembered base that is gone falls back to detection.
-    repo.git(&["config", "branch.b2.brvBase", "deleted"]);
+    repo.git(&["config", "branch.b2.tuiReviewBase", "deleted"]);
     assert_eq!(repo.base(None), "b1");
+}
+
+#[test]
+fn a_base_remembered_under_the_old_brv_key_still_counts() {
+    let repo = stack();
+    repo.git(&["config", "branch.b2.brvBase", "main"]);
+    assert_eq!(repo.base(None), "main");
 }
 
 #[test]
@@ -155,8 +162,8 @@ fn a_given_base_without_shared_history_is_not_remembered() {
     repo.git(&["checkout", "-q", "--orphan", "unrelated"]);
     repo.commit("u.txt", "u\n");
     repo.git(&["checkout", "-q", "b2"]);
-    let git = brv::git::open(repo.path()).unwrap();
-    assert!(brv::git::resolve(&git, Some("unrelated")).is_err());
+    let git = tui_review::git::open(repo.path()).unwrap();
+    assert!(tui_review::git::resolve(&git, Some("unrelated")).is_err());
     assert_eq!(repo.base(None), "b1");
 }
 
@@ -181,8 +188,8 @@ fn a_branch_started_from_origin_main_is_reviewed_against_it() {
 fn a_branch_with_nothing_to_compare_says_how_to_pick_a_base() {
     let repo = Repo::new();
     repo.commit("a.txt", "a\n");
-    let git = brv::git::open(repo.path()).unwrap();
-    let err = brv::git::resolve(&git, None).unwrap_err().to_string();
+    let git = tui_review::git::open(repo.path()).unwrap();
+    let err = tui_review::git::resolve(&git, None).unwrap_err().to_string();
     assert!(err.contains("/tui-review <branch>"), "{err}");
 }
 
@@ -258,7 +265,7 @@ fn a_run_announces_every_chunk_and_the_next_one_is_cached() {
         lines,
         [format!("manifest {dir}").as_str(), "text 0", "text 1", "text 2", "hl 0", "hl 1", "hl 2", "done"]
     );
-    for name in ["manifest.brv", "0000.lines", "0002.lines", "0000.hl", "0002.hl", "done"] {
+    for name in ["manifest.bin", "0000.lines", "0002.lines", "0000.hl", "0002.hl", "done"] {
         assert!(summary.dir.join(name).exists(), "{name}");
     }
     assert!(

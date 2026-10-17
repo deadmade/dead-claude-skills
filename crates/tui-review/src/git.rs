@@ -1,7 +1,7 @@
 //! Which commits a review shows: HEAD against the branch it is stacked on, not against main.
 //!
 //! For `main → b1 → b2`, reviewing `b2` shows only `b2`'s own commits. The base is, in order: the `--base` the person
-//! gave (remembered as `branch.<name>.brvBase`), that remembered pick, or the branch whose merge-base with HEAD is
+//! gave (remembered as `branch.<name>.tuiReviewBase`), that remembered pick, or the branch whose merge-base with HEAD is
 //! nearest to HEAD, counting steps over all of HEAD's parents (so a branch that merged main in still picks main).
 //! The diff is always `merge_base(base, HEAD)..HEAD`, so a base that moved on after this branch was
 //! cut never leaks its new commits into the review.
@@ -26,7 +26,10 @@ pub struct Range {
 }
 
 /// Git config key under `branch.<name>` that remembers a base picked with `--base`.
-pub const BASE_KEY: &str = "brvBase";
+pub const BASE_KEY: &str = "tuiReviewBase";
+
+/// Where bases were remembered while the binary was called brv; read, never written.
+const OLD_BASE_KEY: &str = "brvBase";
 
 /// Commits walked back from HEAD to measure how near each merge-base is. A merge-base past this counts as far, and
 /// only wins when no branch has one nearer. About 10 ms with a commit-graph.
@@ -71,11 +74,14 @@ fn peel(repo: &gix::Repository, spec: &str) -> Result<ObjectId> {
 }
 
 fn remembered(repo: &gix::Repository, branch: &str) -> Option<String> {
-    let key = format!("branch.{branch}.{BASE_KEY}");
-    repo.config_snapshot().string(key.as_str()).map(|v| v.to_str_lossy().into_owned())
+    let config = repo.config_snapshot();
+    [BASE_KEY, OLD_BASE_KEY]
+        .iter()
+        .find_map(|key| config.string(format!("branch.{branch}.{key}").as_str()))
+        .map(|v| v.to_str_lossy().into_owned())
 }
 
-/// Saves `base` as `branch.<branch>.brvBase` in the repository's own config, so the pick sticks.
+/// Saves `base` as `branch.<branch>.tuiReviewBase` in the repository's own config, so the pick sticks.
 fn remember(repo: &gix::Repository, branch: &str, base: &str) -> Result<()> {
     if remembered(repo, branch).as_deref() == Some(base) {
         return Ok(());

@@ -1,10 +1,10 @@
-name: Build brv
+name: Build tui-review
 
-# brv, tui-review's binary, for each platform: archives plus their checksums. release.yml calls this and attaches
+# tui-review, tui-review's binary, for each platform: archives plus their checksums. release.yml calls this and attaches
 # them to the vX.Y.Z release the installer downloads from. A PR that changes this file, or a run by hand, builds only.
 on:
   pull_request:
-    paths: ['.github/workflows/build-brv.yml']
+    paths: ['.github/workflows/build-tui-review.yml']
   workflow_dispatch:
   workflow_call:
 
@@ -26,7 +26,7 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: crates/brv
+        working-directory: crates/tui-review
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -39,7 +39,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          workspaces: crates/brv
+          workspaces: crates/tui-review
           key: ${{ matrix.target }}
 
       - name: Build
@@ -47,16 +47,16 @@ jobs:
 
       - name: Smoke test
         if: matrix.target != 'x86_64-apple-darwin'
-        run: target/${{ matrix.target }}/release/brv --version
+        run: target/${{ matrix.target }}/release/tui-review --version
 
       - name: Package
         run: |
-          name=brv-${{ matrix.target }}
+          name=tui-review-${{ matrix.target }}
           mkdir -p "$RUNNER_TEMP/dist"
           if [ "${{ matrix.archive }}" = zip ]; then
-            7z a -tzip "$RUNNER_TEMP/dist/$name.zip" "./target/${{ matrix.target }}/release/brv.exe" > /dev/null
+            7z a -tzip "$RUNNER_TEMP/dist/$name.zip" "./target/${{ matrix.target }}/release/tui-review.exe" > /dev/null
           else
-            tar -czf "$RUNNER_TEMP/dist/$name.tar.gz" -C "target/${{ matrix.target }}/release" brv
+            tar -czf "$RUNNER_TEMP/dist/$name.tar.gz" -C "target/${{ matrix.target }}/release" tui-review
           fi
           cd "$RUNNER_TEMP/dist"
           for f in "$name".*; do
@@ -65,5 +65,5 @@ jobs:
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: brv-${{ matrix.target }}
+          name: tui-review-${{ matrix.target }}
           path: ${{ runner.temp }}/dist/*

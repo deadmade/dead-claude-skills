@@ -352,19 +352,19 @@ test('cswap missing on Linux points at uv', () => {
   );
 });
 
-test('brv downloads the release archive built for this machine', () => {
-  const win = binAsset('brv', 'win32', 'x64', '1.2.3');
+test('tui-review downloads the release archive built for this machine', () => {
+  const win = binAsset('tui-review', 'win32', 'x64', '1.2.3');
   assert.equal(
     win.url,
-    'https://github.com/deadmade/dead-claude-skills/releases/download/v1.2.3/brv-x86_64-pc-windows-msvc.zip',
+    'https://github.com/deadmade/dead-claude-skills/releases/download/v1.2.3/tui-review-x86_64-pc-windows-msvc.zip',
   );
   assert.equal(win.sha256, `${win.url}.sha256`);
-  assert.equal(win.exe, 'brv.exe');
-  assert.equal(binAsset('brv', 'linux', 'x64', '1.0.0').file, 'brv-x86_64-unknown-linux-musl.tar.gz');
-  assert.equal(binAsset('brv', 'linux', 'arm64', '1.0.0').file, 'brv-aarch64-unknown-linux-musl.tar.gz');
-  assert.equal(binAsset('brv', 'darwin', 'arm64', '1.0.0').exe, 'brv');
-  assert.equal(binAsset('brv', 'win32', 'arm64', '1.0.0'), undefined);
-  assert.equal(binAsset('brv', 'freebsd', 'x64', '1.0.0'), undefined);
+  assert.equal(win.exe, 'tui-review.exe');
+  assert.equal(binAsset('tui-review', 'linux', 'x64', '1.0.0').file, 'tui-review-x86_64-unknown-linux-musl.tar.gz');
+  assert.equal(binAsset('tui-review', 'linux', 'arm64', '1.0.0').file, 'tui-review-aarch64-unknown-linux-musl.tar.gz');
+  assert.equal(binAsset('tui-review', 'darwin', 'arm64', '1.0.0').exe, 'tui-review');
+  assert.equal(binAsset('tui-review', 'win32', 'arm64', '1.0.0'), undefined);
+  assert.equal(binAsset('tui-review', 'freebsd', 'x64', '1.0.0'), undefined);
 });
 
 test('web-mcp downloads its own archive, and each plugin is configured under its own key', () => {
@@ -377,7 +377,7 @@ test('web-mcp downloads its own archive, and each plugin is configured under its
   };
   for (const [k, target] of Object.entries(t)) {
     const [platform, arch] = k.split('-');
-    for (const name of ['brv', 'web-mcp']) {
+    for (const name of ['tui-review', 'web-mcp']) {
       if (name === 'web-mcp' && !['win32-x64', 'linux-x64'].includes(k)) {
         assert.equal(binAsset(name, platform, arch, '1.2.3'), undefined);
         continue;
@@ -388,7 +388,7 @@ test('web-mcp downloads its own archive, and each plugin is configured under its
     }
   }
   assert.equal(binAsset('web-mcp', 'linux', 'ia32', '1.0.0'), undefined);
-  assert.deepEqual(BIN_PLUGINS['tui-review'], { name: 'brv', key: 'brvPath' });
+  assert.deepEqual(BIN_PLUGINS['tui-review'], { name: 'tui-review', key: 'binPath' });
   assert.deepEqual(BIN_PLUGINS['web-mcp'], { name: 'web-mcp', key: 'binPath' });
   const dirs = { 'tui-review': 'plugins/shared/tui-review', 'web-mcp': 'plugins/shared/web-mcp' };
   for (const [plugin, { key }] of Object.entries(BIN_PLUGINS))
@@ -403,14 +403,14 @@ test('install.mjs finds plugin folders through the marketplace, never by a liter
   assert.doesNotMatch(src, /join\(PKG, 'plugins'/);
 });
 
-test('brv versions match the release the installer fetches', () => {
-  const cargo = readFileSync(new URL('../crates/brv/Cargo.toml', import.meta.url), 'utf8');
+test('tui-review versions match the release the installer fetches', () => {
+  const cargo = readFileSync(new URL('../crates/tui-review/Cargo.toml', import.meta.url), 'utf8');
   assert.equal(/^version = "(.+)"/m.exec(cargo)[1], json('package.json').version);
 });
 
-test('brv checksum lines and what to do about brv', () => {
+test('tui-review checksum lines and what to do about tui-review', () => {
   const hex = 'AB'.repeat(32);
-  assert.equal(sha256Of(`${hex}  brv-x.tar.gz\n`), hex.toLowerCase());
+  assert.equal(sha256Of(`${hex}  tui-review-x.tar.gz\n`), hex.toLowerCase());
   assert.equal(sha256Of(`${hex}`), hex.toLowerCase());
   assert.equal(sha256Of('Not Found'), undefined);
   assert.equal(sha256Of(`${hex}ff  x`), undefined);

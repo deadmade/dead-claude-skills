@@ -1,4 +1,4 @@
-//! `brv review`: diffs HEAD against its base into a cache the mod paints from, announcing each piece on stdout.
+//! `tui-review review`: diffs HEAD against its base into a cache the mod paints from, announcing each piece on stdout.
 //!
 //! Pass 1 writes the manifest and every `NNNN.lines` chunk (plain text, the pane can draw at once); pass 2 writes the
 //! `NNNN.hl` colours. A complete cache is keyed by merge-base, HEAD and base, so reopening the same review only prints
@@ -30,11 +30,11 @@ pub struct Options {
     pub repo: PathBuf,
     /// The base to review against, as typed; remembered for the branch.
     pub base: Option<String>,
-    /// Where review caches go; defaults to `<git common dir>/brv`.
+    /// Where review caches go; defaults to `<git common dir>/tui-review`.
     pub cache: Option<PathBuf>,
 }
 
-/// What a run did, for `brv bench` and the stderr summary.
+/// What a run did, for `tui-review bench` and the stderr summary.
 #[derive(Debug, Clone, Default)]
 pub struct Summary {
     pub dir: PathBuf,
@@ -56,7 +56,7 @@ pub fn run<W: Write>(options: &Options, out: W) -> Result<Summary> {
     let started = Instant::now();
     let repo = git::open(&options.repo)?;
     let range = git::resolve(&repo, options.base.as_deref())?;
-    let root = options.cache.clone().unwrap_or_else(|| repo.common_dir().join("brv"));
+    let root = options.cache.clone().unwrap_or_else(|| repo.common_dir().join("tui-review"));
     let dir = root.join(dir_name(&range));
     let mut summary = Summary { dir: dir.clone(), base: range.base_name.clone(), ..Summary::default() };
     summary.resolve = started.elapsed();

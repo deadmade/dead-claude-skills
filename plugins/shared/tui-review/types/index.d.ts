@@ -1,5 +1,5 @@
 /**
- * The review the pane shows: brv's cache directory, and the title naming head and base. A `branch` review is run again
+ * The review the pane shows: tui-review's cache directory, and the title naming head and base. A `branch` review is run again
  * when HEAD may have moved, with the `base` it was opened with; a `demo` one never is.
  */
 export type TuiReviewOpen = { dir: string; title: string; kind: 'branch' | 'demo'; base?: string };

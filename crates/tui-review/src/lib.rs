@@ -1,4 +1,4 @@
-//! brv: computes a branch's review diff and writes it as a cache the tui-review mod paints from.
+//! tui-review: computes a branch's review diff and writes it as a cache the tui-review mod paints from.
 
 pub mod cache;
 pub mod diff;

@@ -18,7 +18,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   under them is a plugin and keeps its plugin's name. A plugin sits with whatever pulls it in; tui-review and web-mcp
   are also offered on their own but live in `shared/`. Moving a folder doesn't touch installs (they key on the
   plugin `name`); renaming a plugin does.
-- `crates/`: the two Rust crates, `brv` (tui-review's binary) and `web-mcp` (web-mcp's server). Each keeps its own
+- `crates/`: the two Rust crates, `tui-review` (the tui-review plugin's binary, formerly `brv`) and `web-mcp` (web-mcp's server). Each keeps its own
   `Cargo.lock`; nothing in the plugins reaches into them at runtime.
 - `plugins/default/dead-skills/`: the default bundle; its `dependencies` are the core plugins.
 - `plugins/default/night-city/`: a theme (`themes/night-city.json`) plus a mod, in the dead-skills bundle. It is the house
@@ -45,8 +45,8 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   (slug, phase, gates, deviations, research numbers), polls every 5 s across the repo root, `.worktrees/*` and
   `.claude/worktrees/*` (newest copy per run), and key `1` resumes the run with the conductor its `flow:` names
   (`SKILL` in `flow.ts`).
-- `plugins/shared/tui-review/`: a Claude Code mod (TypeScript, `hooks/`) driving the Rust binary `brv` (`crates/brv/`). The two
-  share a binary cache format (`crates/brv/src/format.rs` ↔ `hooks/chunks.ts`) and a stdout line protocol; change both sides
+- `plugins/shared/tui-review/`: a Claude Code mod (TypeScript, `hooks/`) driving the Rust binary `tui-review` (`crates/tui-review/`). The two
+  share a binary cache format (`crates/tui-review/src/format.rs` ↔ `hooks/chunks.ts`) and a stdout line protocol; change both sides
   together.
 - `plugins/shared/web-mcp/`: a stdio MCP server (Rust, `crates/web-mcp/`) with `search`, `fetch`, `browser` and `lookup`, built for Windows and Linux
   x64 only (`build-web-mcp.yml`, `BIN_ONLY` in `core.mjs`); the installer downloads it and sets `binPath`. Everything it pulls lands in
@@ -89,7 +89,7 @@ and both crates' `Cargo.toml`/`Cargo.lock`. `check-repo.mjs` fails on drift. Nev
     npm run release -- patch      # on main, clean tree; bumps, runs npm test, commits and tags
     git push --follow-tags origin main
 
-The `v*` tag runs `release.yml`, which builds brv, web-mcp and cswap.exe and publishes the GitHub release the installer
+The `v*` tag runs `release.yml`, which builds tui-review, web-mcp and cswap.exe and publishes the GitHub release the installer
 downloads from. Removing a plugin from the marketplace is enough to retire it: the installer uninstalls installed
 plugins of ours that the manifest no longer lists.
 
@@ -97,9 +97,9 @@ plugins of ours that the manifest no longer lists.
 
 - `npm test`: repo checks plus all `installer/*.test.mjs`, `scripts/*.test.mjs` and `plugins/opt-in/notify/hooks/*.test.mjs` (`claude plugin validate` is skipped when `claude` isn't
   on PATH).
-- brv: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/brv`.
+- tui-review: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/tui-review`.
 - web-mcp: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/web-mcp`.
-- tui-review mod tests need a generated fixture first, from `crates/brv`:
+- tui-review mod tests need a generated fixture first, from `crates/tui-review`:
   `cargo run --release -- gen --out <dir> && node ../../plugins/shared/tui-review/tests/make-fixture.mjs <dir>`, then `claude plugin test .` in
   `plugins/shared/tui-review`.
 - mod tests: `claude plugin test .` in `plugins/opt-in/cswap`, `plugins/default/night-city` and `plugins/flows`.
@@ -109,5 +109,5 @@ plugins of ours that the manifest no longer lists.
 - `nix fmt` formats everything per `treefmt.toml` (alejandra, prettier for js/ts/json/md/yaml, rustfmt).
 
 CI: `test.yml` (npm test and the cswap, night-city and flows mod tests, Linux and Windows) on every PR and push to main; `tui-review.yml` on
-PRs touching tui-review; `web-mcp.yml` on PRs touching web-mcp; `build-brv.yml`/`build-web-mcp.yml`/`build-cswap.yml` on PRs touching the workflow (or the cswap pin) and from `release.yml`; `sync-*.yml`
+PRs touching tui-review; `web-mcp.yml` on PRs touching web-mcp; `build-tui-review.yml`/`build-web-mcp.yml`/`build-cswap.yml` on PRs touching the workflow (or the cswap pin) and from `release.yml`; `sync-*.yml`
 weekly.

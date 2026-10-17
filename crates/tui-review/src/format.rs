@@ -4,7 +4,7 @@
 //! `Uint32Array` / `Uint16Array` view over the mod's buffer lands aligned. All integers are little-endian (only
 //! little-endian targets are built). `hooks/chunks.ts` is the reader; keep the two in step and bump [`VERSION`].
 //!
-//! - `manifest.brv`: header (`n` = files, `m` = string units), [`Meta`], `files: [FileRecord; n]`,
+//! - `manifest.bin`: header (`n` = files, `m` = string units), [`Meta`], `files: [FileRecord; n]`,
 //!   `strings: [u16; m]`.
 //! - `NNNN.lines`: header (`n` = lines, `m` = text units), `kind: [u8; n]`, `old_no: [u32; n]`, `new_no: [u32; n]`,
 //!   `start: [u32; n + 1]`, `text: [u16; m]`. The text is already Raster code points (see [`to_cells`]).
@@ -18,10 +18,10 @@ use unicode_width::UnicodeWidthChar;
 use zerocopy::{Immutable, IntoBytes, KnownLayout};
 
 #[cfg(not(target_endian = "little"))]
-compile_error!("the cache format is little-endian; brv is only built for little-endian targets");
+compile_error!("the cache format is little-endian; tui-review is only built for little-endian targets");
 
 /// Bumped on any layout change; part of the cache directory name, so old caches are never misread.
-pub const VERSION: u16 = 1;
+pub const VERSION: u16 = 2;
 /// Diff lines per chunk. Fixed, so the mod finds a line's chunk as `line / CHUNK_LINES` with no table, and a chunk
 /// stays under 1 MiB even when every line is cut at [`MAX_COLS`] (1024 × 512 × 2 bytes).
 pub const CHUNK_LINES: usize = 1024;
@@ -31,9 +31,9 @@ const TAB: usize = 4;
 /// Stands in for anything the Raster cannot draw in one cell (wide, astral, control).
 const PLACEHOLDER: u16 = 0x00B7;
 
-pub const MAGIC_MANIFEST: [u8; 4] = *b"BRVM";
-pub const MAGIC_LINES: [u8; 4] = *b"BRVL";
-pub const MAGIC_HL: [u8; 4] = *b"BRVH";
+pub const MAGIC_MANIFEST: [u8; 4] = *b"TRVM";
+pub const MAGIC_LINES: [u8; 4] = *b"TRVL";
+pub const MAGIC_HL: [u8; 4] = *b"TRVH";
 
 #[derive(IntoBytes, Immutable, KnownLayout, Debug, Clone, Copy)]
 #[repr(C)]
@@ -201,7 +201,7 @@ fn header(magic: [u8; 4], n: usize, m: usize) -> Header {
 /// # Errors
 /// When the file cannot be written or renamed into place.
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
-    // Named by process, so two brv runs filling the same cache never share a temporary file.
+    // Named by process, so two tui-review runs filling the same cache never share a temporary file.
     let mut tmp = path.as_os_str().to_owned();
     tmp.push(format!(".{}.tmp", std::process::id()));
     let tmp = std::path::PathBuf::from(tmp);
@@ -381,7 +381,7 @@ mod tests {
         chunk.push(Kind::Del, 3, 0, "é");
         let buf = chunk.encode();
         let n = 3;
-        assert_eq!(&buf[..4], b"BRVL");
+        assert_eq!(&buf[..4], b"TRVL");
         assert_eq!(u32_at(&buf, 8), n);
         let text_units = u32_at(&buf, 12) as usize;
         assert_eq!(text_units, 8 + 10 + 1);

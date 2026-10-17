@@ -1,7 +1,7 @@
 {
   "name": "tui-review",
   "version": "0.3.0",
-  "description": "/tui-review: a fast diff pane for the current branch, next to the chat, so you can ask Claude about what you read. Needs the brv binary.",
+  "description": "/tui-review: a fast diff pane for the current branch, next to the chat, so you can ask Claude about what you read. Needs the tui-review binary.",
   "author": {
     "name": "deadmade",
     "url": "https://github.com/deadmade"
@@ -9,10 +9,10 @@
   "repository": "https://github.com/deadmade/dead-claude-skills",
   "types": "./types/index.d.ts",
   "userConfig": {
-    "brvPath": {
+    "binPath": {
       "type": "string",
-      "title": "brv binary",
-      "description": "Path to the brv binary. Empty: brv on PATH.",
+      "title": "tui-review binary",
+      "description": "Path to the tui-review binary. Empty: tui-review on PATH.",
       "default": ""
     }
   }

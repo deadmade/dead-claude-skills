@@ -1,5 +1,5 @@
 [package]
-name = "brv"
+name = "tui-review"
 version = "0.3.0"
 edition = "2024"
 rust-version = "1.97"

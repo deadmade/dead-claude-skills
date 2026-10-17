@@ -72,34 +72,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "brv"
-version = "0.3.0"
-dependencies = [
- "anyhow",
- "divan",
- "gix",
- "imara-diff",
- "libmimalloc-sys",
- "mimalloc",
- "rayon",
- "tempfile",
- "tree-sitter",
- "tree-sitter-bash",
- "tree-sitter-c-sharp",
- "tree-sitter-highlight",
- "tree-sitter-javascript",
- "tree-sitter-json",
- "tree-sitter-nix",
- "tree-sitter-python",
- "tree-sitter-rust",
- "tree-sitter-toml-ng",
- "tree-sitter-typescript",
- "tree-sitter-yaml",
- "unicode-width",
- "zerocopy",
-]
-
-[[package]]
 name = "bstr"
 version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1904,6 +1876,34 @@ checksum = "53c223db85f05e34794f065454843b0668ebc15d240ada63e2b5939f43ce7c97"
 dependencies = [
  "cc",
  "tree-sitter-language",
+]
+
+[[package]]
+name = "tui-review"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "divan",
+ "gix",
+ "imara-diff",
+ "libmimalloc-sys",
+ "mimalloc",
+ "rayon",
+ "tempfile",
+ "tree-sitter",
+ "tree-sitter-bash",
+ "tree-sitter-c-sharp",
+ "tree-sitter-highlight",
+ "tree-sitter-javascript",
+ "tree-sitter-json",
+ "tree-sitter-nix",
+ "tree-sitter-python",
+ "tree-sitter-rust",
+ "tree-sitter-toml-ng",
+ "tree-sitter-typescript",
+ "tree-sitter-yaml",
+ "unicode-width",
+ "zerocopy",
 ]
 
 [[package]]

@@ -37,7 +37,7 @@ let cells = new Uint32Array(0);
 let painting: Promise<void> | undefined;
 let paintAgain = false;
 let stopRun: (() => void) | undefined;
-/** A brv run is reading; a refresh asked for meanwhile waits for it and runs once after. */
+/** A tui-review run is reading; a refresh asked for meanwhile waits for it and runs once after. */
 let running = false;
 /** Bumped per run, so a run ended by a newer one does not mark the newer one finished. */
 let runId = 0;
@@ -48,7 +48,7 @@ let relocateTo: string | undefined;
 const FOCUS_REFRESH_MS = 2000;
 let focusRefreshAt = 0;
 
-/** How the running brv was started: what kind of review, and the base it was asked for. */
+/** How the running tui-review was started: what kind of review, and the base it was asked for. */
 type Origin = { kind: TuiReviewOpen['kind']; base?: string };
 
 type $ = EngineInterface;
@@ -60,7 +60,7 @@ async function readBytes($: $, path: string) {
 
 async function loadManifest($: $, dir: string): Promise<Manifest> {
   if (manifest?.dir !== dir) {
-    const value = new Manifest(await readBytes($, `${dir}/manifest.brv`));
+    const value = new Manifest(await readBytes($, `${dir}/manifest.bin`));
     const marks = Viewed.from(await $.store.get(VIEWED_KEY));
     const files = new Uint8Array(value.files);
     let count = 0;
@@ -112,7 +112,7 @@ async function ensureChunks($: $, dir: string, wanted: number[]) {
   }
 }
 
-/** A chunk brv has not written yet reads as undefined. */
+/** A chunk tui-review has not written yet reads as undefined. */
 async function readOptional($: $, path: string) {
   return (await $.fs.exists(path)) ? readBytes($, path) : undefined;
 }
@@ -297,13 +297,13 @@ async function sendComments($: $) {
 }
 
 /** The command line of a branch review in the session's directory. */
-async function reviewArgv($: $, brv: string, base: string | undefined): Promise<string[]> {
-  const argv = [brv, 'review', '--repo', await $.session.cwd()];
+async function reviewArgv($: $, bin: string, base: string | undefined): Promise<string[]> {
+  const argv = [bin, 'review', '--repo', await $.session.cwd()];
   return base === undefined ? argv : [...argv, '--base', base];
 }
 
 /**
- * Runs the open branch review again: brv answers `cached` at once when HEAD has not moved, and writes the new review
+ * Runs the open branch review again: tui-review answers `cached` at once when HEAD has not moved, and writes the new review
  * when it has. Skipped while a comment is being written, so its text is not lost; the next refresh catches up. No
  * `--base`: the first run saved it for its branch, and passing it again would save it for whatever branch Claude has
  * checked out since.
@@ -315,10 +315,10 @@ async function refresh($: $) {
     refreshAgain = true;
     return;
   }
-  await run($, await reviewArgv($, brvPath, undefined), { kind: 'branch', base: review.base });
+  await run($, await reviewArgv($, binPath, undefined), { kind: 'branch', base: review.base });
 }
 
-/** Reads brv's progress lines and acts on them; one run at a time, a new one ends the old. */
+/** Reads tui-review's progress lines and acts on them; one run at a time, a new one ends the old. */
 async function run($: $, argv: string[], origin: Origin) {
   stopRun?.();
   const id = ++runId;
@@ -361,7 +361,7 @@ async function run($: $, argv: string[], origin: Origin) {
       void refresh($);
     }
   }
-  // brv says what went wrong on stdout; a run that ends with nothing said gets its stderr shown instead.
+  // tui-review says what went wrong on stdout; a run that ends with nothing said gets its stderr shown instead.
   if (!isStopped && !isAnswered) {
     const why = errors.trim().split('\n')[0] ?? '';
     $.ui.toast(`review: ${argv.slice(0, 2).join(' ')} ended without a review${why === '' ? '' : `: ${why}`}`);
@@ -374,7 +374,7 @@ async function close($: $) {
   await closed($);
 }
 
-/** Forgets the open review: stops brv and lets go of the chunks. Comments stay, for the review opened again. */
+/** Forgets the open review: stops tui-review and lets go of the chunks. Comments stay, for the review opened again. */
 async function closed($: $) {
   stopRun?.();
   stopRun = undefined;
@@ -497,11 +497,11 @@ async function onLine($: $, line: string, origin: Origin) {
   }
 }
 
-/** The brv binary: the plugin's `brvPath` option, or brv on PATH. */
-let brvPath = 'brv';
+/** The tui-review binary: the plugin's `binPath` option, or tui-review on PATH. */
+let binPath = 'tui-review';
 
 export const register: Register = (on, options) => {
-  brvPath = typeof options.brvPath === 'string' && options.brvPath !== '' ? options.brvPath : 'brv';
+  binPath = typeof options.binPath === 'string' && options.binPath !== '' ? options.binPath : 'tui-review';
 
   on('session.start', async ($, e, next) => {
     await $.command.register({
@@ -530,16 +530,16 @@ export const register: Register = (on, options) => {
   on('command.run', { command: 'tui-review' }, async ($, e) => {
     const arg = e.args.trim();
     if (arg === 'demo') {
-      void run($, [brvPath, 'gen', '--lines', '100000'], { kind: 'demo' });
+      void run($, [binPath, 'gen', '--lines', '100000'], { kind: 'demo' });
       return { text: 'Opening a 100k-line demo review.' };
     }
     const base = arg === '' ? undefined : arg;
-    void run($, await reviewArgv($, brvPath, base), { kind: 'branch', base });
+    void run($, await reviewArgv($, binPath, base), { kind: 'branch', base });
     return {
       text:
         base === undefined
           ? 'Opening a review of this branch against the branch it is stacked on.'
-          : `Opening a review of this branch against ${base}; brv remembers it for this branch.`,
+          : `Opening a review of this branch against ${base}; tui-review remembers it for this branch.`,
     };
   });
 

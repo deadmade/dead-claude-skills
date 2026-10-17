@@ -76,22 +76,22 @@
   in {
     checks = forAllSystems (system: {pre-commit = preCommit system;});
 
-    # brv, the tui-review plugin's Rust binary: `nix build .#brv`, or `nix run .#brv -- gen`. Its tests run in the build.
+    # The tui-review plugin's Rust binary: `nix build .#tui-review`, or `nix run .#tui-review -- gen`. Its tests run in the build.
     packages = forAllSystems (system: let
       pkgs = nixpkgs.legacyPackages.${system};
-      manifest = (pkgs.lib.importTOML ./crates/brv/Cargo.toml).package;
+      manifest = (pkgs.lib.importTOML ./crates/tui-review/Cargo.toml).package;
       webMcp = (pkgs.lib.importTOML ./crates/web-mcp/Cargo.toml).package;
     in {
-      brv = pkgs.rustPlatform.buildRustPackage {
+      tui-review = pkgs.rustPlatform.buildRustPackage {
         pname = manifest.name;
         inherit (manifest) version;
-        src = ./crates/brv;
-        cargoLock.lockFile = ./crates/brv/Cargo.lock;
+        src = ./crates/tui-review;
+        cargoLock.lockFile = ./crates/tui-review/Cargo.lock;
         # tests/review.rs builds its fixture repositories with git.
         nativeCheckInputs = [pkgs.git];
         meta = {
           inherit (manifest) description;
-          mainProgram = "brv";
+          mainProgram = "tui-review";
         };
       };
       # web-mcp, the web-mcp plugin's MCP server: `nix build .#web-mcp`.
@@ -116,7 +116,7 @@
       default = pkgs.mkShell {
         inherit (pre-commit) shellHook;
         buildInputs = pre-commit.enabledPackages;
-        # What scripts/sync-*.mjs and the workflows use besides stdenv, and the Rust toolchain for tui-review's brv.
+        # What scripts/sync-*.mjs and the workflows use besides stdenv, and the Rust toolchain for tui-review's binary.
         packages = with pkgs; [git gh nodejs_26 cargo rustc clippy rustfmt rust-analyzer];
         RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
       };

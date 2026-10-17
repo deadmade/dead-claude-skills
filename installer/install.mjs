@@ -308,7 +308,7 @@ async function applyAgentBrowser() {
   done.push(`agent-browser: ${action === 'install' ? 'installed' : 'upgraded to'} ${pinned}`);
 }
 
-// --- brv and web-mcp, the binaries of tui-review and web-mcp ---------------------------------------------------------
+// --- tui-review and web-mcp, the binaries of tui-review and web-mcp ---------------------------------------------------------
 const TUI_REVIEW = `tui-review@${MARKETPLACE}`;
 const WEB_MCP = `web-mcp@${MARKETPLACE}`;
 const BIN_DIR = join(CONFIG, 'bin');
@@ -367,7 +367,7 @@ async function applyBin(pluginName, plugin) {
     version,
     supported: asset !== undefined,
   });
-  const build = `build it with \`cargo build --release\` in crates/${pluginName === 'web-mcp' ? 'web-mcp' : 'brv'} and set its path with /plugin configure ${pluginName}`;
+  const build = `build it with \`cargo build --release\` in crates/${pluginName === 'web-mcp' ? 'web-mcp' : 'tui-review'} and set its path with /plugin configure ${pluginName}`;
   if (action === 'skip') return done.push(`${name}: using the one on PATH`);
   if (action === 'unsupported')
     return failures.push(`${name}: no release build for ${process.platform}-${process.arch}; ${build}`);

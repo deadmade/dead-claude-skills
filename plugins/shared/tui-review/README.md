@@ -1,19 +1,19 @@
 # tui-review
 
 `/tui-review` opens a diff pane beside the chat, so you can read a branch's changes and ask Claude about them in the
-same session. The diff, highlighting and git work happen in `brv`, a Rust binary. The mod only paints, from small
-binary chunk files `brv` writes to disk, so a 100k-line PR costs the same memory and frame time as a 100-line one.
+same session. The diff, highlighting and git work happen in the `tui-review` binary (Rust, `crates/tui-review/`). The mod only paints,
+from small binary chunk files the binary writes to disk, so a 100k-line PR costs the same memory and frame time as a 100-line one.
 
 ## Install
 
     /plugin install tui-review@dead-claude-skills
 
-It needs `brv`. The installer (`npx --allow-git=root github:deadmade/dead-claude-skills#semver:*`) downloads the build for your machine
-into `~/.claude/bin` and sets the plugin's `brvPath`, unless a `brv` is already on PATH. By hand: unpack the `brv-*`
+It needs the `tui-review` binary. The installer (`npx --allow-git=root github:deadmade/dead-claude-skills#semver:*`) downloads the build for your machine
+into `~/.claude/bin` and sets the plugin's `binPath`, unless a `tui-review` is already on PATH. By hand: unpack the `tui-review-*`
 archive for your platform from the [releases](https://github.com/deadmade/dead-claude-skills/releases), or build it,
 and put it on PATH or set its path with `/plugin configure tui-review`:
 
-    cargo build --release --manifest-path crates/brv/Cargo.toml   # or: nix build .#brv
+    cargo build --release --manifest-path crates/tui-review/Cargo.toml   # or: nix build .#tui-review
 
 ## Use
 
@@ -25,10 +25,10 @@ and put it on PATH or set its path with `/plugin configure tui-review`:
 merge-base with HEAD is nearest. A base that moved on after you branched stays the base, and its new commits stay out
 (the diff is always `merge-base..HEAD`). Branches stacked on top of yours and your branch's own remote copy are never
 picked. The pane's title shows `head ← base`, so a wrong pick is visible at once; `/tui-review <base>` fixes it, and is
-saved as `git config branch.<name>.brvBase`. Only committed changes are shown.
+saved as `git config branch.<name>.tuiReviewBase` (a base saved as `brvBase`, from before the binary was renamed, still counts). Only committed changes are shown.
 
 **Following HEAD.** After each Bash command Claude runs, and when you come back to the pane, the review runs again. If
-HEAD has not moved, `brv` answers from its cache at once and nothing changes; after a commit, checkout or rebase the new
+HEAD has not moved, `tui-review` answers from its cache at once and nothing changes; after a commit, checkout or rebase the new
 review opens in place, on the file you were in, with your unsent comments moved onto it.
 
 **Claude knows where you are.** Each prompt you send while the pane is open carries a note Claude reads and you don't
@@ -72,13 +72,13 @@ The arrow keys don't scroll yet: the engine only forwards them while a pane has 
 
 The status line shows `load · paint · chunks` for the last frame.
 
-## brv
+## The binary
 
-    brv review [--base REF] [--repo DIR] [--cache DIR]   what /tui-review runs
-    brv gen [--lines N] [--out DIR]                      a synthetic review cache (what /tui-review demo runs)
-    brv bench [--repo DIR] [--base REF]                  how long a review of a real repository takes, cold and cached
+    tui-review review [--base REF] [--repo DIR] [--cache DIR]   what /tui-review runs
+    tui-review gen [--lines N] [--out DIR]                      a synthetic review cache (what /tui-review demo runs)
+    tui-review bench [--repo DIR] [--base REF]                  how long a review of a real repository takes, cold and cached
 
-Reviews are cached in `<git common dir>/brv/` (shared by a repo's worktrees), keyed by merge-base, HEAD and base; the five most recent are kept.
+Reviews are cached in `<git common dir>/tui-review/` (shared by a repo's worktrees), keyed by merge-base, HEAD and base; the five most recent are kept.
 
 `nix develop` (or direnv) gives the Rust toolchain: cargo, clippy, rustfmt and rust-analyzer.
 
@@ -86,17 +86,17 @@ Reviews are cached in `<git common dir>/brv/` (shared by a repo's worktrees), ke
 
     claude --plugin-dir plugins/shared/tui-review        # hot-reloads on save
 
-    cd crates/brv
+    cd crates/tui-review
     cargo clippy --all-targets && cargo test && cargo bench
     cargo test --release --test perf -- --ignored --nocapture   # speed and memory budgets on a large fixture repo
-    cargo run --release -- gen --out /tmp/brv-fixture && node ../../plugins/shared/tui-review/tests/make-fixture.mjs /tmp/brv-fixture
+    cargo run --release -- gen --out /tmp/tui-review-fixture && node ../../plugins/shared/tui-review/tests/make-fixture.mjs /tmp/tui-review-fixture
     cd .. && claude plugin test .                    # format contract, pane, speed budgets
 
-Plugin tests have no file system, so `tests/make-fixture.mjs` turns `brv gen` output into `tests/fixture.gen.ts`
+Plugin tests have no file system, so `tests/make-fixture.mjs` turns `tui-review gen` output into `tests/fixture.gen.ts`
 (not committed). The tests read the real Rust output, so they also hold the TypeScript reader to the Rust writer.
-The cache layout is documented in `crates/brv/src/format.rs`.
+The cache layout is documented in `crates/tui-review/src/format.rs`.
 
-brv ships with the repo's releases (see the main README): `npm run release` bumps `crates/brv/Cargo.toml`, `Cargo.lock` and
+tui-review ships with the repo's releases (see the main README): `npm run release` bumps `crates/tui-review/Cargo.toml`, `Cargo.lock` and
 `.claude-plugin/plugin.json` with everything else (a test checks they match), and the tag's `release.yml` runs
-`.github/workflows/build-brv.yml`, which builds Windows, Linux (static, x64 and arm64) and macOS (arm64 and x64). Run
-`build-brv.yml` by hand to build without releasing.
+`.github/workflows/build-tui-review.yml`, which builds Windows, Linux (static, x64 and arm64) and macOS (arm64 and x64). Run
+`build-tui-review.yml` by hand to build without releasing.
