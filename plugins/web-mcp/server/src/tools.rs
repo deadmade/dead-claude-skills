@@ -13,12 +13,12 @@ use url::Url;
 
 use crate::Ctx;
 use crate::fetch::{self, GetOpts};
+use crate::search;
 
 const FETCH_DEADLINE: Duration = Duration::from_secs(30);
 
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "schemars")]
-#[allow(dead_code)] // read once search is implemented (Task 8)
 pub struct SearchArgs {
     pub query: String,
     pub papers: Option<bool>,
@@ -95,9 +95,15 @@ impl Server {
         description = "Search the web (self-hosted SearXNG) and the local archive.",
         annotations(read_only_hint = true)
     )]
-    #[allow(clippy::unused_async)]
-    async fn search(&self, _args: Parameters<SearchArgs>) -> CallToolResult {
-        not_implemented()
+    async fn search(&self, Parameters(args): Parameters<SearchArgs>) -> CallToolResult {
+        if args.papers == Some(true) {
+            return error("papers mode is not implemented yet");
+        }
+        let n = args.max_passages.map_or(8, |n| n.clamp(1, 20)) as usize;
+        match search::web(&self.ctx, &args.query, n).await {
+            Ok(text) => CallToolResult::success(vec![ContentBlock::text(text)]),
+            Err(e) => error(e.to_string()),
+        }
     }
 
     #[tool(

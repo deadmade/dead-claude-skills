@@ -161,6 +161,22 @@ fn file(path: &str) -> Resp {
     Resp::new(200, ct, std::fs::read(p).unwrap())
 }
 
+/// Scripts `fx` as a `SearXNG` answering the one-word `query` with `results` (url, title).
+pub fn searx(fx: &Fixture, query: &str, results: &[(String, &str)]) {
+    let rs: Vec<Value> = results
+        .iter()
+        .map(|(u, t)| json!({"url": u, "title": t, "content": "x"}))
+        .collect();
+    fx.route(
+        &format!("/search?q={query}&format=json"),
+        vec![Resp::new(
+            200,
+            "application/json",
+            json!({"query": query, "results": rs}).to_string(),
+        )],
+    );
+}
+
 pub fn tempdir() -> PathBuf {
     static N: AtomicU64 = AtomicU64::new(0);
     let d = std::env::temp_dir().join(format!(
@@ -184,9 +200,14 @@ pub struct Mcp {
 
 impl Mcp {
     pub fn start() -> Self {
-        let project = tempdir();
+        Self::start_with(tempdir(), &[])
+    }
+
+    /// In `project` (so a second server there sees the first one's `.web`), with extra environment.
+    pub fn start_with(project: PathBuf, envs: &[(&str, String)]) -> Self {
         let mut cmd = Command::new(env!("CARGO_BIN_EXE_web-mcp"));
-        cmd.env("CLAUDE_PROJECT_DIR", &project)
+        cmd.envs(envs.iter().map(|(k, v)| (k, v)))
+            .env("CLAUDE_PROJECT_DIR", &project)
             .env("WEB_MCP_TEST_PUBLIC_IP", PUBLIC)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped());
@@ -262,6 +283,11 @@ impl Mcp {
                 .map(|(t, a)| ("tools/call".to_owned(), json!({"name": t, "arguments": a})))
                 .collect(),
         )
+    }
+
+    /// The server's environment for a `SearXNG` at `fx`.
+    pub fn searx_env(fx: &Fixture) -> [(&'static str, String); 1] {
+        [("WEB_MCP_SEARXNG_URL", fx.url(""))]
     }
 
     /// `<project>/.web/<run>`.

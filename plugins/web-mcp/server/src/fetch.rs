@@ -718,6 +718,10 @@ mod tests {
                 searxng: Url::parse("http://127.0.0.1:8888").unwrap(),
                 agent_browser: "agent-browser".into(),
             },
+            search: crate::search::SearxNg {
+                base: Url::parse("http://127.0.0.1:8888").unwrap(),
+                http: client(false).unwrap(),
+            },
             http: client(false).unwrap(),
             http_public: client(true).unwrap(),
             limits: crate::limits::HostLimits::default(),
