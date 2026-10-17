@@ -303,7 +303,7 @@ async function applyAgentBrowser() {
         `agent-browser: \`${bin} ${args.join(' ')}\` failed (${r.error?.code ?? `exit ${r.status}`})`,
       );
   }
-  done.push(`agent-browser: ${action}d ${pinned}`);
+  done.push(`agent-browser: ${action === 'install' ? 'installed' : 'upgraded to'} ${pinned}`);
 }
 
 // --- brv and web-mcp, the binaries of tui-review and web-mcp ---------------------------------------------------------

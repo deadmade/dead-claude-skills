@@ -2,7 +2,7 @@ name: Sync agent-browser
 
 on:
   schedule:
-    - cron: '45 7 * * 1' # Mondays 07:15 UTC
+    - cron: '45 7 * * 1' # Mondays 07:45 UTC
   workflow_dispatch:
 
 permissions:

@@ -323,7 +323,12 @@ const BINARIES = [
   ['ccstatusline', 'ccstatusline', 'nix: ccstatusline', 'npm i -g ccstatusline'],
   ['docker', 'web-mcp', 'nix: docker', 'winget install -e --id Docker.DockerDesktop'],
   ['npm', 'web-mcp', 'nix: nodejs', 'winget install -e --id OpenJS.NodeJS.LTS'],
-  ['agent-browser', 'web-mcp', 'nix: agent-browser', 'npm i -g agent-browser && agent-browser install'],
+  [
+    'agent-browser',
+    'web-mcp',
+    'npm i -g agent-browser && agent-browser install',
+    'npm i -g agent-browser && agent-browser install',
+  ],
   ['cswap', 'cswap', 'uv tool install claude-swap', 'rerun this installer (cswap.exe download)'],
 ];
 
