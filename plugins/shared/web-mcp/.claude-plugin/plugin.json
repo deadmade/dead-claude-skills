@@ -1,6 +1,6 @@
 {
   "name": "web-mcp",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Web research tools for Claude: search (self-hosted SearXNG, paper APIs and the archive, ranked with BM25), fetch (whole pages as markdown), browser (agent-browser) and lookup (passive DNS, RDAP, certificate, Wayback, IP and vulnerability records), all archived in .web/. Needs the web-mcp binary.",
   "author": {
     "name": "deadmade",
