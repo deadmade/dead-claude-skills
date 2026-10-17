@@ -596,7 +596,7 @@ pub(crate) fn retry_after(h: &HeaderMap) -> Duration {
 }
 
 /// The body, or `None` once it passes `max` bytes.
-async fn read_capped(
+pub(crate) async fn read_capped(
     mut resp: reqwest::Response,
     max: usize,
 ) -> Result<Option<Vec<u8>>, FetchError> {
@@ -742,7 +742,7 @@ fn shown_images(web: &Path, rel_dir: &Path) -> (Vec<ContentBlock>, Vec<String>) 
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     #[test]
@@ -771,7 +771,7 @@ mod tests {
         assert!(private_target(&local, Some(public), Some(&[public]), true));
     }
 
-    fn test_ctx() -> Arc<Ctx> {
+    pub(crate) fn test_ctx() -> Arc<Ctx> {
         test_ctx_with(crate::browser::Browser::new("agent-browser"))
     }
 

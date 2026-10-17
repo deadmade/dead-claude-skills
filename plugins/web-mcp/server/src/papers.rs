@@ -3,7 +3,6 @@
 
 use std::collections::BTreeMap;
 use std::fmt;
-use std::time::Duration;
 
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
@@ -12,12 +11,10 @@ use url::Url;
 
 use crate::Ctx;
 use crate::archive::Item;
-use crate::fetch::retry_after;
 use crate::rank::PassageDoc;
 
 /// Records asked of a list query.
 const LIMIT: &str = "5";
-const MAX_RETRY_WAIT: Duration = Duration::from_secs(10);
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Paper {
@@ -408,30 +405,13 @@ fn is_asked(p: &Paper, ask: &Ident) -> bool {
 type Parse = fn(&str) -> Result<Vec<Paper>, PaperError>;
 type Answer = (&'static str, Result<Vec<Paper>, String>);
 
-/// GET through the host limits, retrying a 429 or 503 once after `Retry-After` as `fetch` does.
+/// GET through `api::send`: host limits, and a 429 or 5xx retried once after `Retry-After`.
 async fn get_text(ctx: &Ctx, url: &Url) -> Result<String, String> {
-    let mut retried = false;
-    loop {
-        let permit = ctx.limits.acquire(url).await;
-        let resp = ctx
-            .http_public
-            .get(url.clone())
-            .send()
-            .await
-            .map_err(|e| e.without_url().to_string())?;
-        let status = resp.status();
-        if !retried && matches!(status.as_u16(), 429 | 503) {
-            retried = true;
-            let wait = retry_after(resp.headers()).min(MAX_RETRY_WAIT);
-            drop((resp, permit));
-            tokio::time::sleep(wait).await;
-            continue;
-        }
-        if !status.is_success() {
-            return Err(format!("HTTP {}", status.as_u16()));
-        }
-        // shortcut: the body is not size-capped, these are three fixed API hosts.
-        return resp.text().await.map_err(|e| e.without_url().to_string());
+    let got = crate::api::send(ctx, url, None, None, ctx.cfg.papers_deadline, false).await?;
+    if (200..300).contains(&got.status) {
+        Ok(got.body)
+    } else {
+        Err(format!("HTTP {}", got.status))
     }
 }
 
