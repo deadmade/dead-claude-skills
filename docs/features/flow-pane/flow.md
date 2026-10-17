@@ -1,5 +1,5 @@
 ---
-phase: execute
+phase: finish
 ---
 
 # Flow pane: flow
@@ -135,3 +135,24 @@ final fix wave with review items 3 (Windows separator in the spec lookup) and 4 
 
 | spec goal | plan task | file:line | test |
 | --------- | --------- | --------- | ---- |
+| 1. band: slug, phase, gates, deviations | T1, T2, T4 | `hooks/flow.ts:9,37,112`; `hooks/register.tsx:140` | `flow.test.ts` gateDate/parseFlow/bandLines; `register.test.ts:123,275` |
+| 2. research: claim, baseline, feature, verdict | T5 | `hooks/flow.ts:29,57,112`; `hooks/register.tsx:62,80` | `flow.test.ts` research cases; `register.test.ts:341,352,364` |
+| 3. `+N open` | T2, T4 | `hooks/flow.ts:91,112` | `flow.test.ts` pickCurrent/bandLines; `register.test.ts:140` |
+| 4. current run = this session's last write, else newest open | T2, T4 | `hooks/flow.ts:80,91`; `hooks/register.tsx:121,129` | `register.test.ts:194,214,230,298,314,324` |
+| 5. key `1` resumes via `$.command.run` | T2, T4 | `hooks/flow.ts:130`; `hooks/register.tsx:108,140` | `register.test.ts:241,254` |
+| 6. skills resume by slug, never overwrite | T3 | `skills/feature-flow/SKILL.md:44-56`, `skills/research-flow/SKILL.md:43-52` | grep + `npm test` (prose) |
+| 7. follows edits within a poll | T4 | `hooks/register.tsx:108` (5 s `$.clock.every`) | `register.test.ts:165,173,186` |
+| 8. right from main checkout or a worktree | T4 | `hooks/register.tsx` `copies()` (repo root + `.worktrees/*` + `.claude/worktrees/*`) | `register.test.ts:123,134,140,155` |
+| anti-goal: never hide a survey/agent view/other band | T4 | `hooks/register.tsx:140` | `register.test.ts:262,269` |
+| CI + docs | T6 | `.github/workflows/test.yml`, `CLAUDE.md`, `README.md`, descriptions | `npm test` 116/0; `claude plugin test .` 43/0 |
+| D1 reopen on the Gate line; D2 merged runs done | final fix | both SKILL.md; four flow.md frontmatters | re-review |
+
+No goal without code, no code without a goal (paths relative to `plugins/feature-flow/` where not given). Verified
+2026-10-17: `claude plugin test .` 43 pass / 0 fail, `claude plugin validate .` passed, `npm test` 116 pass / 0 fail /
+1 skipped. Per-task reviews: all clean; Task 4 needed one fix round (shared width across surfaces, key per current
+run, session.end reset). Final review (most capable model): ready with fixes; D1/D2 decided by the user, items 3–4
+fixed and re-reviewed.
+
+Not verifiable here, needs a live session: the engine's real name for the skill command (tests fake
+`feature-flow:feature-flow`; the lookup also accepts any command whose `plugin` is `feature-flow`), and that a bare
+`1` in an empty prompt presses the band's Button in a real terminal.
