@@ -28,15 +28,20 @@ const FETCH_DEADLINE: Duration = Duration::from_secs(30);
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "schemars")]
 pub struct SearchArgs {
+    /// What to look for; with `papers`, a topic, a DOI or an arXiv id.
     pub query: String,
+    /// Search scholarly APIs (OpenAlex, arXiv, Crossref) instead of the web.
     pub papers: Option<bool>,
+    /// Passages to return, 1-20 (default 8).
     pub max_passages: Option<u32>,
 }
 
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "schemars")]
 pub struct FetchArgs {
+    /// An http(s) URL; localhost and private addresses are allowed.
     pub url: String,
+    /// Also return the page's images (default false).
     pub images: Option<bool>,
 }
 
@@ -61,12 +66,19 @@ pub enum BrowserAction {
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "schemars")]
 pub struct BrowserArgs {
+    /// What to do.
     pub action: BrowserAction,
+    /// Your name for this browser, 1-32 letters, digits, `_` or `-`; the same name is the same tab.
     pub session: String,
+    /// open: an http(s) URL.
     pub url: Option<String>,
+    /// click, fill, type: an `@eN` from the latest snapshot.
     pub r#ref: Option<String>,
+    /// fill, type: the text. scroll: `<up|down|left|right> [px]`, default `down`.
     pub text: Option<String>,
+    /// press: a key such as `Enter` or `Control+a`.
     pub key: Option<String>,
+    /// eval: JavaScript to run in the page.
     pub js: Option<String>,
 }
 
@@ -292,7 +304,7 @@ impl Server {
 #[tool_router]
 impl Server {
     #[tool(
-        description = "Search the web (self-hosted SearXNG) and the local archive; with papers: true, search OpenAlex, arXiv and Crossref instead.",
+        description = "Search the web (self-hosted SearXNG) and the local archive; returns ranked passages with sources. With papers: true it searches OpenAlex, arXiv and Crossref instead and recognises DOIs and arXiv ids in the query.",
         annotations(read_only_hint = true)
     )]
     async fn search(&self, Parameters(args): Parameters<SearchArgs>) -> CallToolResult {
@@ -313,7 +325,7 @@ impl Server {
     }
 
     #[tool(
-        description = "Fetch a whole page as markdown, optionally with its images.",
+        description = "Fetch one http(s) page or PDF as markdown, localhost included. A long page returns its start plus an archive path under .web/ to read the rest.",
         annotations(read_only_hint = true)
     )]
     async fn fetch(&self, Parameters(args): Parameters<FetchArgs>) -> CallToolResult {
@@ -333,7 +345,9 @@ impl Server {
         }
     }
 
-    #[tool(description = "Drive a browser session through agent-browser.")]
+    #[tool(
+        description = "Drive a browser through agent-browser. Each `session` is its own browser; close it when done. Per action: open needs url; snapshot lists the page with @eN refs; click needs ref; fill and type need ref and text; press needs key; scroll takes text = <up|down|left|right> [px]; eval needs js; screenshot, console, network and close need nothing more. A ref is an @eN from the latest snapshot."
+    )]
     async fn browser(&self, Parameters(args): Parameters<BrowserArgs>) -> CallToolResult {
         browse(&self.ctx, args).await.unwrap_or_else(|e| e)
     }

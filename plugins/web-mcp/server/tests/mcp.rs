@@ -39,6 +39,34 @@ fn lists_three_tools() {
     assert_eq!(fetch["_meta"]["anthropic/maxResultSizeChars"], 200_000);
     let required = browser["inputSchema"]["required"].as_array().unwrap();
     assert!(required.iter().any(|r| r == "session"));
+    let props = &browser["inputSchema"]["properties"];
+    assert!(
+        props["text"]["description"]
+            .as_str()
+            .unwrap()
+            .contains("scroll"),
+        "{props}"
+    );
+    assert!(
+        props["ref"]["description"]
+            .as_str()
+            .unwrap()
+            .contains("@eN"),
+        "{props}"
+    );
+    assert!(search["description"].as_str().unwrap().contains("DOI"));
+    assert!(
+        fetch["description"]
+            .as_str()
+            .unwrap()
+            .contains("archive path")
+    );
+    assert!(browser["description"].as_str().unwrap().contains("close"));
+    for t in [browser, fetch, search] {
+        let size =
+            t["description"].to_string().len() + t["inputSchema"]["properties"].to_string().len();
+        assert!(size < 1200, "{size} bytes of schema for {}", t["name"]);
+    }
     drop(stdin);
     child.wait().unwrap();
 }
