@@ -501,7 +501,8 @@ mod tests {
                     // The reader's view, reloaded by every commit: reading meta.json here would race the
                     // writer's replacing it, which Windows refuses (access denied).
                     let segments = idx.reader.searcher().segment_readers().len();
-                    let done = commits >= 9 && segments < commits;
+                    // +1: `commits` counts the latest commit a moment before the reader reloads to show it.
+                    let done = commits >= 9 && segments + 1 < commits;
                     if done && start.elapsed() > Duration::from_secs(1) {
                         break;
                     }

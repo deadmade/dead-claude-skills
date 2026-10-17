@@ -623,7 +623,7 @@ pub async fn search(ctx: &Ctx, query: &str) -> PapersOutput {
             json: json!({"query": query, "papers": records}).to_string(),
         })
         .await
-        .map(|a| a.path.display().to_string())
+        .map(|a| crate::fetch::slash(&a.path))
         .unwrap_or_default();
     let docs = passages(&papers, &path);
     if !docs.is_empty()

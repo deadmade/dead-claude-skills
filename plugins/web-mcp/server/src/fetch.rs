@@ -419,7 +419,7 @@ async fn index(ctx: &Ctx, url: &Url, page: &Page, archived: &Archived) {
     let (markdown, title) = (page.markdown.clone(), page.title.clone());
     let (url, path, fetched) = (
         url.to_string(),
-        archived.path.to_string_lossy().into_owned(),
+        slash(&archived.path),
         archived.time.clone(),
     );
     let docs = tokio::task::spawn_blocking(move || {
@@ -652,7 +652,7 @@ async fn download_images(
     .collect()
 }
 
-fn slash(p: &Path) -> String {
+pub(crate) fn slash(p: &Path) -> String {
     p.to_string_lossy().replace('\\', "/")
 }
 
