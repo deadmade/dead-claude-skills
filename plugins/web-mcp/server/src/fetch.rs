@@ -798,6 +798,8 @@ pub(crate) mod tests {
                     doh: Url::parse("https://cloudflare-dns.com/dns-query").unwrap(),
                     rdap_bootstrap: Url::parse("https://data.iana.org/rdap/").unwrap(),
                     crtsh: Url::parse("https://crt.sh/").unwrap(),
+                    cdx: Url::parse("https://web.archive.org/cdx/search/cdx").unwrap(),
+                    wayback: Url::parse("https://web.archive.org/").unwrap(),
                 },
                 lookup_deadline: None,
                 project,

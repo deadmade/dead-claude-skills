@@ -421,3 +421,130 @@ fn certs_deadline_is_per_attempt() {
     assert!(!is_error(&r), "{r}");
     assert_eq!(fx.hits(CERTS_PATH), 2);
 }
+
+fn wayback_start(fx: &Fixture) -> Mcp {
+    Mcp::start_with(
+        tempdir(),
+        &[
+            ("WEB_MCP_CDX_URL", fx.url("/cdx")),
+            ("WEB_MCP_WAYBACK_URL", fx.url("/")),
+        ],
+    )
+}
+
+const CDX_PATH: &str = "/cdx?url=example.com&output=json&fl=timestamp%2Coriginal%2Cmimetype%2Cstatuscode%2Cdigest&collapse=digest&limit=-50";
+
+#[cfg(debug_assertions)]
+#[test]
+fn wayback_lists_newest_first() {
+    let fx = Fixture::start(PUBLIC);
+    let rows = json!([
+        ["timestamp", "original", "mimetype", "statuscode", "digest"],
+        [
+            "20200101000000",
+            "http://example.com/",
+            "text/html",
+            "200",
+            "A"
+        ],
+        [
+            "20220101000000",
+            "http://example.com/",
+            "text/html",
+            "301",
+            "B"
+        ],
+        [
+            "20240101000000",
+            "http://example.com/",
+            "text/html",
+            "200",
+            "C"
+        ]
+    ]);
+    fx.route(
+        CDX_PATH,
+        vec![Resp::new(200, "application/json", rows.to_string())],
+    );
+    let mut mcp = wayback_start(&fx);
+    let r = mcp.call(
+        "lookup",
+        json!({"kind": "wayback", "target": "example.com"}),
+    );
+    assert!(!is_error(&r), "{r}");
+    let t = text(&r);
+    let at = |s: &str| t.find(s).unwrap_or_else(|| panic!("{s} in {t}"));
+    assert!(
+        at("20240101000000 200 text/html http://example.com/")
+            < at("20220101000000 301 text/html http://example.com/")
+    );
+    assert!(at("20220101000000 301") < at("20200101000000 200 text/html http://example.com/"));
+    assert_eq!(fx.hits(CDX_PATH), 1);
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn wayback_at_reads_raw_snapshot() {
+    let fx = Fixture::start(PUBLIC);
+    fx.route(
+        "/web/2024id_/http://example.com/",
+        vec![Resp::redirect("/web/20240102030405id_/http://example.com/")],
+    );
+    fx.route(
+        "/web/20240102030405id_/http://example.com/",
+        vec![Resp::html(
+            "<html><body><article><h1>Old page</h1><p>Archived words here.</p></article></body></html>",
+        )],
+    );
+    let mut mcp = wayback_start(&fx);
+    let r = mcp.call(
+        "lookup",
+        json!({"kind": "wayback", "target": "example.com/", "at": "2024"}),
+    );
+    assert!(!is_error(&r), "{r}");
+    let t = text(&r);
+    assert!(
+        t.contains("/web/20240102030405id_/http://example.com/ (fetched"),
+        "{t}"
+    );
+    assert!(t.contains("Archived words here."), "{t}");
+    assert!(t.contains("/pages/127-0-0-2-"), "{t}");
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn wayback_snapshot_is_cut_at_30k() {
+    let fx = Fixture::start(PUBLIC);
+    let body = "<p>paragraph of filler words, repeated to pass the cut</p>".repeat(1000);
+    fx.route(
+        "/web/2024id_/http://example.com/",
+        vec![Resp::html(format!(
+            "<html><body><article>{body}</article></body></html>"
+        ))],
+    );
+    let mut mcp = wayback_start(&fx);
+    let r = mcp.call(
+        "lookup",
+        json!({"kind": "wayback", "target": "http://example.com/", "at": "2024"}),
+    );
+    assert!(!is_error(&r), "{r}");
+    let t = text(&r);
+    assert!(t.chars().count() <= 30_400, "{}", t.chars().count());
+    assert!(
+        t.contains("[Cut at 30,000 characters; the full page is at .web/"),
+        "{t}"
+    );
+    assert!(t.trim_end().ends_with("/page.md]"), "{t}");
+}
+
+#[test]
+fn wayback_at_must_be_digits() {
+    let fx = Fixture::start(PUBLIC);
+    let mut mcp = wayback_start(&fx);
+    let r = mcp.call(
+        "lookup",
+        json!({"kind": "wayback", "target": "example.com", "at": "last week"}),
+    );
+    assert!(is_error(&r), "{r}");
+    assert!(text(&r).contains("digits"), "{r}");
+}

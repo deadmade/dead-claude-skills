@@ -54,12 +54,14 @@ pub struct FetchArgs {
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "schemars")]
 pub struct LookupArgs {
-    /// What to look up, and from where. dns: Cloudflare DNS over HTTPS. whois: RDAP. certs: crt.sh
+    /// What to look up, and from where. dns: Cloudflare DNS over HTTPS. whois: RDAP. certs: crt.sh. wayback: Internet Archive
     pub kind: lookup::Kind,
     /// A domain name; whois also an IP or AS number.
     pub target: String,
     /// dns: a record type such as A, MX or TXT (default A, AAAA, CNAME, MX, NS and TXT).
     pub record: Option<String>,
+    /// wayback: a timestamp or prefix (2024, 20240102) to read the nearest snapshot; omit to list them.
+    pub at: Option<String>,
 }
 
 #[derive(Deserialize, JsonSchema)]

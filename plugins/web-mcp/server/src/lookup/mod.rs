@@ -3,6 +3,7 @@
 mod certs;
 mod dns;
 mod rdap;
+mod wayback;
 
 use std::fmt::Write as _;
 use std::sync::Arc;
@@ -30,6 +31,7 @@ pub enum Kind {
     Dns,
     Whois,
     Certs,
+    Wayback,
 }
 
 impl Kind {
@@ -38,6 +40,7 @@ impl Kind {
             Kind::Dns => "dns",
             Kind::Whois => "whois",
             Kind::Certs => "certs",
+            Kind::Wayback => "wayback",
         }
     }
 }
@@ -119,7 +122,7 @@ pub async fn render(ctx: &Ctx, kind: &'static str, target: &str, o: Outcome) -> 
     for p in &answers {
         let _ = write!(text, "\n## {}\n\n{}\n", p.source, p.shown);
     }
-    let text = cut(text.trim_end());
+    let text = cut(text.trim_end(), CUT_NOTE);
     if answers.is_empty() && !o.failed.is_empty() {
         CallToolResult::error(vec![ContentBlock::text(text)])
     } else {
@@ -129,7 +132,7 @@ pub async fn render(ctx: &Ctx, kind: &'static str, target: &str, o: Outcome) -> 
 
 /// Over `MAX_CHARS`: cut at the last line break in the final 1,000 characters before the limit (records are
 /// pretty JSON, with no blank lines), else at the limit itself, then add the pointer to the archive.
-fn cut(text: &str) -> String {
+fn cut(text: &str, note: &str) -> String {
     let mut ends = text.char_indices().map(|(i, _)| i);
     let Some(from) = ends.nth(MAX_CHARS - 1000) else {
         return text.to_owned();
@@ -138,7 +141,7 @@ fn cut(text: &str) -> String {
         return text.to_owned();
     };
     let head = text[from..end].rfind('\n').map_or(end, |i| from + i);
-    format!("{}\n\n{CUT_NOTE}", &text[..head])
+    format!("{}\n\n{note}", &text[..head])
 }
 
 pub async fn run(ctx: &Arc<Ctx>, a: LookupArgs) -> CallToolResult {
@@ -158,6 +161,7 @@ pub async fn run(ctx: &Arc<Ctx>, a: LookupArgs) -> CallToolResult {
             }
             Err(e) => CallToolResult::error(vec![ContentBlock::text(e)]),
         },
+        Kind::Wayback => wayback::run(ctx, &a.target, a.at.as_deref()).await,
         Kind::Certs => match dns::name(&a.target) {
             Ok(name) => {
                 let o = certs::run(ctx, &name).await;
