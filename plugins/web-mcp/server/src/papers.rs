@@ -79,6 +79,7 @@ struct Entry {
     title: String,
     summary: String,
     doi: String,
+    published: String,
     abs: Option<String>,
 }
 
@@ -106,16 +107,25 @@ pub fn parse_arxiv_atom(body: &str) -> Result<Vec<Paper>, PaperError> {
     let bad = |e: &dyn fmt::Display| PaperError::Malformed(e.to_string());
     let mut reader = Reader::from_str(body);
     let (mut entries, mut cur, mut field) = (Vec::new(), None::<Entry>, None::<&str>);
+    // None before a `<feed>` root, Some(true) while it is open.
+    let mut feed = None::<bool>;
     loop {
         match reader.read_event().map_err(|e| bad(&e))? {
-            Event::Eof => break,
+            Event::Eof => {
+                if feed != Some(false) || cur.is_some() {
+                    return Err(PaperError::Malformed("not a complete Atom feed".into()));
+                }
+                break;
+            }
             Event::Start(e) => match (e.local_name().as_ref(), cur.as_mut()) {
+                ("feed", _) => feed = Some(true),
                 ("entry", _) => cur = Some(Entry::default()),
                 ("link", Some(c)) => link(&e, c),
                 ("id", Some(_)) => field = Some("id"),
                 ("title", Some(_)) => field = Some("title"),
                 ("summary", Some(_)) => field = Some("summary"),
                 ("doi", Some(_)) => field = Some("doi"),
+                ("published", Some(_)) => field = Some("published"),
                 _ => {}
             },
             Event::Empty(e) if e.local_name().as_ref() == "link" => {
@@ -144,14 +154,17 @@ pub fn parse_arxiv_atom(body: &str) -> Result<Vec<Paper>, PaperError> {
                         "id" => c.id.push_str(&piece),
                         "title" => c.title.push_str(&piece),
                         "summary" => c.summary.push_str(&piece),
+                        "published" => c.published.push_str(&piece),
                         _ => c.doi.push_str(&piece),
                     }
                 }
             }
             Event::End(e) => {
                 field = None;
-                if e.local_name().as_ref() == "entry" {
-                    entries.extend(cur.take());
+                match e.local_name().as_ref() {
+                    "entry" => entries.extend(cur.take()),
+                    "feed" => feed = Some(false),
+                    _ => {}
                 }
             }
             _ => {}
@@ -173,7 +186,10 @@ pub fn parse_arxiv_atom(body: &str) -> Result<Vec<Paper>, PaperError> {
                 title: collapse(&e.title),
                 doi,
                 arxiv: Some(strip_version(id).to_owned()),
-                year: None,
+                year: collapse(&e.published)
+                    .get(..4)
+                    .filter(|y| y.bytes().all(|b| b.is_ascii_digit()))
+                    .and_then(|y| y.parse().ok()),
                 oa_url: e.abs.and_then(|u| Url::parse(&u).ok()),
                 abstract_text: collapse(&e.summary),
                 sources: vec!["arXiv"],
@@ -227,17 +243,42 @@ fn openalex_work(w: &Value) -> Paper {
     }
 }
 
+/// The message of a 200 answer that is an error (`{"error": …, "message": …}`).
+fn api_error(v: &Value) -> Option<String> {
+    let text = |k: &str| v[k].as_str().map(str::to_owned);
+    text("error")
+        .map(|e| text("message").unwrap_or(e))
+        .or_else(|| text("message"))
+        .or_else(|| (v["status"] == "failed").then(|| "the API reported a failure".into()))
+}
+
+/// A record with nothing to identify it is not a paper.
+fn is_record(p: &Paper) -> bool {
+    p.doi.is_some() || p.arxiv.is_some() || !p.title.is_empty()
+}
+
 /// A `/works` list or a single work.
 fn parse_openalex(body: &str) -> Result<Vec<Paper>, PaperError> {
     let v: Value = serde_json::from_str(body).map_err(|e| PaperError::Malformed(e.to_string()))?;
-    Ok(match v["results"].as_array() {
+    if let Some(m) = api_error(&v) {
+        return Err(PaperError::Malformed(m));
+    }
+    let list = match v["results"].as_array() {
         Some(list) => list.iter().map(openalex_work).collect(),
         None => vec![openalex_work(&v)],
-    })
+    };
+    let list: Vec<_> = list.into_iter().filter(is_record).collect();
+    if v["results"].is_null() && list.is_empty() {
+        return Err(PaperError::Malformed("no work in the answer".into()));
+    }
+    Ok(list)
 }
 
 fn parse_crossref(body: &str) -> Result<Vec<Paper>, PaperError> {
     let v: Value = serde_json::from_str(body).map_err(|e| PaperError::Malformed(e.to_string()))?;
+    if let Some(m) = api_error(&v).filter(|_| v["message"].is_string() || v["error"].is_string()) {
+        return Err(PaperError::Malformed(m));
+    }
     let m = &v["message"];
     // JATS markup; shortcut: tags are dropped and entities are left as they are.
     let mut abs = String::new();
@@ -254,7 +295,7 @@ fn parse_crossref(body: &str) -> Result<Vec<Paper>, PaperError> {
         }
     }
     let doi = m["DOI"].as_str().map(str::to_owned);
-    Ok(vec![Paper {
+    let paper = Paper {
         title: collapse(m["title"][0].as_str().unwrap_or("")),
         arxiv: doi.as_deref().and_then(arxiv_of_doi),
         doi,
@@ -264,7 +305,11 @@ fn parse_crossref(body: &str) -> Result<Vec<Paper>, PaperError> {
         oa_url: None,
         abstract_text: collapse(&abs).replace(" .", ".").replace(" )", ")"),
         sources: vec!["Crossref"],
-    }])
+    };
+    if !m.is_object() || !is_record(&paper) {
+        return Err(PaperError::Malformed("no work in the answer".into()));
+    }
+    Ok(vec![paper])
 }
 
 fn same(a: &Paper, b: &Paper) -> bool {
@@ -659,6 +704,59 @@ mod tests {
                 "incorrect id format for bogus".into()
             ))
         );
+    }
+
+    #[test]
+    fn arxiv_year_from_published() {
+        let ps = parse_arxiv_atom(&fx("arxiv-ok.xml")).unwrap();
+        assert_eq!((ps[0].year, ps[1].year), (Some(2017), Some(2020)));
+    }
+
+    #[test]
+    fn arxiv_html_body_is_malformed() {
+        for body in [
+            "<html><body>502 Bad Gateway</body></html>",
+            "Service unavailable",
+            "",
+        ] {
+            assert!(
+                matches!(parse_arxiv_atom(body), Err(PaperError::Malformed(_))),
+                "{body}"
+            );
+        }
+    }
+
+    #[test]
+    fn arxiv_truncated_feed_is_malformed() {
+        let ok = fx("arxiv-ok.xml");
+        let no_close = ok.replace("</feed>", "");
+        let mid_entry = &ok[..ok.find("<summary>").unwrap()];
+        for body in [no_close.as_str(), mid_entry] {
+            assert!(matches!(
+                parse_arxiv_atom(body),
+                Err(PaperError::Malformed(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn openalex_error_json_is_a_failure() {
+        let e = parse_openalex(r#"{"error":"Invalid query parameters","message":"bad filter"}"#);
+        assert_eq!(e, Err(PaperError::Malformed("bad filter".into())));
+        assert!(parse_openalex("{}").is_err());
+        assert_eq!(parse_openalex(r#"{"results":[]}"#), Ok(vec![]));
+        assert_eq!(
+            parse_openalex(&fx("openalex-search.json")).unwrap().len(),
+            2
+        );
+    }
+
+    #[test]
+    fn crossref_without_message_is_a_failure() {
+        assert!(parse_crossref(r#"{"status":"ok"}"#).is_err());
+        assert!(parse_crossref(r#"{"status":"failed","message":"nope"}"#).is_err());
+        assert!(parse_crossref(r#"{"status":"ok","message":{}}"#).is_err());
+        assert!(parse_crossref(&fx("crossref-doi.json")).is_ok());
     }
 
     #[test]
