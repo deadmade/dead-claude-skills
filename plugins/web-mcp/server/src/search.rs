@@ -180,6 +180,20 @@ fn check(f: &Filter, known: Option<&Engines>) -> Result<(), SearchError> {
             )));
         }
     }
+    if let Some(c) = &f.category
+        && !known.values().any(|i| in_category(i, c))
+    {
+        let mut cats: Vec<_> = known
+            .values()
+            .flat_map(|i| i.categories.iter().map(|x| x.to_lowercase()))
+            .collect();
+        cats.sort_unstable();
+        cats.dedup();
+        return Err(SearchError::Filter(format!(
+            "unknown category {c}; known categories: {}",
+            cats.join(", ")
+        )));
+    }
     if f.since.is_none() {
         return Ok(());
     }
@@ -499,6 +513,18 @@ mod tests {
         let e = err(&filter(&["nosuch"], None, None), Some(&known()));
         assert!(e.contains("unknown engine nosuch"), "{e}");
         assert!(e.contains("bing, github, gitlab, yahoo"), "{e}");
+    }
+
+    #[test]
+    fn unknown_category_is_a_filter_error() {
+        let e = err(&filter(&[], Some("nosuch"), None), Some(&known()));
+        assert!(e.contains("unknown category nosuch"), "{e}");
+        assert!(e.contains("general, it, repos"), "{e}");
+        let e = err(
+            &filter(&[], Some("nosuch"), Some(Since::Day)),
+            Some(&known()),
+        );
+        assert!(e.contains("unknown category nosuch"), "{e}");
     }
 
     #[test]
