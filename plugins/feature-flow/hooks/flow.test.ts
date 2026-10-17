@@ -3,7 +3,7 @@ import { expect, test } from 'claude-code/testing';
 import type { CommandInfo } from 'claude-code';
 
 import type { Run } from '../types';
-import { bandLines, gateDate, newest, parseFlow, pickCurrent, resumeCommand, slugOf } from './flow';
+import { bandLines, claimOf, gateDate, newest, parseFlow, pickCurrent, resumeCommand, slugOf } from './flow';
 
 const TEMPLATE = `---
 phase: ground
@@ -113,6 +113,10 @@ const run = (slug: string, mtimeMs: number, phase = 'plan'): Run => ({
   phase,
   gates: ['2026-10-17', null],
   deviations: true,
+  spec: null,
+  baseline: '',
+  feature: '',
+  verdict: null,
 });
 
 test('slugOf', () => {
@@ -156,6 +160,59 @@ test('bandLines: narrow drops from the right, then cuts the slug', () => {
   expect(at(40).join('')).toContain('flow-pane');
   expect(at(18).join('')).toContain('…');
   expect(bandLines(run('flow-pane', 1), 0, 100)[0]).not.toContain('+0 open');
+});
+
+const RESEARCH = `---
+flow: research
+phase: validate
+---
+
+## Artifacts
+
+- Spec: [spec.md](spec.md)
+- Plan:
+
+## Results
+
+| run      | command | numbers | date |
+| -------- | ------- | ------- | ---- |
+| baseline | x       | 412ms   | d    |
+| feature  | x       |         |      |
+
+Verdict: supported | not supported | inconclusive. Threats that showed up. The user's decision.
+`;
+
+test('parseFlow: research spec link and results', () => {
+  expect(parseFlow(RESEARCH)).toMatchObject({ spec: 'spec.md', baseline: '412ms', feature: '', verdict: null });
+  expect(parseFlow(TEMPLATE)).toMatchObject({ spec: null, baseline: '', feature: '', verdict: null });
+});
+
+test('parseFlow: verdict', () => {
+  const verdict = (line: string) => parseFlow(RESEARCH.replace(/Verdict:.*/, line)).verdict;
+  expect(verdict('Verdict: supported')).toBe('supported');
+  expect(verdict('Verdict: not supported. Threats showed up.')).toBe('not supported');
+  expect(verdict('Verdict: inconclusive')).toBe('inconclusive');
+  expect(verdict('Verdict: supported | not supported | inconclusive.')).toBeNull();
+});
+
+test('claimOf', () => {
+  expect(claimOf('# S\n\n## Hypothesis\n\n- **Claim:** if we build X, p95 drops 30%\n- **Evidence:** E1\n')).toBe(
+    'if we build X, p95 drops 30%',
+  );
+  expect(claimOf('# S\n\n## Goals\n\n- **Claim:** not here\n')).toBeNull();
+  expect(claimOf('## Hypothesis\n\n- **Evidence:** E1\n')).toBeNull();
+});
+
+test('bandLines: research second line', () => {
+  const r: Run = { ...run('rs', 1), research: true, baseline: '412ms', verdict: 'supported' };
+  const lines = bandLines(r, 0, 100, 'caching cuts p95');
+  expect(lines).toHaveLength(2);
+  for (const s of ['caching cuts p95', '412ms', 'supported']) expect(lines[1]).toContain(s);
+  expect(lines[1]).not.toContain('feature');
+  expect(bandLines(r, 0, 100)[1]).toBe('baseline 412ms · supported');
+  expect(bandLines({ ...r, baseline: '', verdict: null }, 0, 100)).toHaveLength(1);
+  expect(bandLines(r, 0, 30, 'caching cuts p95')[1]!.length).toBeLessThanOrEqual(20);
+  expect(bandLines(run('f', 1), 0, 100, 'a claim')).toHaveLength(1);
 });
 
 test('resumeCommand', () => {

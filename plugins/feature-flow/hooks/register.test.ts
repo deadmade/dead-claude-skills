@@ -6,6 +6,9 @@ type Files = Record<string, { text: string | null; mtimeMs: number }>; // text n
 type Answer = Record<string, unknown>;
 
 const flow = (phase: string) => `---\nphase: ${phase}\n---\n\n## Gates\n\n- Gate 1, spec approved:\n`;
+const research = (spec = '- Spec: [spec.md](spec.md)') =>
+  `---\nflow: research\nphase: validate\n---\n\n## Artifacts\n\n${spec}\n\n## Results\n\n| run | command | numbers | date |\n| - | - | - | - |\n| baseline | x | 412ms | d |\n\nVerdict: supported\n`;
+const SPEC = '## Hypothesis\n\n- **Claim:** caching cuts p95 by 30%\n';
 const START = { cwd: '/repo', surface: null, isInteractive: true } as const;
 const COMMANDS = [
   { name: 'feature-flow:feature-flow', description: '', source: 'plugin', plugin: 'feature-flow' },
@@ -331,4 +334,27 @@ test('session end (a /clear too) forgets the written run', async ($, on) => {
   const s = await shown($);
   expect(s.texts).toContain('b · spec');
   expect(s.resume).toBeDefined();
+});
+
+test('research line', async ($, on) => {
+  const h = host(on, {
+    '/repo/docs/features/r/flow.md': { text: research(), mtimeMs: 1 },
+    '/repo/docs/features/r/spec.md': { text: SPEC, mtimeMs: 1 },
+  });
+  await start($, h);
+  const { texts } = await shown($);
+  expect(texts).toContain('r · validate');
+  expect(texts).toContain('caching cuts p95 by 30% · baseline 412ms · supported');
+});
+
+test('spec unreadable: no claim, first line still drawn', async ($, on) => {
+  const h = host(on, {
+    '/repo/docs/features/r/flow.md': { text: research(), mtimeMs: 1 },
+    '/repo/docs/features/r/spec.md': { text: null, mtimeMs: 1 },
+  });
+  await start($, h);
+  const { texts } = await shown($);
+  expect(texts).toContain('r · validate');
+  expect(texts).toContain('baseline 412ms · supported');
+  expect(texts).not.toContain('caching');
 });

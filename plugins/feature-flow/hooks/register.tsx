@@ -3,7 +3,7 @@ import { atom, read, update } from 'claude-code';
 import type { EngineInterface as $, Register } from 'claude-code';
 
 import type { Band, Run } from '../types';
-import { bandLines, newest, parseFlow, pickCurrent, resumeCommand, slugOf } from './flow';
+import { bandLines, claimOf, newest, parseFlow, pickCurrent, resumeCommand, slugOf } from './flow';
 
 const POLL_MS = 5000;
 
@@ -55,6 +55,16 @@ async function parse($: $, path: string, mtimeMs: number): Promise<Run | null> {
   }
 }
 
+// The Hypothesis claim of the spec a research run links, read relative to its flow.md; null when there is none.
+async function claimFor($: $, run: Run): Promise<string | null> {
+  if (!run.research || !run.spec) return null;
+  try {
+    return claimOf(await $.fs.read(`${run.path.replace(/[^/]*$/, '')}${run.spec.split('#')[0]}`));
+  } catch {
+    return null;
+  }
+}
+
 async function poll($: $) {
   const runs: Run[] = [];
   for (const c of await copies($)) {
@@ -67,6 +77,7 @@ async function poll($: $) {
     others,
     showKey: touched?.slug !== current.slug && current.phase !== 'done',
     command: command[current.research ? 'research' : 'feature'],
+    claim: await claimFor($, current),
   };
   await update($, band, () => value);
 }
@@ -142,7 +153,7 @@ export const register: Register = (on) => {
     return (
       <Box flexDirection="row">
         <Box flexDirection="column" flexGrow={1}>
-          {bandLines(b.run, b.others, e.props.bodyColumns).map((line) => (
+          {bandLines(b.run, b.others, e.props.bodyColumns, b.claim).map((line) => (
             <Text>{line}</Text>
           ))}
         </Box>
