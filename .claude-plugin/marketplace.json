@@ -116,7 +116,7 @@
     },
     {
       "name": "feature-flow",
-      "description": "/feature-flow: brainstorm with prior art, grill with domain docs, plan, have Claude evaluate the plan, then execute and finish through superpowers. /research-flow does the same grounded in papers via paper-lookup, with a hypothesis measured before finishing. Two approval gates, no lock. Opt-in.",
+      "description": "/feature-flow: brainstorm with prior art, grill with domain docs, plan, have Claude evaluate the plan, then execute and finish through superpowers. /research-flow does the same grounded in papers via paper-lookup, with a hypothesis measured before finishing. Two approval gates, no lock. A band above the prompt shows the current run's phase, gates and deviations; 1 resumes it. Opt-in.",
       "source": "./plugins/feature-flow",
       "category": "development"
     },
