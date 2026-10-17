@@ -16,8 +16,8 @@ one glance says where the run stands without opening the file, and one key picks
 4. **Current run:** the run whose `flow.md` this session last wrote through a Write or Edit tool call. Until there is
    one, the open run whose `flow.md` changed most recently. A run created in this session (`/feature-flow <new
    thing>`) becomes current as soon as its `flow.md` is written; no key press.
-5. One key resumes the shown run where it stopped: it submits `/feature-flow <slug>` (or `/research-flow <slug>` for a
-   research run) as if the user typed it.
+5. One key resumes the shown run where it stopped: it runs `/feature-flow <slug>` (or `/research-flow <slug>` for a
+   research run) through `$.command.run`, as if the user typed it.
 6. feature-flow and research-flow accept an existing run's slug as the argument and resume exactly that run, instead
    of starting a new feature.
 7. The band follows the file: edits by hand, by another session or by Claude show up within a few seconds.
@@ -48,6 +48,8 @@ one glance says where the run stands without opening the file, and one key picks
   marker. Pure parsing in its own `.ts` that the tests import, like `cswap/hooks/cswap.ts`.
 - **Surface:** `ui.render` on `{ component: 'AbovePrompt' }`. Yield with `next(e)` when there is no run to show, when
   `hasSurvey`, or when `view.agentId` is set (the night-city pattern, `plugins/night-city/hooks/register.tsx:81`).
+  Otherwise call `next(e)` first and draw only when nothing beneath drew a band: hooks in the same tier have no
+  stated order (`claude-code.d.ts` `TIERS`), so this is what lets night-city's Onibi win wherever it sits.
 - **Open run:** a `flow.md` whose frontmatter `phase:` isn't `done`.
 
 ## Reading flow.md
@@ -58,11 +60,13 @@ Real files drift from the template (`docs/features/*/flow.md`), so the reader ta
   No frontmatter or no `phase:` → phase `?`.
 - **Gates:** the lines under `## Gates` starting `- Gate 1` and `- Gate 2`. A gate is approved when the text after
   its first `:` holds an ISO date (`YYYY-MM-DD`) and its last date isn't the one right after the last "Reopened"
-  (any case); the band shows that last date. Otherwise the gate is open.
+  (any case); the band shows that last date. Otherwise the gate is open. Compare positions on the line, not values:
+  `language-skills` has three equal dates on one Gate 1 line.
   Samples: `cyberpunk-theme` (free text after the date), `language-skills` (reopened, then re-approved),
   `flow-pane` (`<date>` placeholder = open).
-- **Deviations:** the section `## Deviations` up to the next `## ` heading; any line that isn't blank or an HTML
-  comment means "deviations".
+- **Deviations:** the section `## Deviations` up to the next `## ` heading. Its first line that isn't blank or an
+  HTML comment decides: none, or one starting `None` / `- None` → no deviations; anything else → "deviations".
+  Samples: `installer-rewrite`, `postgres-skills` (None…), `cyberpunk-theme`, `superpowers-v7` (deviations).
 - **Research only:**
   - Hypothesis: the `**Claim:**` bullet of the `## Hypothesis` section in the spec linked from `- Spec:` under
     `## Artifacts` (format: `plugins/feature-flow/skills/research-flow/references/literature.md:37-48`). No link, no
@@ -93,19 +97,22 @@ H: caching cuts p95 by 30% · baseline 412ms · feature 280ms · supported
   of a session. After that the band shows status only.
 - **A finished run:** when the session's current run reaches `phase: done`, the band keeps showing it, marked done,
   without the key, until the session ends; then it falls back to the open runs like any other.
-- **Night-city:** while Onibi visits (a few seconds) night-city returns its own band without `next(e)`, so the flow
-  band yields. No change to night-city.
+- **Night-city:** while Onibi visits (a few seconds) the flow band yields to it (see Surface). No change to
+  night-city.
 - **"Last written by this session":** Write and Edit tool calls whose `file_path` ends in `docs/features/<slug>/flow.md`.
   Edits through Bash (`sed`) aren't seen; the mtime fallback covers them.
 - **Poll interval:** 5 seconds.
-- **Resume argument:** a slug resumes only when `docs/features/<slug>/flow.md` exists; anything else is still a new
-  feature. research-flow does the same for `flow: research` runs, feature-flow for the others.
+- **Resume argument:** an argument that names an existing `docs/features/<slug>/flow.md` never creates a new run
+  over it. feature-flow resumes it when it isn't `flow: research`; for a research run it says the run belongs to
+  `/research-flow` and stops. research-flow mirrors that. A `phase: done` run: say it's done and ask what to do.
+  Any other argument is a new feature, as today.
 
 ## Constraints
 
-- No npm dependencies; the mod uses only the `$` engine interface (`$.fs`, `$.clock`, `$.prompt`, `$.ui`).
-- The mod ships at the repo's one version (`check-repo.mjs` fails on drift); `plugin.json` gains `hooks`/`types` the
-  way cswap's does.
+- No npm dependencies; the mod uses only the `$` engine interface (`$.fs`, `$.clock`, `$.command`, `$.ui`).
+- The mod ships at the repo's one version (`check-repo.mjs` fails on drift). Like cswap: `hooks/hooks.json`
+  (`{ "modules": [...] }`) and a `"types"` entry in `plugin.json` if it keeps `$.state`; the generated
+  `.claude-plugin/types/` stays gitignored.
 - Mod tests run with `claude plugin test .` in `plugins/feature-flow`; CI needs a step for it in
   `.github/workflows/test.yml` next to cswap's and night-city's, on Linux and Windows. Tests fake files with
   `on('fs.list')` / `on('fs.read')` and inline flow.md samples (no file system in plugin tests).
