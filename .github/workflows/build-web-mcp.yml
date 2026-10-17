@@ -1,0 +1,65 @@
+name: Build web-mcp
+
+# web-mcp, the web research MCP server, for Windows and Linux x64 only: archives plus their checksums. release.yml calls this and attaches
+# them to the vX.Y.Z release the installer downloads from. A PR that changes this file, or a run by hand, builds only.
+on:
+  pull_request:
+    paths: ['.github/workflows/build-web-mcp.yml']
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, archive: zip }
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-musl, archive: tar.gz }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: plugins/mcp/web-mcp/server
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Rust toolchain
+        run: rustup update stable && rustup default stable && rustup target add ${{ matrix.target }}
+
+      - name: musl C toolchain
+        if: contains(matrix.target, 'musl')
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: plugins/mcp/web-mcp/server
+          key: ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --release --locked --target ${{ matrix.target }}
+
+      - name: Smoke test
+        run: target/${{ matrix.target }}/release/web-mcp --version
+
+      - name: Package
+        run: |
+          name=web-mcp-${{ matrix.target }}
+          mkdir -p "$RUNNER_TEMP/dist"
+          if [ "${{ matrix.archive }}" = zip ]; then
+            7z a -tzip "$RUNNER_TEMP/dist/$name.zip" "./target/${{ matrix.target }}/release/web-mcp.exe" > /dev/null
+          else
+            tar -czf "$RUNNER_TEMP/dist/$name.tar.gz" -C "target/${{ matrix.target }}/release" web-mcp
+          fi
+          cd "$RUNNER_TEMP/dist"
+          for f in "$name".*; do
+            sha256sum "$f" > "$f.sha256"
+          done
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web-mcp-${{ matrix.target }}
+          path: ${{ runner.temp }}/dist/*

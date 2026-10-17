@@ -79,18 +79,32 @@
     # brv, the tui-review plugin's Rust binary: `nix build .#brv`, or `nix run .#brv -- gen`. Its tests run in the build.
     packages = forAllSystems (system: let
       pkgs = nixpkgs.legacyPackages.${system};
-      manifest = (pkgs.lib.importTOML ./plugins/tui-review/brv/Cargo.toml).package;
+      manifest = (pkgs.lib.importTOML ./plugins/mods/tui-review/brv/Cargo.toml).package;
+      webMcp = (pkgs.lib.importTOML ./plugins/mcp/web-mcp/server/Cargo.toml).package;
     in {
       brv = pkgs.rustPlatform.buildRustPackage {
         pname = manifest.name;
         inherit (manifest) version;
-        src = ./plugins/tui-review/brv;
-        cargoLock.lockFile = ./plugins/tui-review/brv/Cargo.lock;
+        src = ./plugins/mods/tui-review/brv;
+        cargoLock.lockFile = ./plugins/mods/tui-review/brv/Cargo.lock;
         # tests/review.rs builds its fixture repositories with git.
         nativeCheckInputs = [pkgs.git];
         meta = {
           inherit (manifest) description;
           mainProgram = "brv";
+        };
+      };
+      # web-mcp, the web-mcp plugin's MCP server: `nix build .#web-mcp`.
+      web-mcp = pkgs.rustPlatform.buildRustPackage {
+        pname = webMcp.name;
+        inherit (webMcp) version;
+        src = ./plugins/mcp/web-mcp/server;
+        cargoLock.lockFile = ./plugins/mcp/web-mcp/server/Cargo.lock;
+        # Debug checks: the fetch tests' WEB_MCP_TEST_PUBLIC_IP hook exists only in debug builds or the `test-hooks` feature.
+        checkType = "debug";
+        meta = {
+          inherit (webMcp) description;
+          mainProgram = "web-mcp";
         };
       };
     });

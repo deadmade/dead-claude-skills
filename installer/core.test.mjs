@@ -8,9 +8,10 @@ import {
   duplicates,
   mergeSettings,
   isShipped,
-  NIGHT_CITY_THEME,
   safeArg,
   missingBinaries,
+  agentBrowserAction,
+  agentBrowserVersion,
   SECRET_DENIES,
   isSandboxOn,
   hasDcgHook,
@@ -30,16 +31,25 @@ import {
   cswapDownload,
   cswapCurrent,
   pathWith,
-  brvAsset,
+  BIN_PLUGINS,
+  binAsset,
   sha256Of,
-  brvAction,
+  binAction,
   CATEGORIES,
   TOGGLES,
   categorize,
   unavailable,
+  searxngRun,
+  searxngSettings,
+  webBuiltinsDecision,
+  isWebBuiltinsOff,
+  HINTS,
   outdated,
   shippedVersions,
   manifestPath,
+  INCLUDED,
+  idOf,
+  withDependencies,
 } from './core.mjs';
 
 const json = (p) => JSON.parse(readFileSync(new URL(`../${p}`, import.meta.url), 'utf8'));
@@ -56,14 +66,13 @@ test('opt-ins from the real manifests', () => {
         'atlassian',
         'csharp-skills',
         'cswap',
-        'feature-flow',
+        'flows',
         'graphify',
         'hallmark',
         'mattpocock-picks',
         'mcp-azure',
         'mcp-github',
         'md-pane',
-        'night-city',
         'nix-lsp',
         'notify',
         'paper-lookup',
@@ -73,6 +82,7 @@ test('opt-ins from the real manifests', () => {
         'self-review',
         'tob-picks',
         'tui-review',
+        'web-mcp',
       ].map((n) => `${n}@${M}`),
       ...['csharp-lsp', 'hookify', 'pyright-lsp', 'rust-analyzer-lsp', 'skill-creator', 'typescript-lsp'].map(
         (n) => `${n}@${O}`,
@@ -87,8 +97,8 @@ test('bundle ids resolve bare names to our marketplace', () => {
 });
 
 test('token plugins', () => {
-  assert.equal(needsToken(json('plugins/mcp-github/.claude-plugin/plugin.json')), true);
-  assert.equal(needsToken(json('plugins/mcp-azure/.claude-plugin/plugin.json')), true);
+  assert.equal(needsToken(json('plugins/mcp/mcp-github/.claude-plugin/plugin.json')), true);
+  assert.equal(needsToken(json('plugins/mcp/mcp-azure/.claude-plugin/plugin.json')), true);
   assert.equal(needsToken(json('plugins/graphify/.claude-plugin/plugin.json')), false);
 });
 
@@ -343,23 +353,54 @@ test('cswap missing on Linux points at uv', () => {
 });
 
 test('brv downloads the release archive built for this machine', () => {
-  const win = brvAsset('win32', 'x64', '1.2.3');
+  const win = binAsset('brv', 'win32', 'x64', '1.2.3');
   assert.equal(
     win.url,
     'https://github.com/deadmade/dead-claude-skills/releases/download/v1.2.3/brv-x86_64-pc-windows-msvc.zip',
   );
   assert.equal(win.sha256, `${win.url}.sha256`);
   assert.equal(win.exe, 'brv.exe');
-  assert.equal(brvAsset('linux', 'x64', '1.0.0').file, 'brv-x86_64-unknown-linux-musl.tar.gz');
-  assert.equal(brvAsset('linux', 'arm64', '1.0.0').file, 'brv-aarch64-unknown-linux-musl.tar.gz');
-  assert.equal(brvAsset('darwin', 'arm64', '1.0.0').exe, 'brv');
-  assert.equal(brvAsset('win32', 'arm64', '1.0.0'), undefined);
-  assert.equal(brvAsset('freebsd', 'x64', '1.0.0'), undefined);
+  assert.equal(binAsset('brv', 'linux', 'x64', '1.0.0').file, 'brv-x86_64-unknown-linux-musl.tar.gz');
+  assert.equal(binAsset('brv', 'linux', 'arm64', '1.0.0').file, 'brv-aarch64-unknown-linux-musl.tar.gz');
+  assert.equal(binAsset('brv', 'darwin', 'arm64', '1.0.0').exe, 'brv');
+  assert.equal(binAsset('brv', 'win32', 'arm64', '1.0.0'), undefined);
+  assert.equal(binAsset('brv', 'freebsd', 'x64', '1.0.0'), undefined);
+});
+
+test('web-mcp downloads its own archive, and each plugin is configured under its own key', () => {
+  const t = {
+    'win32-x64': 'x86_64-pc-windows-msvc',
+    'linux-x64': 'x86_64-unknown-linux-musl',
+    'linux-arm64': 'aarch64-unknown-linux-musl',
+    'darwin-arm64': 'aarch64-apple-darwin',
+    'darwin-x64': 'x86_64-apple-darwin',
+  };
+  for (const [k, target] of Object.entries(t)) {
+    const [platform, arch] = k.split('-');
+    for (const name of ['brv', 'web-mcp']) {
+      if (name === 'web-mcp' && !['win32-x64', 'linux-x64'].includes(k)) {
+        assert.equal(binAsset(name, platform, arch, '1.2.3'), undefined);
+        continue;
+      }
+      const a = binAsset(name, platform, arch, '1.2.3');
+      assert.equal(a.file, `${name}-${target}.${platform === 'win32' ? 'zip' : 'tar.gz'}`);
+      assert.equal(a.exe, name + (platform === 'win32' ? '.exe' : ''));
+    }
+  }
+  assert.equal(binAsset('web-mcp', 'linux', 'ia32', '1.0.0'), undefined);
+  assert.deepEqual(BIN_PLUGINS['tui-review'], { name: 'brv', key: 'brvPath' });
+  assert.deepEqual(BIN_PLUGINS['web-mcp'], { name: 'web-mcp', key: 'binPath' });
+  const dirs = { 'tui-review': 'plugins/mods/tui-review', 'web-mcp': 'plugins/mcp/web-mcp' };
+  for (const [plugin, { key }] of Object.entries(BIN_PLUGINS))
+    assert.ok(json(`${dirs[plugin]}/.claude-plugin/plugin.json`).userConfig[key], `${plugin} has userConfig ${key}`);
+  assert.match(unavailable('web-mcp', 'linux', 'ia32', '1.0.0'), /no web-mcp build for linux-ia32/);
+  assert.equal(unavailable('web-mcp', 'linux', 'x64', '1.0.0'), undefined);
+  assert.match(unavailable('web-mcp', 'darwin', 'arm64', '1.0.0'), /no web-mcp build for darwin-arm64/);
 });
 
 test('brv versions match the release the installer fetches', () => {
-  const cargo = readFileSync(new URL('../plugins/tui-review/brv/Cargo.toml', import.meta.url), 'utf8');
-  assert.equal(/^version = "(.+)"/m.exec(cargo)[1], json('plugins/tui-review/.claude-plugin/plugin.json').version);
+  const cargo = readFileSync(new URL('../plugins/mods/tui-review/brv/Cargo.toml', import.meta.url), 'utf8');
+  assert.equal(/^version = "(.+)"/m.exec(cargo)[1], json('plugins/mods/tui-review/.claude-plugin/plugin.json').version);
 });
 
 test('brv checksum lines and what to do about brv', () => {
@@ -368,7 +409,7 @@ test('brv checksum lines and what to do about brv', () => {
   assert.equal(sha256Of(`${hex}`), hex.toLowerCase());
   assert.equal(sha256Of('Not Found'), undefined);
   assert.equal(sha256Of(`${hex}ff  x`), undefined);
-  const at = (o) => brvAction({ onPath: false, installed: undefined, version: '0.2.0', supported: true, ...o });
+  const at = (o) => binAction({ onPath: false, installed: undefined, version: '0.2.0', supported: true, ...o });
   assert.equal(at({ onPath: true }), 'skip');
   assert.equal(at({ installed: '0.2.0' }), 'configure');
   assert.equal(at({ installed: '0.1.0' }), 'download');
@@ -376,13 +417,36 @@ test('brv checksum lines and what to do about brv', () => {
   assert.equal(at({ supported: false }), 'unsupported');
 });
 
-test('every opt-in and toggle is on exactly one page', () => {
+test('every opt-in and toggle is on exactly one page, except the INCLUDED ones on none', () => {
   const keys = [...optIns(marketplace, bundle), ...TOGGLES];
   const pages = categorize(keys);
-  assert.deepEqual(pages.flatMap((p) => p.keys).sort(), [...keys].sort());
+  const shown = keys.filter((k) => !INCLUDED.includes(k.split('@')[0]));
+  assert.deepEqual(pages.flatMap((p) => p.keys).sort(), shown.sort());
   assert.ok(!pages.some((p) => p.id === 'other'), 'every real opt-in has a category');
   const listed = CATEGORIES.flatMap((c) => c.keys);
   assert.equal(new Set(listed).size, listed.length);
+});
+
+test('withDependencies adds opt-in dependencies transitively, once, and nothing for unselected plugins', () => {
+  const deps = { a: ['b', 'bundled'], b: ['c', 'a'], x: ['y'] };
+  const opts = ['a', 'b', 'c', 'x', 'y'];
+  assert.deepEqual(
+    withDependencies(['a'], (id) => deps[id], opts),
+    ['a', 'b', 'c'],
+  );
+  assert.deepEqual(
+    withDependencies([], (id) => deps[id], opts),
+    [],
+  );
+});
+
+test('flows brings every INCLUDED plugin, and its dependencies are marketplace or official plugins', () => {
+  const flows = json('plugins/flows/.claude-plugin/plugin.json').dependencies.map(idOf);
+  for (const n of INCLUDED) assert.ok(flows.includes(`${n}@${M}`), `${n} comes with flows`);
+  for (const id of flows) {
+    const [name, from] = id.split('@');
+    assert.ok(from === O || marketplace.plugins.some((p) => p.name === name), id);
+  }
 });
 
 test('an uncategorized plugin lands in Other, empty pages are dropped', () => {
@@ -513,32 +577,11 @@ test('Night City ccstatusline keeps the stock widgets in order', () => {
   );
 });
 
-test('nightCity false removes only the Night City theme', () => {
-  const s = { theme: NIGHT_CITY_THEME };
-  assert.equal(mergeSettings(s, { nightCity: false }).theme, undefined);
-  assert.equal(mergeSettings({ theme: 'dark' }, { nightCity: false }).theme, 'dark');
-  assert.equal(mergeSettings(s, { nightCity: true }).theme, NIGHT_CITY_THEME);
-  assert.equal(mergeSettings(s, {}).theme, NIGHT_CITY_THEME);
-});
-
-test('nightCity turns tmux truecolor on next to other env, and deselecting it removes only that', () => {
-  const on = mergeSettings({ env: { FOO: 'x' } }, { nightCity: true });
-  assert.deepEqual(on.env, { FOO: 'x', CLAUDE_CODE_TMUX_TRUECOLOR: '1' });
-  assert.deepEqual(mergeSettings(on, { nightCity: false }).env, { FOO: 'x' });
-  assert.equal(mergeSettings({ env: { CLAUDE_CODE_TMUX_TRUECOLOR: '1' } }, { nightCity: false }).env, undefined);
-  assert.deepEqual(mergeSettings({ env: { CLAUDE_CODE_TMUX_TRUECOLOR: '1' } }, {}).env, {
-    CLAUDE_CODE_TMUX_TRUECOLOR: '1',
-  });
-});
-
-test('nightCity turns syntax highlighting off, and deselecting it turns it back on', () => {
-  assert.equal(mergeSettings({}, { nightCity: true }).syntaxHighlightingDisabled, true);
-  assert.equal(
-    mergeSettings({ syntaxHighlightingDisabled: true }, { nightCity: false }).syntaxHighlightingDisabled,
-    undefined,
-  );
-  assert.equal(mergeSettings({ syntaxHighlightingDisabled: true }, {}).syntaxHighlightingDisabled, true);
-  assert.equal(mergeSettings({}, {}).syntaxHighlightingDisabled, undefined);
+test('Night City settings are always on, next to other env, and leave the theme alone', () => {
+  const out = mergeSettings({ env: { FOO: 'x' }, theme: 'dark' }, {});
+  assert.deepEqual(out.env, { FOO: 'x', CLAUDE_CODE_TMUX_TRUECOLOR: '1' });
+  assert.equal(out.syntaxHighlightingDisabled, true);
+  assert.equal(out.theme, 'dark');
 });
 
 test('notify turns the built-in notification off, and deselecting restores it', () => {
@@ -547,4 +590,58 @@ test('notify turns the built-in notification off, and deselecting restores it', 
   assert.equal(channel({ preferredNotifChannel: 'notifications_disabled' }, false), undefined);
   assert.equal(channel({ preferredNotifChannel: 'kitty' }, false), 'kitty');
   assert.equal(channel({ preferredNotifChannel: 'kitty' }, true), 'notifications_disabled');
+});
+
+test('searxng binds loopback, mounts the config dir and takes the secret', () => {
+  const args = searxngRun('/c/searxng');
+  assert.ok(args.includes('127.0.0.1:8888:8080'));
+  assert.ok(args.includes('/c/searxng:/etc/searxng/'));
+  const tpl = readFileSync(new URL('./searxng.yml', import.meta.url), 'utf8');
+  const out = searxngSettings(tpl, 'abc123');
+  assert.match(out, /secret_key: "abc123"/);
+  assert.doesNotMatch(out, /changeme/);
+  assert.match(out, /- json/);
+  // \r?: Windows checkouts turn the template's line endings into CRLF.
+  assert.match(out, /name: bing\r?\n\s+disabled: false/);
+  for (const e of ['duckduckgo', 'brave', 'google cse'])
+    assert.match(out, new RegExp(`name: ${e}\\r?\\n\\s+disabled: true`));
+});
+
+test('web builtins: tri-state merge keeps other denies, toggle reads deny', () => {
+  const base = { permissions: { deny: ['Bash(sudo:*)'] } };
+  const off = mergeSettings(base, { webBuiltinsOff: true });
+  assert.ok(['Bash(sudo:*)', 'WebFetch', 'WebSearch'].every((d) => off.permissions.deny.includes(d)));
+  assert.ok(isWebBuiltinsOff(off));
+  assert.deepEqual(mergeSettings(off, { webBuiltinsOff: true }), off);
+  assert.deepEqual(mergeSettings(off, {}).permissions.deny, off.permissions.deny);
+  const back = mergeSettings(off, { webBuiltinsOff: false });
+  assert.ok(!back.permissions.deny.includes('WebFetch') && !back.permissions.deny.includes('WebSearch'));
+  assert.ok(back.permissions.deny.includes('Bash(sudo:*)'));
+  assert.ok(!isWebBuiltinsOff(back));
+  assert.ok(!isWebBuiltinsOff({ permissions: { deny: ['WebFetch'] } }));
+  assert.ok(TOGGLES.includes('web-builtins-off') && HINTS['web-builtins-off']);
+  assert.ok(missingBinaries('linux', ['web-mcp'], () => false).some((r) => r.binary === 'docker'));
+});
+
+test('web builtins decision table', () => {
+  for (const was of [true, false]) {
+    assert.equal(webBuiltinsDecision({ toggle: true, was, healthy: true, installed: true }), true);
+    assert.equal(webBuiltinsDecision({ toggle: true, was, healthy: false }), undefined);
+  }
+  assert.equal(webBuiltinsDecision({ toggle: false, was: true, healthy: true, installed: true }), false);
+  assert.equal(webBuiltinsDecision({ toggle: false, was: true, healthy: false, installed: true }), false);
+  assert.equal(webBuiltinsDecision({ toggle: false, was: false, healthy: true }), undefined);
+  assert.equal(webBuiltinsDecision({ toggle: false, was: false, healthy: false }), undefined);
+  // Hand-added denies of someone who never had web-mcp stay.
+  assert.equal(webBuiltinsDecision({ toggle: false, was: true, healthy: false, installed: false }), undefined);
+});
+
+test('agent-browser: install when missing, upgrade when older, keep when equal or newer', () => {
+  const pinned = '0.39.1';
+  assert.equal(agentBrowserAction({ installed: undefined, pinned }), 'install');
+  assert.equal(agentBrowserAction({ installed: '0.38.0', pinned }), 'upgrade');
+  assert.equal(agentBrowserAction({ installed: '0.39.1', pinned }), 'skip');
+  assert.equal(agentBrowserAction({ installed: '0.40.0', pinned }), 'skip');
+  assert.equal(agentBrowserVersion('agent-browser 0.39.1\n'), '0.39.1');
+  assert.equal(agentBrowserVersion('nope'), undefined);
 });

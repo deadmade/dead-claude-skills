@@ -63,7 +63,7 @@ export function pinMarketplace(settings, version) {
 }
 const marketOf = (id) => id.split('@')[1];
 // Bare dependency names resolve against our marketplace, like Claude Code does.
-const idOf = (dep) => (dep.includes('@') ? dep : `${dep}@${MARKETPLACE}`);
+export const idOf = (dep) => (dep.includes('@') ? dep : `${dep}@${MARKETPLACE}`);
 
 export const bundleIds = (bundle) => [idOf(BUNDLE), ...bundle.dependencies.map(idOf)];
 
@@ -84,6 +84,17 @@ export function planPlugins(selected, installedIds, tokenPlugins) {
   };
 }
 
+// Plugins only the flows conductors use: they come with flows (its dependencies) and get no row of their own.
+export const INCLUDED = ['mattpocock-picks', 'pstack-picks', 'tob-picks', 'self-review', 'paper-lookup'];
+
+// selected plus the opt-ins among their dependencies, transitively. depsOf(id): a plugin's dependency ids, if any.
+export function withDependencies(selected, depsOf, opts) {
+  const out = [...selected];
+  for (let i = 0; i < out.length; i++)
+    for (const d of depsOf(out[i]) ?? []) if (opts.includes(d) && !out.includes(d)) out.push(d);
+  return out;
+}
+
 // A plugin we manage, installed from a marketplace we don't take it from (it'd load twice).
 export const duplicates = (installedIds, managedIds) =>
   installedIds.filter((id) => !managedIds.includes(id) && managedIds.some((m) => nameOf(m) === nameOf(id)));
@@ -97,9 +108,6 @@ export const hasDcgHook = (s) =>
 
 const KEEP_SESSIONS_DAYS = 36500;
 
-// The value Claude Code stores when /theme picks the night-city plugin's theme.
-export const NIGHT_CITY_THEME = 'custom:night-city:night-city';
-
 // True when text is JSON equal to any shipped config text (whitespace-insensitive).
 export const isShipped = (text, shippedTexts) => {
   try {
@@ -110,21 +118,42 @@ export const isShipped = (text, shippedTexts) => {
   }
 };
 
-export function mergeSettings(settings, { statusLine, sandbox, version, nightCity, notify }) {
+const WEB_BUILTINS = ['WebFetch', 'WebSearch'];
+export const isWebBuiltinsOff = (s) => WEB_BUILTINS.every((d) => s?.permissions?.deny?.includes(d));
+
+// The SearXNG container web-mcp searches through, bound to loopback only; configDir holds settings.yml.
+// shortcut: unpinned latest tag, pin when an upgrade breaks the JSON API.
+export const searxngRun = (configDir) => [
+  'run',
+  '-d',
+  '--name',
+  'searxng',
+  '--restart',
+  'unless-stopped',
+  '-p',
+  '127.0.0.1:8888:8080',
+  '-v',
+  `${configDir}:/etc/searxng/`,
+  'docker.io/searxng/searxng:latest',
+];
+
+export const searxngSettings = (template, secret) => template.replace(/^(\s*secret_key:).*$/m, `$1 "${secret}"`);
+
+// The built-in web tools' new state: true deny them, false allow them again, undefined leave them.
+// toggle: the choice; was: it was on before; healthy: SearXNG answered JSON; installed: web-mcp was installed before
+// this run (only then can the denies be ours; someone who never had web-mcp keeps theirs).
+// Only an explicit on to off allows them again: a down SearXNG must not undo denies that are already there.
+export const webBuiltinsDecision = ({ toggle, was, healthy, installed }) =>
+  toggle ? healthy || undefined : was && installed ? false : undefined;
+
+export function mergeSettings(settings, { statusLine, sandbox, version, notify, webBuiltinsOff }) {
   const out = structuredClone(settings);
-  if (nightCity === false && out.theme === NIGHT_CITY_THEME) delete out.theme;
-  // Claude Code colours code in a fixed Monokai a theme can't change; off, diffs take Night City's own diff colours.
-  // shortcut: deselecting also clears a `true` the user set themselves; remember who set it if anyone minds.
-  if (nightCity) out.syntaxHighlightingDisabled = true;
-  if (nightCity === false && out.syntaxHighlightingDisabled === true) delete out.syntaxHighlightingDisabled;
+  // Night City ships with the bundle. Claude Code colours code in a fixed Monokai a theme can't change; off, diffs take
+  // Night City's own diff colours.
+  out.syntaxHighlightingDisabled = true;
   // Inside tmux Claude Code draws in 256 colours unless told otherwise, which turns the theme's indigos grey. Outside
   // tmux (and on Windows, which has none) the variable does nothing.
-  if (nightCity) out.env = { ...out.env, CLAUDE_CODE_TMUX_TRUECOLOR: '1' };
-  if (nightCity === false && out.env?.CLAUDE_CODE_TMUX_TRUECOLOR === '1') {
-    const { CLAUDE_CODE_TMUX_TRUECOLOR, ...env } = out.env;
-    if (Object.keys(env).length) out.env = env;
-    else delete out.env;
-  }
+  out.env = { ...out.env, CLAUDE_CODE_TMUX_TRUECOLOR: '1' };
   // The notify plugin raises its own popups; Claude Code's built-in one would double them.
   // shortcut: deselecting also clears a `notifications_disabled` the user set themselves, and retiring notify from
   // the marketplace leaves the setting behind; remember who set it if anyone minds.
@@ -132,10 +161,15 @@ export function mergeSettings(settings, { statusLine, sandbox, version, nightCit
   if (notify === false && out.preferredNotifChannel === 'notifications_disabled') delete out.preferredNotifChannel;
   const allow = out.permissions?.allow ?? [];
   const deny = out.permissions?.deny ?? [];
+  let denied = [...deny, ...SECRET_DENIES.filter((d) => !deny.includes(d))];
+  // web-mcp replaces the built-in web tools once SearXNG answers.
+  // shortcut: false also removes WebFetch/WebSearch entries the user added by hand; remember who set them if anyone minds.
+  if (webBuiltinsOff) denied = [...denied, ...WEB_BUILTINS.filter((d) => !denied.includes(d))];
+  if (webBuiltinsOff === false) denied = denied.filter((d) => !WEB_BUILTINS.includes(d));
   out.permissions = {
     ...out.permissions,
     allow: allow.includes(PERMISSION) ? allow : [...allow, PERMISSION],
-    deny: [...deny, ...SECRET_DENIES.filter((d) => !deny.includes(d))],
+    deny: denied,
   };
   out.extraKnownMarketplaces = {
     ...out.extraKnownMarketplaces,
@@ -289,6 +323,14 @@ const BINARIES = [
   ['bwrap', 'sandbox', 'nix: bubblewrap', 'WSL2 only'],
   ['socat', 'sandbox', 'nix: socat', 'WSL2 only'],
   ['ccstatusline', 'ccstatusline', 'nix: ccstatusline', 'npm i -g ccstatusline'],
+  ['docker', 'web-mcp', 'nix: docker', 'winget install -e --id Docker.DockerDesktop'],
+  ['npm', 'web-mcp', 'nix: nodejs', 'winget install -e --id OpenJS.NodeJS.LTS'],
+  [
+    'agent-browser',
+    'web-mcp',
+    'npm i -g agent-browser && agent-browser install',
+    'npm i -g agent-browser && agent-browser install',
+  ],
   ['cswap', 'cswap', 'uv tool install claude-swap', 'rerun this installer (cswap.exe download)'],
 ];
 
@@ -301,32 +343,38 @@ export function missingBinaries(platform, wanted, onPath) {
   });
 }
 
-// brv, the tui-review plugin's binary, built per platform by .github/workflows/build-brv.yml and attached to the
-// vX.Y.Z release by release.yml.
-const BRV_TARGETS = {
+// The binaries releases ship, built per platform by .github/workflows/build-{brv,web-mcp}.yml and attached to the
+// vX.Y.Z release by release.yml. plugin: which plugin needs it; key: its userConfig key for the binary's path.
+export const BIN_PLUGINS = {
+  'tui-review': { name: 'brv', key: 'brvPath' },
+  'web-mcp': { name: 'web-mcp', key: 'binPath' },
+};
+const BIN_TARGETS = {
   'win32-x64': 'x86_64-pc-windows-msvc',
   'linux-x64': 'x86_64-unknown-linux-musl',
   'linux-arm64': 'aarch64-unknown-linux-musl',
   'darwin-arm64': 'aarch64-apple-darwin',
   'darwin-x64': 'x86_64-apple-darwin',
 };
+// Binaries built for fewer platforms than BIN_TARGETS.
+const BIN_ONLY = { 'web-mcp': ['win32-x64', 'linux-x64'] };
 
-// The release archive of brv `version` for this machine, or undefined where none is built.
-export function brvAsset(platform, arch, version) {
-  const target = BRV_TARGETS[`${platform}-${arch}`];
-  if (!target) return undefined;
-  const file = `brv-${target}.${platform === 'win32' ? 'zip' : 'tar.gz'}`;
+// The release archive of binary `name` ('brv' or 'web-mcp') at `version` for this machine, or undefined where none is built.
+export function binAsset(name, platform, arch, version) {
+  const target = BIN_TARGETS[`${platform}-${arch}`];
+  if (!target || BIN_ONLY[name]?.includes(`${platform}-${arch}`) === false) return undefined;
+  const file = `${name}-${target}.${platform === 'win32' ? 'zip' : 'tar.gz'}`;
   const url = `${RELEASES}/v${version}/${file}`;
-  return { file, url, sha256: `${url}.sha256`, exe: platform === 'win32' ? 'brv.exe' : 'brv' };
+  return { file, url, sha256: `${url}.sha256`, exe: platform === 'win32' ? `${name}.exe` : name };
 }
 
 // The checksum a `sha256sum` line starts with, lowercased; undefined when the text is not one.
 export const sha256Of = (text) => /^[0-9a-f]{64}(?=\s|$)/i.exec(text.trim())?.[0].toLowerCase();
 
-// What to do about brv: `skip` (a brv on PATH is the user's own), `configure` (ours is current, point the plugin at
+// What to do about a binary: `skip` (one on PATH is the user's own), `configure` (ours is current, point the plugin at
 // it), `download` (none, or an older one), or `unsupported` (no build for this machine).
 // installed: the version our copy reports, or undefined when there is none.
-export function brvAction({ onPath, installed, version, supported }) {
+export function binAction({ onPath, installed, version, supported }) {
   if (onPath) return 'skip';
   if (installed === version) return 'configure';
   return supported ? 'download' : 'unsupported';
@@ -334,23 +382,13 @@ export function brvAction({ onPath, installed, version, supported }) {
 
 // The installer's pages, in order. keys: plugin names and installer toggles; an opt-in not listed here lands in Other,
 // so a new marketplace plugin is never left out.
-export const TOGGLES = ['ccstatusline', 'sandbox', 'dcg', 'strip-defaults', 'clean'];
+export const TOGGLES = ['ccstatusline', 'sandbox', 'dcg', 'strip-defaults', 'clean', 'web-builtins-off'];
 export const CATEGORIES = [
   {
     id: 'workflow',
-    title: 'Workflows & skills',
-    blurb: 'Slash commands and skills that shape how Claude works.',
-    keys: [
-      'feature-flow',
-      'self-review',
-      'mattpocock-picks',
-      'pstack-picks',
-      'tob-picks',
-      'hallmark',
-      'paper-lookup',
-      'skill-creator',
-      'hookify',
-    ],
+    title: 'Conductors & skills',
+    blurb: 'flows runs the other skills in order and brings the ones it uses; plus standalone skills.',
+    keys: ['flows', 'hallmark', 'skill-creator', 'hookify'],
   },
   {
     id: 'lsp',
@@ -382,13 +420,13 @@ export const CATEGORIES = [
     id: 'tools',
     title: 'Tools',
     blurb: 'Plugins that bring their own binary or pane.',
-    keys: ['graphify', 'cswap', 'tui-review', 'md-pane'],
+    keys: ['graphify', 'cswap', 'tui-review', 'web-mcp', 'web-builtins-off', 'md-pane'],
   },
   {
     id: 'system',
     title: 'System',
-    blurb: 'Status line, sandbox, command guard, notifications and the Night City theme.',
-    keys: ['ccstatusline', 'sandbox', 'dcg', 'night-city', 'notify'],
+    blurb: 'Status line, sandbox, command guard and notifications.',
+    keys: ['ccstatusline', 'sandbox', 'dcg', 'notify'],
   },
   // bulk: false, so no single key ticks every option here.
   {
@@ -404,7 +442,7 @@ export const CATEGORIES = [
 export function categorize(keys) {
   const known = CATEGORIES.flatMap((c) => c.keys);
   const pages = CATEGORIES.map((c) => ({ ...c, keys: c.keys.flatMap((n) => keys.filter((k) => nameOf(k) === n)) }));
-  const rest = keys.filter((k) => !known.includes(nameOf(k)));
+  const rest = keys.filter((k) => !known.includes(nameOf(k)) && !INCLUDED.includes(nameOf(k)));
   if (rest.length) pages.push({ id: 'other', title: 'Other', blurb: 'Not sorted into a category yet.', keys: rest });
   return pages.filter((c) => c.keys.length);
 }
@@ -421,16 +459,19 @@ export const HINTS = {
   sandbox: 'Bash sandbox, no unsandboxed fallback',
   dcg: 'destructive command guard, runs its own installer',
   'strip-defaults': `remove other marketplaces + plugins (keeps the ${OFFICIAL} ones used here), claude.ai connectors, synced skills/plugins, builtins`,
+  'web-builtins-off': 'Turn off the built-in WebSearch and WebFetch (web-mcp replaces them; only with web-mcp)',
   clean: `clean slate: back up, then reset settings.json and delete ${CLEAN_TARGETS.join(', ')}`,
 };
 
-// Why an option can't work on this machine, or undefined when it can. version: the brv release to look for.
+// Why an option can't work on this machine, or undefined when it can. version: the release whose binaries to look for.
 export function unavailable(key, platform, arch, version) {
   const name = nameOf(key);
   if (platform === 'win32' && name === 'sandbox') return 'needs WSL2';
   if (platform === 'win32' && name === 'nix-lsp') return 'nixd is not available on Windows';
   if (platform !== 'win32' && name === 'cswap') return 'releases ship cswap.exe for Windows only';
-  if (name === 'tui-review' && !brvAsset(platform, arch, version)) return `no brv build for ${platform}-${arch}`;
+  if (name === 'web-builtins-off') return unavailable(`web-mcp@${MARKETPLACE}`, platform, arch, version);
+  const bin = BIN_PLUGINS[name];
+  if (bin && !binAsset(bin.name, platform, arch, version)) return `no ${bin.name} build for ${platform}-${arch}`;
   return undefined;
 }
 
@@ -441,6 +482,13 @@ const newer = (a, b) => {
   const i = x.findIndex((n, k) => n !== y[k]);
   return i >= 0 && x[i] > y[i];
 };
+
+// installed: version from `agent-browser --version` or undefined; pinned: installer/agent-browser.json. A newer one stays.
+export const agentBrowserAction = ({ installed, pinned }) =>
+  !installed ? 'install' : installed === pinned || newer(installed, pinned) ? 'skip' : 'upgrade';
+
+// `agent-browser --version` may print a name prefix ("agent-browser 0.39.1"); undefined when no version is in it.
+export const agentBrowserVersion = (out) => /(\d+\.\d+\.\d+)/.exec(out ?? '')?.[1];
 
 // { name: version } this release ships: a local plugin's plugin.json version (via localVersion(source)), or a url
 // plugin's pinned vX.Y.Z ref. Plugins without either (unpinned url sources) are left out.

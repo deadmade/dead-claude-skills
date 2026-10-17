@@ -34,14 +34,19 @@ if (git('status', '--porcelain')) die('working tree is not clean');
 if (git('tag', '--list', `v${next}`)) die(`tag v${next} already exists`);
 
 // Each file's own version line, edited in place so the rest of the file keeps its formatting. JSON: the top-level
-// (or marketplace metadata) "version". brv: its crate version, and its entry in Cargo.lock so --locked builds pass.
+// (or marketplace metadata) "version". Each Rust crate: its version, and its entry in Cargo.lock so --locked builds pass.
 const json = /^( {2,4}"version": )"[^"]*"/m;
 const bumps = [
   ['package.json', json],
   ['.claude-plugin/marketplace.json', json],
   ...pluginDirs().map((p) => [`${p}/.claude-plugin/plugin.json`, json]),
-  ['plugins/tui-review/brv/Cargo.toml', /^(version = )"[^"]*"/m],
-  ['plugins/tui-review/brv/Cargo.lock', /^(name = "brv"\r?\nversion = )"[^"]*"/m],
+  ...[
+    ['plugins/mods/tui-review/brv', 'brv'],
+    ['plugins/mcp/web-mcp/server', 'web-mcp'],
+  ].flatMap(([dir, name]) => [
+    [`${dir}/Cargo.toml`, /^(version = )"[^"]*"/m],
+    [`${dir}/Cargo.lock`, new RegExp(`^(name = "${name}"\\r?\\nversion = )"[^"]*"`, 'm')],
+  ]),
 ];
 const files = bumps.map(([f]) => f);
 for (const [f, version] of bumps) {

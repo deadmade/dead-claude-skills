@@ -1,0 +1,25 @@
+use_default_settings: true
+search:
+  formats:
+    - html
+    - json
+server:
+  limiter: false
+  secret_key: 'changeme'
+# SearXNG's default general engines (duckduckgo, brave, google cse) CAPTCHA, rate-limit or time out for a scraper,
+# and one dead engine holds every search to the 3 s timeout. Bing answers; Yahoo serves Bing's index as a second site.
+engines:
+  - name: bing
+    disabled: false
+  - name: yahoo
+    disabled: false
+  - name: duckduckgo
+    disabled: true
+  - name: brave
+    disabled: true
+  - name: google cse
+    disabled: true
+  - name: ahmia
+    inactive: true
+  - name: torch
+    inactive: true

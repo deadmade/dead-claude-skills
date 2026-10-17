@@ -1,0 +1,6 @@
+{
+  "superpowers": ["verification-before-completion", "systematic-debugging", "finishing-a-development-branch"],
+  "self-review": ["self-review"],
+  "pstack-picks": ["interrogate"],
+  "tui-review": ["tui-review"]
+}

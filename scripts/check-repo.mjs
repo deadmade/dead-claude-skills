@@ -4,6 +4,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { checkUses, expectedDeps, FLOWS, readUses, renderTree, withTree } from './flows-uses.mjs';
 import { pluginDirs as findPluginDirs } from './plugin-dirs.mjs';
 
 process.chdir(join(import.meta.dirname, '..'));
@@ -47,7 +48,19 @@ for (const dir of pluginDirs) {
   if (!market.some((p) => p.source === `./${dir}`)) problems.push(`${dir} is not listed in ${MARKETPLACE}`);
 }
 
-// --- one version: package.json, marketplace metadata.version, every local plugin.json and brv (scripts/release.mjs) ---
+// --- flows: each conductor's uses.json, and what is generated from them (scripts/flows-uses.mjs) ---
+problems.push(...checkUses('.', { plugins: market }));
+const uses = readUses('.');
+const flowsManifest = `${FLOWS}/.claude-plugin/plugin.json`;
+const regen = 'run node scripts/flows-uses.mjs';
+if (JSON.stringify(JSON.parse(readFileSync(flowsManifest, 'utf8')).dependencies) !== JSON.stringify(expectedDeps(uses)))
+  problems.push(`${flowsManifest}: dependencies differ from the conductors' uses.json: ${regen}`);
+// A Windows checkout has CRLF; the generated tree is LF.
+const flowsReadme = readFileSync(`${FLOWS}/README.md`, 'utf8').replace(/\r\n/g, '\n');
+if (withTree(flowsReadme, renderTree(uses)) !== flowsReadme)
+  problems.push(`${FLOWS}/README.md: uses tree is stale: ${regen}`);
+
+// --- one version: package.json, marketplace metadata.version, every local plugin.json and each Rust crate (scripts/release.mjs) ---
 const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
 const marketVersion = JSON.parse(readFileSync(MARKETPLACE, 'utf8')).metadata?.version;
 if (marketVersion !== version)
@@ -57,12 +70,16 @@ for (const dir of pluginDirs) {
   const v = existsSync(manifest) && JSON.parse(readFileSync(manifest, 'utf8')).version;
   if (v !== version) problems.push(`${manifest}: version is ${v}, package.json has ${version}`);
 }
-const CARGO = 'plugins/tui-review/brv/Cargo.toml';
-const brv = /^version = "(.*)"/m.exec(readFileSync(CARGO, 'utf8'))?.[1];
-if (brv !== version) problems.push(`${CARGO}: version is ${brv}, package.json has ${version}`);
-const LOCK = 'plugins/tui-review/brv/Cargo.lock';
-const locked = /^name = "brv"\r?\nversion = "(.*)"/m.exec(readFileSync(LOCK, 'utf8'))?.[1];
-if (locked !== version) problems.push(`${LOCK}: brv is ${locked}, package.json has ${version}`);
+const CRATES = [
+  { cargo: 'plugins/mods/tui-review/brv/Cargo.toml', lock: 'plugins/mods/tui-review/brv/Cargo.lock', name: 'brv' },
+  { cargo: 'plugins/mcp/web-mcp/server/Cargo.toml', lock: 'plugins/mcp/web-mcp/server/Cargo.lock', name: 'web-mcp' },
+];
+for (const { cargo, lock, name } of CRATES) {
+  const crate = /^version = "(.*)"/m.exec(readFileSync(cargo, 'utf8'))?.[1];
+  if (crate !== version) problems.push(`${cargo}: version is ${crate}, package.json has ${version}`);
+  const locked = new RegExp(`^name = "${name}"\\r?\\nversion = "(.*)"`, 'm').exec(readFileSync(lock, 'utf8'))?.[1];
+  if (locked !== version) problems.push(`${lock}: ${name} is ${locked}, package.json has ${version}`);
+}
 
 if (problems.length) {
   console.error(problems.map((p) => `✗ ${p}`).join('\n'));

@@ -1,7 +1,7 @@
 // The installer's file writes and the clean slate's backup and delete, split out of install.mjs so they can be tested.
 import { cpSync, existsSync, lstatSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { CLEAN_TARGETS } from './core.mjs';
+import { CLEAN_TARGETS, searxngSettings } from './core.mjs';
 
 export function writeAtomic(file, text) {
   mkdirSync(dirname(file), { recursive: true });
@@ -33,4 +33,13 @@ export function clearTargets(config) {
     out.push(`deleted ${path}`);
   }
   return out;
+}
+
+// Writes SearXNG's settings.yml with this secret unless one exists: the container already uses that file's secret.
+// Returns whether it wrote.
+export function writeSearxng(dir, template, secret) {
+  const file = join(dir, 'settings.yml');
+  if (existsSync(file)) return false;
+  writeAtomic(file, searxngSettings(template, secret));
+  return true;
 }

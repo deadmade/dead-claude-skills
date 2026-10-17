@@ -1,0 +1,21 @@
+{
+  "meta": { "count": 2 },
+  "results": [
+    {
+      "id": "https://openalex.org/W2626778328",
+      "doi": "https://doi.org/10.48550/arxiv.1706.03762",
+      "title": "Attention Is All You Need",
+      "publication_year": 2017,
+      "open_access": { "is_oa": true, "oa_url": "https://arxiv.org/pdf/1706.03762" },
+      "abstract_inverted_index": { "Transformers": [0], "use": [1], "attention": [2] }
+    },
+    {
+      "id": "https://openalex.org/W1",
+      "doi": null,
+      "title": "A paper without abstract",
+      "publication_year": null,
+      "open_access": { "is_oa": false, "oa_url": null },
+      "abstract_inverted_index": null
+    }
+  ]
+}

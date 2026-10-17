@@ -1,5 +1,5 @@
 // Draws Onibi, night-city's mascot: a masked netrunner whose cybereye is the eight-point spark, as 64x64 pixel art and
-// writes plugins/night-city/assets/mascot.png plus an 8x nearest-neighbour mascot-512.png, and a brightened crop of her
+// writes plugins/mods/night-city/assets/mascot.png plus an 8x nearest-neighbour mascot-512.png, and a brightened crop of her
 // face as the notify plugin's icon (a plugin can't read another plugin's files once installed). The PNGs are generated:
 // change the drawing here and rerun `node scripts/draw-mascot.mjs`; draw-mascot.test.mjs fails on drift.
 import { writeFileSync } from 'node:fs';
@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { deflateSync } from 'node:zlib';
 
 const PLUGINS = join(import.meta.dirname, '..', 'plugins');
-export const ASSETS = join(PLUGINS, 'night-city', 'assets');
+export const ASSETS = join(PLUGINS, 'mods', 'night-city', 'assets');
 export const SIZE = 64;
 export const SCALE = 8;
 

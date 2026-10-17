@@ -26,7 +26,7 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: plugins/tui-review/brv
+        working-directory: plugins/mods/tui-review/brv
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -39,7 +39,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          workspaces: plugins/tui-review/brv
+          workspaces: plugins/mods/tui-review/brv
           key: ${{ matrix.target }}
 
       - name: Build

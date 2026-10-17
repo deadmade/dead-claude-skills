@@ -1,8 +1,29 @@
 // The installer's screens as pure functions: state + data in, next state or lines to draw out. ui.mjs runs them.
 import { stripVTControlCharacters, styleText } from 'node:util';
-import { HINTS, TOGGLES, nameOf } from './core.mjs';
+import { HINTS, TOGGLES, nameOf, withDependencies } from './core.mjs';
 
 const width = (s) => stripVTControlCharacters(s).length;
+
+// The named colours in Night City's palette (plugins/mods/night-city/themes/night-city.json).
+const NIGHT_CITY = {
+  magenta: [240, 139, 180],
+  cyan: [124, 207, 224],
+  blue: [122, 167, 240],
+  green: [143, 221, 176],
+  yellow: [245, 208, 122],
+  red: [242, 120, 140],
+  white: [230, 220, 247],
+};
+
+// styleText with its named colours in Night City where the terminal has 24-bit colour; elsewhere (16 colours,
+// NO_COLOR, a pipe) styleText decides.
+export function paint(format, text, stream = process.stdout) {
+  const all = [format].flat();
+  const color = all.find((f) => f in NIGHT_CITY);
+  if (!color || !stream.hasColors?.(2 ** 24)) return styleText(format, text);
+  const rest = all.filter((f) => f !== color);
+  return `\x1b[38;2;${NIGHT_CITY[color].join(';')}m${rest.length ? styleText(rest, text) : text}\x1b[39m`;
+}
 const DANGER = ['strip-defaults', 'clean'];
 
 // A rounded box columns - 1 wide (a full-width line makes some terminals wrap). Lines wider than the inside are cut
@@ -10,7 +31,7 @@ const DANGER = ['strip-defaults', 'clean'];
 export function frame(title, lines, { columns, color = 'magenta' }) {
   const w = Math.max(columns - 1, 8);
   const inner = w - 4;
-  const border = (s) => styleText(color, s);
+  const border = (s) => paint(color, s);
   const t = width(title) > w - 6 ? `${stripVTControlCharacters(title).slice(0, w - 7)}…` : title;
   const fit = (l) => (width(l) > inner ? `${stripVTControlCharacters(l).slice(0, inner - 1)}…` : l);
   return [
@@ -57,9 +78,17 @@ export function changeList(s, data) {
   const diff = (k) => !!s.chosen[k] !== !!data.current[k];
   const plugin = (k) => !TOGGLES.includes(k);
   const toggle = (k) => TOGGLES.includes(k) && !DANGER.includes(k);
+  // data.deps: { id: dependency ids }. Dependencies of a chosen plugin are installed whatever their own row says.
+  const deps = data.deps ?? {};
+  const all = [...new Set([...keys.filter(plugin), ...Object.keys(deps), ...Object.values(deps).flat()])];
+  const wanted = withDependencies(
+    keys.filter((k) => plugin(k) && s.chosen[k]),
+    (k) => deps[k],
+    all,
+  );
   const r = {
-    install: keys.filter((k) => plugin(k) && diff(k) && s.chosen[k]),
-    remove: keys.filter((k) => plugin(k) && diff(k) && !s.chosen[k]),
+    install: all.filter((k) => wanted.includes(k) && !data.current[k]),
+    remove: all.filter((k) => !wanted.includes(k) && data.current[k]),
     on: keys.filter((k) => toggle(k) && diff(k) && s.chosen[k]),
     off: keys.filter((k) => toggle(k) && diff(k) && !s.chosen[k]),
     danger: keys.filter((k) => DANGER.includes(k) && s.chosen[k] && !data.current[k]),
@@ -150,7 +179,7 @@ const COLORS = {
 };
 const LABELS = { ccstatusline: 'status line' };
 const pad = (s, n) => s + ' '.repeat(Math.max(0, n - width(s)));
-const pointer = (on) => (on ? styleText(['bold', 'magenta'], '❯') : ' ');
+const pointer = (on) => (on ? paint(['bold', 'magenta'], '❯') : ' ');
 // Lines outside the frame obey the same width rule as the frame.
 const fitLine = (l, columns) =>
   width(l) > columns - 1 ? `${stripVTControlCharacters(l).slice(0, Math.max(columns - 2, 0))}…` : l;
@@ -159,14 +188,14 @@ const fitLine = (l, columns) =>
 function pageValue(page, s, data) {
   const parts = page.keys.flatMap((k) => {
     const [want, has] = [!!s.chosen[k], !!data.current[k]];
-    if (page.id === 'danger') return want ? [styleText('red', nameOf(k))] : [];
+    if (page.id === 'danger') return want ? [paint('red', nameOf(k))] : [];
     if (TOGGLES.includes(k)) {
       const text = `${LABELS[k] ?? k} ${want ? 'on' : 'off'}`;
-      return [want === has ? text : styleText(want ? 'green' : 'red', text)];
+      return [want === has ? text : paint(want ? 'green' : 'red', text)];
     }
     if (want && has) return [nameOf(k)];
-    if (want) return [styleText('green', `+ ${nameOf(k)}`)];
-    if (has) return [styleText('red', `− ${nameOf(k)}`)];
+    if (want) return [paint('green', `+ ${nameOf(k)}`)];
+    if (has) return [paint('red', `− ${nameOf(k)}`)];
     return [];
   });
   if (parts.length) return parts.join(parts.some((p) => /^[+−]/.test(stripVTControlCharacters(p))) ? '  ' : ', ');
@@ -177,16 +206,16 @@ function pageValue(page, s, data) {
 function stateOf(k, s, data) {
   const [want, has] = [!!s.chosen[k], !!data.current[k]];
   if (TOGGLES.includes(k)) {
-    if (want !== has) return styleText(['bold', want ? 'green' : 'red'], want ? 'will turn on' : 'will turn off');
-    return want ? styleText('green', 'on') : 'off';
+    if (want !== has) return paint(['bold', want ? 'green' : 'red'], want ? 'will turn on' : 'will turn off');
+    return want ? paint('green', 'on') : 'off';
   }
   const v = data.versions[k];
-  if (want && !has) return styleText(['bold', 'green'], 'will install');
-  if (!want && has) return styleText(['bold', 'red'], v ? `will remove (installed ${v})` : 'will remove');
+  if (want && !has) return paint(['bold', 'green'], 'will install');
+  if (!want && has) return paint(['bold', 'red'], v ? `will remove (installed ${v})` : 'will remove');
   if (!has) return 'not installed';
   const u = data.updates.find((x) => x.id === k);
-  if (u) return styleText('yellow', `outdated ${u.from} → ${u.to}`);
-  return styleText('green', `installed${v ? ` ${v}` : ''}${data.disabled[k] ? ', disabled' : ''}`);
+  if (u) return paint('yellow', `outdated ${u.from} → ${u.to}`);
+  return paint('green', `installed${v ? ` ${v}` : ''}${data.disabled[k] ? ', disabled' : ''}`);
 }
 
 // A window of `size` rows around the cursor.
@@ -214,23 +243,21 @@ function startScreen(s, data, { columns, rows: height }) {
     `    ${pad('Core', titleW)}  ${data.core}`,
     ...data.pages.map((p, i) => {
       const c = COLORS[p.id] ?? 'white';
-      return `${pointer(at('page', i))} ${styleText(c, '●')} ${styleText(['bold', c], pad(p.title, titleW))}  ${pageValue(p, s, data)}`;
+      return `${pointer(at('page', i))} ${paint(c, '●')} ${paint(['bold', c], pad(p.title, titleW))}  ${pageValue(p, s, data)}`;
     }),
     ...(rows.some((r) => r.kind === 'updates')
       ? [
           '',
-          `${pointer(at('updates'))} ${styleText('yellow', ups.update.length ? `↑ ${ups.update.length} updates` : '↑ updates skipped')}`,
+          `${pointer(at('updates'))} ${paint('yellow', ups.update.length ? `↑ ${ups.update.length} updates` : '↑ updates skipped')}`,
         ]
       : []),
   ];
-  const apply = ups.count
-    ? styleText(['bold', 'green', 'inverse'], ` Apply ${ups.count} changes `)
-    : 'Nothing to change';
+  const apply = ups.count ? paint(['bold', 'green', 'inverse'], ` Apply ${ups.count} changes `) : 'Nothing to change';
   // Frame top and bottom plus the two lines under it; the body scrolls around the focused row.
   const focus = at('updates') ? body.length - 1 : 1 + (rows[s.cursor]?.i ?? 0);
   return [
     ...frame(
-      `${styleText(['bold', 'magenta'], 'dead-claude-skills')} ${data.version}`,
+      `${paint(['bold', 'magenta'], 'dead-claude-skills')} ${data.version}`,
       scroll(body, focus, Math.max(1, height - 4)),
       { columns },
     ),
@@ -249,11 +276,11 @@ function listScreen(s, data, { columns, rows: height }) {
     const p = pointer(i === s.cursor);
     if (r.kind === 'back') return `${p} ← Back`;
     if (r.kind === 'update') {
-      const what = s.skip[r.id] ? 'skip' : styleText('yellow', 'will update');
+      const what = s.skip[r.id] ? 'skip' : paint('yellow', 'will update');
       return `${p} ${pad(nameOf(r.id), labelW)}  ${r.from} → ${r.to}  ${what}`;
     }
     const name = pad(data.describe(r.key).label, labelW);
-    return `${p} ${page.id === 'danger' ? styleText('red', name) : name}  ${stateOf(r.key, s, data)}`;
+    return `${p} ${page.id === 'danger' ? paint('red', name) : name}  ${stateOf(r.key, s, data)}`;
   });
   const focused = list[s.cursor];
   const detail =
@@ -268,7 +295,7 @@ function listScreen(s, data, { columns, rows: height }) {
   if (head.length + tail.length + 4 > height) tail = [];
   if (head.length + tail.length + 4 > height) head = [];
   const size = Math.max(1, height - head.length - tail.length - 3);
-  const title = updates ? 'Updates' : styleText(['bold', COLORS[page.id] ?? 'white'], page.title);
+  const title = updates ? 'Updates' : paint(['bold', COLORS[page.id] ?? 'white'], page.title);
   const hint = updates ? '↑↓ move  enter update/skip  esc back' : '↑↓ move  enter install/remove  esc back';
   return [...frame(title, [...head, ...scroll(lines, s.cursor, size), ...tail], { columns }), hint];
 }
@@ -289,7 +316,7 @@ function reviewScreen(s, data, { columns, rows: height }) {
   const body = groups.length
     ? groups.flatMap(([label, color, items]) =>
         items.flatMap((item, i) =>
-          wrap(item, Math.max(inner - 10, 4)).map((l, j) => `${pad(i || j ? '' : styleText(color, label), 10)}${l}`),
+          wrap(item, Math.max(inner - 10, 4)).map((l, j) => `${pad(i || j ? '' : paint(color, label), 10)}${l}`),
         ),
       )
     : ['Nothing to change.'];
@@ -302,11 +329,11 @@ function reviewScreen(s, data, { columns, rows: height }) {
   // Frame top and bottom, the blank and Unchanged lines, and the choices row.
   const room = Math.max(1, height - 5 - hidden.length);
   const choices = [c.count ? `Apply ${c.count} changes` : 'Apply', 'Back', 'Quit']
-    .map((t, i) => `${pointer(i === s.cursor)} ${i === 0 && c.count ? styleText(['bold', 'green'], t) : t}`)
+    .map((t, i) => `${pointer(i === s.cursor)} ${i === 0 && c.count ? paint(['bold', 'green'], t) : t}`)
     .join('   ');
   return [
     ...frame(
-      styleText('bold', 'This will change'),
+      paint('bold', 'This will change'),
       [
         ...more(body, room),
         '',
