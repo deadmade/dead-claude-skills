@@ -135,6 +135,9 @@ too). Findings, recommendation in brackets. **User: "apply all of them"** (2026-
 - Asked after the PR (2026-10-18): `opt-in/mcp/` (mcp-github, mcp-azure) and `opt-in/implementation/` (rust-skills,
   csharp-skills, postgres, nix-lsp); `pluginDirs()` nests GROUPS. notify folded into dead-skills: always on, the
   installer's notify option is gone and it always sets `preferredNotifChannel: "notifications_disabled"`.
+- Asked after the PR (2026-10-18): main's md-pane (#49) merged in and moved to `opt-in/md-pane`. No macOS or ARM
+  builds any more: build-tui-review.yml builds Windows and Linux x64, the installer's `BIN_TARGETS` lists only those
+  (`BIN_ONLY` gone), and the flake covers `x86_64-linux` only.
 
 ## Walkthrough
 
