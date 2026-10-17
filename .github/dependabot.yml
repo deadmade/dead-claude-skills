@@ -8,3 +8,11 @@ updates:
     groups:
       actions:
         patterns: ['*']
+  - package-ecosystem: cargo
+    directories: ['/crates/tui-review', '/crates/web-mcp']
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      cargo:
+        patterns: ['*']
