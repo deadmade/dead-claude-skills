@@ -1,6 +1,9 @@
 import { expect, test } from 'claude-code/testing';
 
-import { gateDate, parseFlow } from './flow';
+import type { CommandInfo } from 'claude-code';
+
+import type { Run } from '../types';
+import { bandLines, gateDate, newest, parseFlow, pickCurrent, resumeCommand, slugOf } from './flow';
 
 const TEMPLATE = `---
 phase: ground
@@ -100,4 +103,69 @@ test('parseFlow: CRLF gives the same result', () => {
   expect(parseFlow(text.replace(/\n/g, '\r\n'))).toEqual(parseFlow(text));
   const dev = withDeviations('1. **Task 2: x**');
   expect(parseFlow(dev.replace(/\n/g, '\r\n'))).toEqual(parseFlow(dev));
+});
+
+const run = (slug: string, mtimeMs: number, phase = 'plan'): Run => ({
+  slug,
+  path: `/r/docs/features/${slug}/flow.md`,
+  mtimeMs,
+  research: false,
+  phase,
+  gates: ['2026-10-17', null],
+  deviations: true,
+});
+
+test('slugOf', () => {
+  expect(slugOf('/r/docs/features/flow-pane/flow.md')).toBe('flow-pane');
+  expect(slugOf('C:\\r\\docs\\features\\flow-pane\\flow.md')).toBe('flow-pane');
+  expect(slugOf('/r/docs/features/flow-pane/spec.md')).toBeNull();
+});
+
+test('newest: one run per slug, the greatest mtime', () => {
+  const out = newest([run('a', 1), run('a', 2), run('b', 1)]);
+  expect(out.map((r) => [r.slug, r.mtimeMs]).sort()).toEqual([
+    ['a', 2],
+    ['b', 1],
+  ]);
+});
+
+test('pickCurrent', () => {
+  const runs = [run('a', 1), run('b', 3), run('c', 2), run('x', 9, 'done')];
+  expect(pickCurrent(runs, null)).toEqual({ current: runs[1], others: 2 });
+  expect(pickCurrent(runs, 'x')).toEqual({ current: runs[3], others: 3 });
+  expect(pickCurrent(runs, 'nope')).toEqual({ current: runs[1], others: 2 });
+  expect(pickCurrent([run('x', 9, 'done')], null)).toEqual({ current: null, others: 0 });
+  expect(pickCurrent([run('q', 1, '?')], null).current?.slug).toBe('q');
+});
+
+test('bandLines: wide', () => {
+  const lines = bandLines(run('flow-pane', 1), 3, 100);
+  expect(lines).toHaveLength(1);
+  for (const s of ['flow-pane', 'plan', '10-17', 'deviations', '+3 open']) expect(lines[0]).toContain(s);
+});
+
+test('bandLines: narrow drops from the right, then cuts the slug', () => {
+  const at = (cols: number) => bandLines(run('flow-pane', 1), 3, cols);
+  for (const cols of [100, 70, 60, 50, 40, 25, 18]) {
+    for (const l of at(cols)) expect(l.length).toBeLessThanOrEqual(cols - 10);
+  }
+  const mid = at(70).join('');
+  expect(mid).toContain('deviations');
+  expect(mid).not.toContain('+3 open');
+  expect(at(40).join('')).not.toContain('deviations');
+  expect(at(40).join('')).toContain('flow-pane');
+  expect(at(18).join('')).toContain('…');
+  expect(bandLines(run('flow-pane', 1), 0, 100)[0]).not.toContain('+0 open');
+});
+
+test('resumeCommand', () => {
+  const c = (name: string, plugin?: string): CommandInfo =>
+    ({ name, description: '', source: 'plugin', plugin }) as CommandInfo;
+  const cmds = [c('feature-flow:feature-flow', 'feature-flow'), c('feature-flow:research-flow', 'feature-flow')];
+  expect(resumeCommand(cmds, false)).toBe('feature-flow:feature-flow');
+  expect(resumeCommand(cmds, true)).toBe('feature-flow:research-flow');
+  expect(resumeCommand([c('feature-flow:feature-flow'), c('feature-flow:research-flow')], true)).toBe(
+    'feature-flow:research-flow',
+  );
+  expect(resumeCommand([c('other:feature-flow', 'other')], false)).toBeNull();
 });
