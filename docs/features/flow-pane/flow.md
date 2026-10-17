@@ -1,5 +1,5 @@
 ---
-phase: grill
+phase: plan
 ---
 
 # Flow pane: flow
@@ -20,7 +20,7 @@ phase: grill
 
 ## Gates
 
-- Gate 1, spec approved:
+- Gate 1, spec approved: 2026-10-17 ("approved, write the plan")
 - Gate 2, plan approved: <date>, execution: subagent-driven | native
 
 ## Skipped
