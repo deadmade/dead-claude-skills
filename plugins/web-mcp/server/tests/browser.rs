@@ -233,13 +233,124 @@ fn dash_leading_text_is_passed_as_text() {
     let (mut mcp, log) = start(FAKE);
     let r = mcp.call(
         "browser",
-        json!({"action": "fill", "session": "s", "ref": "@e1", "text": "--help"}),
+        json!({"action": "fill", "session": "s", "ref": "@e1", "text": "x --help"}),
     );
     assert!(!is_error(&r), "{r}");
     let c = calls(&log);
-    assert!(!args(&c[0]).contains(&"--help"));
+    assert!(!args(&c[0]).contains(&"x --help"));
     let batch: Value = serde_json::from_str(c[0]["stdin"].as_str().unwrap()).unwrap();
-    assert_eq!(batch, json!([["fill", "@e1", "--help"]]));
+    assert_eq!(batch, json!([["fill", "@e1", "x --help"]]));
+}
+
+#[test]
+fn dash_leading_text_is_rejected() {
+    let (mut mcp, log) = start(FAKE);
+    for action in ["fill", "type"] {
+        let r = mcp.call(
+            "browser",
+            json!({"action": action, "session": "s", "ref": "@e1", "text": "--help"}),
+        );
+        assert!(is_error(&r), "{r}");
+        assert!(text(&r).contains("text may not start with '-'"), "{r}");
+    }
+    assert!(calls(&log).is_empty());
+}
+
+#[test]
+fn eval_never_starts_with_dash() {
+    let (mut mcp, log) = start(FAKE);
+    let r = mcp.call(
+        "browser",
+        json!({"action": "eval", "session": "s", "js": "--version"}),
+    );
+    assert!(!is_error(&r), "{r}");
+    let c = calls(&log);
+    let batch: Value = serde_json::from_str(c[0]["stdin"].as_str().unwrap()).unwrap();
+    assert_eq!(batch, json!([["eval", "\n--version"]]));
+}
+
+#[test]
+fn reserved_and_invalid_session_names_are_rejected() {
+    let (mut mcp, log) = start(FAKE);
+    let too_long = "a".repeat(33);
+    for bad in [
+        "",
+        "-x",
+        "a b",
+        "../x",
+        "web-mcp-fetch-1-0",
+        too_long.as_str(),
+    ] {
+        let r = mcp.call("browser", json!({"action": "snapshot", "session": bad}));
+        assert!(is_error(&r), "{bad:?}: {r}");
+        assert!(text(&r).contains("session"), "{r}");
+    }
+    assert!(calls(&log).is_empty());
+    let ok = mcp.call(
+        "browser",
+        json!({"action": "snapshot", "session": "Ok_1-a"}),
+    );
+    assert!(!is_error(&ok), "{ok}");
+}
+
+#[test]
+fn bad_scroll_is_rejected_and_split() {
+    let (mut mcp, log) = start(FAKE);
+    for bad in ["--x", "sideways", "down abc", "down 10 20"] {
+        let r = mcp.call(
+            "browser",
+            json!({"action": "scroll", "session": "s", "text": bad}),
+        );
+        assert!(is_error(&r), "{bad}: {r}");
+    }
+    assert!(calls(&log).is_empty());
+    mcp.call(
+        "browser",
+        json!({"action": "scroll", "session": "s", "text": "up 300"}),
+    );
+    assert_eq!(&args(&calls(&log)[0])[6..], ["scroll", "up", "300"]);
+}
+
+#[test]
+fn fallback_session_names_include_pid() {
+    let fx = Fixture::start(PUBLIC);
+    let (mut mcp, log) = start(FAKE);
+    mcp.call("fetch", json!({"url": fx.url("/app-shell.html")}));
+    let c = calls(&log);
+    let session = args(&c[0])[1].to_owned();
+    let parts: Vec<&str> = session.split('-').collect();
+    assert_eq!(&parts[..3], ["web", "mcp", "fetch"], "{session}");
+    assert!(
+        parts.len() == 5 && parts[3..].iter().all(|p| p.parse::<u32>().is_ok()),
+        "{session}"
+    );
+}
+
+#[test]
+fn fallback_batch_has_no_output_limits() {
+    let fx = Fixture::start(PUBLIC);
+    let (mut mcp, log) = start(FAKE);
+    mcp.call("fetch", json!({"url": fx.url("/app-shell.html")}));
+    let c = calls(&log);
+    let a = args(&c[0]);
+    assert!(a.contains(&"--json"));
+    assert!(
+        !a.contains(&"--max-output") && !a.contains(&"--content-boundaries"),
+        "{a:?}"
+    );
+}
+
+#[test]
+fn screenshot_temp_removed_on_failure() {
+    let (mut mcp, _) = start(FAKE);
+    let r = mcp.call(
+        "browser",
+        json!({"action": "screenshot", "session": "fail-shot"}),
+    );
+    assert!(is_error(&r), "{r}");
+    let tmp = mcp.run_dir().join(".tmp");
+    let left = std::fs::read_dir(tmp).map_or(0, Iterator::count);
+    assert_eq!(left, 0);
 }
 
 #[test]

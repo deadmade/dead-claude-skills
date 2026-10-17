@@ -149,6 +149,16 @@ impl Archive {
         &self.0.web
     }
 
+    /// A private scratch folder in this run's folder (made on demand), for files other programs write.
+    ///
+    /// # Errors
+    /// When the folder can't be created.
+    pub fn scratch(&self) -> io::Result<PathBuf> {
+        let dir = self.0.run.join(".tmp");
+        std::fs::create_dir_all(&dir)?;
+        Ok(dir)
+    }
+
     /// The latest page or PDF put for this URL in this run. Never for private URLs.
     #[must_use]
     pub fn cached(&self, url: &Url) -> Option<Archived> {

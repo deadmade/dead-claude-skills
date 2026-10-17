@@ -12,6 +12,30 @@ use tokio::io::AsyncWriteExt as _;
 use tokio::process::Command;
 use url::Url;
 
+/// Sessions the fetch fallback names for itself; the `browser` tool may not use them.
+const FETCH_PREFIX: &str = "web-mcp-fetch-";
+
+/// A session name for the `browser` tool: short (agent-browser's socket path is length-limited),
+/// plain, not flag-like and not one of the fallback's.
+///
+/// # Errors
+/// What is wrong with the name.
+pub fn check_session(s: &str) -> Result<(), String> {
+    let plain = (1..=32).contains(&s.len())
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+        && !s.starts_with('-');
+    if !plain {
+        return Err("session must be 1-32 characters of letters, digits, `_` and `-`, not starting with `-`".into());
+    }
+    if s.starts_with(FETCH_PREFIX) {
+        return Err(format!(
+            "session names starting with `{FETCH_PREFIX}` are reserved"
+        ));
+    }
+    Ok(())
+}
+
 /// Per call; a browser that hangs is killed.
 const CALL_TIMEOUT: Duration = Duration::from_secs(60);
 /// Characters of page output per call: under Claude Code's 25,000-token cap on MCP results.
@@ -62,18 +86,23 @@ impl Browser {
     /// `Missing` when the binary can't be started; `Failed` when the call times out, answers
     /// `{"success": false}`, or answers no JSON.
     pub async fn run(&self, session: &str, args: &[String]) -> Result<Value, BrowserError> {
-        self.run_with(session, args, None).await
+        self.run_with(session, args, None, true).await
     }
 
+    /// `limits`: cap and wrap the page output (for answers read as text; off where the output is data).
     async fn run_with(
         &self,
         session: &str,
         args: &[String],
         stdin: Option<&str>,
+        limits: bool,
     ) -> Result<Value, BrowserError> {
-        let mut child = Command::new(&self.bin)
-            .args(["--session", session, "--json", "--max-output", MAX_OUTPUT])
-            .arg("--content-boundaries")
+        let mut cmd = Command::new(&self.bin);
+        cmd.args(["--session", session, "--json"]);
+        if limits {
+            cmd.args(["--max-output", MAX_OUTPUT, "--content-boundaries"]);
+        }
+        let mut child = cmd
             .args(args)
             .stdin(if stdin.is_some() {
                 Stdio::piped()
@@ -88,14 +117,22 @@ impl Browser {
                 std::io::ErrorKind::NotFound => BrowserError::Missing,
                 _ => BrowserError::Failed(format!("could not start agent-browser: {e}")),
             })?;
-        if let (Some(input), Some(mut pipe)) = (stdin, child.stdin.take()) {
-            let _ = pipe.write_all(input.as_bytes()).await; // a dead child shows in its output
-        }
-        // Dropping the future on timeout kills the child (kill_on_drop).
-        let out = tokio::time::timeout(CALL_TIMEOUT, child.wait_with_output())
-            .await
-            .map_err(|_| BrowserError::Failed("agent-browser did not answer within 60 s".into()))?
-            .map_err(|e| BrowserError::Failed(e.to_string()))?;
+        let mut pipe = child.stdin.take();
+        let write = async move {
+            if let (Some(input), Some(pipe)) = (stdin, pipe.as_mut()) {
+                let _ = pipe.write_all(input.as_bytes()).await; // a dead child shows in its output
+            }
+            drop(pipe); // EOF
+        };
+        // The write runs beside the reads, so a big input can't deadlock on a full pipe, and both
+        // sit under the timeout; dropping the future on timeout kills the child (kill_on_drop).
+        let (out, ()) = tokio::time::timeout(CALL_TIMEOUT, async {
+            let (out, ()) = tokio::join!(child.wait_with_output(), write);
+            (out, ())
+        })
+        .await
+        .map_err(|_| BrowserError::Failed("agent-browser did not answer within 60 s".into()))?;
+        let out = out.map_err(|e| BrowserError::Failed(e.to_string()))?;
         let stdout = String::from_utf8_lossy(&out.stdout);
         let Ok(v) = serde_json::from_str::<Value>(stdout.trim()) else {
             let err = String::from_utf8_lossy(&out.stderr);
@@ -122,9 +159,18 @@ impl Browser {
         session: &str,
         commands: &[Vec<&str>],
     ) -> Result<Vec<Value>, BrowserError> {
+        self.batch_with(session, commands, true).await
+    }
+
+    async fn batch_with(
+        &self,
+        session: &str,
+        commands: &[Vec<&str>],
+        limits: bool,
+    ) -> Result<Vec<Value>, BrowserError> {
         let input = json!(commands).to_string();
         let args = ["batch".to_owned(), "--json".to_owned()];
-        let answer = self.run_with(session, &args, Some(&input)).await?;
+        let answer = self.run_with(session, &args, Some(&input), limits).await?;
         // One entry per command: {"command", "success", "result"}.
         let entries = answer.as_array().ok_or_else(|| {
             BrowserError::Failed("agent-browser's batch answer is not a list".into())
@@ -150,14 +196,21 @@ impl Browser {
     /// As `batch`, or when it answers no HTML or no URL.
     pub async fn rendered_html(&self, url: &Url) -> Result<(String, Url), BrowserError> {
         static N: AtomicU64 = AtomicU64::new(0);
-        let session = format!("web-mcp-fetch-{}", N.fetch_add(1, Ordering::Relaxed));
+        let session = format!(
+            "{FETCH_PREFIX}{}-{}",
+            std::process::id(), // sessions are global per user: another web-mcp may be running
+            N.fetch_add(1, Ordering::Relaxed)
+        );
         let cmds = [
             vec!["open", url.as_str()],
             vec!["get", "html", "body"],
             vec!["get", "url"],
         ];
-        let answer = self.batch(&session, &cmds).await;
-        let _ = self.run(&session, &["close".to_owned()]).await;
+        // The HTML is data for the extractor: no output cap, no boundary markers.
+        let answer = self.batch_with(&session, &cmds, false).await;
+        let _ = self
+            .run_with(&session, &["close".to_owned()], None, false)
+            .await;
         let answer = answer?;
         let field =
             |v: &Value, key: &str| v.as_str().or_else(|| v[key].as_str()).map(str::to_owned);

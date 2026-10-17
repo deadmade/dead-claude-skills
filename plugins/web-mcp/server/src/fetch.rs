@@ -25,6 +25,8 @@ const ACCEPT_VALUE: &str = "text/markdown, text/html;q=0.9, */*;q=0.8";
 // shortcut: pages with more content images than this archive only the first ones; raise if that bites.
 const MAX_IMAGES: usize = 24;
 const SHOWN_IMAGES: usize = 6;
+/// The whole browser fallback: open, read, close.
+const FALLBACK_DEADLINE: Duration = Duration::from_secs(30);
 const MAX_REDIRECTS: usize = 10;
 
 #[derive(Clone, Copy)]
@@ -316,7 +318,7 @@ async fn run(
                     blocking(Box::new(move || extract_html(&text, &base))).await?
                 };
                 // A private page that this fetch may not reach was refused in `download` already.
-                if opts.browser_fallback && near_empty(&page) {
+                if wants_fallback(opts, &page) {
                     match browser_page(ctx, &final_url, opts.allow_private).await {
                         Ok(html) => {
                             let h = html.clone();
@@ -375,13 +377,21 @@ async fn run(
     })
 }
 
+/// Only the user's own `fetch` calls re-render: a DNS rebind between our check and the browser's
+/// connect could otherwise point the browser at the local network on a search result's behalf.
+fn wants_fallback(opts: GetOpts, page: &Page) -> bool {
+    opts.browser_fallback && opts.allow_private && near_empty(page)
+}
+
 /// The page rendered by agent-browser. The browser follows redirects on its own, so where it ended
 /// is checked like a fetch hop: a landing on a private address is dropped unless `allow_private`.
 /// The `Err` is a note for the reader.
 async fn browser_page(ctx: &Ctx, url: &Url, allow_private: bool) -> Result<String, String> {
-    let (html, landed) = ctx.browser.rendered_html(url).await.map_err(|e| {
-        format!("(This page looks empty without JavaScript, and the browser fallback failed: {e})")
-    })?;
+    let why = "(This page looks empty without JavaScript, and the browser fallback";
+    let (html, landed) = tokio::time::timeout(FALLBACK_DEADLINE, ctx.browser.rendered_html(url))
+        .await
+        .map_err(|_| format!("{why} took over 30 s.)"))?
+        .map_err(|e| format!("{why} failed: {e})"))?;
     if !allow_private && private_landing(&landed).await {
         return Err(format!(
             "(This page looks empty without JavaScript; the browser ended on {landed}, a private-network address this fetch may not reach, so its content was dropped.)"
@@ -823,6 +833,26 @@ mod tests {
         assert!(matches!(restricted, Err(FetchError::Blocked(_))));
         let ok = first.await.unwrap().map_err(|e| e.to_string()).unwrap();
         assert_eq!(ok.page.markdown, "# hi\n");
+    }
+
+    #[test]
+    fn no_fallback_without_allow_private() {
+        let shell = Page {
+            title: String::new(),
+            markdown: String::new(),
+            images: Vec::new(),
+        };
+        let on = GetOpts {
+            allow_private: true,
+            ..GetOpts::default()
+        };
+        assert!(wants_fallback(on, &shell));
+        assert!(!wants_fallback(GetOpts::default(), &shell));
+        let off = GetOpts {
+            browser_fallback: false,
+            ..on
+        };
+        assert!(!wants_fallback(off, &shell));
     }
 
     #[tokio::test]

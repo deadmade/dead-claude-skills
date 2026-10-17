@@ -16,6 +16,7 @@ use url::Url;
 
 use crate::Ctx;
 use crate::archive::Item;
+use crate::browser;
 use crate::fetch::{self, GetOpts};
 use crate::images;
 use crate::{papers, search};
@@ -135,12 +136,19 @@ async fn browse(ctx: &Ctx, args: BrowserArgs) -> Result<CallToolResult, CallTool
         Eval => "eval",
         Close => "close",
     };
+    browser::check_session(&args.session).map_err(|e| error(format!("browser: {e}")))?;
     let mut cmd = vec![name.to_owned()];
-    let shot = std::env::temp_dir().join(format!(
-        "web-mcp-shot-{}-{}.jpg",
-        std::process::id(),
-        SHOTS.fetch_add(1, Ordering::Relaxed)
-    ));
+    // Written by agent-browser into web-mcp's own folder, and removed on every path out.
+    let shot = Scratch(
+        ctx.archive
+            .scratch()
+            .map_err(|e| error(format!("no scratch folder for the screenshot: {e}")))?
+            .join(format!(
+                "{}-{}.jpg",
+                std::process::id(),
+                SHOTS.fetch_add(1, Ordering::Relaxed)
+            )),
+    );
     match args.action {
         Open => {
             let u = need(args.url.as_ref(), name, "url")?;
@@ -157,18 +165,38 @@ async fn browse(ctx: &Ctx, args: BrowserArgs) -> Result<CallToolResult, CallTool
         Click => cmd.push(plain(args.r#ref.as_ref(), name, "ref")?.clone()),
         Fill | Type => {
             cmd.push(plain(args.r#ref.as_ref(), name, "ref")?.clone());
-            cmd.push(need(args.text.as_ref(), name, "text")?.clone());
+            let t = need(args.text.as_ref(), name, "text")?;
+            // Batch commands are split like argv, so a leading `-` would still be read as a flag.
+            if t.starts_with('-') {
+                return Err(error(format!(
+                    "browser {name}: text may not start with '-'; agent-browser would read it as a flag"
+                )));
+            }
+            cmd.push(t.clone());
         }
         Press => cmd.push(plain(args.key.as_ref(), name, "key")?.clone()),
-        Scroll => cmd.push(match args.text.as_ref() {
-            Some(_) => plain(args.text.as_ref(), name, "text")?.clone(),
-            None => "down".into(),
-        }),
-        Eval => cmd.push(need(args.js.as_ref(), name, "js")?.clone()),
+        Scroll => {
+            let t = args.text.as_deref().unwrap_or("down");
+            let mut words = t.split_whitespace();
+            let dir = words.next().unwrap_or("");
+            let px = words.next();
+            let ok = matches!(dir, "up" | "down" | "left" | "right")
+                && px.is_none_or(|p| p.bytes().all(|b| b.is_ascii_digit()))
+                && words.next().is_none();
+            if !ok {
+                return Err(error(
+                    "browser scroll: `text` must be up, down, left or right, optionally followed by a pixel count",
+                ));
+            }
+            cmd.push(dir.to_owned());
+            cmd.extend(px.map(str::to_owned));
+        }
+        // The leading newline keeps the script from ever being read as a flag.
+        Eval => cmd.push(format!("\n{}", need(args.js.as_ref(), name, "js")?)),
         Network => cmd.push("requests".into()),
         Screenshot => cmd.extend(
             [
-                &*shot.to_string_lossy(),
+                &*shot.0.to_string_lossy(),
                 "--screenshot-format",
                 "jpeg",
                 "--screenshot-quality",
@@ -201,14 +229,11 @@ async fn browse(ctx: &Ctx, args: BrowserArgs) -> Result<CallToolResult, CallTool
             show(&data)
         ))]));
     }
-    let jpeg = tokio::fs::read(&shot)
+    let jpeg = tokio::fs::read(&shot.0)
         .await
-        .map_err(|e| error(format!("agent-browser wrote no screenshot: {e}")));
-    let _ = tokio::fs::remove_file(&shot).await;
-    let jpeg = jpeg?;
+        .map_err(|e| error(format!("agent-browser wrote no screenshot: {e}")))?;
     // Shown downscaled like fetch's images; the archive keeps the original.
-    let (shown, mime) =
-        images::downscale(&jpeg, 1024).unwrap_or_else(|_| (jpeg.clone(), "image/jpeg"));
+    let shown = images::downscale(&jpeg, 1024);
     let archived = ctx
         .archive
         .put(Item::Screenshot {
@@ -218,13 +243,31 @@ async fn browse(ctx: &Ctx, args: BrowserArgs) -> Result<CallToolResult, CallTool
         .await
         .map_err(|e| error(format!("could not archive the screenshot: {e}")))?;
     let path = archived.path.to_string_lossy().replace('\\', "/");
-    Ok(CallToolResult::success(vec![
-        ContentBlock::text(format!("{source}\n\nScreenshot archived at .web/{path}")),
-        ContentBlock::image(
-            base64::engine::general_purpose::STANDARD.encode(shown),
+    let mut content = vec![ContentBlock::text(format!(
+        "{source}\n\nScreenshot archived at .web/{path}"
+    ))];
+    match shown {
+        Ok((bytes, mime)) => content.push(ContentBlock::image(
+            base64::engine::general_purpose::STANDARD.encode(bytes),
             mime,
-        ),
-    ]))
+        )),
+        // The full-size image could blow the token budget, so it is not sent.
+        Err(e) => {
+            content[0] = ContentBlock::text(format!(
+                "{source}\n\nScreenshot archived at .web/{path}\n\n(Not shown: it could not be downscaled: {e})"
+            ));
+        }
+    }
+    Ok(CallToolResult::success(content))
+}
+
+/// A file agent-browser writes for us; gone when this drops, whichever way the call ended.
+struct Scratch(std::path::PathBuf);
+
+impl Drop for Scratch {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
 }
 
 impl Server {

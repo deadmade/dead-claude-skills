@@ -73,6 +73,10 @@ fn main() {
         Some("screenshot") => {
             let path = rest[1..].iter().find(|a| !a.starts_with("--")).unwrap();
             std::fs::write(path, include_bytes!("../fixtures/photo.jpg")).unwrap();
+            if session.contains("fail") {
+                println!("{}", json!({"success": false, "error": "no screen"}));
+                std::process::exit(1);
+            }
             json!({"success": true, "data": {"path": path}})
         }
         cmd => json!({"success": true, "data": {"command": cmd, "session": session}}),
