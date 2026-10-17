@@ -13,7 +13,7 @@ chat; ctrl/cmd+click keeps the system opener.
 
 ## Artifacts
 
-- Spec:
+- Spec: [2026-10-17-click-to-read-design.md](../../superpowers/specs/2026-10-17-click-to-read-design.md) (draft, builder check done)
 - Plan:
 - ADRs:
 - CONTEXT.md:
