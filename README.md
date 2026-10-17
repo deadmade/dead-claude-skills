@@ -11,7 +11,8 @@ toned-down synthwave theme that everything else here is painted in), desktop not
 waits for you, and my global rules. Everything else is opt-in: language
 servers, language and database skills (rust, csharp, postgres), integrations (GitHub, Azure, Atlassian), skill packs
 like hallmark, paper-lookup, self-review, graphify and the mattpocock/pstack/Trail of Bits picks, and tools such as
-[tui-review](plugins/shared/tui-review/README.md), cswap for multi-account switching, [web-mcp](plugins/shared/web-mcp/README.md) for web search, page fetching,
+[tui-review](plugins/shared/tui-review/README.md), [md-pane](plugins/opt-in/md-pane/README.md) for reading the `.md` files
+Claude names in a pane beside the chat, cswap for multi-account switching, [web-mcp](plugins/shared/web-mcp/README.md) for web search, page fetching,
 passive lookups and a browser with an archive of everything it pulled.
 
 The opt-in [flows](plugins/flows/README.md) plugin ties the rest together: conductor skills (`/feature-flow`,

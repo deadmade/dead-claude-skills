@@ -73,6 +73,7 @@ test('opt-ins from the real manifests', () => {
         'mattpocock-picks',
         'mcp-azure',
         'mcp-github',
+        'md-pane',
         'nix-lsp',
         'paper-lookup',
         'postgres',

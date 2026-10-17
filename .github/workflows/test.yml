@@ -44,3 +44,7 @@ jobs:
       - name: flows mod tests
         working-directory: plugins/flows
         run: claude plugin test .
+
+      - name: md-pane mod tests
+        working-directory: plugins/opt-in/md-pane
+        run: claude plugin test .

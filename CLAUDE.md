@@ -58,6 +58,9 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   feature) showed embeddings don't help, so none ship. `browser` drives the npm CLI `agent-browser`, pinned in
   `installer/agent-browser.json` (bumped by `sync-agent-browser.yml`). Test-only hooks: `WEB_MCP_TEST_PUBLIC_IP`
   (debug builds or the `test-hooks` feature) treats a comma-separated list of IPs as public; `WEB_MCP_FALLBACK_MS` shortens the fetch browser fallback's deadline, `WEB_MCP_PAPERS_MS` each paper source's (8 s), `WEB_MCP_LOOKUP_MS` each lookup source's.
+- `plugins/opt-in/md-pane/`: a mod. Pure path logic in `hooks/paths.ts`; `register.tsx` redraws replies that name an existing
+  `.md` file as its own `Markdown` (only a plugin-drawn `Markdown` with `onLinkPress` receives plain link clicks, and
+  only in the fullscreen terminal) and shows the clicked file in a pane, refreshed by a 1 s stat while open.
 - `plugins/opt-in/cswap/`: a mod wrapping the external `claude-swap` CLI, whose release tag is pinned in `installer/cswap.json`
   (bumped by `sync-cswap.yml`).
 - Notifications (`plugins/default/`, formerly the notify plugin): `hooks.json` entries (Stop, Notification, PreToolUse
@@ -107,12 +110,14 @@ plugins of ours that the manifest no longer lists.
 - tui-review mod tests need a generated fixture first, from `crates/tui-review`:
   `cargo run --release -- gen --out <dir> && node ../../plugins/shared/tui-review/tests/make-fixture.mjs <dir>`, then `claude plugin test .` in
   `plugins/shared/tui-review`.
-- mod tests: `claude plugin test .` in `plugins/opt-in/cswap`, `plugins/default` and `plugins/flows`.
+- mod tests: `claude plugin test .` in `plugins/opt-in/cswap`, `plugins/default`, `plugins/opt-in/md-pane` and
+  `plugins/flows`. `tsc -p .` there needs the engine's typings in `.claude-plugin/types/` (gitignored; the engine
+  writes them when it loads the mod).
 - `nix develop` (or direnv) gives the toolchain and installs the pre-commit hooks (treefmt, merge conflicts, JSON,
   check-repo, installer and scripts tests, end-of-file; vendored paths excluded). Enter it from the repo root only:
   started in a subfolder, its hook setup treats that folder as the repo and uninstalls the pre-commit hook.
 - `nix fmt` formats everything per `treefmt.toml` (alejandra, prettier for js/ts/json/md/yaml, rustfmt).
 
-CI: `test.yml` (npm test and the cswap, dead-skills and flows mod tests, Linux and Windows) on every PR and push to main; `tui-review.yml` on
+CI: `test.yml` (npm test and the cswap, dead-skills, md-pane and flows mod tests, Linux and Windows) on every PR and push to main; `tui-review.yml` on
 PRs touching tui-review; `web-mcp.yml` on PRs touching web-mcp; `build-tui-review.yml`/`build-web-mcp.yml`/`build-cswap.yml` on PRs touching the workflow (or the cswap pin) and from `release.yml`; `sync-*.yml`
 weekly.
