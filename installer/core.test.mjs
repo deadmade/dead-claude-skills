@@ -610,7 +610,7 @@ test('web builtins: tri-state merge keeps other denies, toggle reads deny', () =
 test('web builtins decision table', () => {
   for (const was of [true, false]) {
     assert.equal(webBuiltinsDecision({ toggle: true, was, healthy: true }), true);
-    assert.equal(webBuiltinsDecision({ toggle: true, was, healthy: false }), false);
+    assert.equal(webBuiltinsDecision({ toggle: true, was, healthy: false }), undefined);
   }
   assert.equal(webBuiltinsDecision({ toggle: false, was: true, healthy: true }), false);
   assert.equal(webBuiltinsDecision({ toggle: false, was: true, healthy: false }), false);

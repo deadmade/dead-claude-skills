@@ -354,7 +354,7 @@ async function applyBin(pluginName, plugin) {
 
 // SearXNG in Docker for web-mcp's search. True when it answers JSON on 127.0.0.1:8888 within 30 s. Every failure is a
 // summary line, never a crash. An existing settings.yml is kept so the running container's secret stays valid.
-async function applySearxng() {
+async function applySearxng(denied) {
   if (!onPath('docker')) {
     failures.push(
       `SearXNG: docker not found; write ${join(SEARXNG, 'settings.yml')} (see installer/searxng.yml) and run: docker ${searxngRun(SEARXNG).join(' ')}`,
@@ -372,6 +372,7 @@ async function applySearxng() {
     )
       done.push(`wrote ${join(SEARXNG, 'settings.yml')}`);
     const exists = docker('container', 'inspect', 'searxng').status === 0;
+    if (!exists) log('info', 'First run pulls the SearXNG image and may take a minute');
     const r = exists ? docker('start', 'searxng') : docker(...searxngRun(SEARXNG));
     if (r.status !== 0) {
       failures.push(
@@ -397,7 +398,10 @@ async function applySearxng() {
     return { ok: false };
   });
   if (healthy.ok) done.push('SearXNG answers on 127.0.0.1:8888');
-  else failures.push('SearXNG did not answer JSON within 30 s; the built-in WebSearch and WebFetch stay on');
+  else
+    failures.push(
+      `SearXNG did not answer JSON within 30 s; ${denied ? 'WebSearch and WebFetch stay denied; start SearXNG (docker start searxng)' : 'the built-in WebSearch and WebFetch stay on'}. If ${join(SEARXNG, 'settings.yml')} predates this installer, check that search.formats includes json`,
+    );
   return healthy.ok;
 }
 
@@ -503,8 +507,8 @@ const chosen = {
   ...current,
   'strip-defaults': FLAGS.includes('--strip-defaults') || current['strip-defaults'],
   clean: FLAGS.includes('--clean'),
-  // On by default once web-mcp is installed; on a first install tick it with web-mcp.
-  'web-builtins-off': current['web-builtins-off'] || has(WEB_MCP),
+  // On by default where offered; it does nothing unless web-mcp is selected and SearXNG answers.
+  'web-builtins-off': unavailable('web-builtins-off', process.platform, process.arch, BIN_VERSION) === undefined,
 };
 
 // Options that can't work here stay off the pages, unless they're on already: hiding never removes anything.
@@ -645,7 +649,7 @@ if (selected.includes(WEB_MCP)) await applyBin('web-mcp', WEB_MCP);
 const webBuiltinsOff = webBuiltinsDecision({
   toggle: selected.includes(WEB_MCP) && on('web-builtins-off'),
   was: current['web-builtins-off'],
-  healthy: selected.includes(WEB_MCP) && (await applySearxng()),
+  healthy: selected.includes(WEB_MCP) && (await applySearxng(current['web-builtins-off'])),
 });
 
 const nightCity = selected.some((id) => nameOf(id) === 'night-city');
