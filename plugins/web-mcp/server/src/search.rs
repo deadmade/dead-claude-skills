@@ -487,7 +487,11 @@ pub async fn web(
         let _ = write!(out, "\n\nNot fetched within 3 s: {}", slow.join(", "));
     }
     if !failed.is_empty() {
-        let _ = write!(out, "\n\nNot fetched: {}", failed.join(", "));
+        let _ = write!(
+            out,
+            "\n\nNot fetched: {}\nTry those with the fetch tool, or the browser tool if the site blocks non-browser clients.",
+            failed.join(", ")
+        );
     }
     if fetched == 0 && !filtered {
         out.push_str("\n\nThe web side returned nothing; archive passages only.");

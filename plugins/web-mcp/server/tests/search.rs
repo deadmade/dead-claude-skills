@@ -148,6 +148,7 @@ fn failed_and_blocked_results_are_named() {
     );
     assert!(line.contains(&private.url("/p")), "{t}");
     assert!(t.contains("\n\nNot fetched: "), "{t}");
+    assert!(t.contains("\nTry those with the fetch tool"), "{t}");
     assert_eq!(private.hits("/p"), 0);
     assert!(
         t.contains("The web side returned nothing; archive passages only."),

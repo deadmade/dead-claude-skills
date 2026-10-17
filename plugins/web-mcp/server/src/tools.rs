@@ -357,7 +357,7 @@ impl Server {
     }
 
     #[tool(
-        description = "Fetch one http(s) page or PDF as markdown, localhost included. A long page returns its start plus an archive path under .web/ to read the rest.",
+        description = "Fetch one http(s) page or PDF as markdown, localhost included. A long page returns its start plus an archive path under .web/ to read the rest. If the site blocks you (e.g. HTTP 403) or the content you need is loaded by JavaScript and missing, open the page with the browser tool.",
         annotations(read_only_hint = true)
     )]
     async fn fetch(&self, Parameters(args): Parameters<FetchArgs>) -> CallToolResult {
