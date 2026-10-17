@@ -42,7 +42,7 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
   mattpocock-picks skills (`teach`, `to-tickets`, `to-spec`, `improve-codebase-architecture`, `handoff`,
   `grill-with-docs`), `self-review`, and every conductor here. Read its SKILL.md and follow it:
   - another plugin: `${CLAUDE_SKILL_DIR}/../../../../<plugin>/*/skills/<name>/SKILL.md` (in a checkout of this
-    marketplace: `plugins/<plugin>/skills/<name>/SKILL.md`)
+    marketplace: the folder the plugin's marketplace `source` names, then `skills/<name>/SKILL.md`)
   - a conductor of this plugin: `${CLAUDE_SKILL_DIR}/../<name>/SKILL.md`
 - **Calling another conductor** (`/fix-flow` → `/verify`): read its SKILL.md and run it inline. Skip its start and
   resume step (the caller hands it the input), keep its gates, then return to the caller's next phase.

@@ -1,4 +1,4 @@
-// Colours, 0xRRGGBB, or DEFAULT for the terminal's own. Style ids follow brv/src/styles.rs; keep the order.
+// Colours, 0xRRGGBB, or DEFAULT for the terminal's own. Style ids follow crates/brv/src/styles.rs; keep the order.
 
 export const DEFAULT = 0x01000000;
 
@@ -21,7 +21,7 @@ export const styleFg: readonly number[] = [
   0x7ccfe0, // escape
 ];
 
-// Night City (plugins/mods/night-city/themes/night-city.json).
+// Night City (plugins/default/night-city/themes/night-city.json).
 export const theme = {
   barFg: 0xe6dcf7,
   barBg: 0x2a2340,

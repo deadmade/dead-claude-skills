@@ -1,4 +1,4 @@
-// Views over brv's cache files (layout: brv/src/format.rs). Nothing is parsed: the bytes `$.fs.read` hands back
+// Views over brv's cache files (layout: crates/brv/src/format.rs). Nothing is parsed: the bytes `$.fs.read` hands back
 // get typed-array views laid over them, so any line is a direct lookup and no per-line objects are made.
 
 export const VERSION = 1;

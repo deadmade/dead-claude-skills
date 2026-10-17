@@ -84,19 +84,19 @@ Reviews are cached in `<git common dir>/brv/` (shared by a repo's worktrees), ke
 
 ## Develop
 
-    claude --plugin-dir plugins/mods/tui-review        # hot-reloads on save
+    claude --plugin-dir plugins/shared/tui-review        # hot-reloads on save
 
     cd crates/brv
     cargo clippy --all-targets && cargo test && cargo bench
     cargo test --release --test perf -- --ignored --nocapture   # speed and memory budgets on a large fixture repo
-    cargo run --release -- gen --out /tmp/brv-fixture && node ../../plugins/mods/tui-review/tests/make-fixture.mjs /tmp/brv-fixture
+    cargo run --release -- gen --out /tmp/brv-fixture && node ../../plugins/shared/tui-review/tests/make-fixture.mjs /tmp/brv-fixture
     cd .. && claude plugin test .                    # format contract, pane, speed budgets
 
 Plugin tests have no file system, so `tests/make-fixture.mjs` turns `brv gen` output into `tests/fixture.gen.ts`
 (not committed). The tests read the real Rust output, so they also hold the TypeScript reader to the Rust writer.
-The cache layout is documented in `brv/src/format.rs`.
+The cache layout is documented in `crates/brv/src/format.rs`.
 
-brv ships with the repo's releases (see the main README): `npm run release` bumps `brv/Cargo.toml`, `Cargo.lock` and
+brv ships with the repo's releases (see the main README): `npm run release` bumps `crates/brv/Cargo.toml`, `Cargo.lock` and
 `.claude-plugin/plugin.json` with everything else (a test checks they match), and the tag's `release.yml` runs
 `.github/workflows/build-brv.yml`, which builds Windows, Linux (static, x64 and arm64) and macOS (arm64 and x64). Run
 `build-brv.yml` by hand to build without releasing.
