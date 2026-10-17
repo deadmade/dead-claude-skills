@@ -7,5 +7,6 @@
     "url": "https://github.com/deadmade"
   },
   "repository": "https://github.com/deadmade/dead-claude-skills",
+  "types": "./types/index.d.ts",
   "dependencies": ["superpowers", "mattpocock-picks", "paper-lookup"]
 }
