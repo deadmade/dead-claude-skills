@@ -41,8 +41,8 @@ const bumps = [
   ['.claude-plugin/marketplace.json', json],
   ...pluginDirs().map((p) => [`${p}/.claude-plugin/plugin.json`, json]),
   ...[
-    ['plugins/mods/tui-review/brv', 'brv'],
-    ['plugins/mcp/web-mcp/server', 'web-mcp'],
+    ['crates/brv', 'brv'],
+    ['crates/web-mcp', 'web-mcp'],
   ].flatMap(([dir, name]) => [
     [`${dir}/Cargo.toml`, /^(version = )"[^"]*"/m],
     [`${dir}/Cargo.lock`, new RegExp(`^(name = "${name}"\\r?\\nversion = )"[^"]*"`, 'm')],

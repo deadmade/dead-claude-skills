@@ -3,6 +3,7 @@ name: tui-review
 on:
   pull_request:
     paths:
+      - 'crates/brv/**'
       - 'plugins/mods/tui-review/**'
       - '.github/workflows/tui-review.yml'
   workflow_dispatch:
@@ -20,7 +21,7 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: plugins/mods/tui-review/brv
+        working-directory: crates/brv
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -29,7 +30,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          workspaces: plugins/mods/tui-review/brv
+          workspaces: crates/brv
 
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
@@ -46,7 +47,7 @@ jobs:
       - name: Mod fixture from brv gen
         run: |
           cargo run --release -- gen --out "$RUNNER_TEMP/brv-fixture" > /dev/null
-          node ../tests/make-fixture.mjs "$RUNNER_TEMP/brv-fixture"
+          node ../../plugins/mods/tui-review/tests/make-fixture.mjs "$RUNNER_TEMP/brv-fixture"
 
       - name: Mod tests and speed budgets
         working-directory: plugins/mods/tui-review

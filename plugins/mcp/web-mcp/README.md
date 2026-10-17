@@ -50,7 +50,7 @@ deleted, so it grows; delete it by hand only while no server is running, since t
     /plugin install web-mcp@dead-claude-skills
 
 The installer downloads the `web-mcp` binary from the release and sets `binPath`. By hand, build it with
-`cargo build --release --manifest-path plugins/mcp/web-mcp/server/Cargo.toml` (or `nix build .#web-mcp`) and put it on PATH
+`cargo build --release --manifest-path crates/web-mcp/Cargo.toml` (or `nix build .#web-mcp`) and put it on PATH
 or set its path with `/plugin configure web-mcp`.
 
 - **SearXNG** (for `search`): with Docker, the installer starts it on 127.0.0.1:8888 with

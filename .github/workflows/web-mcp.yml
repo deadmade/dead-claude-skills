@@ -3,6 +3,7 @@ name: web-mcp
 on:
   pull_request:
     paths:
+      - 'crates/web-mcp/**'
       - 'plugins/mcp/web-mcp/**'
       - '.github/workflows/web-mcp.yml'
   workflow_dispatch:
@@ -20,7 +21,7 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: plugins/mcp/web-mcp/server
+        working-directory: crates/web-mcp
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -29,7 +30,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          workspaces: plugins/mcp/web-mcp/server
+          workspaces: crates/web-mcp
 
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings

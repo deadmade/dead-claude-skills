@@ -404,7 +404,7 @@ test('install.mjs finds plugin folders through the marketplace, never by a liter
 });
 
 test('brv versions match the release the installer fetches', () => {
-  const cargo = readFileSync(new URL('../plugins/mods/tui-review/brv/Cargo.toml', import.meta.url), 'utf8');
+  const cargo = readFileSync(new URL('../crates/brv/Cargo.toml', import.meta.url), 'utf8');
   assert.equal(/^version = "(.+)"/m.exec(cargo)[1], json('package.json').version);
 });
 

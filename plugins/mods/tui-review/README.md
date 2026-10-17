@@ -13,7 +13,7 @@ into `~/.claude/bin` and sets the plugin's `brvPath`, unless a `brv` is already 
 archive for your platform from the [releases](https://github.com/deadmade/dead-claude-skills/releases), or build it,
 and put it on PATH or set its path with `/plugin configure tui-review`:
 
-    cargo build --release --manifest-path plugins/mods/tui-review/brv/Cargo.toml   # or: nix build .#brv
+    cargo build --release --manifest-path crates/brv/Cargo.toml   # or: nix build .#brv
 
 ## Use
 
@@ -86,10 +86,10 @@ Reviews are cached in `<git common dir>/brv/` (shared by a repo's worktrees), ke
 
     claude --plugin-dir plugins/mods/tui-review        # hot-reloads on save
 
-    cd plugins/mods/tui-review/brv
+    cd crates/brv
     cargo clippy --all-targets && cargo test && cargo bench
     cargo test --release --test perf -- --ignored --nocapture   # speed and memory budgets on a large fixture repo
-    cargo run --release -- gen --out /tmp/brv-fixture && node ../tests/make-fixture.mjs /tmp/brv-fixture
+    cargo run --release -- gen --out /tmp/brv-fixture && node ../../plugins/mods/tui-review/tests/make-fixture.mjs /tmp/brv-fixture
     cd .. && claude plugin test .                    # format contract, pane, speed budgets
 
 Plugin tests have no file system, so `tests/make-fixture.mjs` turns `brv gen` output into `tests/fixture.gen.ts`

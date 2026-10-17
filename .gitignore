@@ -5,8 +5,7 @@ Thumbs.db
 .claude/settings.local.json
 .direnv/
 .pre-commit-config.yaml
-plugins/mods/tui-review/brv/target/
-plugins/mcp/web-mcp/server/target/
+target/
 plugins/mods/tui-review/tests/fixture.gen.ts
 plugins/*/.claude-plugin/types/
 node_modules/

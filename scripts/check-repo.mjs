@@ -71,8 +71,8 @@ for (const dir of pluginDirs) {
   if (v !== version) problems.push(`${manifest}: version is ${v}, package.json has ${version}`);
 }
 const CRATES = [
-  { cargo: 'plugins/mods/tui-review/brv/Cargo.toml', lock: 'plugins/mods/tui-review/brv/Cargo.lock', name: 'brv' },
-  { cargo: 'plugins/mcp/web-mcp/server/Cargo.toml', lock: 'plugins/mcp/web-mcp/server/Cargo.lock', name: 'web-mcp' },
+  { cargo: 'crates/brv/Cargo.toml', lock: 'crates/brv/Cargo.lock', name: 'brv' },
+  { cargo: 'crates/web-mcp/Cargo.toml', lock: 'crates/web-mcp/Cargo.lock', name: 'web-mcp' },
 ];
 for (const { cargo, lock, name } of CRATES) {
   const crate = /^version = "(.*)"/m.exec(readFileSync(cargo, 'utf8'))?.[1];

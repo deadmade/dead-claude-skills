@@ -61,14 +61,14 @@
             enable = true;
             name = "claude plugin validate + marketplace consistency";
             entry = "${check-repo}/bin/check-repo";
-            files = "^(\\.claude-plugin/|plugins/|scripts/check-repo\\.mjs$|package\\.json$)";
+            files = "^(\\.claude-plugin/|plugins/|crates/|scripts/check-repo\\.mjs$|package\\.json$)";
             pass_filenames = false;
           };
           installer-test = {
             enable = true;
             name = "installer tests";
             entry = "${installer-test}/bin/installer-test";
-            files = "^(installer/|scripts/|plugins/notify/hooks/|\\.claude-plugin/marketplace\\.json$|package\\.json$)";
+            files = "^(installer/|scripts/|crates/|plugins/notify/hooks/|\\.claude-plugin/marketplace\\.json$|package\\.json$)";
             pass_filenames = false;
           };
         };
@@ -79,14 +79,14 @@
     # brv, the tui-review plugin's Rust binary: `nix build .#brv`, or `nix run .#brv -- gen`. Its tests run in the build.
     packages = forAllSystems (system: let
       pkgs = nixpkgs.legacyPackages.${system};
-      manifest = (pkgs.lib.importTOML ./plugins/mods/tui-review/brv/Cargo.toml).package;
-      webMcp = (pkgs.lib.importTOML ./plugins/mcp/web-mcp/server/Cargo.toml).package;
+      manifest = (pkgs.lib.importTOML ./crates/brv/Cargo.toml).package;
+      webMcp = (pkgs.lib.importTOML ./crates/web-mcp/Cargo.toml).package;
     in {
       brv = pkgs.rustPlatform.buildRustPackage {
         pname = manifest.name;
         inherit (manifest) version;
-        src = ./plugins/mods/tui-review/brv;
-        cargoLock.lockFile = ./plugins/mods/tui-review/brv/Cargo.lock;
+        src = ./crates/brv;
+        cargoLock.lockFile = ./crates/brv/Cargo.lock;
         # tests/review.rs builds its fixture repositories with git.
         nativeCheckInputs = [pkgs.git];
         meta = {
@@ -98,8 +98,8 @@
       web-mcp = pkgs.rustPlatform.buildRustPackage {
         pname = webMcp.name;
         inherit (webMcp) version;
-        src = ./plugins/mcp/web-mcp/server;
-        cargoLock.lockFile = ./plugins/mcp/web-mcp/server/Cargo.lock;
+        src = ./crates/web-mcp;
+        cargoLock.lockFile = ./crates/web-mcp/Cargo.lock;
         # Debug checks: the fetch tests' WEB_MCP_TEST_PUBLIC_IP hook exists only in debug builds or the `test-hooks` feature.
         checkType = "debug";
         meta = {

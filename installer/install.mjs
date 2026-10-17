@@ -367,7 +367,7 @@ async function applyBin(pluginName, plugin) {
     version,
     supported: asset !== undefined,
   });
-  const build = `build it with \`cargo build --release\` in plugins/${pluginName}/${pluginName === 'web-mcp' ? 'server' : 'brv'} and set its path with /plugin configure ${pluginName}`;
+  const build = `build it with \`cargo build --release\` in crates/${pluginName === 'web-mcp' ? 'web-mcp' : 'brv'} and set its path with /plugin configure ${pluginName}`;
   if (action === 'skip') return done.push(`${name}: using the one on PATH`);
   if (action === 'unsupported')
     return failures.push(`${name}: no release build for ${process.platform}-${process.arch}; ${build}`);
