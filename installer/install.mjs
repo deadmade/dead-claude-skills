@@ -16,7 +16,6 @@ import {
 } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
-import { styleText } from 'node:util';
 import {
   BUNDLE,
   CLEAN_TARGETS,
@@ -68,7 +67,7 @@ import {
 } from './core.mjs';
 import { backup, clearTargets, writeAtomic, writeSearxng } from './files.mjs';
 import { confirm, line, log, note, progress, screen } from './ui.mjs';
-import { changeList, initial, move, render } from './view.mjs';
+import { changeList, initial, move, paint, render } from './view.mjs';
 
 const PKG = join(import.meta.dirname, '..');
 const CONFIG = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude');
@@ -97,8 +96,8 @@ if (!process.stdin.isTTY || !process.stdout.isTTY) {
 }
 
 // --- terminal UI ------------------------------------------------------------------------------------------------
-const red = (s) => styleText('red', s);
-const green = (s) => styleText('green', s);
+const red = (s) => paint('red', s);
+const green = (s) => paint('green', s);
 
 // The answer of a prompt; ctrl-c (null) ends the installer.
 function must(answer) {
@@ -178,10 +177,10 @@ async function applySettings(toggles, { strip, reset }) {
 
 // Off only deletes the config when this installer's status line was on: the toggle also reads off for a ccstatusline
 // set up some other way, whose config isn't ours to delete.
-async function applyCcstatusline(was, on, nightCity) {
+async function applyCcstatusline(was, on) {
   if (!on) return was ? remove(CCSL, CCSL) : undefined;
   const shippedFile = (f) => readFileSync(join(PKG, 'installer', f), 'utf8');
-  const shipped = shippedFile(nightCity ? 'ccstatusline-night-city.json' : 'ccstatusline.json');
+  const shipped = shippedFile('ccstatusline-night-city.json');
   if (!existsSync(CCSL)) {
     writeAtomic(CCSL, shipped);
     return done.push(`wrote ${CCSL}`);
@@ -190,7 +189,7 @@ async function applyCcstatusline(was, on, nightCity) {
   if (isShipped(current, [shipped])) return;
   const newer = (tryJson(CCSL)?.version ?? 0) > JSON.parse(shipped).version;
   if (newer) log('warn', `${CCSL} has a newer config version than the shipped one; keeping it is safer.`);
-  // The other shipped config (stock vs Night City) is ours, not a customization: swap it without asking.
+  // The stock config earlier versions wrote is ours, not a customization: swap it without asking.
   const ours = isShipped(current, [shippedFile('ccstatusline.json'), shippedFile('ccstatusline-night-city.json')]);
   if (ours || (await ask(`${CCSL} differs from the shipped config. Replace it?`, false))) {
     writeAtomic(CCSL, shipped);
@@ -471,7 +470,7 @@ function pinSettingsEntry() {
   return raw;
 }
 
-log('info', `${styleText(['bold', 'magenta'], 'dead-claude-skills')} v${VERSION}`);
+log('info', `${paint(['bold', 'magenta'], 'dead-claude-skills')} v${VERSION}`);
 
 // A failed list would read as "nothing installed": stop instead of planning from it.
 function listed(what, r) {
@@ -691,20 +690,18 @@ const webBuiltinsOff = webBuiltinsDecision({
   healthy: selected.includes(WEB_MCP) && (await applySearxng(current['web-builtins-off'])),
 });
 
-const nightCity = selected.some((id) => nameOf(id) === 'night-city');
 const notify = selected.some((id) => nameOf(id) === 'notify');
 const toggles = {
   statusLine: on('ccstatusline'),
   sandbox: on('sandbox'),
   dcg: on('dcg'),
   version: VERSION,
-  nightCity,
   notify,
   webBuiltinsOff,
 };
 await applySettings(toggles, { strip, reset: clean });
 const autoUpdate = tryJson(join(CONFIG, 'plugins', 'known_marketplaces.json'))?.[MARKETPLACE]?.autoUpdate;
-await applyCcstatusline(current.ccstatusline, on('ccstatusline'), nightCity);
+await applyCcstatusline(current.ccstatusline, on('ccstatusline'));
 await applyDcg(current.dcg, on('dcg'));
 if (selected.includes(WEB_MCP)) await applyAgentBrowser();
 await applyCswap(selected.some((id) => nameOf(id) === 'cswap'));

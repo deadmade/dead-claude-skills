@@ -2,10 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { DONE, WAITING, shouldNotify, tmuxFocused, nightCityEnabled, message, notifiers, TMUX_ARGV } from './lib.mjs';
+import { DONE, WAITING, shouldNotify, tmuxFocused, message, notifiers, TMUX_ARGV } from './lib.mjs';
 
 const first = (l) => l[0];
-const plain = { nightCity: false, pick: first };
+const plain = { pick: first };
 
 test('skips continuations, subagents and headless runs', () => {
   assert.equal(shouldNotify({ stop_hook_active: true }, {}), false);
@@ -30,27 +30,20 @@ test('tmux focus needs active pane, active window and a focused client', () => {
   assert.equal(tmuxFocused('11\nunfocused'), false);
 });
 
-test('night-city is on only when enabled in settings', () => {
-  assert.equal(nightCityEnabled('{"enabledPlugins":{"night-city@dead-claude-skills":true}}'), true);
-  assert.equal(nightCityEnabled('{"enabledPlugins":{"night-city@dead-claude-skills":false}}'), false);
-  assert.equal(nightCityEnabled(undefined), false);
-  assert.equal(nightCityEnabled('{oops'), false);
-});
-
-test('plain stop message', () => {
+test('stop message', () => {
   const input = {
     hook_event_name: 'Stop',
     cwd: '/home/u/dead-claude-skills',
     last_assistant_message: '\nAll tests pass.\nDetails',
   };
-  assert.deepEqual(message(input, plain), { title: 'dead-claude-skills', status: 'Done', detail: 'All tests pass.' });
+  assert.deepEqual(message(input, plain), { title: 'dead-claude-skills', status: DONE[0], detail: 'All tests pass.' });
 });
 
-test('plain waiting message', () => {
+test('waiting message', () => {
   const input = { hook_event_name: 'Notification', message: 'Claude needs your permission to use Bash' };
   assert.deepEqual(
     [message(input, plain).status, message(input, plain).detail],
-    ['Needs your input', 'Claude needs your permission to use Bash'],
+    [WAITING[0], 'Claude needs your permission to use Bash'],
   );
 });
 
@@ -61,10 +54,9 @@ test('question message', () => {
 });
 
 test('night-city wording', () => {
-  const nc = { nightCity: true, pick: first };
-  assert.equal(message({ hook_event_name: 'Stop' }, nc).status, DONE[0]);
-  assert.equal(message({ hook_event_name: 'Notification', message: 'x' }, nc).status, WAITING[0]);
-  assert.equal(message({ hook_event_name: 'PreToolUse', tool_input: {} }, nc).status, WAITING[0]);
+  assert.equal(message({ hook_event_name: 'Stop' }, plain).status, DONE[0]);
+  assert.equal(message({ hook_event_name: 'Notification', message: 'x' }, plain).status, WAITING[0]);
+  assert.equal(message({ hook_event_name: 'PreToolUse', tool_input: {} }, plain).status, WAITING[0]);
 });
 
 test('empty answer gives no detail', () => {

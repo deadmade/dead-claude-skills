@@ -1,8 +1,7 @@
 // The installer's terminal I/O on Node's stdlib: interactive screens, a yes/no, a typed line and plain output.
 import { createInterface } from 'node:readline';
 import { createInterface as createLineInterface } from 'node:readline/promises';
-import { styleText } from 'node:util';
-import { frame, wrap } from './view.mjs';
+import { frame, paint, wrap } from './view.mjs';
 
 const STD = { input: process.stdin, output: process.stdout };
 const HIDE = '\x1b[?25l';
@@ -96,7 +95,7 @@ export async function confirm(message, initial = true, io = STD) {
         return k === 'return' ? { ...st, result: 'done' } : st;
       },
       render: (st) => {
-        const choice = (label, on) => (on ? styleText(['bold', 'inverse'], ` ${label} `) : ` ${label} `);
+        const choice = (label, on) => (on ? paint(['bold', 'inverse'], ` ${label} `) : ` ${label} `);
         return [`${message}  ${choice('Yes', st.yes)} / ${choice('No', !st.yes)}`];
       },
     },
@@ -128,7 +127,7 @@ export function note(title, lines) {
   const inner = Math.max(columns - 1, 8) - 4;
   process.stdout.write(
     `${frame(
-      styleText('bold', title),
+      paint('bold', title),
       lines.flatMap((l) => wrap(l, inner)),
       { columns },
     ).join('\n')}\n`,
@@ -145,12 +144,12 @@ export async function progress(label, fn) {
     r = { ok: false, err: e.message };
   }
   process.stdout.write(
-    r.ok ? `${styleText('green', 'done')}\n` : `${styleText('red', 'failed')}\n${r.err ? `  ${r.err}\n` : ''}`,
+    r.ok ? `${paint('green', 'done')}\n` : `${paint('red', 'failed')}\n${r.err ? `  ${r.err}\n` : ''}`,
   );
   return r;
 }
 
 export function log(kind, text) {
-  const out = kind === 'warn' ? styleText('yellow', text) : kind === 'error' ? styleText('red', `✗ ${text}`) : text;
+  const out = kind === 'warn' ? paint('yellow', text) : kind === 'error' ? paint('red', `✗ ${text}`) : text;
   process.stdout.write(`${out}\n`);
 }

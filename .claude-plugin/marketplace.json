@@ -48,19 +48,19 @@
     {
       "name": "mcp-basic",
       "description": "Basic MCP servers for every machine: Context7 (up-to-date library docs).",
-      "source": "./plugins/mcp-basic",
+      "source": "./plugins/mcp/mcp-basic",
       "category": "productivity"
     },
     {
       "name": "mcp-github",
       "description": "GitHub's hosted MCP server (repos, issues, PRs, Actions). Opt-in per machine.",
-      "source": "./plugins/mcp-github",
+      "source": "./plugins/mcp/mcp-github",
       "category": "productivity"
     },
     {
       "name": "mcp-azure",
       "description": "Azure DevOps Server MCP server (self-hosted, PAT). Opt-in per machine, configure with /plugin configure.",
-      "source": "./plugins/mcp-azure",
+      "source": "./plugins/mcp/mcp-azure",
       "category": "productivity"
     },
     {
@@ -140,8 +140,8 @@
     },
     {
       "name": "night-city",
-      "description": "Night City: a toned-down synthwave Claude Code theme with Night City spinner words, short status-line reactions and Onibi dropping by with a one-liner. Opt-in.",
-      "source": "./plugins/night-city",
+      "description": "Night City: a toned-down synthwave Claude Code theme with Night City spinner words, short status-line reactions and Onibi dropping by with a one-liner. Part of the default bundle.",
+      "source": "./plugins/mods/night-city",
       "category": "development"
     },
     {
@@ -153,19 +153,19 @@
     {
       "name": "cswap",
       "description": "claude-swap in Claude Code: accounts pane, /swap, usage status line, opt-in auto-switch. The installer downloads cswap.exe on Windows. Opt-in.",
-      "source": "./plugins/cswap",
+      "source": "./plugins/mods/cswap",
       "category": "productivity"
     },
     {
       "name": "tui-review",
       "description": "/tui-review: a fast, stacked-branch-aware diff pane beside the chat, so you can ask Claude about what you read. Needs the brv binary, which the installer downloads. Opt-in.",
-      "source": "./plugins/tui-review",
+      "source": "./plugins/mods/tui-review",
       "category": "development"
     },
     {
       "name": "web-mcp",
       "description": "Web research tools for Claude: search (self-hosted SearXNG, paper APIs and the archive, ranked with BM25), fetch (whole pages as markdown, optionally with images), browser (via agent-browser) and lookup (passive DNS, RDAP, certificate, Wayback, IP and vulnerability records). Everything is archived in .web/. Needs the web-mcp binary, which the installer downloads. Opt-in.",
-      "source": "./plugins/web-mcp",
+      "source": "./plugins/mcp/web-mcp",
       "category": "development"
     }
   ]
