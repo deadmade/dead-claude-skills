@@ -1,5 +1,5 @@
 ---
-phase: execute
+phase: finish
 ---
 
 # Click-to-read file pane: flow
@@ -121,11 +121,34 @@ unchanged; polling runs on error documents too; race-test setup and `host()` par
 
 ## Execution
 
-- Task 1 (9fc8e1c) and Task 2 (a218a8f) done; waiting at the checkpoint for the user's terminal check.
+- Native, on this branch. Task 1 `9fc8e1c`, Task 2 `a218a8f`, checkpoint, Task 3 `0cec867`, Task 4 `71aeada`, Task 5
+  `c26b425`; main merged and md-pane moved to `plugins/mods/md-pane/` (`93402fe`, main's #47 grouped the mods); final
+  review fixes `f978632`.
+- Checkpoint (user, 2026-10-17): a plain click toasted `file:///home/deadmade/dead-claude-skills/docs/features/click-to-read/flow.md`
+  (href arrives as written); ctrl+click still opens the system app; streaming not reported as a problem.
+- Final review (opus): C1 Windows test-host paths, I1 behind main, I2 nested/longer fences, I3 close during a press's
+  state write: all fixed (I2/I3 with failing tests first; C1 only provable on the Windows CI job). Minors deferred:
+  non-ENOENT stat errors reload each tick, Markdown edge cases (link titles, double-backtick spans, `<…>` targets,
+  `notes.md.bak`, `_…_`, `%20` targets), a cwd lookup on every fullscreen reply render.
 
 ## Deviations
 
+None from the spec. Plan-level rulings (test-kit workarounds, two extra tests, the refresh change check) are listed in
+the final message of the run; the plan's paths predate the move to `plugins/mods/`.
+
 ## Walkthrough
 
-| spec goal | plan task | file:line | test |
-| --------- | --------- | --------- | ---- |
+| spec goal                                                                             | plan task | file:line                                                                                                               | test                                                                     |
+| ------------------------------------------------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 1 `.md` paths in replies become links (bare, code, link; cwd, `~`, absolute, Windows) | T1, T2    | `plugins/mods/md-pane/hooks/paths.ts:50`, `:75`, `:93`; `plugins/mods/md-pane/hooks/register.tsx:157`                   | `paths.test.ts` find/resolve/href tests; `register.test.ts:93`, `:307`   |
+| Only existing files; look-alikes and fences skipped                                   | T1, T2    | `plugins/mods/md-pane/hooks/paths.ts:30`; `plugins/mods/md-pane/hooks/register.tsx` `isFile`                            | `paths.test.ts` look-alike and fence tests; `register.test.ts:101`       |
+| 2 plain click opens the file rendered in a pane, titled                               | T3        | `plugins/mods/md-pane/hooks/register.tsx:101`, `:165`                                                                   | `register.test.ts:195`                                                   |
+| 3 ctrl/cmd+click keeps the system opener                                              | T2        | `pressableLinks` only intercepts plain clicks                                                                           | checkpoint (user)                                                        |
+| 4 one pane; another path swaps, the open one stays                                    | T3        | `plugins/mods/md-pane/hooks/register.tsx:101-116`                                                                       | `register.test.ts:204`, `:213`, `:267`                                   |
+| 5 auto refresh on change                                                              | T4        | `plugins/mods/md-pane/hooks/register.tsx:124`                                                                           | `register.test.ts:318`-`:405`                                            |
+| 6 scroll (engine), close with q/Esc/mark/ctrl+x x; closes on session end              | T3, T4    | `plugins/mods/md-pane/hooks/register.tsx:113`, `:186`, `:191`, `:198`                                                   | `register.test.ts:291`, `:299`, `:357`, `:368`, `:419`; Esc/mark: manual |
+| 7 links inside the doc swap, doc folder then cwd                                      | T3        | `plugins/mods/md-pane/hooks/register.tsx:76` (`linked` bases)                                                           | `register.test.ts:221`, `:230`                                           |
+| 8 missing / too large / long documents                                                | T3        | `plugins/mods/md-pane/hooks/register.tsx:83`, `:92`                                                                     | `register.test.ts:238`, `:248`, `:256`, `:378`                           |
+| Fullscreen terminal only; summaries and over-long replies untouched                   | T2        | `plugins/mods/md-pane/hooks/register.tsx:157-163`                                                                       | `register.test.ts:107`, `:149`                                           |
+| Streaming: one stat per existing path, misses kept 2 s                                | T2        | `plugins/mods/md-pane/hooks/register.tsx` `isFile`                                                                      | `register.test.ts:117`, `:124`, `:133`                                   |
+| Shipped: marketplace, installer Tools page, CI, docs                                  | T1, T5    | `.claude-plugin/marketplace.json`, `installer/core.mjs`, `.github/workflows/test.yml`, `plugins/mods/md-pane/README.md` | `npm test` (check-repo, `core.test.mjs`)                                 |
