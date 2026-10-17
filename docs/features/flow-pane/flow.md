@@ -1,5 +1,5 @@
 ---
-phase: evaluate
+phase: execute
 ---
 
 # Flow pane: flow
@@ -21,7 +21,7 @@ phase: evaluate
 ## Gates
 
 - Gate 1, spec approved: 2026-10-17 ("approved, write the plan")
-- Gate 2, plan approved: <date>, execution: subagent-driven | native
+- Gate 2, plan approved: 2026-10-17 ("approved, subagent-driven"; incl. round-2 fixes), execution: subagent-driven
 
 ## Skipped
 
