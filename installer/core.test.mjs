@@ -374,6 +374,10 @@ test('web-mcp downloads its own archive, and each plugin is configured under its
   for (const [k, target] of Object.entries(t)) {
     const [platform, arch] = k.split('-');
     for (const name of ['brv', 'web-mcp']) {
+      if (name === 'web-mcp' && !['win32-x64', 'linux-x64'].includes(k)) {
+        assert.equal(binAsset(name, platform, arch, '1.2.3'), undefined);
+        continue;
+      }
       const a = binAsset(name, platform, arch, '1.2.3');
       assert.equal(a.file, `${name}-${target}.${platform === 'win32' ? 'zip' : 'tar.gz'}`);
       assert.equal(a.exe, name + (platform === 'win32' ? '.exe' : ''));
@@ -387,6 +391,7 @@ test('web-mcp downloads its own archive, and each plugin is configured under its
     assert.ok(json(`${dirs[plugin]}/.claude-plugin/plugin.json`).userConfig[key], `${plugin} has userConfig ${key}`);
   assert.match(unavailable('web-mcp', 'linux', 'ia32', '1.0.0'), /no web-mcp build for linux-ia32/);
   assert.equal(unavailable('web-mcp', 'linux', 'x64', '1.0.0'), undefined);
+  assert.match(unavailable('web-mcp', 'darwin', 'arm64', '1.0.0'), /no web-mcp build for darwin-arm64/);
 });
 
 test('brv versions match the release the installer fetches', () => {

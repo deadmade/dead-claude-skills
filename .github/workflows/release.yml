@@ -99,5 +99,5 @@ jobs:
             --notes "Install or update with \`npx --allow-git=root github:deadmade/dead-claude-skills#$GITHUB_REF_NAME\`, which pins the marketplace to this release, or with \`/plugin update\` if you added the marketplace by hand.
 
           brv-*: the binary behind tui-review, for each platform; the installer downloads yours.
-          web-mcp-*: the binary behind the web-mcp plugin, for each platform; the installer downloads yours.
+          web-mcp-*: the binary behind the web-mcp plugin, for Windows and Linux x64; the installer downloads yours.
           cswap.exe is claude-swap $cswap (https://github.com/realiti4/claude-swap, MIT) compiled with Nuitka for Windows."

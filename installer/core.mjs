@@ -345,11 +345,13 @@ const BIN_TARGETS = {
   'darwin-arm64': 'aarch64-apple-darwin',
   'darwin-x64': 'x86_64-apple-darwin',
 };
+// Binaries built for fewer platforms than BIN_TARGETS.
+const BIN_ONLY = { 'web-mcp': ['win32-x64', 'linux-x64'] };
 
 // The release archive of binary `name` ('brv' or 'web-mcp') at `version` for this machine, or undefined where none is built.
 export function binAsset(name, platform, arch, version) {
   const target = BIN_TARGETS[`${platform}-${arch}`];
-  if (!target) return undefined;
+  if (!target || BIN_ONLY[name]?.includes(`${platform}-${arch}`) === false) return undefined;
   const file = `${name}-${target}.${platform === 'win32' ? 'zip' : 'tar.gz'}`;
   const url = `${RELEASES}/v${version}/${file}`;
   return { file, url, sha256: `${url}.sha256`, exe: platform === 'win32' ? `${name}.exe` : name };
