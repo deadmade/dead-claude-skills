@@ -1,11 +1,12 @@
 {
   "name": "feature-flow",
   "version": "0.3.0",
-  "description": "/feature-flow: one entry point for a feature. Brainstorm with prior art, grill with domain docs, plan, have Claude evaluate the plan, then execute and finish through superpowers. /research-flow: the same, grounded in papers, with a hypothesis measured before finishing.",
+  "description": "/feature-flow: one entry point for a feature. Brainstorm with prior art, grill with domain docs, plan, have Claude evaluate the plan, then execute and finish through superpowers. /research-flow: the same, grounded in papers, with a hypothesis measured before finishing. A band above the prompt shows the current run's phase, gates and deviations; 1 resumes it from an idle prompt.",
   "author": {
     "name": "deadmade",
     "url": "https://github.com/deadmade"
   },
   "repository": "https://github.com/deadmade/dead-claude-skills",
+  "types": "./types/index.d.ts",
   "dependencies": ["superpowers", "mattpocock-picks", "paper-lookup"]
 }
