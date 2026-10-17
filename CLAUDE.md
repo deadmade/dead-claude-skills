@@ -53,7 +53,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   share a binary cache format (`crates/tui-review/src/format.rs` ↔ `hooks/chunks.ts`) and a stdout line protocol; change both sides
   together.
 - `plugins/shared/web-mcp/`: a stdio MCP server (Rust, `crates/web-mcp/`) with `search`, `fetch`, `browser` and `lookup`, built for Windows and Linux
-  x64 only (`build-web-mcp.yml`, `BIN_ONLY` in `core.mjs`); the installer downloads it and sets `binPath`. Everything it pulls lands in
+  x64 only, like tui-review's binary (`build-web-mcp.yml`, `BIN_TARGETS` in `core.mjs`; no macOS or ARM builds); the installer downloads it and sets `binPath`. Everything it pulls lands in
   `$CLAUDE_PROJECT_DIR/.web/` before Claude sees it. Ranking is BM25 only: the H4 experiment (`examples/h4.rs`, `h4`
   feature) showed embeddings don't help, so none ship. `browser` drives the npm CLI `agent-browser`, pinned in
   `installer/agent-browser.json` (bumped by `sync-agent-browser.yml`). Test-only hooks: `WEB_MCP_TEST_PUBLIC_IP`

@@ -14,7 +14,7 @@
     nixpkgs,
     git-hooks,
   }: let
-    forAllSystems = nixpkgs.lib.genAttrs ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
+    forAllSystems = nixpkgs.lib.genAttrs ["x86_64-linux"];
 
     # Upstream files copied by scripts/sync-*.mjs: fixing them here would churn every sync PR.
     vendored = ["^plugins/shared/(paper-lookup|mattpocock-picks|pstack-picks|tob-picks|graphify)/" "^plugins/opt-in/hallmark/" "^plugins/opt-in/implementation/(rust|csharp)-skills/(library/|skills/|LICENSE$|UPSTREAM$)" "^plugins/opt-in/implementation/postgres/skills/" "^plugins/shared/self-review/(LICENSE|agents/|skills/self-review/references/upstream/)"];

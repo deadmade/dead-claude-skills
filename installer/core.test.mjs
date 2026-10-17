@@ -361,9 +361,8 @@ test('tui-review downloads the release archive built for this machine', () => {
   assert.equal(win.sha256, `${win.url}.sha256`);
   assert.equal(win.exe, 'tui-review.exe');
   assert.equal(binAsset('tui-review', 'linux', 'x64', '1.0.0').file, 'tui-review-x86_64-unknown-linux-musl.tar.gz');
-  assert.equal(binAsset('tui-review', 'linux', 'arm64', '1.0.0').file, 'tui-review-aarch64-unknown-linux-musl.tar.gz');
-  assert.equal(binAsset('tui-review', 'darwin', 'arm64', '1.0.0').exe, 'tui-review');
-  assert.equal(binAsset('tui-review', 'win32', 'arm64', '1.0.0'), undefined);
+  for (const [platform, arch] of [['linux', 'arm64'], ['darwin', 'arm64'], ['darwin', 'x64'], ['win32', 'arm64']])
+    assert.equal(binAsset('tui-review', platform, arch, '1.0.0'), undefined, `no build for ${platform}-${arch}`);
   assert.equal(binAsset('tui-review', 'freebsd', 'x64', '1.0.0'), undefined);
 });
 
@@ -371,17 +370,10 @@ test('web-mcp downloads its own archive, and each plugin is configured under its
   const t = {
     'win32-x64': 'x86_64-pc-windows-msvc',
     'linux-x64': 'x86_64-unknown-linux-musl',
-    'linux-arm64': 'aarch64-unknown-linux-musl',
-    'darwin-arm64': 'aarch64-apple-darwin',
-    'darwin-x64': 'x86_64-apple-darwin',
   };
   for (const [k, target] of Object.entries(t)) {
     const [platform, arch] = k.split('-');
     for (const name of ['tui-review', 'web-mcp']) {
-      if (name === 'web-mcp' && !['win32-x64', 'linux-x64'].includes(k)) {
-        assert.equal(binAsset(name, platform, arch, '1.2.3'), undefined);
-        continue;
-      }
       const a = binAsset(name, platform, arch, '1.2.3');
       assert.equal(a.file, `${name}-${target}.${platform === 'win32' ? 'zip' : 'tar.gz'}`);
       assert.equal(a.exe, name + (platform === 'win32' ? '.exe' : ''));
@@ -491,10 +483,13 @@ test('options hidden per platform', () => {
   assert.equal(unavailable(`cswap@${M}`, 'win32', 'x64', '1.0.0'), undefined);
   assert.ok(unavailable(`cswap@${M}`, 'linux', 'x64', '1.0.0'));
   assert.ok(unavailable(`cswap@${M}`, 'darwin', 'arm64', '1.0.0'));
-  for (const k of ['sandbox', `nix-lsp@${M}`, `tui-review@${M}`, 'dcg']) {
+  assert.ok(unavailable(`tui-review@${M}`, 'darwin', 'arm64', '1.0.0'));
+  assert.ok(unavailable(`tui-review@${M}`, 'linux', 'arm64', '1.0.0'));
+  for (const k of ['sandbox', `nix-lsp@${M}`, 'dcg']) {
     assert.equal(unavailable(k, 'linux', 'x64', '1.0.0'), undefined);
     assert.equal(unavailable(k, 'darwin', 'arm64', '1.0.0'), undefined);
   }
+  assert.equal(unavailable(`tui-review@${M}`, 'linux', 'x64', '1.0.0'), undefined);
 });
 
 test('outdated compares our shipped versions only, once per id, never downgrading', () => {
