@@ -498,7 +498,9 @@ mod tests {
                 let mut adds = Vec::new();
                 for i in 0.. {
                     let commits = idx.commits.load(Ordering::SeqCst);
-                    let segments = idx.tantivy.searchable_segment_ids().unwrap().len();
+                    // The reader's view, reloaded by every commit: reading meta.json here would race the
+                    // writer's replacing it, which Windows refuses (access denied).
+                    let segments = idx.reader.searcher().segment_readers().len();
                     let done = commits >= 9 && segments < commits;
                     if done && start.elapsed() > Duration::from_secs(1) {
                         break;
