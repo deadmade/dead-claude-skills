@@ -17,6 +17,12 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   together.
 - `plugins/cswap/`: a mod wrapping the external `claude-swap` CLI, whose release tag is pinned in `installer/cswap.json`
   (bumped by `sync-cswap.yml`).
+- `plugins/web-mcp/`: a stdio MCP server (Rust, `server/`) with `search`, `fetch`, `browser` and `lookup`, built per platform like
+  brv (`build-web-mcp.yml`); the installer downloads it and sets `binPath`. Everything it pulls lands in
+  `$CLAUDE_PROJECT_DIR/.web/` before Claude sees it. Ranking is BM25 only: the H4 experiment (`examples/h4.rs`, `h4`
+  feature) showed embeddings don't help, so none ship. `browser` drives the npm CLI `agent-browser`, pinned in
+  `installer/agent-browser.json` (bumped by `sync-agent-browser.yml`). Test-only hooks: `WEB_MCP_TEST_PUBLIC_IP`
+  (debug builds or the `test-hooks` feature) treats a comma-separated list of IPs as public; `WEB_MCP_FALLBACK_MS` shortens the fetch browser fallback's deadline, `WEB_MCP_PAPERS_MS` each paper source's (8 s), `WEB_MCP_LOOKUP_MS` each lookup source's.
 - `plugins/languages/`: a grouping folder (`GROUPS` in `scripts/plugin-dirs.mjs`); each folder under it is a plugin.
   `rust-skills` and `csharp-skills` are vendored (`sync-rust.mjs`, `sync-csharp.mjs`). `paths:` frontmatter doesn't
   gate plugin skills in Claude Code (checked on 2.1.272 and 2.1.296), so csharp-skills exposes six router skills over an
@@ -60,7 +66,7 @@ and brv's `Cargo.toml`/`Cargo.lock`. `check-repo.mjs` fails on drift. Never bump
     npm run release -- patch      # on main, clean tree; bumps, runs npm test, commits and tags
     git push --follow-tags origin main
 
-The `v*` tag runs `release.yml`, which builds brv and cswap.exe and publishes the GitHub release the installer
+The `v*` tag runs `release.yml`, which builds brv, web-mcp and cswap.exe and publishes the GitHub release the installer
 downloads from. Removing a plugin from the marketplace is enough to retire it: the installer uninstalls installed
 plugins of ours that the manifest no longer lists.
 
@@ -69,6 +75,7 @@ plugins of ours that the manifest no longer lists.
 - `npm test`: repo checks plus all `installer/*.test.mjs`, `scripts/*.test.mjs` and `plugins/notify/hooks/*.test.mjs` (`claude plugin validate` is skipped when `claude` isn't
   on PATH).
 - brv: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `plugins/tui-review/brv`.
+- web-mcp: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `plugins/web-mcp/server`.
 - tui-review mod tests need a generated fixture first, from `plugins/tui-review/brv`:
   `cargo run --release -- gen --out <dir> && node ../tests/make-fixture.mjs <dir>`, then `claude plugin test .` in
   `plugins/tui-review`.
@@ -78,5 +85,5 @@ plugins of ours that the manifest no longer lists.
 - `nix fmt` formats everything per `treefmt.toml` (alejandra, prettier for js/ts/json/md/yaml, rustfmt).
 
 CI: `test.yml` (npm test and cswap mod tests, Linux and Windows) on every PR and push to main; `tui-review.yml` on
-PRs touching tui-review; `build-brv.yml`/`build-cswap.yml` on PRs touching the workflow (or the cswap pin) and from `release.yml`; `sync-*.yml`
+PRs touching tui-review; `web-mcp.yml` on PRs touching web-mcp; `build-brv.yml`/`build-web-mcp.yml`/`build-cswap.yml` on PRs touching the workflow (or the cswap pin) and from `release.yml`; `sync-*.yml`
 weekly.

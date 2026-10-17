@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Interactive installer for the dead-claude-skills marketplace. Decisions live in core.mjs.
 import { spawn, spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import {
   chmodSync,
   cpSync,
@@ -24,8 +24,9 @@ import {
   MARKETPLACE,
   OFFICIAL,
   TOGGLES,
-  brvAction,
-  brvAsset,
+  BIN_PLUGINS,
+  binAction,
+  binAsset,
   bundleIds,
   categorize,
   cswapCurrent,
@@ -38,11 +39,16 @@ import {
   hasDcgHook,
   isOurStatusLine,
   isSandboxOn,
+  isWebBuiltinsOff,
+  searxngRun,
+  webBuiltinsDecision,
   isStripped,
   mergeSettings,
   isShipped,
   marketplaceArg,
   missingBinaries,
+  agentBrowserAction,
+  agentBrowserVersion,
   nameOf,
   manifestPath,
   needsToken,
@@ -60,13 +66,14 @@ import {
   stripDefaults,
   unavailable,
 } from './core.mjs';
-import { backup, clearTargets, writeAtomic } from './files.mjs';
+import { backup, clearTargets, writeAtomic, writeSearxng } from './files.mjs';
 import { confirm, line, log, note, progress, screen } from './ui.mjs';
 import { changeList, initial, move, render } from './view.mjs';
 
 const PKG = join(import.meta.dirname, '..');
 const CONFIG = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude');
 const SETTINGS = join(CONFIG, 'settings.json');
+const SEARXNG = join(CONFIG, 'searxng');
 const RULES = join(CONFIG, 'rules', 'dead-claude-skills.md');
 const CCSL = join(homedir(), '.config', 'ccstatusline', 'settings.json');
 const WIN = process.platform === 'win32';
@@ -266,16 +273,51 @@ async function applyCswap(on) {
   else failures.push(`cswap: couldn't add ${dl.dir} to PATH; add it by hand`);
 }
 
-// --- brv, tui-review's binary --------------------------------------------------------------------------------------
-const TUI_REVIEW = `tui-review@${MARKETPLACE}`;
-const BRV_DIR = join(CONFIG, 'bin');
-const BRV_VERSION = readJson(join(PKG, 'plugins', 'tui-review', '.claude-plugin', 'plugin.json')).version;
+// web-mcp's `browser` tool drives the npm CLI agent-browser, pinned in installer/agent-browser.json. Asks first; every
+// failure is a summary line. Linux's --with-deps runs sudo, so it has its own prompt (default no).
+async function applyAgentBrowser() {
+  const pinned = readJson(join(PKG, 'installer', 'agent-browser.json')).upstream;
+  // The pin goes into a shell string on Windows (npm's .cmd shim), so it must be a plain version.
+  if (!/^\d+\.\d+\.\d+$/.test(pinned)) return failures.push(`agent-browser: bad pin ${JSON.stringify(pinned)}`);
+  const have = onPath('agent-browser')
+    ? spawnSync('agent-browser', ['--version'], { encoding: 'utf8', shell: WIN })
+    : undefined;
+  const installed = have?.status === 0 ? agentBrowserVersion(have.stdout) : undefined;
+  const action = agentBrowserAction({ installed, pinned });
+  if (action === 'skip') return;
+  const what = action === 'install' ? 'Install' : `Upgrade ${installed} to`;
+  if (!(await ask(`${what} agent-browser ${pinned} (npm -g, then its browser download)?`, true)))
+    return done.push('agent-browser: install skipped by you');
+  const deps =
+    process.platform === 'linux' &&
+    (await ask('Also install the browser system packages (agent-browser install --with-deps, runs sudo)?', false));
+  const steps = [
+    ['npm', ['install', '-g', `agent-browser@${pinned}`]],
+    ['agent-browser', deps ? ['install', '--with-deps'] : ['install']],
+  ];
+  for (const [bin, args] of steps) {
+    log('info', `Running ${bin} ${args.join(' ')}`);
+    const r = spawnSync(bin, args, { stdio: 'inherit', shell: WIN });
+    if (r.status !== 0)
+      return failures.push(
+        `agent-browser: \`${bin} ${args.join(' ')}\` failed (${r.error?.code ?? `exit ${r.status}`})`,
+      );
+  }
+  done.push(`agent-browser: ${action === 'install' ? 'installed' : 'upgraded to'} ${pinned}`);
+}
 
-// The version a brv binary reports, or undefined when there is none or it does not run.
-function brvVersionAt(path) {
+// --- brv and web-mcp, the binaries of tui-review and web-mcp ---------------------------------------------------------
+const TUI_REVIEW = `tui-review@${MARKETPLACE}`;
+const WEB_MCP = `web-mcp@${MARKETPLACE}`;
+const BIN_DIR = join(CONFIG, 'bin');
+// One repo version: tui-review's plugin.json is the release both binaries come from.
+const BIN_VERSION = readJson(join(PKG, 'plugins', 'tui-review', '.claude-plugin', 'plugin.json')).version;
+
+// The version a binary reports (`<name> <version>`), or undefined when there is none or it does not run.
+function binVersionAt(name, path) {
   if (!existsSync(path)) return undefined;
   const r = spawnSync(path, ['--version'], { encoding: 'utf8' });
-  return /^brv (\S+)/.exec(r.stdout ?? '')?.[1];
+  return new RegExp(`^${name} (\\S+)`).exec(r.stdout ?? '')?.[1];
 }
 
 async function fetchOk(url) {
@@ -286,7 +328,7 @@ async function fetchOk(url) {
 }
 
 // Downloads the release archive, checks it against its .sha256, and puts the binary at `bin` in one rename.
-async function downloadBrv(asset, bin) {
+async function downloadBin(name, asset, bin) {
   const [archive, sum] = await Promise.all([
     fetchOk(asset.url).then((r) => r.arrayBuffer()),
     fetchOk(asset.sha256).then((r) => r.text()),
@@ -294,7 +336,7 @@ async function downloadBrv(asset, bin) {
   const bytes = Buffer.from(archive);
   if (sha256Of(sum) !== createHash('sha256').update(bytes).digest('hex'))
     throw new Error(`${asset.file}: checksum mismatch`);
-  const tmp = mkdtempSync(join(tmpdir(), 'brv-'));
+  const tmp = mkdtempSync(join(tmpdir(), `${name}-`));
   try {
     const file = join(tmp, asset.file);
     writeFileSync(file, bytes);
@@ -302,7 +344,7 @@ async function downloadBrv(asset, bin) {
     const r = spawnSync('tar', ['-xf', file, '-C', tmp], { encoding: 'utf8' });
     if (r.status !== 0)
       throw new Error(`could not unpack ${asset.file}: ${(r.stderr || r.error?.message || '').trim()}`);
-    mkdirSync(BRV_DIR, { recursive: true });
+    mkdirSync(BIN_DIR, { recursive: true });
     const staged = `${bin}.tmp-${process.pid}`;
     cpSync(join(tmp, asset.exe), staged);
     chmodSync(staged, 0o755);
@@ -312,35 +354,90 @@ async function downloadBrv(asset, bin) {
   }
 }
 
-// tui-review needs brv: a brv on PATH is used as is; otherwise the release for this version goes to ~/.claude/bin
-// and the plugin's brvPath points at it.
-async function applyBrv() {
-  const version = BRV_VERSION;
-  const asset = brvAsset(process.platform, process.arch, version);
-  const bin = join(BRV_DIR, asset?.exe ?? (WIN ? 'brv.exe' : 'brv'));
-  const action = brvAction({
-    onPath: onPath('brv'),
-    installed: brvVersionAt(bin),
+// A plugin that needs its binary: one on PATH is used as is; otherwise the release for this version goes to
+// ~/.claude/bin and the plugin's userConfig key points at it.
+async function applyBin(pluginName, plugin) {
+  const { name, key } = BIN_PLUGINS[pluginName];
+  const version = BIN_VERSION;
+  const asset = binAsset(name, process.platform, process.arch, version);
+  const bin = join(BIN_DIR, asset?.exe ?? (WIN ? `${name}.exe` : name));
+  const action = binAction({
+    onPath: onPath(name),
+    installed: binVersionAt(name, bin),
     version,
     supported: asset !== undefined,
   });
-  const build =
-    'build it with `cargo build --release` in plugins/tui-review/brv and set its path with /plugin configure tui-review';
-  if (action === 'skip') return done.push('brv: using the one on PATH');
+  const build = `build it with \`cargo build --release\` in plugins/${pluginName}/${pluginName === 'web-mcp' ? 'server' : 'brv'} and set its path with /plugin configure ${pluginName}`;
+  if (action === 'skip') return done.push(`${name}: using the one on PATH`);
   if (action === 'unsupported')
-    return failures.push(`brv: no release build for ${process.platform}-${process.arch}; ${build}`);
+    return failures.push(`${name}: no release build for ${process.platform}-${process.arch}; ${build}`);
   if (action === 'download') {
-    const r = await progress(`Downloading brv ${version}`, async () => {
-      await downloadBrv(asset, bin);
+    const r = await progress(`Downloading ${name} ${version}`, async () => {
+      await downloadBin(name, asset, bin);
       return { ok: true };
     });
-    if (!r.ok) return failures.push(`brv ${version}: ${r.err}; ${build}`);
-    done.push(`installed brv ${version} to ${bin}`);
+    if (!r.ok) return failures.push(`${name} ${version}: ${r.err}; ${build}`);
+    done.push(`installed ${name} ${version} to ${bin}`);
   }
-  const r = await claude(JSON.stringify({ brvPath: bin }), 'plugin', 'configure', TUI_REVIEW, '--values-stdin');
-  if (r.ok) done.push(`tui-review: brvPath is ${bin}`);
+  const r = await claude(JSON.stringify({ [key]: bin }), 'plugin', 'configure', plugin, '--values-stdin');
+  if (r.ok) done.push(`${pluginName}: ${key} is ${bin}`);
   else
-    failures.push(`tui-review: could not set brvPath (${r.err}); set it to ${bin} with /plugin configure tui-review`);
+    failures.push(
+      `${pluginName}: could not set ${key} (${r.err}); set it to ${bin} with /plugin configure ${pluginName}`,
+    );
+}
+
+// SearXNG in Docker for web-mcp's search. True when it answers JSON on 127.0.0.1:8888 within 30 s. Every failure is a
+// summary line, never a crash. An existing settings.yml is kept so the running container's secret stays valid.
+async function applySearxng(denied) {
+  if (!onPath('docker')) {
+    failures.push(
+      `SearXNG: docker not found; write ${join(SEARXNG, 'settings.yml')} (see installer/searxng.yml) and run: docker ${searxngRun(SEARXNG).join(' ')}`,
+    );
+    return false;
+  }
+  const docker = (...args) => spawnSync('docker', args, { encoding: 'utf8' });
+  try {
+    if (
+      writeSearxng(
+        SEARXNG,
+        readFileSync(join(PKG, 'installer', 'searxng.yml'), 'utf8'),
+        randomBytes(32).toString('hex'),
+      )
+    )
+      done.push(`wrote ${join(SEARXNG, 'settings.yml')}`);
+    const exists = docker('container', 'inspect', 'searxng').status === 0;
+    if (!exists) log('info', 'First run pulls the SearXNG image and may take a minute');
+    const r = exists ? docker('start', 'searxng') : docker(...searxngRun(SEARXNG));
+    if (r.status !== 0) {
+      failures.push(
+        `SearXNG: docker ${exists ? 'start' : 'run'} failed (${r.error?.code ?? (r.stderr || `exit ${r.status}`).trim()})`,
+      );
+      return false;
+    }
+  } catch (e) {
+    failures.push(`SearXNG: ${e.message}`);
+    return false;
+  }
+  const healthy = await progress('Waiting for SearXNG', async () => {
+    for (const end = Date.now() + 30000; Date.now() < end; await new Promise((r) => setTimeout(r, 1000))) {
+      try {
+        const res = await fetch('http://127.0.0.1:8888/search?q=test&format=json', {
+          signal: AbortSignal.timeout(3000),
+        });
+        if (res.ok && (await res.json())) return { ok: true };
+      } catch {
+        /* not up yet */
+      }
+    }
+    return { ok: false };
+  });
+  if (healthy.ok) done.push('SearXNG answers on 127.0.0.1:8888');
+  else
+    failures.push(
+      `SearXNG did not answer JSON within 30 s; ${denied ? 'WebSearch and WebFetch stay denied; start SearXNG (docker start searxng)' : 'the built-in WebSearch and WebFetch stay on'}. If ${join(SEARXNG, 'settings.yml')} predates this installer, check that search.formats includes json`,
+    );
+  return healthy.ok;
 }
 
 function onPath(bin) {
@@ -439,16 +536,22 @@ const current = {
   dcg: hasDcgHook(settingsNow),
   'strip-defaults': isStripped(settingsNow),
   clean: false,
+  'web-builtins-off': isWebBuiltinsOff(settingsNow),
 };
 const chosen = {
   ...current,
   'strip-defaults': FLAGS.includes('--strip-defaults') || current['strip-defaults'],
   clean: FLAGS.includes('--clean'),
+  // On by default where offered, until web-mcp is installed; then it keeps the user's choice. It does nothing unless
+  // web-mcp is selected and SearXNG answers.
+  'web-builtins-off': has(WEB_MCP)
+    ? current['web-builtins-off']
+    : unavailable('web-builtins-off', process.platform, process.arch, BIN_VERSION) === undefined,
 };
 
 // Options that can't work here stay off the pages, unless they're on already: hiding never removes anything.
 const hidden = [...opts, ...TOGGLES]
-  .map((key) => ({ key, why: unavailable(key, process.platform, process.arch, BRV_VERSION) }))
+  .map((key) => ({ key, why: unavailable(key, process.platform, process.arch, BIN_VERSION) }))
   .filter((h) => h.why && !current[h.key]);
 const pages = categorize([...opts, ...TOGGLES].filter((k) => !hidden.some((h) => h.key === k)));
 
@@ -578,7 +681,15 @@ for (const u of changeList(state, data).update) {
 }
 if (plan.uninstall.length || data.retired.length || dupes.length || foreign.length)
   await run('Pruning unused dependencies', 'pruned unused dependencies', 'plugin', 'prune', '-y');
-if (selected.includes(TUI_REVIEW)) await applyBrv();
+if (selected.includes(TUI_REVIEW)) await applyBin('tui-review', TUI_REVIEW);
+if (selected.includes(WEB_MCP)) await applyBin('web-mcp', WEB_MCP);
+
+const webBuiltinsOff = webBuiltinsDecision({
+  toggle: selected.includes(WEB_MCP) && on('web-builtins-off'),
+  was: current['web-builtins-off'],
+  installed: has(WEB_MCP),
+  healthy: selected.includes(WEB_MCP) && (await applySearxng(current['web-builtins-off'])),
+});
 
 const nightCity = selected.some((id) => nameOf(id) === 'night-city');
 const notify = selected.some((id) => nameOf(id) === 'notify');
@@ -589,11 +700,13 @@ const toggles = {
   version: VERSION,
   nightCity,
   notify,
+  webBuiltinsOff,
 };
 await applySettings(toggles, { strip, reset: clean });
 const autoUpdate = tryJson(join(CONFIG, 'plugins', 'known_marketplaces.json'))?.[MARKETPLACE]?.autoUpdate;
 await applyCcstatusline(current.ccstatusline, on('ccstatusline'), nightCity);
 await applyDcg(current.dcg, on('dcg'));
+if (selected.includes(WEB_MCP)) await applyAgentBrowser();
 await applyCswap(selected.some((id) => nameOf(id) === 'cswap'));
 if (clean) done.push(...clearTargets(CONFIG));
 // The global instructions moved into a dead-skills SessionStart hook; the old file would duplicate them.

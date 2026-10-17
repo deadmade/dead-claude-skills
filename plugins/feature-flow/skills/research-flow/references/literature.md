@@ -11,8 +11,9 @@ Launch one `general-purpose` agent in the background with this prompt, filled in
 Research the scientific literature on: <feature and the question it should answer, in one paragraph>.
 This codebase: <language, the subsystem it touches, the workload: data sizes, hardware, users, as far as known>.
 
-Use the paper-lookup skill (Skill tool) for every search and lookup. If it isn't available, use WebSearch/WebFetch
-on arxiv.org, Semantic Scholar or the publisher's page, and mark those rows "weak provenance".
+Use web-mcp's `search` with `papers: true` for every search and lookup, and paper-lookup for citation lookups (who
+cites a paper). Without web-mcp, use paper-lookup for everything; without either, WebSearch/WebFetch on arxiv.org,
+Semantic Scholar or the publisher's page, rows marked weak provenance.
 
 Find 5–10 papers, in this order: surveys or systematic reviews, then the primary studies they point to, then
 replications and negative results. For each claim that bears on the design, one row:

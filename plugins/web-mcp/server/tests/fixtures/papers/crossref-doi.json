@@ -1,0 +1,10 @@
+{
+  "status": "ok",
+  "message-type": "work",
+  "message": {
+    "DOI": "10.7717/peerj.4375",
+    "title": ["The state of OA: a large-scale analysis"],
+    "abstract": "<jats:p>Despite growing interest in <jats:italic>Open Access</jats:italic> (OA).</jats:p>",
+    "issued": { "date-parts": [[2018, 2, 13]] }
+  }
+}

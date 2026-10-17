@@ -47,7 +47,7 @@ for (const dir of pluginDirs) {
   if (!market.some((p) => p.source === `./${dir}`)) problems.push(`${dir} is not listed in ${MARKETPLACE}`);
 }
 
-// --- one version: package.json, marketplace metadata.version, every local plugin.json and brv (scripts/release.mjs) ---
+// --- one version: package.json, marketplace metadata.version, every local plugin.json and each Rust crate (scripts/release.mjs) ---
 const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
 const marketVersion = JSON.parse(readFileSync(MARKETPLACE, 'utf8')).metadata?.version;
 if (marketVersion !== version)
@@ -57,12 +57,16 @@ for (const dir of pluginDirs) {
   const v = existsSync(manifest) && JSON.parse(readFileSync(manifest, 'utf8')).version;
   if (v !== version) problems.push(`${manifest}: version is ${v}, package.json has ${version}`);
 }
-const CARGO = 'plugins/tui-review/brv/Cargo.toml';
-const brv = /^version = "(.*)"/m.exec(readFileSync(CARGO, 'utf8'))?.[1];
-if (brv !== version) problems.push(`${CARGO}: version is ${brv}, package.json has ${version}`);
-const LOCK = 'plugins/tui-review/brv/Cargo.lock';
-const locked = /^name = "brv"\r?\nversion = "(.*)"/m.exec(readFileSync(LOCK, 'utf8'))?.[1];
-if (locked !== version) problems.push(`${LOCK}: brv is ${locked}, package.json has ${version}`);
+const CRATES = [
+  { cargo: 'plugins/tui-review/brv/Cargo.toml', lock: 'plugins/tui-review/brv/Cargo.lock', name: 'brv' },
+  { cargo: 'plugins/web-mcp/server/Cargo.toml', lock: 'plugins/web-mcp/server/Cargo.lock', name: 'web-mcp' },
+];
+for (const { cargo, lock, name } of CRATES) {
+  const crate = /^version = "(.*)"/m.exec(readFileSync(cargo, 'utf8'))?.[1];
+  if (crate !== version) problems.push(`${cargo}: version is ${crate}, package.json has ${version}`);
+  const locked = new RegExp(`^name = "${name}"\\r?\\nversion = "(.*)"`, 'm').exec(readFileSync(lock, 'utf8'))?.[1];
+  if (locked !== version) problems.push(`${lock}: ${name} is ${locked}, package.json has ${version}`);
+}
 
 if (problems.length) {
   console.error(problems.map((p) => `✗ ${p}`).join('\n'));

@@ -11,6 +11,8 @@ import {
   NIGHT_CITY_THEME,
   safeArg,
   missingBinaries,
+  agentBrowserAction,
+  agentBrowserVersion,
   SECRET_DENIES,
   isSandboxOn,
   hasDcgHook,
@@ -30,13 +32,19 @@ import {
   cswapDownload,
   cswapCurrent,
   pathWith,
-  brvAsset,
+  BIN_PLUGINS,
+  binAsset,
   sha256Of,
-  brvAction,
+  binAction,
   CATEGORIES,
   TOGGLES,
   categorize,
   unavailable,
+  searxngRun,
+  searxngSettings,
+  webBuiltinsDecision,
+  isWebBuiltinsOff,
+  HINTS,
   outdated,
   shippedVersions,
   manifestPath,
@@ -72,6 +80,7 @@ test('opt-ins from the real manifests', () => {
         'self-review',
         'tob-picks',
         'tui-review',
+        'web-mcp',
       ].map((n) => `${n}@${M}`),
       ...['csharp-lsp', 'hookify', 'pyright-lsp', 'rust-analyzer-lsp', 'skill-creator', 'typescript-lsp'].map(
         (n) => `${n}@${O}`,
@@ -342,18 +351,43 @@ test('cswap missing on Linux points at uv', () => {
 });
 
 test('brv downloads the release archive built for this machine', () => {
-  const win = brvAsset('win32', 'x64', '1.2.3');
+  const win = binAsset('brv', 'win32', 'x64', '1.2.3');
   assert.equal(
     win.url,
     'https://github.com/deadmade/dead-claude-skills/releases/download/v1.2.3/brv-x86_64-pc-windows-msvc.zip',
   );
   assert.equal(win.sha256, `${win.url}.sha256`);
   assert.equal(win.exe, 'brv.exe');
-  assert.equal(brvAsset('linux', 'x64', '1.0.0').file, 'brv-x86_64-unknown-linux-musl.tar.gz');
-  assert.equal(brvAsset('linux', 'arm64', '1.0.0').file, 'brv-aarch64-unknown-linux-musl.tar.gz');
-  assert.equal(brvAsset('darwin', 'arm64', '1.0.0').exe, 'brv');
-  assert.equal(brvAsset('win32', 'arm64', '1.0.0'), undefined);
-  assert.equal(brvAsset('freebsd', 'x64', '1.0.0'), undefined);
+  assert.equal(binAsset('brv', 'linux', 'x64', '1.0.0').file, 'brv-x86_64-unknown-linux-musl.tar.gz');
+  assert.equal(binAsset('brv', 'linux', 'arm64', '1.0.0').file, 'brv-aarch64-unknown-linux-musl.tar.gz');
+  assert.equal(binAsset('brv', 'darwin', 'arm64', '1.0.0').exe, 'brv');
+  assert.equal(binAsset('brv', 'win32', 'arm64', '1.0.0'), undefined);
+  assert.equal(binAsset('brv', 'freebsd', 'x64', '1.0.0'), undefined);
+});
+
+test('web-mcp downloads its own archive, and each plugin is configured under its own key', () => {
+  const t = {
+    'win32-x64': 'x86_64-pc-windows-msvc',
+    'linux-x64': 'x86_64-unknown-linux-musl',
+    'linux-arm64': 'aarch64-unknown-linux-musl',
+    'darwin-arm64': 'aarch64-apple-darwin',
+    'darwin-x64': 'x86_64-apple-darwin',
+  };
+  for (const [k, target] of Object.entries(t)) {
+    const [platform, arch] = k.split('-');
+    for (const name of ['brv', 'web-mcp']) {
+      const a = binAsset(name, platform, arch, '1.2.3');
+      assert.equal(a.file, `${name}-${target}.${platform === 'win32' ? 'zip' : 'tar.gz'}`);
+      assert.equal(a.exe, name + (platform === 'win32' ? '.exe' : ''));
+    }
+  }
+  assert.equal(binAsset('web-mcp', 'linux', 'ia32', '1.0.0'), undefined);
+  assert.deepEqual(BIN_PLUGINS['tui-review'], { name: 'brv', key: 'brvPath' });
+  assert.deepEqual(BIN_PLUGINS['web-mcp'], { name: 'web-mcp', key: 'binPath' });
+  for (const [plugin, { key }] of Object.entries(BIN_PLUGINS))
+    assert.ok(json(`plugins/${plugin}/.claude-plugin/plugin.json`).userConfig[key], `${plugin} has userConfig ${key}`);
+  assert.match(unavailable('web-mcp', 'linux', 'ia32', '1.0.0'), /no web-mcp build for linux-ia32/);
+  assert.equal(unavailable('web-mcp', 'linux', 'x64', '1.0.0'), undefined);
 });
 
 test('brv versions match the release the installer fetches', () => {
@@ -367,7 +401,7 @@ test('brv checksum lines and what to do about brv', () => {
   assert.equal(sha256Of(`${hex}`), hex.toLowerCase());
   assert.equal(sha256Of('Not Found'), undefined);
   assert.equal(sha256Of(`${hex}ff  x`), undefined);
-  const at = (o) => brvAction({ onPath: false, installed: undefined, version: '0.2.0', supported: true, ...o });
+  const at = (o) => binAction({ onPath: false, installed: undefined, version: '0.2.0', supported: true, ...o });
   assert.equal(at({ onPath: true }), 'skip');
   assert.equal(at({ installed: '0.2.0' }), 'configure');
   assert.equal(at({ installed: '0.1.0' }), 'download');
@@ -546,4 +580,58 @@ test('notify turns the built-in notification off, and deselecting restores it', 
   assert.equal(channel({ preferredNotifChannel: 'notifications_disabled' }, false), undefined);
   assert.equal(channel({ preferredNotifChannel: 'kitty' }, false), 'kitty');
   assert.equal(channel({ preferredNotifChannel: 'kitty' }, true), 'notifications_disabled');
+});
+
+test('searxng binds loopback, mounts the config dir and takes the secret', () => {
+  const args = searxngRun('/c/searxng');
+  assert.ok(args.includes('127.0.0.1:8888:8080'));
+  assert.ok(args.includes('/c/searxng:/etc/searxng/'));
+  const tpl = readFileSync(new URL('./searxng.yml', import.meta.url), 'utf8');
+  const out = searxngSettings(tpl, 'abc123');
+  assert.match(out, /secret_key: "abc123"/);
+  assert.doesNotMatch(out, /changeme/);
+  assert.match(out, /- json/);
+  // \r?: Windows checkouts turn the template's line endings into CRLF.
+  assert.match(out, /name: bing\r?\n\s+disabled: false/);
+  for (const e of ['duckduckgo', 'brave', 'google cse'])
+    assert.match(out, new RegExp(`name: ${e}\\r?\\n\\s+disabled: true`));
+});
+
+test('web builtins: tri-state merge keeps other denies, toggle reads deny', () => {
+  const base = { permissions: { deny: ['Bash(sudo:*)'] } };
+  const off = mergeSettings(base, { webBuiltinsOff: true });
+  assert.ok(['Bash(sudo:*)', 'WebFetch', 'WebSearch'].every((d) => off.permissions.deny.includes(d)));
+  assert.ok(isWebBuiltinsOff(off));
+  assert.deepEqual(mergeSettings(off, { webBuiltinsOff: true }), off);
+  assert.deepEqual(mergeSettings(off, {}).permissions.deny, off.permissions.deny);
+  const back = mergeSettings(off, { webBuiltinsOff: false });
+  assert.ok(!back.permissions.deny.includes('WebFetch') && !back.permissions.deny.includes('WebSearch'));
+  assert.ok(back.permissions.deny.includes('Bash(sudo:*)'));
+  assert.ok(!isWebBuiltinsOff(back));
+  assert.ok(!isWebBuiltinsOff({ permissions: { deny: ['WebFetch'] } }));
+  assert.ok(TOGGLES.includes('web-builtins-off') && HINTS['web-builtins-off']);
+  assert.ok(missingBinaries('linux', ['web-mcp'], () => false).some((r) => r.binary === 'docker'));
+});
+
+test('web builtins decision table', () => {
+  for (const was of [true, false]) {
+    assert.equal(webBuiltinsDecision({ toggle: true, was, healthy: true, installed: true }), true);
+    assert.equal(webBuiltinsDecision({ toggle: true, was, healthy: false }), undefined);
+  }
+  assert.equal(webBuiltinsDecision({ toggle: false, was: true, healthy: true, installed: true }), false);
+  assert.equal(webBuiltinsDecision({ toggle: false, was: true, healthy: false, installed: true }), false);
+  assert.equal(webBuiltinsDecision({ toggle: false, was: false, healthy: true }), undefined);
+  assert.equal(webBuiltinsDecision({ toggle: false, was: false, healthy: false }), undefined);
+  // Hand-added denies of someone who never had web-mcp stay.
+  assert.equal(webBuiltinsDecision({ toggle: false, was: true, healthy: false, installed: false }), undefined);
+});
+
+test('agent-browser: install when missing, upgrade when older, keep when equal or newer', () => {
+  const pinned = '0.39.1';
+  assert.equal(agentBrowserAction({ installed: undefined, pinned }), 'install');
+  assert.equal(agentBrowserAction({ installed: '0.38.0', pinned }), 'upgrade');
+  assert.equal(agentBrowserAction({ installed: '0.39.1', pinned }), 'skip');
+  assert.equal(agentBrowserAction({ installed: '0.40.0', pinned }), 'skip');
+  assert.equal(agentBrowserVersion('agent-browser 0.39.1\n'), '0.39.1');
+  assert.equal(agentBrowserVersion('nope'), undefined);
 });

@@ -12,7 +12,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { backup, clearTargets } from './files.mjs';
+import { backup, clearTargets, writeSearxng } from './files.mjs';
 
 // A config dir with a skill, settings.json, a symlinked rules dir (home-manager) and a file clean never touches.
 function config() {
@@ -55,3 +55,10 @@ test(
     chmodSync(join(cfg, 'skills', 'x', 'SKILL.md'), 0o644);
   },
 );
+
+test('searxng settings are written once, the first secret stays', () => {
+  const dir = join(mkdtempSync(join(tmpdir(), 'sx-')), 'searxng');
+  assert.equal(writeSearxng(dir, 'secret_key: "x"\n', 'one'), true);
+  assert.equal(writeSearxng(dir, 'secret_key: "x"\n', 'two'), false);
+  assert.equal(readFileSync(join(dir, 'settings.yml'), 'utf8'), 'secret_key: "one"\n');
+});

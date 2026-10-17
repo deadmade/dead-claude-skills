@@ -1,0 +1,69 @@
+{"kind":"search","run":0,"q":"rmcp rust mcp sdk stdio server example","ms":7643,"results":9,"chars":2663}
+{"kind":"search","run":0,"q":"tokio spawn vs spawn_blocking when to use","ms":7410,"results":9,"chars":2809}
+{"kind":"search","run":0,"q":"searxng json api format settings.yml","ms":12375,"results":10,"chars":2797}
+{"kind":"search","run":0,"q":"readability algorithm main content extraction benchmark","ms":6835,"results":10,"chars":2587}
+{"kind":"search","run":0,"q":"reciprocal rank fusion bm25 dense retrieval","ms":5797,"results":9,"chars":2594}
+{"kind":"search","run":0,"q":"agent-browser vercel snapshot refs","ms":7145,"results":10,"chars":3106}
+{"kind":"search","run":0,"q":"rust html to markdown crate","ms":6375,"results":9,"chars":2081}
+{"kind":"search","run":0,"q":"claude code mcp tool output token limit","ms":7040,"results":9,"chars":3624}
+{"kind":"search","run":0,"q":"tantivy query parser fuzzy search example","ms":7512,"results":9,"chars":2672}
+{"kind":"search","run":0,"q":"arxiv api rate limit","ms":6084,"results":9,"chars":2573}
+{"kind":"search","run":1,"q":"rmcp rust mcp sdk stdio server example","ms":5776,"results":9,"chars":2234}
+{"kind":"search","run":1,"q":"tokio spawn vs spawn_blocking when to use","ms":7855,"results":9,"chars":3087}
+{"kind":"search","run":1,"q":"searxng json api format settings.yml","ms":7082,"results":10,"chars":2755}
+{"kind":"search","run":1,"q":"readability algorithm main content extraction benchmark","ms":6354,"results":10,"chars":2991}
+{"kind":"search","run":1,"q":"reciprocal rank fusion bm25 dense retrieval","ms":6487,"results":9,"chars":3006}
+{"kind":"search","run":1,"q":"agent-browser vercel snapshot refs","ms":7102,"results":10,"chars":3122}
+{"kind":"search","run":1,"q":"rust html to markdown crate","ms":6487,"results":9,"chars":1898}
+{"kind":"search","run":1,"q":"claude code mcp tool output token limit","ms":6996,"results":9,"chars":3081}
+{"kind":"search","run":1,"q":"tantivy query parser fuzzy search example","ms":7232,"results":9,"chars":2546}
+{"kind":"search","run":1,"q":"arxiv api rate limit","ms":5992,"results":9,"chars":2631}
+{"kind":"search","run":2,"q":"rmcp rust mcp sdk stdio server example","ms":5627,"results":9,"chars":2292}
+{"kind":"search","run":2,"q":"tokio spawn vs spawn_blocking when to use","ms":6021,"results":9,"chars":3209}
+{"kind":"search","run":2,"q":"searxng json api format settings.yml","ms":6469,"results":10,"chars":2406}
+{"kind":"search","run":2,"q":"readability algorithm main content extraction benchmark","ms":7832,"results":10,"chars":3153}
+{"kind":"search","run":2,"q":"reciprocal rank fusion bm25 dense retrieval","ms":6370,"results":9,"chars":2872}
+{"kind":"search","run":2,"q":"agent-browser vercel snapshot refs","ms":6257,"results":10,"chars":2987}
+{"kind":"search","run":2,"q":"rust html to markdown crate","ms":6322,"results":9,"chars":2331}
+{"kind":"search","run":2,"q":"claude code mcp tool output token limit","ms":8515,"results":9,"chars":3159}
+{"kind":"search","run":2,"q":"tantivy query parser fuzzy search example","ms":6766,"results":9,"chars":2728}
+{"kind":"search","run":2,"q":"arxiv api rate limit","ms":6009,"results":9,"chars":2491}
+{"kind":"fetch","run":0,"url":"https://raw.githubusercontent.com/vercel-labs/agent-browser/main/README.md","ms":7590,"code":200,"bytes":105343,"chars":1920,"pageChars":103313,"recall":0}
+{"kind":"fetch","run":0,"url":"https://raw.githubusercontent.com/quickwit-oss/tantivy/main/README.md","ms":5326,"code":200,"bytes":7954,"chars":1497,"pageChars":7950,"recall":0.05}
+{"kind":"fetch","run":0,"url":"https://raw.githubusercontent.com/modelcontextprotocol/rust-sdk/main/README.md","ms":5234,"code":200,"bytes":69071,"chars":1674,"pageChars":68995,"recall":0}
+{"kind":"fetch","run":0,"url":"https://pypi.org/project/requests/","ms":8049,"code":200,"bytes":269791,"chars":1655,"pageChars":76317,"recall":0}
+{"kind":"fetch","run":0,"url":"https://code.claude.com/docs/en/mcp","ms":9387,"code":200,"bytes":123214,"chars":4129,"pageChars":121063,"recall":0}
+{"kind":"fetch","run":0,"url":"https://docs.searxng.org/dev/search_api.html","error":"no call (exit 0)"}
+{"kind":"fetch","run":0,"url":"https://doc.rust-lang.org/book/ch16-01-threads.html","error":"no call (exit 0)"}
+{"kind":"fetch","run":0,"url":"https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Caching","error":"no call (exit 0)"}
+{"kind":"fetch","run":0,"url":"https://en.wikipedia.org/wiki/Okapi_BM25","error":"no call (exit 0)"}
+{"kind":"fetch","run":0,"url":"https://arxiv.org/abs/1706.03762","error":"no call (exit 0)"}
+{"kind":"fetch","run":1,"url":"https://raw.githubusercontent.com/vercel-labs/agent-browser/main/README.md","ms":5553,"code":200,"bytes":105343,"chars":1883,"pageChars":103313,"recall":0}
+{"kind":"fetch","run":1,"url":"https://raw.githubusercontent.com/quickwit-oss/tantivy/main/README.md","ms":5464,"code":200,"bytes":7954,"chars":1596,"pageChars":7950,"recall":0}
+{"kind":"fetch","run":1,"url":"https://raw.githubusercontent.com/modelcontextprotocol/rust-sdk/main/README.md","ms":4751,"code":200,"bytes":69071,"chars":1359,"pageChars":68995,"recall":0}
+{"kind":"fetch","run":1,"url":"https://pypi.org/project/requests/","ms":6166,"code":200,"bytes":269791,"chars":1407,"pageChars":76317,"recall":0}
+{"kind":"fetch","run":1,"url":"https://code.claude.com/docs/en/mcp","ms":8103,"code":200,"bytes":123214,"chars":3677,"pageChars":121063,"recall":0}
+{"kind":"fetch","run":1,"url":"https://docs.searxng.org/dev/search_api.html","error":"no call (exit 0)"}
+{"kind":"fetch","run":1,"url":"https://doc.rust-lang.org/book/ch16-01-threads.html","error":"no call (exit 0)"}
+{"kind":"fetch","run":1,"url":"https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Caching","error":"no call (exit 0)"}
+{"kind":"fetch","run":1,"url":"https://en.wikipedia.org/wiki/Okapi_BM25","error":"no call (exit 0)"}
+{"kind":"fetch","run":1,"url":"https://arxiv.org/abs/1706.03762","error":"no call (exit 0)"}
+{"kind":"fetch","run":2,"url":"https://raw.githubusercontent.com/vercel-labs/agent-browser/main/README.md","ms":5718,"code":200,"bytes":105343,"chars":1902,"pageChars":103313,"recall":0}
+{"kind":"fetch","run":2,"url":"https://raw.githubusercontent.com/quickwit-oss/tantivy/main/README.md","ms":4009,"code":200,"bytes":7954,"chars":1097,"pageChars":7950,"recall":0}
+{"kind":"fetch","run":2,"url":"https://raw.githubusercontent.com/modelcontextprotocol/rust-sdk/main/README.md","ms":5789,"code":200,"bytes":69071,"chars":1569,"pageChars":68995,"recall":0}
+{"kind":"fetch","run":2,"url":"https://pypi.org/project/requests/","ms":6288,"code":200,"bytes":269791,"chars":1545,"pageChars":76317,"recall":0}
+{"kind":"fetch","run":2,"url":"https://code.claude.com/docs/en/mcp","ms":9137,"code":200,"bytes":123214,"chars":4498,"pageChars":121063,"recall":0}
+{"kind":"fetch","run":2,"url":"https://docs.searxng.org/dev/search_api.html","error":"no call (exit 0)"}
+{"kind":"fetch","run":2,"url":"https://doc.rust-lang.org/book/ch16-01-threads.html","error":"no call (exit 0)"}
+{"kind":"fetch","run":2,"url":"https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Caching","error":"no call (exit 0)"}
+{"kind":"fetch","run":2,"url":"https://en.wikipedia.org/wiki/Okapi_BM25","error":"no call (exit 0)"}
+{"kind":"fetch","run":2,"url":"https://arxiv.org/abs/1706.03762","error":"no call (exit 0)"}
+{"kind":"parallel","run":0,"calls":4,"spanMs":8429,"sumMs":24821}
+{"kind":"parallel","run":1,"calls":4,"spanMs":7145,"sumMs":22523}
+{"kind":"parallel","run":2,"calls":4,"spanMs":7206,"sumMs":22257}
+{"kind":"papers","run":0,"name":"arxiv id","ms":62.301703,"exit":1,"outChars":0,"err":"curl: (56) CONNECT tunnel failed, response 403\nerror: input was empty\n"}
+{"kind":"papers","run":0,"name":"arxiv search","ms":267.386767,"exit":1,"outChars":0,"err":"curl: (56) CONNECT tunnel failed, response 403\nerror: input was empty\n"}
+{"kind":"papers","run":0,"name":"openalex doi + abstract","ms":255.215562,"exit":1,"outChars":0,"err":"curl: (56) CONNECT tunnel failed, response 403\nerror: input was empty\n"}
+{"kind":"papers","run":0,"name":"openalex search","ms":288.869485,"exit":1,"outChars":0,"err":"curl: (56) CONNECT tunnel failed, response 403\nerror: input was empty\n"}
+{"kind":"papers","run":0,"name":"crossref doi","ms":248.417746,"exit":56,"outChars":3,"err":"curl: (56) CONNECT tunnel failed, response 403\n"}
+{"kind":"papers","run":0,"name":"semantic scholar arxiv id","ms":239.770085,"exit":56,"outChars":3,"err":"curl: (56) CONNECT tunnel failed, response 403\n"}

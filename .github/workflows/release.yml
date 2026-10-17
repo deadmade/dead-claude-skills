@@ -1,7 +1,7 @@
 name: Release
 
 # One release for the whole repo: scripts/release.mjs bumps package.json, the marketplace and every plugin to the
-# same version and tags vX.Y.Z; pushing that tag checks the repo, builds brv and cswap.exe (or carries the unchanged
+# same version and tags vX.Y.Z; pushing that tag checks the repo, builds brv, web-mcp and cswap.exe (or carries the unchanged
 # cswap.exe over from the latest release) and publishes the release.
 on:
   push:
@@ -71,8 +71,11 @@ jobs:
   brv:
     uses: ./.github/workflows/build-brv.yml
 
+  web-mcp:
+    uses: ./.github/workflows/build-web-mcp.yml
+
   publish:
-    needs: [check, cswap-reuse, cswap, brv]
+    needs: [check, cswap-reuse, cswap, brv, web-mcp]
     # cswap is skipped when its exe was carried over; any failure still stops the release.
     if: ${{ !cancelled() && !failure() }}
     runs-on: ubuntu-latest
@@ -81,7 +84,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # Every artifact of this run: cswap.exe and the brv archives, each with its .sha256.
+      # Every artifact of this run: cswap.exe, the brv and web-mcp archives, each with its .sha256.
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
@@ -96,4 +99,5 @@ jobs:
             --notes "Install or update with \`npx --allow-git=root github:deadmade/dead-claude-skills#$GITHUB_REF_NAME\`, which pins the marketplace to this release, or with \`/plugin update\` if you added the marketplace by hand.
 
           brv-*: the binary behind tui-review, for each platform; the installer downloads yours.
+          web-mcp-*: the binary behind the web-mcp plugin, for each platform; the installer downloads yours.
           cswap.exe is claude-swap $cswap (https://github.com/realiti4/claude-swap, MIT) compiled with Nuitka for Windows."
