@@ -84,6 +84,10 @@ phase: grill
   Worktrees: user chose "handle both": scan `.worktrees/*/` and `.claude/worktrees/*/` too, newest copy wins.
 - Claude's calls: the mod lives in the feature-flow plugin; the band yields to night-city's Onibi; skills accept a
   slug to resume one run.
+- Grill round 1 (2026-10-17): Q1 old open runs shown however old; Q2 key `1`, first prompt only; Q3 a done run
+  stays until session end; Q4 subagent writes count; Q5 no hide setting; Q6 research cells as written; Q7 CI step
+  plus CLAUDE.md Checks. User: "yes to all". Frontier empty. No CONTEXT.md terms (run/current run/open run are
+  defined in the spec) and no ADR (nothing hard to reverse).
 
 ## Plan review
 

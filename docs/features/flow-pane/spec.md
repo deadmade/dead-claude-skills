@@ -96,6 +96,17 @@ H: caching cuts p95 by 30% · baseline 412ms · feature 280ms · supported
 - Fits `e.props.bodyColumns`: drop segments from the right (count, then deviations) before truncating the slug.
 - The resume Button uses the digit hotkey `1` (a bare digit in an empty prompt presses a band Button).
 
+## Grilled (user, 2026-10-17)
+
+- **Old open runs:** the fallback shows the most recently changed open run however old it is; no age cut-off.
+- **Resume key:** `1`, shown only before this session wrote the run's flow.md and while no turn runs (below).
+- **Finished run:** stays on the band marked done, without the key, until the session ends (below).
+- **Subagent writes:** Write/Edit calls from subagents (`tool.call` with an `agentId`) count as this session's.
+- **No setting** to hide the band; add one only if it gets in the way.
+- **Research line:** the Results cells as written, truncated; no number parsing.
+- **CI:** a `claude plugin test .` step for `plugins/feature-flow` in `test.yml` (Linux and Windows); CLAUDE.md's
+  Checks/CI text names every mod test, night-city's included.
+
 ## Claude's calls (not discussed with the user)
 
 - **Resume key only when nothing runs:** the Button shows only while this session hasn't yet written the current run's
@@ -106,7 +117,8 @@ H: caching cuts p95 by 30% · baseline 412ms · feature 280ms · supported
   without the key, until the session ends; then it falls back to the open runs like any other.
 - **Night-city:** while Onibi visits (a few seconds) the flow band yields to it (see Surface). No change to
   night-city.
-- **"Last written by this session":** Write and Edit tool calls whose `file_path` ends in `docs/features/<slug>/flow.md`.
+- **"Last written by this session":** Write and Edit tool calls (subagents' included) whose `file_path` ends in
+  `docs/features/<slug>/flow.md`.
   Edits through Bash (`sed`) aren't seen; the mtime fallback covers them.
 - **Poll interval:** 5 seconds.
 - **Resume argument:** an argument that names an existing `docs/features/<slug>/flow.md` never creates a new run
