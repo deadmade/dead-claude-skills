@@ -112,6 +112,13 @@ None dropped; one downgraded (pane placement: `PaneOpenArgs` docs say a press is
   caught; C4 `/` separators internally; C5 size as well as mtime; C6 no non-terminal pane branch.
 - Co-author rule kept: it is the user's own startup-hook rule.
 
+Round 2 (2026-10-17, one opus reviewer, re-check after the task order changed): round-1 fixes confirmed in the kit.
+New findings were plan mechanics, applied without a user decision since none changes the spec: negative cache
+dropped by `$.clock.after` and `mock.clock` in every test; the person's close moved to the Manual check (the kit
+can't raise it); missing stat answered `{ deny: 'ENOENT' }`; `load` stats directly, not through the link cache;
+the checkpoint toast lands in Task 2's commit; prettier limited to touched paths; over-long replies `next(e)`
+unchanged; polling runs on error documents too; race-test setup and `host()` parameters spelled out.
+
 ## Deviations
 
 ## Walkthrough

@@ -26,7 +26,8 @@ dependencies. Types: `/tmp/claude-0/bundled-skills/2.1.302/0b885b2b5aea887736e0d
   and the reply has at least one linkable path; otherwise `next(e)`.
 - A path is linkable only if `$.fs.stat(path)` resolves with `kind === 'file'`; a rejection (missing, network path,
   OS error) means not linkable, never a thrown hook. Results are shared per path while in flight; a file result is
-  kept for the session, a not-a-file result for 2000 ms.
+  kept for the session, a not-a-file result until a `$.clock.after(2000, …)` drops it (no clock reads while
+  drawing). This cache only decides what gets linked; `load` and the refresh tick call `$.fs.stat` directly.
 - Paths are handled with `/` separators internally (`C:/proj/docs/a.md` on Windows; the host accepts it), `.`/`..`
   folded. Relative paths resolve against `$.session.cwd()` (replies) or the open document's folder, falling back to
   the cwd when that isn't a file (pane). `~` from `(await $.env.get('HOME')) ?? (await $.env.get('USERPROFILE'))`.
@@ -34,13 +35,13 @@ dependencies. Types: `/tmp/claude-0/bundled-skills/2.1.302/0b885b2b5aea887736e0d
 - `:line[:col]` and `#fragment` are accepted and stripped; documents open at the top.
 - Hrefs are absolute `file:///…`, percent-encoded outside unreserved ASCII and `/` (and the drive letter's `:`);
   hrefs over 2048 characters are not linked. Hrefs are de-duplicated; at most 256 per `Markdown`.
-- A redrawn reply whose rewritten text is over 99 000 characters is not intercepted:
-  `next({ ...e, props: { ...e.props, text } })` (links stay for ctrl+click).
+- A reply whose rewritten text is over 99 000 characters is not intercepted: `next(e)` unchanged (the engine would
+  cut a rewritten text at 100 000; reference.md, Drawing).
 - Pane text is rewritten first, then cut at the last newline at or before 99 000 characters, plus the note
   `\n\n_Cut at 99 000 characters; open the file elsewhere for the rest._`
 - Files over 4 MiB (`4 * 1024 * 1024` bytes by `stat().size`) are not read; the pane shows a one-line message.
 - Pane id `md-pane`, `$.ui.open({ id, title: <basename>, focus: true, closeOnEscape: true })`; `q` closes; closes
-  on `session.end`; refresh polls every 1000 ms only while the pane shows a document.
+  on `session.end`; refresh polls every 1000 ms while the atom holds a document, error documents included.
 - Module state (cache maps, timer, generation counter) is reset at the top of `register`, as
   `plugins/night-city/hooks/register.tsx:45-51` does.
 - Commit messages are one sentence; no co-author lines (the user's own rule).
@@ -62,6 +63,7 @@ dependencies. Types: `/tmp/claude-0/bundled-skills/2.1.302/0b885b2b5aea887736e0d
 ### Task 1: Scaffold, listing and path logic
 
 **Files:**
+
 - Create: `plugins/md-pane/.claude-plugin/plugin.json`, `plugins/md-pane/hooks/hooks.json`,
   `plugins/md-pane/tsconfig.json`, `plugins/md-pane/types/index.d.ts`, `plugins/md-pane/hooks/register.tsx` (an
   empty `register` for now), `plugins/md-pane/hooks/paths.ts`
@@ -70,6 +72,7 @@ dependencies. Types: `/tmp/claude-0/bundled-skills/2.1.302/0b885b2b5aea887736e0d
 - Test: `plugins/md-pane/hooks/paths.test.ts`
 
 **Interfaces:**
+
 - Produces (`hooks/paths.ts`):
   - `type Found = { start: number; end: number; raw: string; label: string; kind: 'bare' | 'code' | 'link' }` —
     `raw` is the path as written minus suffix/fragment (a `file:` target is passed through `fromHref`); `start`/`end`
@@ -97,7 +100,7 @@ dependencies. Types: `/tmp/claude-0/bundled-skills/2.1.302/0b885b2b5aea887736e0d
     `` `docs/my notes ü.md` ``.
   - `findPaths` finds nothing in: `https://github.com/x/README.md`, `[r](https://x.io/r.md)`,
     `[see docs/a.md](https://x.io)` (no nested link), `` `glow docs/a.md` ``, `version 1.2.3`, `a/b`, `notes.txt`,
-    and a ```` ``` ```` fenced block containing `docs/a.md`.
+    and a ` ``` ` fenced block containing `docs/a.md`.
   - `resolvePath('docs/a.md', '/proj', null)` → `/proj/docs/a.md`; `('../b.md', '/proj/docs', null)` → `/proj/b.md`;
     `('~/x.md', '/proj', '/home/u')` → `/home/u/x.md`; `('/abs/x.md', '/proj', null)` → `/abs/x.md`;
     `('docs\\a.md', 'C:\\proj', null)` → `C:/proj/docs/a.md`; `('~/x.md', 'C:\\proj', 'C:\\Users\\u')` →
@@ -110,20 +113,22 @@ dependencies. Types: `/tmp/claude-0/bundled-skills/2.1.302/0b885b2b5aea887736e0d
     the text unchanged.
 - [ ] **Step 2: Run to verify it fails** — `cd plugins/md-pane && claude plugin test .`: FAIL, exports missing.
 - [ ] **Step 3: Implement `hooks/paths.ts`, the scaffold and the listing.** One regex pass with three alternatives
-  (Markdown link, code span, bare token); link targets with a URL scheme other than `file:` (anything
-  `^[a-z][a-z0-9+.-]+:` that isn't a single drive letter) are skipped whole, label included.
+      (Markdown link, code span, bare token); link targets with a URL scheme other than `file:` (anything
+      `^[a-z][a-z0-9+.-]+:` that isn't a single drive letter) are skipped whole, label included.
 - [ ] **Step 4: Run to verify it passes** —
-  `npm test && cd plugins/md-pane && claude plugin validate . && claude plugin test . && npx -y -p typescript tsc -p .`:
-  all PASS, tsc clean.
+      `npm test && cd plugins/md-pane && claude plugin validate . && claude plugin test . && npx -y -p typescript tsc -p .`:
+      all PASS, tsc clean.
 - [ ] **Step 5: Commit** `git add -A && git commit -m "Add md-pane with its path finding, file links and listing."`
 
 ### Task 2: Reply links
 
 **Files:**
+
 - Modify: `plugins/md-pane/hooks/register.tsx`
 - Test: `plugins/md-pane/hooks/register.test.ts`
 
 **Interfaces:**
+
 - Consumes: Task 1's `findPaths`, `resolvePath`, `linkify`, `toHref`.
 - Produces (`register.tsx`, used by Tasks 3–4):
   - `isFile($: EngineInterface, path: string): Promise<{ size: number; mtimeMs: number } | null>` — the cached stat
@@ -135,27 +140,28 @@ dependencies. Types: `/tmp/claude-0/bundled-skills/2.1.302/0b885b2b5aea887736e0d
 - The reply tree is `<Markdown key="reply" text={text} onLinkPress={link => onPress($, link.href)} pressableLinks={hrefs} />`
   from `$.ui.resolve(e)`.
 
-- [ ] **Step 1: Write the failing tests.** A `host(on, files: Record<string, string>)` helper answers with
-  `{ value: … }`: `fs.stat` (`{ kind: 'file', size, mtimeMs, isLink: false }`, a directory entry for paths ending
-  `/`-less folders when given, a rejection for missing), `fs.read`, `session.cwd` → `/proj`,
-  `mock.env(on, { HOME: '/home/u' })`; it records `ui.open`, `ui.close`, `state.set` values, and counts
-  `fs.stat`/`fs.read` calls per path; a bottom `ui.render` hook records the props it receives (night-city's
-  `engine()` pattern). Mount replies with
-  `$.ui.mount({ plugin: 'md-pane', surface: 'terminal', component: 'AssistantMessage', props: { text, isFirstOfReply: true }, viewport: { columns: 120, rows: 40, isFullscreen: true } })`.
+- [ ] **Step 1: Write the failing tests.** A
+      `host(on, { files: Record<string, string>, dirs?: string[], cwd?: string })` helper (cwd default `/proj`) calls
+      `mock.clock(on)` and `mock.env(on, { HOME: '/home/u' })`, and answers with `{ value: … }`: `fs.stat`
+      (`{ kind: 'file', size, mtimeMs, isLink: false }`, `kind: 'directory'` for `dirs`, `{ deny: 'ENOENT' }` for a
+      missing path), `fs.read`, `session.cwd`; it records `ui.open`, `ui.close`, `state.set` values, and counts
+      `fs.stat`/`fs.read` calls per path; a bottom `ui.render` hook records the props it receives (night-city's
+      `engine()` pattern). Mount replies with
+      `$.ui.mount({ plugin: 'md-pane', surface: 'terminal', component: 'AssistantMessage', props: { text, isFirstOfReply: true }, viewport: { columns: 120, rows: 40, isFullscreen: true } })`.
   - `a reply naming an existing md file is redrawn with a pressable link`: `find({ type: 'Markdown', key: 'reply' })`
     has text `Spec: [docs/s.md](file:///proj/docs/s.md)` and `pressableLinks` `['file:///proj/docs/s.md']`.
   - `a reply naming only missing files or folders is the engine's own`: the bottom hook saw the original `text`.
   - `the main-screen terminal, other surfaces and summaries are left alone`: `isFullscreen: false`,
     `surface: 'desktop'` and `isSummary: true` reach the bottom hook unchanged.
   - `an existing file is statted once` (two mounts) and `a missing file is statted once within 2 s, again after`
-    (three mounts, then `mock.clock` advance 2001 ms, a fourth mount → 2 stats).
+    (three mounts, then advance the clock 2001 ms, a fourth mount → 2 stats).
   - `repeated mentions give one pressable link`.
-  - `an over-long reply keeps its links without interception`: 100 000 characters plus a path → the bottom hook saw
-    the rewritten text.
+  - `an over-long reply is the engine's own`: 100 000 characters plus a path → the bottom hook saw the original text.
 
 - [ ] **Step 2: Run to verify it fails** — `claude plugin test .`: the new tests FAIL.
 - [ ] **Step 3: Implement** the `ui.render` hook on `{ component: 'AssistantMessage' }`, `isFile`, `linked`, the
-  `onPress` stub, and the module-state reset in `register`.
+      `onPress` stub (for the checkpoint it only calls `void $.ui.toast(href)`), and the module-state reset in
+      `register`.
 - [ ] **Step 4: Run to verify it passes** — `claude plugin test . && npx -y -p typescript tsc -p .`: all PASS.
 - [ ] **Step 5: Commit** `git commit -am "Redraw replies with md paths as links md-pane answers."`
 
@@ -164,18 +170,20 @@ dependencies. Types: `/tmp/claude-0/bundled-skills/2.1.302/0b885b2b5aea887736e0d
 Push, then ask the user to run, on their machine, from a checkout of this branch: `claude --plugin-dir plugins/md-pane`,
 `/tui fullscreen`, and a prompt that makes Claude name an existing `.md` path. Report back: (1) is the path a link,
 (2) does a plain click do nothing visible yet (the stub) while ctrl+click opens the system app, (3) does a streaming
-reply feel the same, (4) the `href` the stub logs via `$.ui.toast(href)` (add that one line to the stub for this
-checkpoint, remove it in Task 3). Continue with Task 3 only after the user reports; a surprise there is a deviation.
+reply feel the same, (4) the `href` the stub shows as a toast. Continue with Task 3 only after the user reports; a surprise there is a deviation.
 
 ### Task 3: The reading pane
 
 **Files:**
+
 - Modify: `plugins/md-pane/hooks/register.tsx`
 - Test: `plugins/md-pane/hooks/register.test.ts`
 
 **Interfaces:**
+
 - Consumes: Task 2's `isFile`, `linked`, `PANE`, `onPress`; Task 1's `fromHref`; `Doc` from `../types`.
-- Produces: `load($: EngineInterface, path: string): Promise<Doc>` (stat → not a file / over 4 MiB → `error`; read
+- Produces: `load($: EngineInterface, path: string): Promise<Doc>` (`$.fs.stat` directly, not `isFile`; a rejection
+  matching `/ENOENT/` → `'not found'`; not a file / over 4 MiB → `error`; read
   → `linked(text, [dirname(path), cwd])` → cut; never throws: missing → `'not found'`, folder → `'not a file'`,
   too large → `'larger than 4 MiB'`, other → the error's message), the atom
   `doc = atom({ plugin: 'md-pane', key: 'doc' } as const, null)`, and a module `generation` counter; Task 4 uses all
@@ -190,8 +198,8 @@ checkpoint, remove it in Task 3). Continue with Task 3 only after the user repor
   `session.end`. `on('ui.close', { id: PANE })` bumps `generation` and sets the atom to `null` for the person's close.
 
 - [ ] **Step 1: Write the failing tests** (mount the pane like `plugins/tui-review/tests/harness.ts:130` with
-  `plugin: 'md-pane'`, component `Pane`, requestId `md-pane`; press links with
-  `mounted.press({ key: 'reply', link: { href } })`; read the atom from the recorded `state.set` values):
+      `plugin: 'md-pane'`, component `Pane`, requestId `md-pane`; press links with
+      `mounted.press({ key: 'reply', link: { href } })`; read the atom from the recorded `state.set` values):
   - `pressing a reply link opens the document`: `ui.open` recorded with
     `{ id: 'md-pane', title: 's.md', focus: true, closeOnEscape: true }`; the pane draws header `s.md` and a
     `Markdown` keyed `doc` with the file's text.
@@ -205,26 +213,29 @@ checkpoint, remove it in Task 3). Continue with Task 3 only after the user repor
   - `a long, link-heavy document is cut at a line with its links kept`: 3000 lines each naming an existing file →
     drawn text ends with the note, is ≤ 99 100 characters, and `pressableLinks` is non-empty.
   - `the later of two quick presses wins`: press A with a `fs.read` that resolves after B's → header is B's.
-  - `a close during a load keeps the pane closed`: press, close before `fs.read` resolves → atom stays `null`, one
-    `ui.open`.
+  - `a close during a load keeps the pane closed`: A open, press B, `$.session.end(…)` before B's `fs.read`
+    resolves → atom `null`, `ui.open` count stays 1 (A's).
   - `q closes the pane` and `session end closes the pane`: `ui.close` recorded, atom `null`.
   - `a Windows path opens`: cwd `C:\proj`, reply `docs\a.md`, press its href → `fs.read` called with
     `C:/proj/docs/a.md`.
 - [ ] **Step 2: Run to verify it fails** — `claude plugin test .`: the new tests FAIL.
 - [ ] **Step 3: Implement** `load`, the atom, `generation`, `onPress`, `close`, the `ui.render` hook on
-  `{ component: 'Pane', requestId: PANE }`, the `session.end` and `ui.close` hooks; remove the checkpoint toast.
+      `{ component: 'Pane', requestId: PANE }`, the `session.end` and `ui.close` hooks; remove the checkpoint toast.
 - [ ] **Step 4: Run to verify it passes** — `claude plugin test . && npx -y -p typescript tsc -p .`: all PASS.
 - [ ] **Step 5: Commit** `git commit -am "Open clicked md files in md-pane's reading pane."`
 
 ### Task 4: Automatic refresh
 
 **Files:**
+
 - Modify: `plugins/md-pane/hooks/register.tsx`
 - Test: `plugins/md-pane/hooks/register.test.ts`
 
 **Interfaces:**
+
 - Consumes: Task 3's `load`, `doc` atom, `generation`, `close`, `PANE`.
-- Produces: a module `timer` started by the Pane render hook when it draws a document and none runs
+- Produces: a module `timer` started by the Pane render hook when the atom holds a document (error ones too) and none
+  runs
   (`$.clock.every(1000, tick)`), cancelled by every close path (`close`, the `ui.close` hook) and by a tick that
   finds the atom `null`. `tick`: skip while the previous tick runs; capture `generation`; `$.fs.stat` the open
   path; when `mtimeMs` or `size` differ, or the stat fails/recovers, `load` and write only if `generation` hasn't
@@ -235,8 +246,10 @@ checkpoint, remove it in Task 3). Continue with Task 3 only after the user repor
   - `an edit that keeps the mtime but changes the size redraws too`.
   - `an unchanged file is not re-read`: advance 3000 ms → `fs.read` count stays 1.
   - `a deleted then recreated file recovers`: delete → advance → `not found`; recreate → advance → the text.
-  - `nothing polls once the pane is closed`: by `q` and by the person's close (the `ui.close` hook), advance
-    3000 ms → no `fs.stat` after the close.
+  - `nothing polls once the pane is closed`: by `q` and by `$.session.end(…)`, advance 3000 ms → no `fs.stat` after
+    the close. (The kit can't raise the person's close; it is in the Manual check.)
+  - `a pane opened on a missing file recovers`: press a path deleted after linking → `not found`; create it,
+    advance 1000 ms → the text.
   - `a swap during a refresh keeps the new document`: tick's `fs.read` resolves after a press on B → header B.
 - [ ] **Step 2: Run to verify it fails** — `claude plugin test .`: the new tests FAIL.
 - [ ] **Step 3: Implement** the timer and `tick` and wire them in.
@@ -246,22 +259,24 @@ checkpoint, remove it in Task 3). Continue with Task 3 only after the user repor
 ### Task 5: CI and docs
 
 **Files:**
+
 - Create: `plugins/md-pane/README.md`
 - Modify: `.github/workflows/test.yml` (after the night-city step, l.41-42), `README.md:13`, `CLAUDE.md` (Layout)
 
 **Interfaces:** none new.
 
 - [ ] **Step 1: CI.** Add a step `working-directory: plugins/md-pane`, `run: claude plugin test .`, named like its
-  neighbours.
+      neighbours.
 - [ ] **Step 2: Docs.** `plugins/md-pane/README.md` in tui-review's shape: what it does, install
-  (`/plugin install md-pane@dead-claude-skills`), use (fullscreen via `/tui fullscreen`, plain click vs ctrl/cmd
-  click, `q`/Esc, refresh, links inside the doc and their cwd fallback), limits (only `.md`, reply text, existing
-  files, 4 MiB, 99 000 characters, a reply drawn before its file existed). Root README: add
-  `[md-pane](plugins/md-pane/README.md)` to the tools sentence. CLAUDE.md Layout: one bullet for `plugins/md-pane/`
-  (pure logic in `hooks/paths.ts`; replies are redrawn as a plugin `Markdown` because only that receives link
-  presses).
-- [ ] **Step 3: Run** `npm test && (cd plugins/md-pane && claude plugin test .) && npx -y prettier --check plugins/md-pane README.md CLAUDE.md docs`
-  — PASS, prettier clean.
+      (`/plugin install md-pane@dead-claude-skills`), use (fullscreen via `/tui fullscreen`, plain click vs ctrl/cmd
+      click, `q`/Esc, refresh, links inside the doc and their cwd fallback), limits (only `.md`, reply text, existing
+      files, 4 MiB, 99 000 characters, a reply drawn before its file existed). Root README: add
+      `[md-pane](plugins/md-pane/README.md)` to the tools sentence. CLAUDE.md Layout: one bullet for `plugins/md-pane/`
+      (pure logic in `hooks/paths.ts`; replies are redrawn as a plugin `Markdown` because only that receives link
+      presses).
+- [ ] **Step 3: Run**
+      `npm test && (cd plugins/md-pane && claude plugin test .) && npx -y prettier --check plugins/md-pane README.md CLAUDE.md docs/features/click-to-read docs/superpowers/specs/2026-10-17-click-to-read-design.md docs/superpowers/plans/2026-10-17-click-to-read.md`
+      — PASS, prettier clean (older docs elsewhere already fail prettier; not this task's).
 - [ ] **Step 4: Commit** `git add -A && git commit -m "Add md-pane to CI and the docs."`
 
 ## Manual check (after Task 5, on the user's machine)
@@ -269,4 +284,4 @@ checkpoint, remove it in Task 3). Continue with Task 3 only after the user repor
 `/plugin marketplace update dead-claude-skills`, `/plugin install md-pane@dead-claude-skills`, `/tui fullscreen`,
 ask Claude to name `docs/features/click-to-read/flow.md`: a plain click opens the pane at the top, a link inside it
 swaps the document, ctrl+click opens the system app, a reply without paths looks as before, editing the file
-refreshes the pane, `q` and Esc close it.
+refreshes the pane, `q`, Esc and the frame's close mark close it (and polling stops: no flicker after closing).
