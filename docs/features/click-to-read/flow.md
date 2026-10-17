@@ -1,5 +1,5 @@
 ---
-phase: brainstorm
+phase: grill
 ---
 
 # Click-to-read file pane: flow
@@ -13,7 +13,7 @@ chat; ctrl/cmd+click keeps the system opener.
 
 ## Artifacts
 
-- Spec: [2026-10-17-click-to-read-design.md](../../superpowers/specs/2026-10-17-click-to-read-design.md) (draft, builder check done)
+- Spec: [2026-10-17-click-to-read-design.md](../../superpowers/specs/2026-10-17-click-to-read-design.md) (builder check done, answers folded in 2026-10-17)
 - Plan:
 - ADRs:
 - CONTEXT.md:
@@ -82,6 +82,13 @@ Cmd/Ctrl+click on a `.md` path, [docs](https://docs.warp.dev/terminal/more-featu
   percent-encode non-ASCII in `file://` URIs, ~2083-byte practical limit.
 
 ## Options
+
+- How it gets made (settled in conversation before the flow started; the user asked for the mod route):
+  **chosen** prior-art B through the mod API: redraw replies containing `.md` paths as a plugin `Markdown` with
+  `onLinkPress`, open a `Pane`. **Rejected** A (OSC 8 only; the click never reaches Claude Code, which is today's
+  ctrl+click) and C (click handlers on tool-call data; the user wants reply text, not tool rows).
+- Brainstorm answers: flow/spec/plan files; read only; `.md` only; auto refresh; reply text only; small visual
+  differences on redrawn replies OK; links inside the open document swap the pane.
 
 ## Plan review
 

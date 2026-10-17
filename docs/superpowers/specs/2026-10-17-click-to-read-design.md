@@ -21,7 +21,9 @@ conversation in view.
 5. The pane refreshes by itself when the open file changes on disk (Claude edits the spec after feedback).
 6. Scroll with the wheel, arrows and page keys (the engine's pane scrolling); close with `q`, Esc, the frame's close
    mark or ctrl+x x.
-7. A missing, unreadable or too large (over `$.fs.read`'s 4 MiB) file shows a one-line message in the pane instead
+7. Inside the pane, links and paths to existing `.md` files (relative to the open document's own folder) are
+   clickable too, by the same rules as goal 1: a plain click swaps the pane to that document.
+8. A missing, unreadable or too large (over `$.fs.read`'s 4 MiB) file shows a one-line message in the pane instead
    of the document.
 
 ## Non-goals
@@ -34,7 +36,8 @@ conversation in view.
 
 ## Anti-goals (a failure even if it works)
 
-- Replies look different from today apart from the paths being links: same renderer, same text, same wrapping.
+- Replies look clearly different from today: same renderer, same text. Small differences on replies that contain a
+  link (a missing bullet, a changed indent) are acceptable (user, 2026-10-17); replies without one are untouched.
 - The chat gets slower while Claude streams a reply.
 - Ctrl/cmd+click stops opening the file in the system app.
 
@@ -59,6 +62,7 @@ conversation in view.
 ## Decided by the user
 
 - Markdown only; read-only; reply text only; automatic refresh on change.
+- Small visual differences on redrawn replies are fine; links inside the open document swap the pane.
 - It ships as an opt-in plugin in this marketplace (accepted the playback).
 
 ## Builder's calls (made in brainstorming, open to the grill)
@@ -87,4 +91,4 @@ conversation in view.
 - Whether `AssistantMessage` re-renders per streaming delta (drives the caching of existence checks).
 - Whether a pane opened from a `Markdown` link press counts as "asked" for the width floor (documented for Button
   presses).
-- Whether the mod's `Markdown` draws byte-identical to the engine's own reply drawing (anti-goal 1).
+- How close the mod's `Markdown` draws to the engine's own reply drawing (anti-goal 1 allows small differences).
