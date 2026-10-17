@@ -13,7 +13,7 @@ phase: brainstorm
 
 ## Artifacts
 
-- Spec:
+- Spec: [spec.md](spec.md)
 - Plan:
 - ADRs:
 - CONTEXT.md:
@@ -71,6 +71,16 @@ phase: brainstorm
   separate machine-readable state file next to flow.md.
 
 ## Options
+
+- Purpose (2026-10-17): a "you are here" marker while developing a feature with `/feature-flow` (user).
+- Which run (2026-10-17): the current one plus a count of the other open runs (user, over listing all open runs).
+- Key (2026-10-17): resumes the run where it stopped; a new flow is picked up as soon as its flow.md exists (user).
+- Shape (2026-10-17): one band above the prompt, not a side pane (Claude's call, user accepted the play-back).
+- Source and refresh (2026-10-17): **A**, poll `docs/features/*/flow.md` by mtime and parse fixed tokens (user).
+  Rejected: B FileChanged-driven redraw (needs a hook file, delivery to a mod unverified), C a separate `flow.json`
+  (two files to keep in step, hand edits go stale).
+- Claude's calls: the mod lives in the feature-flow plugin; the band yields to night-city's Onibi; skills accept a
+  slug to resume one run.
 
 ## Plan review
 
