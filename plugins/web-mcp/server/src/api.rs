@@ -21,6 +21,8 @@ const LOOKUP_UA: &str = concat!(
 );
 
 pub struct Answer {
+    /// The URL that answered, after redirects.
+    pub url: Url,
     pub status: u16,
     pub body: String,
 }
@@ -77,7 +79,7 @@ async fn once(
             .map_err(|_| format!("no answer within {} s", deadline.as_secs_f32()))??;
         let Some(loc) = next else {
             let body = String::from_utf8_lossy(&body).into_owned();
-            return Ok((Answer { status, body }, wait));
+            return Ok((Answer { url, status, body }, wait));
         };
         if hop == MAX_HOPS {
             return Err("too many redirects".into());

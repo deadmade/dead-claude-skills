@@ -26,6 +26,7 @@ pub struct Ctx {
     pub limits: limits::HostLimits,
     pub archive: archive::Archive,
     pub inflight: fetch::Inflight,
+    pub lookup: lookup::Cache,
     pub index: rank::Index,
     pub search: search::SearxNg,
     pub browser: browser::Browser,
@@ -51,6 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         http_public: fetch::client(true)?,
         limits: limits::HostLimits::default(),
         inflight: fetch::Inflight::default(),
+        lookup: lookup::Cache::default(),
         cfg,
     };
     let ctx = Arc::new(ctx);

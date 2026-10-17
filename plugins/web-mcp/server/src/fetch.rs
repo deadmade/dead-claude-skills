@@ -796,6 +796,7 @@ pub(crate) mod tests {
                 papers_deadline: std::time::Duration::from_secs(8),
                 lookup_urls: crate::config::LookupUrls {
                     doh: Url::parse("https://cloudflare-dns.com/dns-query").unwrap(),
+                    rdap_bootstrap: Url::parse("https://data.iana.org/rdap/").unwrap(),
                 },
                 lookup_deadline: None,
                 project,
@@ -810,6 +811,7 @@ pub(crate) mod tests {
             http_public: client(true).unwrap(),
             limits: crate::limits::HostLimits::default(),
             inflight: Inflight::default(),
+            lookup: crate::lookup::Cache::default(),
             browser,
         })
     }

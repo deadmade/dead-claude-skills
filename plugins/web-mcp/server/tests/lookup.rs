@@ -120,3 +120,154 @@ fn dns_rejects_non_names() {
         assert_eq!(fx.hits(&path("8.8.8.8", t)), 0, "{t}");
     }
 }
+
+fn rdap_start(fx: &Fixture, ms: Option<&str>) -> Mcp {
+    let mut envs = vec![("WEB_MCP_RDAP_URL", fx.url("/rdap/"))];
+    if let Some(ms) = ms {
+        envs.push(("WEB_MCP_LOOKUP_MS", ms.to_owned()));
+    }
+    Mcp::start_with(tempdir(), &envs)
+}
+
+/// Serves a `dns.json` that sends `tlds` to the fixture's `/registry/`.
+fn bootstrap(fx: &Fixture, tlds: &[&str]) {
+    let b = json!({"services": [[tlds, [fx.url("/registry/")]]]});
+    fx.route(
+        "/rdap/dns.json",
+        vec![Resp::new(200, "application/json", b.to_string())],
+    );
+}
+
+fn rdap(body: &Value) -> Vec<Resp> {
+    vec![Resp::new(200, "application/rdap+json", body.to_string())]
+}
+
+fn whois(mcp: &mut Mcp, target: &str) -> Value {
+    mcp.call("lookup", json!({"kind": "whois", "target": target}))
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn whois_domain_uses_bootstrap_once() {
+    let fx = Fixture::start(PUBLIC);
+    bootstrap(&fx, &["com"]);
+    fx.route(
+        "/registry/domain/example.com",
+        rdap(&json!({"ldhName": "EXAMPLE.COM"})),
+    );
+    let mut mcp = rdap_start(&fx, None);
+    for _ in 0..2 {
+        let r = whois(&mut mcp, "example.com");
+        assert!(!is_error(&r), "{r}");
+        assert!(text(&r).contains("\"ldhName\": \"EXAMPLE.COM\""), "{r}");
+    }
+    assert_eq!(fx.hits("/rdap/dns.json"), 1);
+    assert_eq!(fx.hits("/registry/domain/example.com"), 2);
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn whois_normalises_target() {
+    let fx = Fixture::start(PUBLIC);
+    bootstrap(&fx, &["com", "de"]);
+    fx.route("/registry/domain/example.com", rdap(&json!({})));
+    fx.route("/registry/domain/xn--bcher-kva.de", rdap(&json!({})));
+    let mut mcp = rdap_start(&fx, None);
+    assert!(!is_error(&whois(&mut mcp, "Example.COM.")));
+    assert!(!is_error(&whois(&mut mcp, "bücher.de")));
+    assert_eq!(fx.hits("/registry/domain/example.com"), 1);
+    assert_eq!(fx.hits("/registry/domain/xn--bcher-kva.de"), 1);
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn whois_follows_registry_redirect() {
+    let fx = Fixture::start(PUBLIC);
+    bootstrap(&fx, &["com"]);
+    let to = fx.url("/other/ip/192.0.2.1");
+    fx.route(
+        "/registry/domain/example.com",
+        vec![Resp::new(303, "text/plain", "").header("Location", &to)],
+    );
+    fx.route("/other/ip/192.0.2.1", rdap(&json!({"handle": "NET-X"})));
+    let mut mcp = rdap_start(&fx, None);
+    let r = whois(&mut mcp, "example.com");
+    assert!(!is_error(&r), "{r}");
+    let t = text(&r);
+    assert!(t.contains("\"handle\": \"NET-X\""), "{t}");
+    assert!(t.contains(&format!("Source: RDAP {to} (")), "{t}");
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn whois_stops_after_three_redirects() {
+    let fx = Fixture::start(PUBLIC);
+    bootstrap(&fx, &["com"]);
+    let hop = |n: u32| format!("/registry/hop{n}");
+    fx.route(
+        "/registry/domain/example.com",
+        vec![Resp::redirect(&fx.url(&hop(1)))],
+    );
+    for n in 1..=4 {
+        fx.route(&hop(n), vec![Resp::redirect(&fx.url(&hop(n + 1)))]);
+    }
+    let mut mcp = rdap_start(&fx, None);
+    let r = whois(&mut mcp, "example.com");
+    assert!(is_error(&r), "{r}");
+    assert!(text(&r).contains("too many redirects"), "{r}");
+    assert_eq!(fx.hits(&hop(3)), 1);
+    assert_eq!(fx.hits(&hop(4)), 0);
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn whois_no_rdap_tld_says_so() {
+    let fx = Fixture::start(PUBLIC);
+    bootstrap(&fx, &["com"]);
+    let mut mcp = rdap_start(&fx, None);
+    let r = whois(&mut mcp, "example.de");
+    assert!(is_error(&r), "{r}");
+    assert!(
+        text(&r)
+            .contains("no RDAP server for .de in IANA's bootstrap; port-43 whois isn't supported"),
+        "{r}"
+    );
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn whois_404_is_not_found() {
+    let fx = Fixture::start(PUBLIC);
+    bootstrap(&fx, &["com"]);
+    fx.route(
+        "/registry/domain/nope.com",
+        vec![Resp::new(
+            404,
+            "application/rdap+json",
+            "{\"errorCode\": 404}",
+        )],
+    );
+    let mut mcp = rdap_start(&fx, None);
+    let r = whois(&mut mcp, "nope.com");
+    assert!(!is_error(&r), "{r}");
+    assert!(text(&r).contains("Not found: nope.com"), "{r}");
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn whois_timeout_with_only_bootstrap_is_an_error() {
+    let fx = Fixture::start(PUBLIC);
+    bootstrap(&fx, &["com"]);
+    fx.route(
+        "/registry/domain/slow.com",
+        vec![
+            Resp::new(200, "application/rdap+json", "{}").delay(std::time::Duration::from_secs(2)),
+        ],
+    );
+    let mut mcp = rdap_start(&fx, Some("300"));
+    let r = whois(&mut mcp, "slow.com");
+    assert!(is_error(&r), "{r}");
+    let t = text(&r);
+    assert!(t.contains("Source: IANA RDAP bootstrap"), "{t}");
+    assert!(t.contains("Failed: RDAP"), "{t}");
+}

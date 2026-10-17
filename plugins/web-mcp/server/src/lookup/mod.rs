@@ -1,6 +1,7 @@
 //! The `lookup` tool: one record about a target from public sources, archived as each source sent it.
 
 mod dns;
+mod rdap;
 
 use std::fmt::Write as _;
 use std::sync::Arc;
@@ -10,6 +11,7 @@ use rmcp::model::{CallToolResult, ContentBlock};
 use rmcp::schemars::{self, JsonSchema};
 use serde::Deserialize;
 use serde_json::Value;
+use tokio::sync::OnceCell;
 use url::Url;
 
 use crate::Ctx;
@@ -25,14 +27,25 @@ const CUT_NOTE: &str =
 #[serde(rename_all = "snake_case")]
 pub enum Kind {
     Dns,
+    Whois,
 }
 
 impl Kind {
     pub fn as_str(self) -> &'static str {
         match self {
             Kind::Dns => "dns",
+            Kind::Whois => "whois",
         }
     }
+}
+
+/// The RDAP bootstrap files, each loaded on first use and kept for the server's life.
+#[derive(Default)]
+pub struct Cache {
+    dns: OnceCell<rdap::Bootstrap>,
+    ipv4: OnceCell<rdap::Bootstrap>,
+    ipv6: OnceCell<rdap::Bootstrap>,
+    asn: OnceCell<rdap::Bootstrap>,
 }
 
 /// One source request's reply.
@@ -132,6 +145,13 @@ pub async fn run(ctx: &Arc<Ctx>, a: LookupArgs) -> CallToolResult {
             Ok(name) => {
                 let o = dns::run(ctx, &name, a.record.as_deref()).await;
                 render(ctx, kind, &name, o).await
+            }
+            Err(e) => CallToolResult::error(vec![ContentBlock::text(e)]),
+        },
+        Kind::Whois => match rdap::target(&a.target) {
+            Ok(t) => {
+                let o = rdap::run(ctx, &t).await;
+                render(ctx, kind, &t, o).await
             }
             Err(e) => CallToolResult::error(vec![ContentBlock::text(e)]),
         },
