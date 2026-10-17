@@ -146,9 +146,16 @@ fn failed_and_blocked_results_are_named() {
         line.contains(&format!("{} (HTTP 404)", fx.url("/missing"))),
         "{t}"
     );
-    assert!(line.contains(&private.url("/p")), "{t}");
+    assert!(!line.contains(&private.url("/p")), "{t}");
     assert!(t.contains("\n\nNot fetched: "), "{t}");
     assert!(t.contains("\nTry those with the fetch tool"), "{t}");
+    assert!(
+        t.contains(&format!(
+            "\n\nRefused (private address): {}",
+            private.url("/p")
+        )),
+        "{t}"
+    );
     assert_eq!(private.hits("/p"), 0);
     assert!(
         t.contains("The web side returned nothing; archive passages only."),
@@ -248,13 +255,6 @@ fn default_output_under_10k_tokens() {
     let t = text(&search(&mut mcp, "zebra")).to_owned();
     assert_eq!(t.matches("## [").count(), 8, "{t}");
     assert!(t.chars().count() / 4 < 10_000, "{}", t.len());
-}
-
-#[test]
-fn papers_mode_is_not_implemented_yet() {
-    let mut mcp = Mcp::start();
-    let r = mcp.call("search", json!({ "query": "zebra", "papers": true }));
-    assert!(is_error(&r));
 }
 
 const ENGINES: &[(&str, &[&str], bool)] = &[

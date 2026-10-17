@@ -452,11 +452,12 @@ pub async fn web(
         (&r.url, got)
     }))
     .await;
-    let (mut slow, mut failed, mut fetched) = (Vec::new(), Vec::new(), 0);
+    let (mut slow, mut failed, mut blocked, mut fetched) = (Vec::new(), Vec::new(), Vec::new(), 0);
     let mut only: HashSet<String> = results.iter().map(|r| r.url.to_string()).collect();
     for (url, got) in outcomes {
         match got {
             Err(_) => slow.push(url.to_string()),
+            Ok(Err(fetch::FetchError::Blocked(_))) => blocked.push(url.to_string()),
             Ok(Err(e)) => failed.push(format!("{url} ({e})")),
             Ok(Ok(f)) => {
                 fetched += 1;
@@ -492,6 +493,10 @@ pub async fn web(
             "\n\nNot fetched: {}\nTry those with the fetch tool, or the browser tool if the site blocks non-browser clients.",
             failed.join(", ")
         );
+    }
+    // Apart from `failed`: its hint must not steer a search result onto fetch, which reaches private addresses.
+    if !blocked.is_empty() {
+        let _ = write!(out, "\n\nRefused (private address): {}", blocked.join(", "));
     }
     if fetched == 0 && !filtered {
         out.push_str("\n\nThe web side returned nothing; archive passages only.");

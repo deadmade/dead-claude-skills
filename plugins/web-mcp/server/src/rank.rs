@@ -487,8 +487,9 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn queued_batches_dont_wait_for_merges() {
         let idx = Arc::new(Index::open(&temp_web("merges")).unwrap());
-        // An add every 200 µs until 9 commits (20 s cap): the queue refills during every commit, and the many small
-        // segments push the merge policy (layer of 100 docs, 8 segments) into merging.
+        // An add every 200 µs until 9 commits and a finished merge (20 s cap): the queue refills during every commit,
+        // and the many small segments push the merge policy (layer of 100 docs, 8 segments) into merging. Slow commits
+        // (Windows) make segments of uneven size that take more commits to fill a merge layer.
         let handle = tokio::runtime::Handle::current();
         let producer = {
             let idx = Arc::clone(&idx);
@@ -496,7 +497,9 @@ mod tests {
                 let start = Instant::now();
                 let mut adds = Vec::new();
                 for i in 0.. {
-                    let done = idx.commits.load(Ordering::SeqCst) >= 9;
+                    let commits = idx.commits.load(Ordering::SeqCst);
+                    let segments = idx.tantivy.searchable_segment_ids().unwrap().len();
+                    let done = commits >= 9 && segments < commits;
                     if done && start.elapsed() > Duration::from_secs(1) {
                         break;
                     }
