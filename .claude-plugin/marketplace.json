@@ -161,6 +161,12 @@
       "description": "/tui-review: a fast, stacked-branch-aware diff pane beside the chat, so you can ask Claude about what you read. Needs the brv binary, which the installer downloads. Opt-in.",
       "source": "./plugins/tui-review",
       "category": "development"
+    },
+    {
+      "name": "md-pane",
+      "description": "Click a .md path in Claude's reply to read it, rendered, in a pane beside the chat (fullscreen terminal). Opt-in.",
+      "source": "./plugins/md-pane",
+      "category": "productivity"
     }
   ]
 }
