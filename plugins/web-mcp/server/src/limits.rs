@@ -27,6 +27,8 @@ fn interval(url: &Url) -> Duration {
             Duration::from_millis(200)
         }
         "api.crossref.org" | "api.openalex.org" => Duration::from_secs(1),
+        // NVD's keyless limit (5 requests per 30 s); unverified: its docs page is a JS shell.
+        "services.nvd.nist.gov" => Duration::from_secs(6),
         _ => Duration::ZERO,
     }
 }

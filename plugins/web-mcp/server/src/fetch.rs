@@ -801,6 +801,13 @@ pub(crate) mod tests {
                     cdx: Url::parse("https://web.archive.org/cdx/search/cdx").unwrap(),
                     wayback: Url::parse("https://web.archive.org/").unwrap(),
                     internetdb: Url::parse("https://internetdb.shodan.io/").unwrap(),
+                    osv: Url::parse("https://api.osv.dev/v1/").unwrap(),
+                    nvd: Url::parse("https://services.nvd.nist.gov/rest/json/cves/2.0").unwrap(),
+                    epss: Url::parse("https://api.first.org/data/v1/epss").unwrap(),
+                    kev: Url::parse(
+                        "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
+                    )
+                    .unwrap(),
                 },
                 lookup_deadline: None,
                 project,

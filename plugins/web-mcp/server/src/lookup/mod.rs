@@ -4,6 +4,7 @@ mod certs;
 mod dns;
 mod ip;
 mod rdap;
+mod vuln;
 mod wayback;
 
 use std::fmt::Write as _;
@@ -34,6 +35,7 @@ pub enum Kind {
     Certs,
     Wayback,
     Ip,
+    Vuln,
 }
 
 impl Kind {
@@ -44,17 +46,19 @@ impl Kind {
             Kind::Certs => "certs",
             Kind::Wayback => "wayback",
             Kind::Ip => "ip",
+            Kind::Vuln => "vuln",
         }
     }
 }
 
-/// The RDAP bootstrap files, each loaded on first use and kept for the server's life.
+/// The RDAP bootstrap files and the KEV feed, each loaded on first use and kept for the server's life.
 #[derive(Default)]
 pub struct Cache {
     dns: OnceCell<rdap::Bootstrap>,
     ipv4: OnceCell<rdap::Bootstrap>,
     ipv6: OnceCell<rdap::Bootstrap>,
     asn: OnceCell<rdap::Bootstrap>,
+    kev: OnceCell<Value>,
 }
 
 /// One source request's reply.
@@ -165,6 +169,10 @@ pub async fn run(ctx: &Arc<Ctx>, a: LookupArgs) -> CallToolResult {
             Err(e) => CallToolResult::error(vec![ContentBlock::text(e)]),
         },
         Kind::Ip => ip::run(ctx, &a.target).await,
+        Kind::Vuln => {
+            let o = vuln::run(ctx, &a.target, a.ecosystem.as_deref()).await;
+            render(ctx, kind, a.target.trim(), o).await
+        }
         Kind::Wayback => wayback::run(ctx, &a.target, a.at.as_deref()).await,
         Kind::Certs => match dns::name(&a.target) {
             Ok(name) => {

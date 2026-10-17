@@ -54,14 +54,16 @@ pub struct FetchArgs {
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "schemars")]
 pub struct LookupArgs {
-    /// What to look up, and from where. dns: Cloudflare DNS over HTTPS. whois: RDAP. certs: crt.sh. wayback: Internet Archive. ip: Shodan's free IP database
+    /// What to look up, and from where. dns: Cloudflare DNS over HTTPS. whois: RDAP. certs: crt.sh. wayback: Internet Archive. ip: Shodan's free IP database. vuln: OSV, EPSS, CISA KEV, NVD
     pub kind: lookup::Kind,
-    /// A domain name; whois also an IP or AS number; ip an IP address.
+    /// A domain name; whois also an IP or AS number; ip an IP address; vuln a CVE/OSV id or name@version.
     pub target: String,
     /// dns: a record type such as A, MX or TXT (default A, AAAA, CNAME, MX, NS and TXT).
     pub record: Option<String>,
     /// wayback: a timestamp or prefix (2024, 20240102) to read the nearest snapshot; omit to list them.
     pub at: Option<String>,
+    /// vuln, for name@version: npm, `PyPI`, crates.io, Go, Maven, ...
+    pub ecosystem: Option<String>,
 }
 
 #[derive(Deserialize, JsonSchema)]

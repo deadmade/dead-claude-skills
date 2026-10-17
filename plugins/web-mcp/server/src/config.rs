@@ -20,6 +20,11 @@ pub struct LookupUrls {
     /// The Wayback Machine's root, where `web/<timestamp>id_/<url>` serves a raw capture.
     pub wayback: Url,
     pub internetdb: Url,
+    /// OSV's API root, ending in `/`.
+    pub osv: Url,
+    pub nvd: Url,
+    pub epss: Url,
+    pub kev: Url,
 }
 
 pub struct Config {
@@ -36,7 +41,7 @@ pub struct Config {
 
 impl Config {
     /// Reads `CLAUDE_PROJECT_DIR`, `WEB_MCP_SEARXNG_URL`, `WEB_MCP_AGENT_BROWSER` and
-    /// `WEB_MCP_{ARXIV,OPENALEX,CROSSREF,DOH,RDAP,CRTSH,CDX,WAYBACK}_URL`, each with its default, `WEB_MCP_PAPERS_MS` (8 s; shorter for
+    /// `WEB_MCP_{ARXIV,OPENALEX,CROSSREF,DOH,RDAP,CRTSH,CDX,WAYBACK,INTERNETDB,OSV,NVD,EPSS,KEV}_URL`, each with its default, `WEB_MCP_PAPERS_MS` (8 s; shorter for
     /// tests) and `WEB_MCP_LOOKUP_MS` (unset: each lookup source's own deadline).
     ///
     /// # Errors
@@ -57,6 +62,16 @@ impl Config {
                 cdx: url("WEB_MCP_CDX_URL", "https://web.archive.org/cdx/search/cdx")?,
                 wayback: url("WEB_MCP_WAYBACK_URL", "https://web.archive.org/")?,
                 internetdb: url("WEB_MCP_INTERNETDB_URL", "https://internetdb.shodan.io/")?,
+                osv: url("WEB_MCP_OSV_URL", "https://api.osv.dev/v1/")?,
+                nvd: url(
+                    "WEB_MCP_NVD_URL",
+                    "https://services.nvd.nist.gov/rest/json/cves/2.0",
+                )?,
+                epss: url("WEB_MCP_EPSS_URL", "https://api.first.org/data/v1/epss")?,
+                kev: url(
+                    "WEB_MCP_KEV_URL",
+                    "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
+                )?,
             },
             lookup_deadline: var("WEB_MCP_LOOKUP_MS")
                 .and_then(|v| v.parse().ok())
