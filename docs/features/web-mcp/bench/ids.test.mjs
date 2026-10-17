@@ -34,7 +34,7 @@ test('norm strips markdown link targets', () => {
 });
 
 test('web-mcp target loads the plugin and puts the binary on PATH', () => {
-  assert.deepEqual(claudeArgs('web-mcp', '/r'), ['--plugin-dir', '/r/plugins/web-mcp']);
+  assert.deepEqual(claudeArgs('web-mcp', '/r'), ['--plugin-dir', '/r/plugins/mcp/web-mcp']);
   assert.deepEqual(claudeArgs('builtin', '/r'), []);
   assert.equal(claudeEnv('web-mcp', '/x/bin/web-mcp', { PATH: '/usr/bin' }).PATH, `/x/bin${path.delimiter}/usr/bin`);
   const env = { PATH: '/usr/bin' };

@@ -43,7 +43,7 @@ function verbatimRecall(text, result) {
 
 // Extra `claude` flags and env so the spawned session loads this checkout's web-mcp plugin and finds the dev binary.
 export const claudeArgs = (target, repo) =>
-  target === 'web-mcp' ? ['--plugin-dir', path.join(repo, 'plugins/web-mcp')] : [];
+  target === 'web-mcp' ? ['--plugin-dir', path.join(repo, 'plugins/mcp/web-mcp')] : [];
 export const claudeEnv = (target, bin, env) =>
   target === 'web-mcp' ? { ...env, PATH: path.dirname(path.resolve(bin)) + path.delimiter + (env.PATH ?? '') } : env;
 

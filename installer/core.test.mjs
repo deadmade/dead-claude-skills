@@ -8,7 +8,6 @@ import {
   duplicates,
   mergeSettings,
   isShipped,
-  NIGHT_CITY_THEME,
   safeArg,
   missingBinaries,
   agentBrowserAction,
@@ -73,7 +72,6 @@ test('opt-ins from the real manifests', () => {
         'mattpocock-picks',
         'mcp-azure',
         'mcp-github',
-        'night-city',
         'nix-lsp',
         'notify',
         'paper-lookup',
@@ -98,8 +96,8 @@ test('bundle ids resolve bare names to our marketplace', () => {
 });
 
 test('token plugins', () => {
-  assert.equal(needsToken(json('plugins/mcp-github/.claude-plugin/plugin.json')), true);
-  assert.equal(needsToken(json('plugins/mcp-azure/.claude-plugin/plugin.json')), true);
+  assert.equal(needsToken(json('plugins/mcp/mcp-github/.claude-plugin/plugin.json')), true);
+  assert.equal(needsToken(json('plugins/mcp/mcp-azure/.claude-plugin/plugin.json')), true);
   assert.equal(needsToken(json('plugins/graphify/.claude-plugin/plugin.json')), false);
 });
 
@@ -379,6 +377,10 @@ test('web-mcp downloads its own archive, and each plugin is configured under its
   for (const [k, target] of Object.entries(t)) {
     const [platform, arch] = k.split('-');
     for (const name of ['brv', 'web-mcp']) {
+      if (name === 'web-mcp' && !['win32-x64', 'linux-x64'].includes(k)) {
+        assert.equal(binAsset(name, platform, arch, '1.2.3'), undefined);
+        continue;
+      }
       const a = binAsset(name, platform, arch, '1.2.3');
       assert.equal(a.file, `${name}-${target}.${platform === 'win32' ? 'zip' : 'tar.gz'}`);
       assert.equal(a.exe, name + (platform === 'win32' ? '.exe' : ''));
@@ -387,15 +389,17 @@ test('web-mcp downloads its own archive, and each plugin is configured under its
   assert.equal(binAsset('web-mcp', 'linux', 'ia32', '1.0.0'), undefined);
   assert.deepEqual(BIN_PLUGINS['tui-review'], { name: 'brv', key: 'brvPath' });
   assert.deepEqual(BIN_PLUGINS['web-mcp'], { name: 'web-mcp', key: 'binPath' });
+  const dirs = { 'tui-review': 'plugins/mods/tui-review', 'web-mcp': 'plugins/mcp/web-mcp' };
   for (const [plugin, { key }] of Object.entries(BIN_PLUGINS))
-    assert.ok(json(`plugins/${plugin}/.claude-plugin/plugin.json`).userConfig[key], `${plugin} has userConfig ${key}`);
+    assert.ok(json(`${dirs[plugin]}/.claude-plugin/plugin.json`).userConfig[key], `${plugin} has userConfig ${key}`);
   assert.match(unavailable('web-mcp', 'linux', 'ia32', '1.0.0'), /no web-mcp build for linux-ia32/);
   assert.equal(unavailable('web-mcp', 'linux', 'x64', '1.0.0'), undefined);
+  assert.match(unavailable('web-mcp', 'darwin', 'arm64', '1.0.0'), /no web-mcp build for darwin-arm64/);
 });
 
 test('brv versions match the release the installer fetches', () => {
-  const cargo = readFileSync(new URL('../plugins/tui-review/brv/Cargo.toml', import.meta.url), 'utf8');
-  assert.equal(/^version = "(.+)"/m.exec(cargo)[1], json('plugins/tui-review/.claude-plugin/plugin.json').version);
+  const cargo = readFileSync(new URL('../plugins/mods/tui-review/brv/Cargo.toml', import.meta.url), 'utf8');
+  assert.equal(/^version = "(.+)"/m.exec(cargo)[1], json('plugins/mods/tui-review/.claude-plugin/plugin.json').version);
 });
 
 test('brv checksum lines and what to do about brv', () => {
@@ -572,32 +576,11 @@ test('Night City ccstatusline keeps the stock widgets in order', () => {
   );
 });
 
-test('nightCity false removes only the Night City theme', () => {
-  const s = { theme: NIGHT_CITY_THEME };
-  assert.equal(mergeSettings(s, { nightCity: false }).theme, undefined);
-  assert.equal(mergeSettings({ theme: 'dark' }, { nightCity: false }).theme, 'dark');
-  assert.equal(mergeSettings(s, { nightCity: true }).theme, NIGHT_CITY_THEME);
-  assert.equal(mergeSettings(s, {}).theme, NIGHT_CITY_THEME);
-});
-
-test('nightCity turns tmux truecolor on next to other env, and deselecting it removes only that', () => {
-  const on = mergeSettings({ env: { FOO: 'x' } }, { nightCity: true });
-  assert.deepEqual(on.env, { FOO: 'x', CLAUDE_CODE_TMUX_TRUECOLOR: '1' });
-  assert.deepEqual(mergeSettings(on, { nightCity: false }).env, { FOO: 'x' });
-  assert.equal(mergeSettings({ env: { CLAUDE_CODE_TMUX_TRUECOLOR: '1' } }, { nightCity: false }).env, undefined);
-  assert.deepEqual(mergeSettings({ env: { CLAUDE_CODE_TMUX_TRUECOLOR: '1' } }, {}).env, {
-    CLAUDE_CODE_TMUX_TRUECOLOR: '1',
-  });
-});
-
-test('nightCity turns syntax highlighting off, and deselecting it turns it back on', () => {
-  assert.equal(mergeSettings({}, { nightCity: true }).syntaxHighlightingDisabled, true);
-  assert.equal(
-    mergeSettings({ syntaxHighlightingDisabled: true }, { nightCity: false }).syntaxHighlightingDisabled,
-    undefined,
-  );
-  assert.equal(mergeSettings({ syntaxHighlightingDisabled: true }, {}).syntaxHighlightingDisabled, true);
-  assert.equal(mergeSettings({}, {}).syntaxHighlightingDisabled, undefined);
+test('Night City settings are always on, next to other env, and leave the theme alone', () => {
+  const out = mergeSettings({ env: { FOO: 'x' }, theme: 'dark' }, {});
+  assert.deepEqual(out.env, { FOO: 'x', CLAUDE_CODE_TMUX_TRUECOLOR: '1' });
+  assert.equal(out.syntaxHighlightingDisabled, true);
+  assert.equal(out.theme, 'dark');
 });
 
 test('notify turns the built-in notification off, and deselecting restores it', () => {

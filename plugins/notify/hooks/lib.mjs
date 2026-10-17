@@ -1,6 +1,4 @@
 import { spawn } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 
 // Night City lines for a finished turn and for Claude waiting on you; deliberately not night-city's own words.
@@ -38,14 +36,6 @@ export function tmuxFocused(output) {
   return active === '11' && clients.some((flags) => flags.split(',').includes('focused'));
 }
 
-export function nightCityEnabled(settingsText) {
-  try {
-    return JSON.parse(settingsText).enabledPlugins?.['night-city@dead-claude-skills'] === true;
-  } catch {
-    return false;
-  }
-}
-
 // First non-empty line, cut by code points so an emoji is never split.
 function firstLine(text) {
   const line = (text ?? '').split('\n').find((l) => l.trim()) ?? '';
@@ -53,9 +43,9 @@ function firstLine(text) {
   return chars.length > MAX ? chars.slice(0, MAX - 1).join('') + '…' : chars.join('');
 }
 
-export function message(input, { nightCity, pick }) {
+export function message(input, { pick }) {
   const done = input.hook_event_name === 'Stop';
-  const status = nightCity ? pick(done ? DONE : WAITING) : done ? 'Done' : 'Needs your input';
+  const status = pick(done ? DONE : WAITING);
   const detail = firstLine(
     done
       ? input.last_assistant_message
@@ -176,12 +166,8 @@ export async function main({ stdin, env, platform }) {
       const focused = await run(TMUX_ARGV(env.TMUX_PANE), env).then(tmuxFocused, () => false);
       if (focused) return;
     }
-    let settings;
-    try {
-      settings = readFileSync(join(env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.claude'), 'settings.json'), 'utf8');
-    } catch {}
     const pick = (list) => list[Math.floor(Math.random() * list.length)];
-    const msg = message(input, { nightCity: nightCityEnabled(settings), pick });
+    const msg = message(input, { pick });
     for (const { argv, env: childEnv } of notifiers(platform, msg, ICON)) {
       try {
         await run(argv, childEnv ?? env);

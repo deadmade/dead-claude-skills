@@ -97,7 +97,7 @@ synced upstream commit is in `plugins/graphify/UPSTREAM`.
 
 ## claude-swap (cswap)
 
-`plugins/cswap/` is a front end for [realiti4/claude-swap](https://github.com/realiti4/claude-swap) (MIT License,
+`plugins/mods/cswap/` is a front end for [realiti4/claude-swap](https://github.com/realiti4/claude-swap) (MIT License,
 Copyright (c) Onur Cetinkol); it runs the `cswap` binary and vendors none of its code.
 `.github/workflows/build-cswap.yml` compiles the upstream tag pinned in `installer/cswap.json` with Nuitka;
 `release.yml` attaches the result as `cswap.exe` to each `vX.Y.Z` release, and `sync-cswap.yml` bumps the pin weekly.
@@ -113,7 +113,7 @@ skill (MIT License, Copyright Matt Pocock; `LICENSE-MIT`), unmodified apart from
 
 ## night-city
 
-The palette of `plugins/night-city/themes/night-city.json` is derived from the Cyberpunk Neon theme
+The palette of `plugins/mods/night-city/themes/night-city.json` is derived from the Cyberpunk Neon theme
 (`plugins/theme-gallery/themes/cyberpunk.json`) of [livlign/ccthemes](https://github.com/livlign/ccthemes) (MIT
 License, Copyright its authors), with changed and added colors. Nothing is vendored or synced.
 
