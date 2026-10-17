@@ -253,6 +253,75 @@ fn whois_404_is_not_found() {
     assert!(text(&r).contains("Not found: nope.com"), "{r}");
 }
 
+/// Serves `file` (`ipv4.json`, `asn.json`) sending `entry` to the fixture's `/registry/`.
+fn bootstrap_file(fx: &Fixture, file: &str, entry: &str) {
+    let b = json!({"services": [[[entry], [fx.url("/registry/")]]]});
+    fx.route(
+        &format!("/rdap/{file}"),
+        vec![Resp::new(200, "application/json", b.to_string())],
+    );
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn whois_ip_uses_ipv4_bootstrap_once() {
+    let fx = Fixture::start(PUBLIC);
+    bootstrap_file(&fx, "ipv4.json", "8.0.0.0/8");
+    fx.route("/registry/ip/8.8.8.8", rdap(&json!({"handle": "NET-8"})));
+    let mut mcp = rdap_start(&fx, None);
+    // The mapped form is the same address, so it takes the same route.
+    for target in ["8.8.8.8", "::ffff:8.8.8.8"] {
+        let r = whois(&mut mcp, target);
+        assert!(!is_error(&r), "{target}: {r}");
+        assert!(text(&r).contains("\"handle\": \"NET-8\""), "{r}");
+    }
+    assert_eq!(fx.hits("/rdap/ipv4.json"), 1);
+    assert_eq!(fx.hits("/rdap/ipv6.json"), 0);
+    assert_eq!(fx.hits("/registry/ip/8.8.8.8"), 2);
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn whois_asn_uses_asn_bootstrap_once() {
+    let fx = Fixture::start(PUBLIC);
+    bootstrap_file(&fx, "asn.json", "2000-3000");
+    fx.route("/registry/autnum/2043", rdap(&json!({"handle": "AS2043"})));
+    let mut mcp = rdap_start(&fx, None);
+    for target in ["AS2043", "as2043"] {
+        let r = whois(&mut mcp, target);
+        assert!(!is_error(&r), "{target}: {r}");
+        assert!(text(&r).contains("\"handle\": \"AS2043\""), "{r}");
+    }
+    assert_eq!(fx.hits("/rdap/asn.json"), 1);
+    assert_eq!(fx.hits("/registry/autnum/2043"), 2);
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn whois_failed_bootstrap_is_an_error_and_retried() {
+    let fx = Fixture::start(PUBLIC);
+    fx.route("/rdap/dns.json", vec![Resp::new(500, "text/plain", "down")]);
+    let mut mcp = rdap_start(&fx, None);
+    for _ in 0..2 {
+        let r = whois(&mut mcp, "example.com");
+        assert!(is_error(&r), "{r}");
+        assert!(
+            text(&r).contains("Failed: IANA RDAP bootstrap dns.json: "),
+            "{r}"
+        );
+    }
+    // Each call tried twice (one retry on 5xx), and the failure was not cached.
+    assert_eq!(fx.hits("/rdap/dns.json"), 4);
+    fx.route(
+        "/rdap/dns.json",
+        vec![Resp::new(200, "application/json", "not json")],
+    );
+    let r = whois(&mut mcp, "example.com");
+    assert!(is_error(&r), "{r}");
+    assert!(text(&r).contains("not JSON"), "{r}");
+    assert_eq!(fx.hits("/rdap/dns.json"), 5);
+}
+
 #[cfg(debug_assertions)]
 #[test]
 fn whois_timeout_with_only_bootstrap_is_an_error() {

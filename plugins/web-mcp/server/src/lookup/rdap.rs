@@ -107,8 +107,8 @@ enum Target {
 impl Target {
     fn parse(raw: &str) -> Result<Self, String> {
         let t = raw.trim();
-        if let Ok(ip) = t.parse() {
-            return Ok(Self::Ip(ip));
+        if let Ok(ip) = t.parse::<IpAddr>() {
+            return Ok(Self::Ip(ip.to_canonical()));
         }
         if let Some(n) = t
             .get(..2)
@@ -298,6 +298,20 @@ mod tests {
     }
 
     #[test]
+    fn full_and_empty_masks() {
+        let b = boot(&[
+            (&["0.0.0.0/0"], &["https://any.example/"]),
+            (&["1.2.3.4/32"], &["https://one.example/"]),
+            (&["::/0"], &["https://any6.example/"]),
+            (&["::1/128"], &["https://one6.example/"]),
+        ]);
+        assert_eq!(host(b.ip("1.2.3.4".parse().unwrap())), "one.example");
+        assert_eq!(host(b.ip("1.2.3.5".parse().unwrap())), "any.example");
+        assert_eq!(host(b.ip("::1".parse().unwrap())), "one6.example");
+        assert_eq!(host(b.ip("::2".parse().unwrap())), "any6.example");
+    }
+
+    #[test]
     fn asn_range_match() {
         let b = boot(&[(&["64512-65534"], &["https://priv.example/"])]);
         assert_eq!(host(b.asn(64512)), "priv.example");
@@ -338,6 +352,7 @@ mod tests {
         assert_eq!(target("as2043").unwrap(), "AS2043");
         assert_eq!(target("2001:DB8::1").unwrap(), "2001:db8::1");
         assert_eq!(target("Example.COM.").unwrap(), "example.com");
+        assert_eq!(target("::ffff:8.8.8.8").unwrap(), "8.8.8.8");
         assert!(target("http://x/y").is_err());
     }
 }
