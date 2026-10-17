@@ -30,7 +30,7 @@ const FETCH_DEADLINE: Duration = Duration::from_secs(30);
 pub struct SearchArgs {
     /// What to look for; with `papers`, a topic, a DOI or an arXiv id.
     pub query: String,
-    /// Search scholarly APIs (OpenAlex, arXiv, Crossref) instead of the web.
+    /// Search scholarly paper APIs instead of the web.
     pub papers: Option<bool>,
     /// Passages to return, 1-20 (default 8).
     pub max_passages: Option<u32>,

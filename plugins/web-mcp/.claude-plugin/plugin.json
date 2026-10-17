@@ -1,7 +1,7 @@
 {
   "name": "web-mcp",
   "version": "0.3.0",
-  "description": "Web research tools for Claude: search (self-hosted SearXNG and the archive), fetch (whole pages as markdown) and browser (agent-browser), all archived in .web/. Needs the web-mcp binary.",
+  "description": "Web research tools for Claude: search (self-hosted SearXNG, paper APIs and the archive, ranked with BM25), fetch (whole pages as markdown) and browser (agent-browser), all archived in .web/. Needs the web-mcp binary.",
   "author": {
     "name": "deadmade",
     "url": "https://github.com/deadmade"

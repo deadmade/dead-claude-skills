@@ -60,10 +60,10 @@ pub struct Index {
     f: Fields,
     jobs: mpsc::UnboundedSender<Job>,
     /// Commits made by this index's writer task.
-    #[allow(dead_code)] // read by the tests
+    #[cfg_attr(not(test), allow(dead_code))] // read by the tests
     commits: Arc<AtomicUsize>,
     /// Times the writer task waited for merges (only ever with an empty queue).
-    #[allow(dead_code)] // read by the tests
+    #[cfg_attr(not(test), allow(dead_code))] // read by the tests
     merge_waits: Arc<AtomicUsize>,
 }
 
@@ -72,6 +72,10 @@ impl Index {
     /// When the directory can't be created or holds an index tantivy can't open.
     pub fn open(web_root: &Path) -> anyhow::Result<Index> {
         let dir = web_root.join("index");
+        // A committed `.web/` could hold a symlink here that would take tantivy's files, or its index, elsewhere.
+        if std::fs::symlink_metadata(&dir).is_ok_and(|m| m.file_type().is_symlink()) {
+            anyhow::bail!("{} is a symlink; refusing to use it", dir.display());
+        }
         std::fs::create_dir_all(&dir).with_context(|| format!("creating {}", dir.display()))?;
         let mut b = Schema::builder();
         let f = Fields {
@@ -332,7 +336,7 @@ impl Writer {
 
 /// Reciprocal rank fusion: score = Σ 1 / (k + rank), rank from 1; ties keep the first list's order.
 /// A passage is the same across lists when its URL and text are.
-#[allow(dead_code)] // used by Tasks 11 and 12
+#[cfg_attr(not(feature = "h4"), allow(dead_code))] // used by examples/h4.rs
 pub fn rrf(lists: &[Vec<Hit>], k: f32) -> Vec<Hit> {
     let mut fused: Vec<Hit> = Vec::new();
     let mut at: HashMap<(&str, &str), usize> = HashMap::new();
@@ -370,6 +374,16 @@ mod tests {
         ));
         std::fs::create_dir_all(&p).unwrap();
         p
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlinked_index_dir_is_refused() {
+        let web = temp_web("symlink");
+        let target = temp_web("symlink-target");
+        std::os::unix::fs::symlink(&target, web.join("index")).unwrap();
+        assert!(Index::open(&web).is_err());
+        assert!(std::fs::read_dir(&target).unwrap().next().is_none());
     }
 
     fn doc(text: &str, url: &str) -> PassageDoc {

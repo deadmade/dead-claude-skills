@@ -499,6 +499,13 @@ async fn send(
             is_private(&url) || r.is_none_or(|r| r.iter().any(|ip| is_private_ip(*ip)))
         };
         if !allow_private && blocked(resolved.as_deref()) {
+            // A name that doesn't resolve is a dead link, not a private address (it stays refused either way).
+            if resolved.is_none() && !is_private(&url) {
+                return Err(net(format!(
+                    "{} does not resolve",
+                    url.host_str().unwrap_or("")
+                )));
+            }
             return Err(FetchError::Blocked(url.to_string()));
         }
         let permit = ctx.limits.acquire(&url).await;
@@ -832,6 +839,19 @@ mod tests {
         assert!(matches!(restricted, Err(FetchError::Blocked(_))));
         let ok = first.await.unwrap().map_err(|e| e.to_string()).unwrap();
         assert_eq!(ok.page.markdown, "# hi\n");
+    }
+
+    #[tokio::test]
+    async fn unresolvable_host_is_a_network_error_not_a_block() {
+        let url = Url::parse("http://no-such-host.invalid/").unwrap();
+        let r = get(
+            &test_ctx(),
+            &url,
+            Duration::from_secs(10),
+            GetOpts::default(),
+        )
+        .await;
+        assert!(matches!(r, Err(FetchError::Network(_))), "{:?}", r.err());
     }
 
     #[test]

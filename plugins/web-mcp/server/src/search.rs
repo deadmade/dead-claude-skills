@@ -38,7 +38,7 @@ impl fmt::Display for SearchError {
         match self {
             Self::Unreachable(u) => write!(
                 f,
-                "SearXNG is not reachable at {u}; run `docker start searxng`."
+                "SearXNG is not reachable at {u}; start SearXNG (with the installer's Docker setup: `docker start searxng`)."
             ),
             Self::Failed(m) => write!(f, "SearXNG search failed: {m}"),
         }

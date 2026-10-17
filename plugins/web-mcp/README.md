@@ -12,13 +12,14 @@ they pull is archived in `.web/` in the project before Claude sees it.
   content images come back downscaled. A page that is empty without JavaScript is re-fetched through the browser. A URL
   fetched earlier in the run comes from the archive, except localhost and private-network addresses.
 - `browser { action, session, url?, ref?, text?, key?, js? }`: drives agent-browser. `session` is required, and each
-  session is its own browser. Actions: `open`, `snapshot`, `click`, `fill`, `type`, `press`, `scroll`, `screenshot`,
+  session is its own browser (named per server process, and closed again when the server exits). Actions: `open`, `snapshot`, `click`, `fill`, `type`, `press`, `scroll`, `screenshot`,
   `console`, `network`, `eval`, `close`.
 
 ## The archive
 
 `.web/<date>_<run>/` holds an `index.jsonl` plus the searches, pages, PDFs and screenshots of one server run. `.web/`
-writes its own `.gitignore`. Nothing is ever deleted, so it grows; it is safe to delete at any time.
+writes its own `.gitignore`. `.web/index/` is the BM25 passage index shared by all runs. Archived items are never
+deleted, so it grows; delete it by hand only while no server is running, since the index is memory-mapped.
 
 ## Install
 

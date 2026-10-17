@@ -1,3 +1,5 @@
+use std::fmt::Write as _;
+
 use dom_smoothie::Readability;
 use url::Url;
 
@@ -44,14 +46,27 @@ fn image_urls(content: &str, base: &Url) -> Vec<Url> {
 
 pub fn extract_pdf(bytes: &[u8]) -> anyhow::Result<String> {
     let doc = pdf_oxide::PdfDocument::from_bytes(bytes.to_vec())?;
+    let pages = doc.page_count()?;
+    Ok(join_pages(
+        (0..pages).map(|page| Ok(doc.extract_text(page)?)),
+    ))
+}
+
+/// The pages' text, a page that failed standing in as `[page N: no text]` so one bad page doesn't drop the PDF.
+fn join_pages(pages: impl IntoIterator<Item = anyhow::Result<String>>) -> String {
     let mut text = String::new();
-    for page in 0..doc.page_count()? {
-        if !text.is_empty() {
+    for (i, page) in pages.into_iter().enumerate() {
+        if i > 0 {
             text.push_str("\n\n");
         }
-        text.push_str(doc.extract_text(page)?.trim());
+        match page {
+            Ok(t) => text.push_str(t.trim()),
+            Err(_) => {
+                let _ = write!(text, "[page {}: no text]", i + 1);
+            }
+        }
     }
-    Ok(text)
+    text
 }
 
 /// Pages with less text than this are probably client-rendered shells.
@@ -100,6 +115,16 @@ mod tests {
     fn app_shell_is_near_empty() {
         let page = extract_html(include_str!("../tests/fixtures/app-shell.html"), &base());
         assert!(near_empty(&page));
+    }
+
+    #[test]
+    fn a_bad_pdf_page_does_not_drop_the_others() {
+        let pages = vec![
+            Ok("one".to_owned()),
+            Err(anyhow::anyhow!("bad")),
+            Ok("three".to_owned()),
+        ];
+        assert_eq!(join_pages(pages), "one\n\n[page 2: no text]\n\nthree");
     }
 
     #[test]
