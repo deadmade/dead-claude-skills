@@ -54,8 +54,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         inflight: fetch::Inflight::default(),
         cfg,
     };
-    let server = tools::Server::new(Arc::new(ctx));
-    server.serve(stdio()).await?.waiting().await?;
+    let ctx = Arc::new(ctx);
+    let served = tools::Server::new(Arc::clone(&ctx))
+        .serve(stdio())
+        .await?
+        .waiting()
+        .await;
+    // stdin closed: don't leave the sessions' daemons and browsers behind.
+    ctx.browser.close_all().await;
+    served?;
     Ok(())
 }
 

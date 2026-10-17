@@ -1,9 +1,11 @@
 //! agent-browser, driven as a child process: one `--json` call per action, one named session per browser.
 
+use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
@@ -62,6 +64,8 @@ pub struct Browser {
     pub bin: PathBuf,
     /// How long the fetch fallback's batch may take.
     pub fallback_deadline: Duration,
+    /// Agent-browser sessions the `browser` tool opened and has not closed; shutdown closes them.
+    opened: Mutex<BTreeSet<String>>,
 }
 
 impl Browser {
@@ -71,7 +75,36 @@ impl Browser {
         Self {
             bin: Self::resolve(name).unwrap_or_else(|| name.into()),
             fallback_deadline: Duration::from_secs(30),
+            opened: Mutex::default(),
         }
+    }
+
+    /// The agent-browser session behind the user's `name`, and a note to close it at shutdown. Sessions are
+    /// global per user, so the pid keeps two servers off the same tab. At most `web-mcp-` + 10 pid digits + `-`
+    /// + 32 name characters = 51 bytes, which leaves room in agent-browser's ~103-byte socket path.
+    pub fn session(&self, name: &str) -> String {
+        let s = format!("web-mcp-{}-{name}", std::process::id());
+        self.opened.lock().expect("session set").insert(s.clone());
+        s
+    }
+
+    /// Closes `session` (a name from `session`) and forgets it.
+    pub async fn close(&self, session: &str) -> Result<Value, BrowserError> {
+        self.opened.lock().expect("session set").remove(session);
+        self.run(session, &["close".to_owned()]).await
+    }
+
+    /// Closes every session still open, in parallel, best effort, each within 5 s.
+    pub async fn close_all(&self) {
+        let open = std::mem::take(&mut *self.opened.lock().expect("session set"));
+        let close = ["close".to_owned()];
+        futures::future::join_all(open.iter().map(|s| {
+            tokio::time::timeout(
+                Duration::from_secs(5),
+                self.run_with(s, &close, None, false),
+            )
+        }))
+        .await;
     }
 
     /// A path to an existing file, or `name` found on PATH. On Windows each `PATHEXT` extension is

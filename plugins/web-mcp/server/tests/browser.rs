@@ -56,7 +56,7 @@ fn open_passes_session_json_and_limits() {
         args(&calls(&log)[0]),
         [
             "--session",
-            "s1",
+            &format!("web-mcp-{}-s1", mcp.pid()),
             "--json",
             "--max-output",
             "40000",
@@ -72,10 +72,50 @@ fn two_sessions_stay_separate() {
     let (mut mcp, log) = start(FAKE);
     for s in ["a", "b"] {
         let r = mcp.call("browser", json!({"action": "snapshot", "session": s}));
-        assert!(text(&r).contains(&format!("session: {s}")), "{r}");
+        assert!(
+            text(&r).contains(&format!("session: web-mcp-{}-{s}", mcp.pid())),
+            "{r}"
+        );
     }
     let sessions: Vec<_> = calls(&log).iter().map(|c| args(c)[1].to_owned()).collect();
-    assert_eq!(sessions, ["a", "b"]);
+    let pid = mcp.pid();
+    assert_eq!(
+        sessions,
+        [format!("web-mcp-{pid}-a"), format!("web-mcp-{pid}-b")]
+    );
+}
+
+/// agent-browser's socket path is limited to about 103 bytes, so the longest session name must stay short.
+#[test]
+fn longest_session_name_stays_short() {
+    let (mut mcp, log) = start(FAKE);
+    let name = "a".repeat(32);
+    mcp.call("browser", json!({"action": "snapshot", "session": name}));
+    // 7-digit Linux pids at most; Windows pids reach 10 digits, covered by the 56-byte budget.
+    assert!(args(&calls(&log)[0])[1].len() <= 56);
+}
+
+#[test]
+fn opened_sessions_are_closed_on_shutdown_unless_closed() {
+    let (mut mcp, log) = start(FAKE);
+    for s in ["a", "b", "gone"] {
+        mcp.call("browser", json!({"action": "snapshot", "session": s}));
+    }
+    mcp.call("browser", json!({"action": "close", "session": "gone"}));
+    mcp.finish();
+    let pid = mcp.pid();
+    let closes: Vec<String> = calls(&log)
+        .iter()
+        .filter(|c| args(c).last() == Some(&"close"))
+        .map(|c| args(c)[1].to_owned())
+        .collect();
+    let mut after_user_close: Vec<_> = closes[1..].to_vec();
+    after_user_close.sort();
+    assert_eq!(closes[0], format!("web-mcp-{pid}-gone"));
+    assert_eq!(
+        after_user_close,
+        [format!("web-mcp-{pid}-a"), format!("web-mcp-{pid}-b")]
+    );
 }
 
 #[test]

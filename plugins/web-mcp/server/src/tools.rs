@@ -138,6 +138,7 @@ async fn browse(ctx: &Ctx, args: BrowserArgs) -> Result<CallToolResult, CallTool
         Close => "close",
     };
     browser::check_session(&args.session).map_err(|e| error(format!("browser: {e}")))?;
+    let session = ctx.browser.session(&args.session);
     let mut cmd = vec![name.to_owned()];
     // Written by agent-browser into web-mcp's own folder, and removed on every path out.
     let shot = if matches!(args.action, Screenshot) {
@@ -214,11 +215,13 @@ async fn browse(ctx: &Ctx, args: BrowserArgs) -> Result<CallToolResult, CallTool
     let data = if matches!(args.action, Fill | Type | Eval) {
         let cmd: Vec<&str> = cmd.iter().map(String::as_str).collect();
         ctx.browser
-            .batch(&args.session, &[cmd])
+            .batch(&session, &[cmd])
             .await
             .map(|mut r| r.pop().unwrap_or(Value::Null))
+    } else if matches!(args.action, Close) {
+        ctx.browser.close(&session).await
     } else {
-        ctx.browser.run(&args.session, &cmd).await
+        ctx.browser.run(&session, &cmd).await
     }
     .map_err(|e| error(e.to_string()))?;
     let source = format!(

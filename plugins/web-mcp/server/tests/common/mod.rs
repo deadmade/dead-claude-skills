@@ -193,7 +193,7 @@ pub fn tempdir() -> PathBuf {
 pub struct Mcp {
     pub project: PathBuf,
     child: Child,
-    stdin: ChildStdin,
+    stdin: Option<ChildStdin>,
     out: BufReader<ChildStdout>,
     next_id: u64,
 }
@@ -227,7 +227,7 @@ impl Mcp {
         let mut m = Self {
             project,
             child,
-            stdin,
+            stdin: Some(stdin),
             out,
             next_id: 1,
         };
@@ -241,8 +241,9 @@ impl Mcp {
     }
 
     fn send(&mut self, m: &Value) {
-        writeln!(self.stdin, "{m}").unwrap();
-        self.stdin.flush().unwrap();
+        let stdin = self.stdin.as_mut().unwrap();
+        writeln!(stdin, "{m}").unwrap();
+        stdin.flush().unwrap();
     }
 
     fn request(&mut self, method: &str, params: Value) -> Value {
@@ -283,6 +284,17 @@ impl Mcp {
                 .map(|(t, a)| ("tools/call".to_owned(), json!({"name": t, "arguments": a})))
                 .collect(),
         )
+    }
+
+    /// The server's process id (part of its agent-browser session names).
+    pub fn pid(&self) -> u32 {
+        self.child.id()
+    }
+
+    /// Closes the server's stdin, as Claude Code does when it exits, and waits for the server to finish.
+    pub fn finish(&mut self) {
+        self.stdin = None;
+        self.child.wait().unwrap();
     }
 
     /// The server's environment for a `SearXNG` at `fx`.
