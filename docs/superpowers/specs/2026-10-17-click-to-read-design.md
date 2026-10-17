@@ -63,16 +63,26 @@ conversation in view.
 
 - Markdown only; read-only; reply text only; automatic refresh on change.
 - Small visual differences on redrawn replies are fine; links inside the open document swap the pane.
+
+## Settled in the grill (2026-10-17, user accepted every recommendation)
+
+- Name `md-pane`.
+- A bare name like `flow.md` resolves against the session cwd only; no project search.
+- A `:line[:col]` suffix or `#fragment` is accepted, stripped, and the document opens at the top.
+- Refresh: while the pane is open, check the file's mtime (`$.fs.stat`) about once a second and re-render on change;
+  nothing runs while it's closed. Catches Claude's edits and the user's own.
+- No back key; the reply's link opens the previous document again.
+- The pane closes on session end (`/clear`, resume, new session) like tui-review's; the open document survives only a
+  mod reload (`$.state`).
+- A reply drawn before its file existed keeps the path plain until the engine redraws that reply; a negative
+  existence result is never cached for the session.
 - It ships as an opt-in plugin in this marketplace (accepted the playback).
 
-## Builder's calls (made in brainstorming, open to the grill)
+## Builder's calls (made in brainstorming)
 
-- Plugin name `md-pane`.
-- Path detection: VS Code-style, a regex for path-shaped tokens ending in `.md` (optional `:line[:col]` suffix
-  stripped and ignored), trailing `.,;:'")]` trimmed, then the existence check. Paths with spaces only when Claude
+- Path detection: VS Code-style, a regex for path-shaped tokens ending in `.md` (suffixes per the grill), trailing
+  `.,;:'")]` trimmed, then the existence check. Paths with spaces only when Claude
   wrote them as a Markdown link or in backticks.
-- Refresh: how the mod notices a change (poll `$.fs.stat` mtime on a timer while the pane is open, re-read after
-  each tool call, or both) is the builder's, within goal 5 and the streaming anti-goal.
 - Pane width, title format, the error message wording: the builder's.
 - Ctrl+click target is the same `file://` URL the mod writes; no OSC 8 hostname (the API draws the link).
 - Only replies containing at least one matched path are redrawn by the mod; every other reply is `next(e)`.

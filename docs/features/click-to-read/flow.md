@@ -15,8 +15,8 @@ chat; ctrl/cmd+click keeps the system opener.
 
 - Spec: [2026-10-17-click-to-read-design.md](../../superpowers/specs/2026-10-17-click-to-read-design.md) (builder check done, answers folded in 2026-10-17)
 - Plan:
-- ADRs:
-- CONTEXT.md:
+- ADRs: none (no decision met the three ADR conditions)
+- CONTEXT.md: none (no new domain terms; pane/reply are Claude Code's words)
 
 ## Gates
 
