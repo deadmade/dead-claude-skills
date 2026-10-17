@@ -16,6 +16,7 @@ phase: execute
 
 ## Artifacts
 
+- Follow-up feature, optional search sources: [sources/flow.md](sources/flow.md)
 - Plan (pre-flow, approved 2026-10-16 "plan lgtm"):
   [Web MCP server: validated plan](https://claude.ai/code/artifact/5fc18b2f-8c6f-4cc4-ac46-dca899c2b7c9)
 - Spec: [spec.md](spec.md)

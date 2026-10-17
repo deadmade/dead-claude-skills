@@ -51,3 +51,16 @@ _Avoid_: tab, browser instance
 **Passage**:
 A piece of a page's text, a few hundred tokens long, returned word for word as one ranked search result.
 _Avoid_: chunk, snippet, excerpt
+
+**Lookup**:
+One request for one record about a target, such as a domain's DNS records or a CVE, answered by sources rather than
+by search.
+_Avoid_: query, probe
+
+**Source**:
+An outside service web-mcp reads records from directly, such as OSV or crt.sh.
+_Avoid_: provider, backend
+
+**Engine**:
+One of SearXNG's search sites, such as `github` or `bing`; a filtered search names the engines it uses.
+_Avoid_: source
