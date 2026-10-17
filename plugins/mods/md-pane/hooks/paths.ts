@@ -25,18 +25,21 @@ function pathOf(target: string): string | null {
   return s.endsWith('.md') && s.length > 3 ? s : null;
 }
 
-// Line ranges inside ``` or ~~~ fences, where nothing is linked.
+// Line ranges inside ``` or ~~~ fences (indented ones too, as in list items), where nothing is linked. A fence
+// closes only on a bare fence of its own character, at least as long.
 function fences(text: string): [number, number][] {
   const out: [number, number][] = [];
   let open = -1;
+  let mark = '';
   let at = 0;
   for (const line of text.split('\n')) {
-    if (/^ {0,3}(```|~~~)/.test(line)) {
-      if (open < 0) open = at;
-      else {
-        out.push([open, at + line.length]);
-        open = -1;
-      }
+    const fence = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
+    if (fence && open < 0) {
+      open = at;
+      mark = fence;
+    } else if (fence && fence[0] === mark[0] && fence.length >= mark.length && /^\s*[`~]+\s*$/.test(line)) {
+      out.push([open, at + line.length]);
+      open = -1;
     }
     at += line.length + 1;
   }

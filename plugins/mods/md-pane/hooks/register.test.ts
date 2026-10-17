@@ -21,10 +21,16 @@ function host(on: On, { files = {}, dirs = [], cwd = '/proj' }: { files?: Files;
   const sizes: Record<string, number> = {};
   const gates: Record<string, Promise<void>> = {};
   const started: Record<string, () => void> = {};
+  // A one-shot hold on the next state write, and a callback when that write arrives.
+  const holdSet: { gate?: Promise<void>; arrived?: () => void } = {};
   on('session.cwd', () => ({ value: cwd }));
   on('session.end', async (_$, e) => ({ sessionId: e.sessionId }));
-  // On a Linux host the kit resolves `C:/…` against its own cwd; keep from the drive letter on.
-  const at = (path: string) => path.replace(/^.*?(?=[A-Za-z]:\/)/, '');
+  // The kit resolves paths before a hook sees them: on Linux `C:/…` against its own cwd, on Windows `/proj/x` to
+  // `D:\proj\x`. Keep from a drive letter on, and drop that drive unless the test named the path with it.
+  const at = (path: string) => {
+    const p = path.replace(/\\/g, '/').replace(/^.*?(?=[A-Za-z]:\/)/, '');
+    return p in files || dirs.includes(p) ? p : p.replace(/^[A-Za-z]:/, '');
+  };
   on('fs.stat', (_$, ev) => {
     const e = { path: at(ev.path) };
     stats[e.path] = (stats[e.path] ?? 0) + 1;
@@ -54,15 +60,22 @@ function host(on: On, { files = {}, dirs = [], cwd = '/proj' }: { files?: Files;
     toasts.push(e.text);
     return { value: undefined };
   });
-  on('state.set', (_$, e, next) => {
+  on('state.set', async (_$, e, next) => {
+    const gate = holdSet.gate;
+    if (gate) {
+      delete holdSet.gate;
+      holdSet.arrived?.();
+      await gate;
+    }
+    const done = await next(e);
     states.push(e.value);
-    return next(e);
+    return done;
   });
   on('ui.render', ($, e) => {
     seen.push(e.props as Record<string, unknown>);
     return $.ui.resolve(e).Text({ children: 'engine' }) as never;
   });
-  return { clock, files, mtimes, sizes, gates, started, stats, reads, opens, closes, toasts, states, seen };
+  return { clock, files, mtimes, sizes, gates, started, holdSet, stats, reads, opens, closes, toasts, states, seen };
 }
 
 const FULL = { columns: 120, rows: 40, isFullscreen: true };
@@ -401,4 +414,19 @@ test('a slow refresh is not overlapped by the next ticks', async ($, on) => {
   // Let every started refresh finish inside the test, then count the reads they made.
   for (let i = 0; i < 20; i++) await h.clock.advance(0);
   expect(h.reads['/proj/a.md']).toBe(2);
+});
+
+test("a close during a press's state write keeps the pane closed", async ($, on) => {
+  const h = host(on, { files: { '/proj/a.md': 'A', '/proj/b.md': 'B' } });
+  await press($, 'a.md', 'file:///proj/a.md');
+  let release!: () => void;
+  h.holdSet.gate = new Promise<void>((r) => (release = r));
+  const arrived = new Promise<void>((r) => (h.holdSet.arrived = r));
+  const pending = press($, 'b.md', 'file:///proj/b.md');
+  await arrived;
+  await $.session.end({ reason: 'clear', sessionId: 'old', resume: { id: 'old' } } as never);
+  release();
+  await pending;
+  expect(h.opens.length).toBe(1);
+  expect(h.states.at(-1)).toBe(null);
 });

@@ -95,3 +95,11 @@ test('linkify rewrites only the matches', () => {
   ).toBe('the [spec](file:///s) x');
   expect(linkify(text, [])).toBe(text);
 });
+
+test('findPaths skips fences nested in list items', () => {
+  expect(findPaths('1. Run:\n\n     ```bash\n     grep x docs/a.md\n     ```\n')).toEqual([]);
+});
+
+test('a longer fence is closed only by a fence as long', () => {
+  expect(findPaths('````md\n```\ndocs/a.md\n```\n````\nthen y.md').map((f) => f.raw)).toEqual(['y.md']);
+});

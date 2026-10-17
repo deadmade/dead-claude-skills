@@ -106,8 +106,10 @@ export async function onPress($: EngineInterface, href: string): Promise<void> {
   if (swap) {
     const fresh = await load($, path);
     if (gen !== generation) return;
-    await update($, doc, () => fresh);
+    // Re-checked inside the write: a close that lands while it waits wins.
+    await update($, doc, (cur) => (gen === generation ? fresh : cur));
   }
+  if (gen !== generation) return;
   await $.ui.open({ id: PANE, title: basename(path), focus: true, closeOnEscape: true });
   // The test kit has no ui.scroll; a swapped document should still start at its top.
   if (swap) void $.ui.scroll({ in: PANE, to: 'start' }).catch(() => {});
