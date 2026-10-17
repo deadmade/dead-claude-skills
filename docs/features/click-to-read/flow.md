@@ -1,5 +1,5 @@
 ---
-phase: finish
+phase: done
 ---
 
 # Click-to-read file pane: flow
@@ -130,6 +130,8 @@ unchanged; polling runs on error documents too; race-test setup and `host()` par
   state write: all fixed (I2/I3 with failing tests first; C1 only provable on the Windows CI job). Minors deferred:
   non-ENOENT stat errors reload each tick, Markdown edge cases (link titles, double-backtick spans, `<…>` targets,
   `notes.md.bak`, `_…_`, `%20` targets), a cwd lookup on every fullscreen reply render.
+
+- Finished 2026-10-17: the user chose a PR, https://github.com/deadmade/dead-claude-skills/pull/49.
 
 ## Deviations
 
