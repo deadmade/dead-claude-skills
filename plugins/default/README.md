@@ -5,12 +5,13 @@ The default bundle, on every machine:
 - **Global rules**: `rules.md`, added to the context at session start.
 - **Context7** (`.mcp.json`): up-to-date library docs.
 - **Night City**: the theme and its mod, below.
+- **Notifications**: a desktop popup when a turn ends or Claude waits for you, below.
 - The core plugins as dependencies: code-review, claude-code-setup, claude-md-management, security-guidance,
   claude-security, superpowers and ponytail.
 
   /plugin install dead-skills@dead-claude-skills
 
-Night City and Context7 were plugins of their own (night-city, mcp-basic) until 0.3.0; the installer removes those and keeps Night City picked in `/theme`.
+Night City, Context7 and the notifications were plugins of their own (night-city, mcp-basic, notify) until 0.3.0; the installer removes those and keeps Night City picked in `/theme`.
 
 ## Night City
 
@@ -18,7 +19,7 @@ Night City and Context7 were plugins of their own (night-city, mcp-basic) until 
 
 A toned-down synthwave Claude Code theme, "Night City": a dusk-indigo background, lavender text, dusty-pink Claude,
 peach inline code and permission prompts, soft teal suggestions and bash, muted violet instead of grey for dim text. It is the house look: tui-review's pane,
-notify's popups and the installer's screens use the same palette. Pick it in `/theme` (Claude Code does not let a plugin
+the notifications and the installer's screens use the same palette. Pick it in `/theme` (Claude Code does not let a plugin
 select a custom theme).
 
 Beyond the theme:
@@ -53,7 +54,7 @@ retuned to softer synthwave colours; see `THIRD_PARTY.md` in the repository root
 their end). The netrunner above is the theme's mascot, an original 64×64 pixel-art character in the theme's palette: a
 respirator with an LED bar, an undercut with a circuit tattoo, and a chrome plate whose cybereye is an eight-point
 spark, a nod to Claude rather than Anthropic's logo. `assets/mascot.png` is the 1x original, `assets/mascot-512.png`
-the 8x nearest-neighbour scale; she is also the notify plugin's notification icon. All are drawn by `scripts/draw-mascot.mjs` in the repository root; edit the drawing
+the 8x nearest-neighbour scale; she is also the notification icon. All are drawn by `scripts/draw-mascot.mjs` in the repository root; edit the drawing
 there and rerun it rather than editing the PNGs.
 
 ### Contrast (WCAG)
@@ -70,3 +71,47 @@ anyway.
 
 `text` on the diff backgrounds: added 9.80, removed 10.56, added word 5.94, removed word 7.03, added dimmed 11.25,
 removed dimmed 12.22.
+
+## Notifications
+
+A desktop notification when Claude finishes a turn or waits for you, so you can work in another window (or on another
+monitor) and come back when it's your move.
+
+It fires on:
+
+- a finished turn of the main agent (`Stop`): a Night City line ("Come look at your Agent") and the first line of Claude's answer;
+- a permission prompt or an MCP elicitation (`Notification`): a Night City line ("Songbird requests your help") and Claude Code's message;
+- a question from Claude (`PreToolUse` on `AskUserQuestion`, which raises no notification of its own): a waiting line and the
+  question.
+
+The popup comes from Onibi, Night City's pixel-art netrunner: her face is the icon (`icon.png`, a brightened crop
+written by `scripts/draw-mascot.mjs`; never edit it by hand) and, on Linux, she is the sender. The title is the
+project folder, then the status in bold and Claude's line below it. Windows shows "Windows PowerShell" as the
+sender, since the toast borrows PowerShell's app id.
+
+It stays quiet:
+
+- in tmux, when the session's pane is the active pane of the active window and a client showing that session has
+  focus. This needs `set -g focus-events on` in your tmux config; without it tmux never knows about focus and every
+  event pops up;
+- on Windows, when Windows Terminal is the foreground app (any tab counts);
+- for subagents, Stop-hook continuations and headless runs (`claude -p`, the Agent SDK, CI).
+
+Outside tmux on Linux and macOS it always notifies.
+
+### Delivery
+
+| Platform | How                                                                               | Needs                                                                  |
+| -------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Linux    | `busctl --user` to `org.freedesktop.Notifications`, falling back to `notify-send` | systemd's `busctl` or libnotify's `notify-send`; a notification daemon |
+| Windows  | a WinRT toast from Windows PowerShell, under PowerShell's app id                  | Windows PowerShell 5.1 (built in); notifications on for it in Settings |
+| macOS    | `osascript` `display notification` (best effort, untested, no icon)               | nothing extra                                                          |
+
+Talking to the notification daemon directly means tmux needs no `allow-passthrough`. The hook runs in the background
+(`async`), so a slow PowerShell start doesn't hold up the turn. Claude's text reaches the notifier as an argument or
+an environment variable, never as script source.
+
+### Claude Code's own notification
+
+The installer sets `"preferredNotifChannel": "notifications_disabled"` in `~/.claude/settings.json`, so Claude Code's
+own notification doesn't double up. Installed by hand, set it yourself.

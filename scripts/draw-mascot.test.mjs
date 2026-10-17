@@ -44,7 +44,7 @@ test("Onibi is night-city's mascot and notify's icon", () => {
     [
       ['plugins/default/assets/mascot.png', 1],
       ['plugins/default/assets/mascot-512.png', 8],
-      ['plugins/opt-in/notify/icon.png', 6],
+      ['plugins/default/icon.png', 6],
     ],
   );
 });

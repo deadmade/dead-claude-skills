@@ -1,4 +1,4 @@
-// Vendor every skill of Microsoft's dotnet/skills marketplace into plugins/opt-in/csharp-skills/library/, indexed by
+// Vendor every skill of Microsoft's dotnet/skills marketplace into plugins/opt-in/implementation/csharp-skills/library/, indexed by
 // six C#-only router skills under skills/ (ROUTERS). Idempotent: same upstream commit, same output.
 import {
   appendFileSync,
@@ -154,7 +154,7 @@ export const entrySummary = (name, desc) => SUMMARY_OVERRIDES[name] ?? summary(d
 // Upstream plugin.json keys for parts we don't vendor.
 const UNVENDORED = ['agents', 'mcpServers', 'lspServers', 'hooks', 'commands'];
 
-const PLUGIN = join(ROOT, 'plugins', 'opt-in', 'csharp-skills');
+const PLUGIN = join(ROOT, 'plugins', 'opt-in', 'implementation', 'csharp-skills');
 const LIBRARY = join(PLUGIN, 'library');
 
 function report(line) {

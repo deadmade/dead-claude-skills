@@ -17,7 +17,7 @@
     forAllSystems = nixpkgs.lib.genAttrs ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
 
     # Upstream files copied by scripts/sync-*.mjs: fixing them here would churn every sync PR.
-    vendored = ["^plugins/shared/(paper-lookup|mattpocock-picks|pstack-picks|tob-picks|graphify)/" "^plugins/opt-in/hallmark/" "^plugins/opt-in/(rust|csharp)-skills/(library/|skills/|LICENSE$|UPSTREAM$)" "^plugins/opt-in/postgres/skills/" "^plugins/shared/self-review/(LICENSE|agents/|skills/self-review/references/upstream/)"];
+    vendored = ["^plugins/shared/(paper-lookup|mattpocock-picks|pstack-picks|tob-picks|graphify)/" "^plugins/opt-in/hallmark/" "^plugins/opt-in/implementation/(rust|csharp)-skills/(library/|skills/|LICENSE$|UPSTREAM$)" "^plugins/opt-in/implementation/postgres/skills/" "^plugins/shared/self-review/(LICENSE|agents/|skills/self-review/references/upstream/)"];
 
     # treefmt with the formatters treefmt.toml names: `nix fmt` and the pre-commit hook.
     treefmt = system: let
@@ -41,7 +41,7 @@
       installer-test = pkgs.writeShellApplication {
         name = "installer-test";
         runtimeInputs = [pkgs.nodejs];
-        text = ''exec node --test 'installer/*.test.mjs' 'scripts/*.test.mjs' 'plugins/opt-in/notify/hooks/*.test.mjs' '';
+        text = ''exec node --test 'installer/*.test.mjs' 'scripts/*.test.mjs' 'plugins/default/hooks/*.test.mjs' '';
       };
     in
       git-hooks.lib.${system}.run {
@@ -68,7 +68,7 @@
             enable = true;
             name = "installer tests";
             entry = "${installer-test}/bin/installer-test";
-            files = "^(installer/|scripts/|crates/|plugins/opt-in/notify/hooks/|\\.claude-plugin/marketplace\\.json$|package\\.json$)";
+            files = "^(installer/|scripts/|crates/|plugins/default/hooks/|\\.claude-plugin/marketplace\\.json$|package\\.json$)";
             pass_filenames = false;
           };
         };

@@ -62,7 +62,7 @@ Say which plugin provides it, then use the fallback:
 | a knowledge graph                                        | graphify               | Explore agents                                               |
 | library docs                                             | dead-skills (context7) | the library's docs via web-mcp `fetch` or WebFetch           |
 | the diff pane                                            | tui-review             | `git diff --stat`, then offer to walk the user through it    |
-| a desktop ping                                           | notify                 | nothing                                                      |
+| a desktop ping                                           | dead-skills            | nothing                                                      |
 | `claude-security`                                        | claude-security        | the built-in `security-review`                               |
 | `claude-md-improver`, `revise-claude-md`                 | claude-md-management   | read each CLAUDE.md against the code yourself                |
 | `ponytail-audit`, `ponytail-review`                      | ponytail               | `/simplify` on the scope, report only                        |

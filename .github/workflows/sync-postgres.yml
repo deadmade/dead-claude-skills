@@ -21,7 +21,7 @@ jobs:
       - name: Sanity checks
         id: check
         run: |
-          d=plugins/opt-in/postgres
+          d=plugins/opt-in/implementation/postgres
           jq empty .claude-plugin/marketplace.json $d/.claude-plugin/plugin.json
           test -s $d/skills/postgres-best-practices/SKILL.md
           test -s $d/skills/postgres-database-migration/SKILL.md
@@ -46,4 +46,4 @@ jobs:
               https://github.com/timescale/pg-aiguide/commit/${{ steps.check.outputs.pgai }}
 
             cc @deadmade
-          add-paths: plugins/opt-in/postgres
+          add-paths: plugins/opt-in/implementation/postgres

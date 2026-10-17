@@ -710,13 +710,11 @@ const webBuiltinsOff = webBuiltinsDecision({
   healthy: selected.includes(WEB_MCP) && (await applySearxng(current['web-builtins-off'])),
 });
 
-const notify = selected.some((id) => nameOf(id) === 'notify');
 const toggles = {
   statusLine: on('ccstatusline'),
   sandbox: on('sandbox'),
   dcg: on('dcg'),
   version: VERSION,
-  notify,
   webBuiltinsOff,
 };
 await applySettings(toggles, { strip, reset: clean });

@@ -74,7 +74,6 @@ test('opt-ins from the real manifests', () => {
         'mcp-azure',
         'mcp-github',
         'nix-lsp',
-        'notify',
         'paper-lookup',
         'postgres',
         'pstack-picks',
@@ -97,8 +96,8 @@ test('bundle ids resolve bare names to our marketplace', () => {
 });
 
 test('token plugins', () => {
-  assert.equal(needsToken(json('plugins/opt-in/mcp-github/.claude-plugin/plugin.json')), true);
-  assert.equal(needsToken(json('plugins/opt-in/mcp-azure/.claude-plugin/plugin.json')), true);
+  assert.equal(needsToken(json('plugins/opt-in/mcp/mcp-github/.claude-plugin/plugin.json')), true);
+  assert.equal(needsToken(json('plugins/opt-in/mcp/mcp-azure/.claude-plugin/plugin.json')), true);
   assert.equal(needsToken(json('plugins/shared/graphify/.claude-plugin/plugin.json')), false);
 });
 
@@ -540,13 +539,13 @@ test('shippedVersions counts pinned url plugins and skips unpinned ones', () => 
 test('manifestPath finds a local plugin manifest, null for url sources and unknown names', () => {
   const m = {
     plugins: [
-      { name: 'rust-skills', source: './plugins/opt-in/rust-skills' },
+      { name: 'rust-skills', source: './plugins/opt-in/implementation/rust-skills' },
       { name: 'superpowers', source: { source: 'url' } },
     ],
   };
   assert.equal(
     manifestPath(m, 'rust-skills@dead-claude-skills'),
-    'plugins/opt-in/rust-skills/.claude-plugin/plugin.json',
+    'plugins/opt-in/implementation/rust-skills/.claude-plugin/plugin.json',
   );
   assert.equal(manifestPath(m, 'superpowers@dead-claude-skills'), null);
   assert.equal(manifestPath(m, 'nope@dead-claude-skills'), null);
@@ -593,12 +592,9 @@ test('Night City picked while it was its own plugin stays picked now that dead-s
   assert.equal(mergeSettings({ theme: 'custom:night-city:night-city' }, {}).theme, 'custom:dead-skills:night-city');
 });
 
-test('notify turns the built-in notification off, and deselecting restores it', () => {
-  const channel = (s, notify) => mergeSettings(s, { notify }).preferredNotifChannel;
-  assert.equal(channel({}, true), 'notifications_disabled');
-  assert.equal(channel({ preferredNotifChannel: 'notifications_disabled' }, false), undefined);
-  assert.equal(channel({ preferredNotifChannel: 'kitty' }, false), 'kitty');
-  assert.equal(channel({ preferredNotifChannel: 'kitty' }, true), 'notifications_disabled');
+test('the built-in notification is always off, since dead-skills raises its own', () => {
+  assert.equal(mergeSettings({}, {}).preferredNotifChannel, 'notifications_disabled');
+  assert.equal(mergeSettings({ preferredNotifChannel: 'kitty' }, {}).preferredNotifChannel, 'notifications_disabled');
 });
 
 test('searxng binds loopback, mounts the config dir and takes the secret', () => {

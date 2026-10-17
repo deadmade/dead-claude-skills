@@ -9,7 +9,7 @@ import { ROOT, addPaths, fail, finish, git, sparseClone } from './sync-lib.mjs';
 
 const GLOBS = ['**/*.sql', '**/migrations/**', '**/migrate/**', '**/*.prisma', '**/alembic/**'];
 
-const SKILLS = join(ROOT, 'plugins', 'opt-in', 'postgres', 'skills');
+const SKILLS = join(ROOT, 'plugins', 'opt-in', 'implementation', 'postgres', 'skills');
 
 const UPSTREAMS = [
   {

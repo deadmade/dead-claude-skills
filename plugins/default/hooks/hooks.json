@@ -1,5 +1,5 @@
 {
-  "description": "Global instructions: rules.md is added to the context on session start. register.tsx is the Night City mod.",
+  "description": "Global instructions: rules.md is added to the context on session start. Desktop notifications when a turn ends or Claude waits for you (notify.mjs). register.tsx is the Night City mod.",
   "modules": ["./register.tsx"],
   "hooks": {
     "SessionStart": [
@@ -8,6 +8,41 @@
           {
             "type": "command",
             "command": "node -e \"process.stdout.write(require('fs').readFileSync(process.argv[1], 'utf8'))\" \"${CLAUDE_PLUGIN_ROOT}/rules.md\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/notify.mjs\"",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "permission_prompt|elicitation_dialog",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/notify.mjs\"",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/notify.mjs\"",
+            "async": true
           }
         ]
       }

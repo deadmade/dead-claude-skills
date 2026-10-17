@@ -146,7 +146,7 @@ export const searxngSettings = (template, secret) => template.replace(/^(\s*secr
 export const webBuiltinsDecision = ({ toggle, was, healthy, installed }) =>
   toggle ? healthy || undefined : was && installed ? false : undefined;
 
-export function mergeSettings(settings, { statusLine, sandbox, version, notify, webBuiltinsOff }) {
+export function mergeSettings(settings, { statusLine, sandbox, version, webBuiltinsOff }) {
   const out = structuredClone(settings);
   // Night City ships with the bundle. Claude Code colours code in a fixed Monokai a theme can't change; off, diffs take
   // Night City's own diff colours.
@@ -156,11 +156,8 @@ export function mergeSettings(settings, { statusLine, sandbox, version, notify, 
   out.env = { ...out.env, CLAUDE_CODE_TMUX_TRUECOLOR: '1' };
   // The theme's id carries its plugin's name, and night-city became part of dead-skills.
   if (out.theme === 'custom:night-city:night-city') out.theme = 'custom:dead-skills:night-city';
-  // The notify plugin raises its own popups; Claude Code's built-in one would double them.
-  // shortcut: deselecting also clears a `notifications_disabled` the user set themselves, and retiring notify from
-  // the marketplace leaves the setting behind; remember who set it if anyone minds.
-  if (notify) out.preferredNotifChannel = 'notifications_disabled';
-  if (notify === false && out.preferredNotifChannel === 'notifications_disabled') delete out.preferredNotifChannel;
+  // dead-skills raises its own popups; Claude Code's built-in one would double them.
+  out.preferredNotifChannel = 'notifications_disabled';
   const allow = out.permissions?.allow ?? [];
   const deny = out.permissions?.deny ?? [];
   let denied = [...deny, ...SECRET_DENIES.filter((d) => !deny.includes(d))];
@@ -427,8 +424,8 @@ export const CATEGORIES = [
   {
     id: 'system',
     title: 'System',
-    blurb: 'Status line, sandbox, command guard and notifications.',
-    keys: ['ccstatusline', 'sandbox', 'dcg', 'notify'],
+    blurb: 'Status line, sandbox and command guard.',
+    keys: ['ccstatusline', 'sandbox', 'dcg'],
   },
   // bulk: false, so no single key ticks every option here.
   {

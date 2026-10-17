@@ -132,6 +132,9 @@ too). Findings, recommendation in brackets. **User: "apply all of them"** (2026-
   itself ("I use it, and I dont care" about losing a separate install or the Onibi setting). The installer retires the two
   and moves a picked theme to `custom:dead-skills:night-city`; `/upgrade`'s context7 now comes from dead-skills, and the
   uses check counts a plugin's `.mcp.json` servers.
+- Asked after the PR (2026-10-18): `opt-in/mcp/` (mcp-github, mcp-azure) and `opt-in/implementation/` (rust-skills,
+  csharp-skills, postgres, nix-lsp); `pluginDirs()` nests GROUPS. notify folded into dead-skills: always on, the
+  installer's notify option is gone and it always sets `preferredNotifChannel: "notifications_disabled"`.
 
 ## Walkthrough
 

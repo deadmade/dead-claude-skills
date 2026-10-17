@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "release": "node scripts/release.mjs",
-    "test": "node scripts/check-repo.mjs && node --test \"installer/*.test.mjs\" \"scripts/*.test.mjs\" \"plugins/opt-in/notify/hooks/*.test.mjs\""
+    "test": "node scripts/check-repo.mjs && node --test \"installer/*.test.mjs\" \"scripts/*.test.mjs\" \"plugins/default/hooks/*.test.mjs\""
   },
   "bin": {
     "dead-claude-skills": "installer/install.mjs"
@@ -15,7 +15,8 @@
     "installer/",
     ".claude-plugin/marketplace.json",
     "plugins/*/.claude-plugin/plugin.json",
-    "plugins/*/*/.claude-plugin/plugin.json"
+    "plugins/*/*/.claude-plugin/plugin.json",
+    "plugins/*/*/*/.claude-plugin/plugin.json"
   ],
   "engines": {
     "node": ">=20.12"

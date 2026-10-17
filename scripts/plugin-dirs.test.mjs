@@ -22,6 +22,15 @@ test('a GROUPS folder is replaced by its subfolders', () => {
   ]);
 });
 
+test('a GROUPS folder can hold another one', () => {
+  const fx = mkdtempSync(join(tmpdir(), 'pd-'));
+  for (const d of ['opt-in/x', 'opt-in/mcp/m', 'opt-in/implementation/i']) {
+    mkdirSync(join(fx, 'plugins', d, '.claude-plugin'), { recursive: true });
+    writeFileSync(join(fx, 'plugins', d, '.claude-plugin', 'plugin.json'), '{}');
+  }
+  assert.deepEqual(pluginDirs(fx), ['plugins/opt-in/implementation/i', 'plugins/opt-in/mcp/m', 'plugins/opt-in/x']);
+});
+
 test('the real repo lists cswap but not the grouping folder', () => {
   const dirs = pluginDirs(ROOT);
   assert.ok(dirs.includes('plugins/opt-in/cswap'));

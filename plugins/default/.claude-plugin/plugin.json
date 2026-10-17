@@ -1,7 +1,7 @@
 {
   "name": "dead-skills",
   "version": "0.3.0",
-  "description": "Default bundle: global instructions, the Night City theme and mod, Context7, plus the core plugins of the dead-claude-skills marketplace as dependencies.",
+  "description": "Default bundle: global instructions, the Night City theme and mod, desktop notifications, Context7, plus the core plugins of the dead-claude-skills marketplace as dependencies.",
   "author": {
     "name": "deadmade",
     "url": "https://github.com/deadmade"

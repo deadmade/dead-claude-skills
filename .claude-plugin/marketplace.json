@@ -13,7 +13,7 @@
   "plugins": [
     {
       "name": "dead-skills",
-      "description": "Default bundle: global instructions, the Night City theme and mod (spinner words, status-line reactions, Onibi dropping by), Context7, and the core plugins of this marketplace as dependencies.",
+      "description": "Default bundle: global instructions, the Night City theme and mod (spinner words, status-line reactions, Onibi dropping by), desktop notifications, Context7, and the core plugins of this marketplace as dependencies.",
       "source": "./plugins/default",
       "category": "productivity"
     },
@@ -42,19 +42,19 @@
     {
       "name": "nix-lsp",
       "description": "Nix language server (nixd) for code intelligence (requires nixd on PATH)",
-      "source": "./plugins/opt-in/nix-lsp",
+      "source": "./plugins/opt-in/implementation/nix-lsp",
       "category": "development"
     },
     {
       "name": "mcp-github",
       "description": "GitHub's hosted MCP server (repos, issues, PRs, Actions). Opt-in per machine.",
-      "source": "./plugins/opt-in/mcp-github",
+      "source": "./plugins/opt-in/mcp/mcp-github",
       "category": "productivity"
     },
     {
       "name": "mcp-azure",
       "description": "Azure DevOps Server MCP server (self-hosted, PAT). Opt-in per machine, configure with /plugin configure.",
-      "source": "./plugins/opt-in/mcp-azure",
+      "source": "./plugins/opt-in/mcp/mcp-azure",
       "category": "productivity"
     },
     {
@@ -87,19 +87,19 @@
     {
       "name": "rust-skills",
       "description": "Rust best practices from Apollo GraphQL's handbook (rust-best-practices): ownership, errors, clippy, testing, dispatch. Vendored, synced weekly. Opt-in.",
-      "source": "./plugins/opt-in/rust-skills",
+      "source": "./plugins/opt-in/implementation/rust-skills",
       "category": "development"
     },
     {
       "name": "csharp-skills",
       "description": "Microsoft's .NET skills (dotnet/skills): C#, testing, MSBuild/NuGet, ASP.NET Core, Blazor, EF Core, MAUI, WinForms, behind six C#-only router skills. Vendored, synced weekly. Opt-in.",
-      "source": "./plugins/opt-in/csharp-skills",
+      "source": "./plugins/opt-in/implementation/csharp-skills",
       "category": "development"
     },
     {
       "name": "postgres",
       "description": "Postgres best practices (Neon's postgres-best-practices) and safe, non-blocking migrations (Timescale pg-aiguide's postgres-database-migration). Vendored, synced weekly. Opt-in.",
-      "source": "./plugins/opt-in/postgres",
+      "source": "./plugins/opt-in/implementation/postgres",
       "category": "development"
     },
     {
@@ -130,12 +130,6 @@
       "name": "paper-lookup",
       "description": "Paper lookup: search arXiv, Semantic Scholar, OpenAlex, Crossref, Unpaywall and other scholarly APIs (trimmed for computer science) for papers, citations and open-access full text. Vendored from K-Dense-AI/scientific-agent-skills. Opt-in.",
       "source": "./plugins/shared/paper-lookup",
-      "category": "development"
-    },
-    {
-      "name": "notify",
-      "description": "Desktop notifications when a turn ends or Claude needs you, on Linux, Windows and macOS; quiet while you are looking at the session. Opt-in.",
-      "source": "./plugins/opt-in/notify",
       "category": "development"
     },
     {
