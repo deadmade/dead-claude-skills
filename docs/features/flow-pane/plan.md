@@ -223,9 +223,9 @@ declare module 'claude-code' {
       `on('tool.call', () => ({ result: 'ok' }))` unless a test answers otherwise; a bottom
       `on('ui.render', { component: 'AbovePrompt' }, () => ({ type: 'engine', ref: 0 }) as never)` (nothing sits
       beneath test hooks, reference.md:81; night-city test:10-17). Draw with
-      `$.ui.mount({ plugin: 'feature-flow', surface: 'terminal', component: 'AbovePrompt', props: { hasSurvey: false,
-      isWorking: false, maxRows: 10, bodyColumns: 100, scroll: …, view: {} } })` and read it with `ui.find` /
-      `ui.press({ key })`.
+      `$.ui.mount({ plugin: 'feature-flow', surface: 'terminal', component: 'AbovePrompt', props })` with
+      `props = { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 100, scroll: …, view: {} }`, and read
+      it with `ui.find` / `ui.press({ key })`.
   - "no runs": no `docs/features` anywhere → nothing of ours drawn.
   - "a worktree copy wins": `/repo/docs/features/a/flow.md` at `phase: plan` (mtime 1) and
     `/repo/.worktrees/wt/docs/features/a/flow.md` at `phase: execute` (mtime 2) → shows `execute`.
