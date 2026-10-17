@@ -222,9 +222,11 @@ impl Browser {
             )))
         });
         // Whatever happened, the session (a daemon and its Chromium) must not outlive the fetch.
-        let _ = self
-            .run_with(&session, &["close".to_owned()], None, false)
-            .await;
+        let _ = tokio::time::timeout(
+            Duration::from_secs(5),
+            self.run_with(&session, &["close".to_owned()], None, false),
+        )
+        .await;
         let answer = answer?;
         let field =
             |v: &Value, key: &str| v.as_str().or_else(|| v[key].as_str()).map(str::to_owned);
