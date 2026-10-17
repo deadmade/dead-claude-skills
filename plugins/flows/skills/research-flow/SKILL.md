@@ -1,8 +1,8 @@
 ---
 name: research-flow
-description: "Build a feature on scientific evidence: ground it in the code and in papers, brainstorm options that cite an evidence table, state a falsifiable hypothesis with a metric, grill, plan, evaluate, execute, then measure the result against the hypothesis before finishing. Runs feature-flow's phases with research added. Two approval gates, no lock. Use for /research-flow <what to build>; no argument resumes the active research feature."
+description: "Build a feature on scientific evidence: ground it in the code and in papers, brainstorm options that cite an evidence table, state a falsifiable hypothesis with a metric, grill, plan, evaluate, execute, then measure the result against the hypothesis before finishing. Runs feature-flow's phases with research added. Two approval gates, no lock. Use for /research-flow <what to build>; no argument resumes the active research feature, a run's slug resumes that run."
 disable-model-invocation: true
-argument-hint: 'What do you want to build, and what should the research answer?'
+argument-hint: "What do you want to build, and what should the research answer (or a run's slug)?"
 ---
 
 # research-flow
@@ -37,12 +37,20 @@ differs.
   plugins, then use WebSearch/WebFetch on arxiv.org, Semantic Scholar or the publisher's page, and mark those rows as
   weaker provenance.
 - The hypothesis is fixed at Gate 1. Changing its metric or threshold after that, above all after seeing numbers,
-  reopens Gate 1.
+  reopens Gate 1. Record a reopening on its Gate line in flow.md as `Reopened <date>: <why>`, and the re-approval date
+  after it.
 
 ## Start or resume
 
-- **With an argument:** derive a kebab-case slug, create `docs/features/<slug>/flow.md` from the research template,
-  then Phase 1.
+- **With an argument, an existing run's slug** (`docs/features/<arg>/flow.md` exists in the repository root or a
+  worktree under `.worktrees/*/` or `.claude/worktrees/*/`): read the newest copy. Not `flow: research` → say which
+  conductor it belongs to and stop. `phase: done` → say it's done and ask what to do. When the newest copy is in
+  a worktree, work in that worktree (EnterWorktree with its path) and write that copy; if the switch is refused
+  (EnterWorktree only switches into `.claude/worktrees/` from inside another worktree), say so and ask the user to
+  start the session in that worktree. Then continue at its phase, as "Without one" does. Never create a flow.md over
+  an existing one.
+- **With an argument, anything else:** derive a kebab-case slug, create `docs/features/<slug>/flow.md` from the
+  research template, then Phase 1. If the derived slug exists, ask before choosing another.
 - **Without one:** find `docs/features/*/flow.md` with `flow: research` whose `phase:` isn't `done`. One: read it and
   the artifacts it links, then continue at its phase. Several: ask which. None: ask what to build.
 

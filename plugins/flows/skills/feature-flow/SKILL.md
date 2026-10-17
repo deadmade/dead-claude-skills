@@ -1,8 +1,8 @@
 ---
 name: feature-flow
-description: 'Build a feature through the whole skill chain: ground in the code and in how other projects solve it, brainstorm with options, grill the spec with domain docs and ADRs, write the plan, evaluate it adversarially, then execute, verify and finish. Two approval gates, no lock. Use for /feature-flow <what to build>; no argument resumes the active feature.'
+description: "Build a feature through the whole skill chain: ground in the code and in how other projects solve it, brainstorm with options, grill the spec with domain docs and ADRs, write the plan, evaluate it adversarially, then execute, verify and finish. Two approval gates, no lock. Use for /feature-flow <what to build>; no argument resumes the active feature, a run's slug resumes that run."
 disable-model-invocation: true
-argument-hint: 'What do you want to build?'
+argument-hint: "What do you want to build (or a run's slug)?"
 ---
 
 # feature-flow
@@ -31,8 +31,16 @@ Claude proposes and recommends; the user decides.
 
 ## Start or resume
 
-- **With an argument:** derive a kebab-case slug (`checkout-webhooks`), create `docs/features/<slug>/flow.md` from
-  [references/flow-template.md](references/flow-template.md), then Phase 1.
+- **With an argument, an existing run's slug** (`docs/features/<arg>/flow.md` exists in the repository root or a
+  worktree under `.worktrees/*/` or `.claude/worktrees/*/`): read the newest copy. A `flow:` other than `feature` (or
+  missing) → say which conductor it belongs to and stop. `phase: done` → say it's done and ask what to do. When the newest copy is in a
+  worktree, work in that worktree (EnterWorktree with its path) and write that copy; if the switch is refused
+  (EnterWorktree only switches into `.claude/worktrees/` from inside another worktree), say so and ask the user to
+  start the session in that worktree. Then continue at its phase, as "Without one" does. Never create a flow.md over
+  an existing one.
+- **With an argument, anything else:** derive a kebab-case slug (`checkout-webhooks`), create
+  `docs/features/<slug>/flow.md` from [references/flow-template.md](references/flow-template.md), then Phase 1. If
+  the derived slug exists, ask before choosing another.
 - **Without one:** find `docs/features/*/flow.md` files whose `phase:` isn't `done` and whose `flow:` is `feature` or
   missing (other values belong to other conductors). One: read it and the artifacts
   it links, then continue at its phase. Several: ask which. None: ask what to build.
@@ -94,7 +102,8 @@ flow.md and go to Phase 5.
 
 Follow [references/plan-review.md](references/plan-review.md): 2–3 reviewer subagents with different angles, then
 you synthesize and screen. Present the findings, each with options and a recommendation. The user decides each one;
-you edit the plan, and the spec too if a decision changes it (say so: that edit reopens Gate 1 for that item).
+you edit the plan, and the spec too if a decision changes it (say so: that edit reopens Gate 1 for that item). Record a
+reopening on its Gate line in flow.md as `Reopened <date>: <why>`, and the re-approval date after it.
 
 Optional, for a large or ambiguous design, offer before the review: pstack `architect` (sketch types and signatures
 first) or `arena` (several models draft the plan, best one wins). Only on the user's yes.

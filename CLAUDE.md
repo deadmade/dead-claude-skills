@@ -51,6 +51,10 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   conductor's `uses.json` lists what it runs; `scripts/flows-uses.mjs` generates flows' `dependencies` and the README
   tree from them, and check-repo fails when a listed skill is gone or the generated parts are stale. The installer
   hides `INCLUDED` plugins (`installer/core.mjs`): they arrive only as flows' dependencies (`withDependencies`).
+  flows is also a mod: `hooks/flow.ts` parses `docs/features/*/flow.md`; `register.tsx` draws a band above the prompt
+  (slug, phase, gates, deviations, research numbers), polls every 5 s across the repo root, `.worktrees/*` and
+  `.claude/worktrees/*` (newest copy per run), and key `1` resumes the run with the conductor its `flow:` names
+  (`SKILL` in `flow.ts`).
 - `scripts/`: `check-repo.mjs` (marketplace/bundle/version consistency), `release.mjs`, `sync-*.mjs` (vendoring),
   `sync-plugins.mjs` (re-pins url-sourced plugins), `draw-mascot.mjs` (Onibi, night-city's pixel-art mascot, also notify's `icon.png`).
 
@@ -87,11 +91,11 @@ plugins of ours that the manifest no longer lists.
 - tui-review mod tests need a generated fixture first, from `plugins/tui-review/brv`:
   `cargo run --release -- gen --out <dir> && node ../tests/make-fixture.mjs <dir>`, then `claude plugin test .` in
   `plugins/tui-review`.
-- cswap mod tests: `claude plugin test .` in `plugins/cswap`.
+- mod tests: `claude plugin test .` in `plugins/cswap`, `plugins/night-city` and `plugins/flows`.
 - `nix develop` (or direnv) gives the toolchain and installs the pre-commit hooks (treefmt, merge conflicts, JSON,
   check-repo, installer and scripts tests, end-of-file; vendored paths excluded).
 - `nix fmt` formats everything per `treefmt.toml` (alejandra, prettier for js/ts/json/md/yaml, rustfmt).
 
-CI: `test.yml` (npm test and cswap mod tests, Linux and Windows) on every PR and push to main; `tui-review.yml` on
+CI: `test.yml` (npm test and the cswap, night-city and flows mod tests, Linux and Windows) on every PR and push to main; `tui-review.yml` on
 PRs touching tui-review; `web-mcp.yml` on PRs touching web-mcp; `build-brv.yml`/`build-web-mcp.yml`/`build-cswap.yml` on PRs touching the workflow (or the cswap pin) and from `release.yml`; `sync-*.yml`
 weekly.
