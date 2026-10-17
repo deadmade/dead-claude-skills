@@ -91,13 +91,13 @@ pub async fn run(ctx: &Ctx, target: &str, ecosystem: Option<&str>) -> Outcome {
     package(ctx, name, version, eco).await
 }
 
-async fn get(ctx: &Ctx, url: &url::Url, secs: u64) -> Result<Answer, String> {
+async fn get(ctx: &Ctx, url: &url::Url) -> Result<Answer, String> {
     crate::api::send(
         ctx,
         url,
         None,
         Some("application/json"),
-        deadline(ctx, Duration::from_secs(secs)),
+        deadline(ctx, Duration::from_secs(8)),
         true,
     )
     .await
@@ -153,7 +153,7 @@ async fn osv(ctx: &Ctx, id: &str, cve: bool) -> Outcome {
     let mut o = Outcome::default();
     // `is_id` allows no `/`, `?` or `#`, so the id stays one path segment.
     let got = match ctx.cfg.lookup_urls.osv.join(&format!("vulns/{id}")) {
-        Ok(url) => get(ctx, &url, 8).await,
+        Ok(url) => get(ctx, &url).await,
         Err(e) => Err(e.to_string()),
     };
     match got {
@@ -183,7 +183,7 @@ async fn osv(ctx: &Ctx, id: &str, cve: bool) -> Outcome {
 async fn nvd(ctx: &Ctx, id: &str, o: &mut Outcome) {
     let mut url = ctx.cfg.lookup_urls.nvd.clone();
     url.query_pairs_mut().append_pair("cveId", id);
-    match get(ctx, &url, 8).await {
+    match get(ctx, &url).await {
         Err(e) => o.failed.push(format!("NVD: {e}")),
         Ok(got) if (200..300).contains(&got.status) => {
             let v: Value = serde_json::from_str(&got.body).unwrap_or_default();
@@ -202,7 +202,7 @@ async fn epss(ctx: &Ctx, id: &str) -> Outcome {
     let mut o = Outcome::default();
     let mut url = ctx.cfg.lookup_urls.epss.clone();
     url.query_pairs_mut().append_pair("cve", id);
-    match get(ctx, &url, 8).await {
+    match get(ctx, &url).await {
         Err(e) => o.failed.push(format!("EPSS: {e}")),
         Ok(got) if (200..300).contains(&got.status) => {
             let v: Value = serde_json::from_str(&got.body).unwrap_or_default();
@@ -231,7 +231,7 @@ async fn kev(ctx: &Ctx, id: &str) -> Outcome {
         .lookup
         .kev
         .get_or_try_init(|| async {
-            let got = get(ctx, url, 20).await?;
+            let got = get(ctx, url).await?;
             if !(200..300).contains(&got.status) {
                 return Err(format!("HTTP {}", got.status));
             }
