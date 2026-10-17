@@ -140,7 +140,7 @@
     },
     {
       "name": "night-city",
-      "description": "Night City: a toned-down synthwave Claude Code theme with Night City spinner words, short status-line reactions and Onibi dropping by with a one-liner. Opt-in.",
+      "description": "Night City: a toned-down synthwave Claude Code theme with Night City spinner words, short status-line reactions and Onibi dropping by with a one-liner. Part of the default bundle.",
       "source": "./plugins/mods/night-city",
       "category": "development"
     },

@@ -8,7 +8,6 @@ import {
   duplicates,
   mergeSettings,
   isShipped,
-  NIGHT_CITY_THEME,
   safeArg,
   missingBinaries,
   agentBrowserAction,
@@ -70,7 +69,6 @@ test('opt-ins from the real manifests', () => {
         'mattpocock-picks',
         'mcp-azure',
         'mcp-github',
-        'night-city',
         'nix-lsp',
         'notify',
         'paper-lookup',
@@ -547,32 +545,11 @@ test('Night City ccstatusline keeps the stock widgets in order', () => {
   );
 });
 
-test('nightCity false removes only the Night City theme', () => {
-  const s = { theme: NIGHT_CITY_THEME };
-  assert.equal(mergeSettings(s, { nightCity: false }).theme, undefined);
-  assert.equal(mergeSettings({ theme: 'dark' }, { nightCity: false }).theme, 'dark');
-  assert.equal(mergeSettings(s, { nightCity: true }).theme, NIGHT_CITY_THEME);
-  assert.equal(mergeSettings(s, {}).theme, NIGHT_CITY_THEME);
-});
-
-test('nightCity turns tmux truecolor on next to other env, and deselecting it removes only that', () => {
-  const on = mergeSettings({ env: { FOO: 'x' } }, { nightCity: true });
-  assert.deepEqual(on.env, { FOO: 'x', CLAUDE_CODE_TMUX_TRUECOLOR: '1' });
-  assert.deepEqual(mergeSettings(on, { nightCity: false }).env, { FOO: 'x' });
-  assert.equal(mergeSettings({ env: { CLAUDE_CODE_TMUX_TRUECOLOR: '1' } }, { nightCity: false }).env, undefined);
-  assert.deepEqual(mergeSettings({ env: { CLAUDE_CODE_TMUX_TRUECOLOR: '1' } }, {}).env, {
-    CLAUDE_CODE_TMUX_TRUECOLOR: '1',
-  });
-});
-
-test('nightCity turns syntax highlighting off, and deselecting it turns it back on', () => {
-  assert.equal(mergeSettings({}, { nightCity: true }).syntaxHighlightingDisabled, true);
-  assert.equal(
-    mergeSettings({ syntaxHighlightingDisabled: true }, { nightCity: false }).syntaxHighlightingDisabled,
-    undefined,
-  );
-  assert.equal(mergeSettings({ syntaxHighlightingDisabled: true }, {}).syntaxHighlightingDisabled, true);
-  assert.equal(mergeSettings({}, {}).syntaxHighlightingDisabled, undefined);
+test('Night City settings are always on, next to other env, and leave the theme alone', () => {
+  const out = mergeSettings({ env: { FOO: 'x' }, theme: 'dark' }, {});
+  assert.deepEqual(out.env, { FOO: 'x', CLAUDE_CODE_TMUX_TRUECOLOR: '1' });
+  assert.equal(out.syntaxHighlightingDisabled, true);
+  assert.equal(out.theme, 'dark');
 });
 
 test('notify turns the built-in notification off, and deselecting restores it', () => {

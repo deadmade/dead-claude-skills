@@ -2,7 +2,7 @@ process.env.FORCE_COLOR = '1';
 const { test } = await import('node:test');
 const { default: assert } = await import('node:assert/strict');
 const { stripVTControlCharacters: plain } = await import('node:util');
-const { changeList, frame, initial, move, render, wrap } = await import('./view.mjs');
+const { changeList, frame, initial, move, paint, render, wrap } = await import('./view.mjs');
 
 const M = 'dead-claude-skills';
 const azure = `mcp-azure@${M}`;
@@ -251,4 +251,12 @@ test('review always lists retired plugins for removal and counts them', () => {
   const s = { ...initial({ ...chosen }), screen: 'review' };
   assert.match(text(s, d), /Remove\s+dev-feature/);
   assert.equal(changeList(s, d).count, 2); // retired + the atlassian update
+});
+
+test('paint uses Night City on 24-bit terminals and styleText elsewhere', () => {
+  const tty = (depth) => ({ hasColors: (n) => n <= 2 ** depth });
+  assert.equal(paint(['bold', 'magenta'], 'x', tty(24)), '\x1b[38;2;240;139;180m\x1b[1mx\x1b[22m\x1b[39m');
+  assert.equal(paint('green', 'x', tty(4)), '\x1b[32mx\x1b[39m');
+  assert.equal(paint('green', 'x', {}), '\x1b[32mx\x1b[39m');
+  assert.equal(paint('bold', 'x', tty(24)), '\x1b[1mx\x1b[22m');
 });

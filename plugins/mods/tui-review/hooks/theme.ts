@@ -4,39 +4,40 @@ export const DEFAULT = 0x01000000;
 
 export const styleFg: readonly number[] = [
   DEFAULT, // plain
-  0xc678dd, // keyword
-  0x98c379, // string
-  0x7f848e, // comment
-  0x61afef, // function
-  0xe5c07b, // type
-  0xd19a66, // number
-  0xd19a66, // constant
-  0x56b6c2, // operator
-  0xabb2bf, // punctuation
+  0xc79af0, // keyword
+  0x8fddb0, // string
+  0x9a90c2, // comment
+  0x7aa7f0, // function
+  0xf5d07a, // type
+  0xf2a36b, // number
+  0xf2a36b, // constant
+  0x7ccfe0, // operator
+  0xbdb4de, // punctuation
   DEFAULT, // variable
-  0xe06c75, // property
-  0xd19a66, // attribute
-  0xe06c75, // tag
-  0x56b6c2, // builtin
-  0x56b6c2, // escape
+  0xf08bb4, // property
+  0xf2a36b, // attribute
+  0xf08bb4, // tag
+  0x7ccfe0, // builtin
+  0x7ccfe0, // escape
 ];
 
+// Night City (plugins/mods/night-city/themes/night-city.json).
 export const theme = {
-  barFg: 0xdcdfe4,
-  barBg: 0x2c313c,
-  fileFg: 0xffffff,
-  fileBg: 0x3b4252,
-  viewedFg: 0x98c379,
-  viewedBg: 0x2a2f38,
-  hunkFg: 0x56b6c2,
-  gutterFg: 0x636d83,
-  addBg: 0x1e3a2a,
-  delBg: 0x3f2226,
-  addSign: 0x98c379,
-  delSign: 0xe06c75,
-  dimFg: 0x7f848e,
-  cursorBg: 0x3e4451,
-  commentFg: 0xe5c07b,
-  noteFg: 0xdcdfe4,
-  noteBg: 0x2f2b1f,
+  barFg: 0xe6dcf7,
+  barBg: 0x2a2340,
+  fileFg: 0xe6dcf7,
+  fileBg: 0x362d52,
+  viewedFg: 0x8fddb0,
+  viewedBg: 0x221c33,
+  hunkFg: 0x7ccfe0,
+  gutterFg: 0x7a71a6,
+  addBg: 0x1e3631,
+  delBg: 0x42213a,
+  addSign: 0x8fddb0,
+  delSign: 0xf2788c,
+  dimFg: 0x9a90c2,
+  cursorBg: 0x463a6e,
+  commentFg: 0xf5b97a,
+  noteFg: 0xe6dcf7,
+  noteBg: 0x3a3024,
 } as const;

@@ -97,9 +97,6 @@ export const hasDcgHook = (s) =>
 
 const KEEP_SESSIONS_DAYS = 36500;
 
-// The value Claude Code stores when /theme picks the night-city plugin's theme.
-export const NIGHT_CITY_THEME = 'custom:night-city:night-city';
-
 // True when text is JSON equal to any shipped config text (whitespace-insensitive).
 export const isShipped = (text, shippedTexts) => {
   try {
@@ -138,21 +135,14 @@ export const searxngSettings = (template, secret) => template.replace(/^(\s*secr
 export const webBuiltinsDecision = ({ toggle, was, healthy, installed }) =>
   toggle ? healthy || undefined : was && installed ? false : undefined;
 
-export function mergeSettings(settings, { statusLine, sandbox, version, nightCity, notify, webBuiltinsOff }) {
+export function mergeSettings(settings, { statusLine, sandbox, version, notify, webBuiltinsOff }) {
   const out = structuredClone(settings);
-  if (nightCity === false && out.theme === NIGHT_CITY_THEME) delete out.theme;
-  // Claude Code colours code in a fixed Monokai a theme can't change; off, diffs take Night City's own diff colours.
-  // shortcut: deselecting also clears a `true` the user set themselves; remember who set it if anyone minds.
-  if (nightCity) out.syntaxHighlightingDisabled = true;
-  if (nightCity === false && out.syntaxHighlightingDisabled === true) delete out.syntaxHighlightingDisabled;
+  // Night City ships with the bundle. Claude Code colours code in a fixed Monokai a theme can't change; off, diffs take
+  // Night City's own diff colours.
+  out.syntaxHighlightingDisabled = true;
   // Inside tmux Claude Code draws in 256 colours unless told otherwise, which turns the theme's indigos grey. Outside
   // tmux (and on Windows, which has none) the variable does nothing.
-  if (nightCity) out.env = { ...out.env, CLAUDE_CODE_TMUX_TRUECOLOR: '1' };
-  if (nightCity === false && out.env?.CLAUDE_CODE_TMUX_TRUECOLOR === '1') {
-    const { CLAUDE_CODE_TMUX_TRUECOLOR, ...env } = out.env;
-    if (Object.keys(env).length) out.env = env;
-    else delete out.env;
-  }
+  out.env = { ...out.env, CLAUDE_CODE_TMUX_TRUECOLOR: '1' };
   // The notify plugin raises its own popups; Claude Code's built-in one would double them.
   // shortcut: deselecting also clears a `notifications_disabled` the user set themselves, and retiring notify from
   // the marketplace leaves the setting behind; remember who set it if anyone minds.
@@ -432,8 +422,8 @@ export const CATEGORIES = [
   {
     id: 'system',
     title: 'System',
-    blurb: 'Status line, sandbox, command guard, notifications and the Night City theme.',
-    keys: ['ccstatusline', 'sandbox', 'dcg', 'night-city', 'notify'],
+    blurb: 'Status line, sandbox, command guard and notifications.',
+    keys: ['ccstatusline', 'sandbox', 'dcg', 'notify'],
   },
   // bulk: false, so no single key ticks every option here.
   {
