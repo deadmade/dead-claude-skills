@@ -12,7 +12,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   (settings merges, plugin plans, platform rules); `files.mjs` the file writes and clean-slate backup/delete;
   `view.mjs`/`ui.mjs` the screens. No npm dependencies: Node's standard library only. New logic goes into
   `core.mjs` or `files.mjs` with a test, not into `install.mjs`.
-- `plugins/mods/`: a `GROUPS` folder holding the Claude Code mods (`cswap`, `night-city`, `tui-review`). notify
+- `plugins/mods/`: a `GROUPS` folder holding the Claude Code mods (`cswap`, `night-city`, `tui-review`, `md-pane`). notify
   is plain `hooks.json`, not a mod, and stays at the top level.
 - `plugins/mods/tui-review/`: a Claude Code mod (TypeScript, `hooks/`) driving the Rust binary `brv` (`brv/`). The two
   share a binary cache format (`brv/src/format.rs` ↔ `hooks/chunks.ts`) and a stdout line protocol; change both sides
@@ -49,6 +49,9 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
 - `plugins/notify/`: plain `hooks.json` (Stop, Notification, PreToolUse on AskUserQuestion) running one stdlib Node
   script, async. Logic and tests in `hooks/lib.mjs`; Linux talks D-Bus via `busctl`, Windows runs an inline PowerShell
   WinRT toast, focus comes from tmux. With notify the installer sets `preferredNotifChannel: "notifications_disabled"`.
+- `plugins/mods/md-pane/`: a mod. Pure path logic in `hooks/paths.ts`; `register.tsx` redraws replies that name an existing
+  `.md` file as its own `Markdown` (only a plugin-drawn `Markdown` with `onLinkPress` receives plain link clicks, and
+  only in the fullscreen terminal) and shows the clicked file in a pane, refreshed by a 1 s stat while open.
 - `plugins/dead-skills/`: the default bundle; its `dependencies` are the core plugins.
 - `plugins/flows/`: the conductor skills (`/feature-flow`, `/research-flow`, `/implement`, `/fix-flow`, `/upgrade`,
   `/test-audit`, `/doc-audit`, `/harden`, `/verify`, `/understand`, `/learn`). Each runs other plugins' skills in order;
@@ -98,11 +101,13 @@ plugins of ours that the manifest no longer lists.
 - tui-review mod tests need a generated fixture first, from `plugins/mods/tui-review/brv`:
   `cargo run --release -- gen --out <dir> && node ../tests/make-fixture.mjs <dir>`, then `claude plugin test .` in
   `plugins/mods/tui-review`.
-- mod tests: `claude plugin test .` in `plugins/mods/cswap`, `plugins/mods/night-city` and `plugins/flows`.
+- mod tests: `claude plugin test .` in `plugins/mods/cswap`, `plugins/mods/night-city`, `plugins/mods/md-pane` and
+  `plugins/flows`. `tsc -p .` there needs the engine's typings in `.claude-plugin/types/` (gitignored; the engine
+  writes them when it loads the mod).
 - `nix develop` (or direnv) gives the toolchain and installs the pre-commit hooks (treefmt, merge conflicts, JSON,
   check-repo, installer and scripts tests, end-of-file; vendored paths excluded).
 - `nix fmt` formats everything per `treefmt.toml` (alejandra, prettier for js/ts/json/md/yaml, rustfmt).
 
-CI: `test.yml` (npm test and the cswap, night-city and flows mod tests, Linux and Windows) on every PR and push to main; `tui-review.yml` on
+CI: `test.yml` (npm test and the cswap, night-city, md-pane and flows mod tests, Linux and Windows) on every PR and push to main; `tui-review.yml` on
 PRs touching tui-review; `web-mcp.yml` on PRs touching web-mcp; `build-brv.yml`/`build-web-mcp.yml`/`build-cswap.yml` on PRs touching the workflow (or the cswap pin) and from `release.yml`; `sync-*.yml`
 weekly.

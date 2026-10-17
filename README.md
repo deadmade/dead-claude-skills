@@ -10,7 +10,8 @@ claude-security, superpowers, ponytail, mcp-basic (context7), [night-city](plugi
 toned-down synthwave theme that everything else here is painted in) and my global rules. Everything else is opt-in: language
 servers, language and database skills (rust, csharp, postgres), integrations (GitHub, Azure, Atlassian), skill packs
 like hallmark, paper-lookup, self-review, graphify and the mattpocock/pstack/Trail of Bits picks, and tools such as
-[tui-review](plugins/mods/tui-review/README.md), cswap for multi-account switching, [notify](plugins/notify/README.md) for
+[tui-review](plugins/mods/tui-review/README.md), [md-pane](plugins/mods/md-pane/README.md) for reading the `.md` files
+Claude names in a pane beside the chat, cswap for multi-account switching, [notify](plugins/notify/README.md) for
 desktop notifications when a turn ends, [web-mcp](plugins/mcp/web-mcp/README.md) for web search, page fetching,
 passive lookups and a browser with an archive of everything it pulled.
 

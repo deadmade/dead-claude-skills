@@ -420,7 +420,7 @@ export const CATEGORIES = [
     id: 'tools',
     title: 'Tools',
     blurb: 'Plugins that bring their own binary or pane.',
-    keys: ['graphify', 'cswap', 'tui-review', 'web-mcp', 'web-builtins-off'],
+    keys: ['graphify', 'cswap', 'tui-review', 'web-mcp', 'web-builtins-off', 'md-pane'],
   },
   {
     id: 'system',
