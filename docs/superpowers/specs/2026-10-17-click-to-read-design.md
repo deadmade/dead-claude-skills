@@ -21,8 +21,9 @@ conversation in view.
 5. The pane refreshes by itself when the open file changes on disk (Claude edits the spec after feedback).
 6. Scroll with the wheel, arrows and page keys (the engine's pane scrolling); close with `q`, Esc, the frame's close
    mark or ctrl+x x.
-7. Inside the pane, links and paths to existing `.md` files (relative to the open document's own folder) are
-   clickable too, by the same rules as goal 1: a plain click swaps the pane to that document.
+7. Inside the pane, links and paths to existing `.md` files (relative to the open document's own folder, falling back
+   to the session cwd for repo-relative paths) are clickable too, by the same rules as goal 1: a plain click swaps
+   the pane to that document. (Cwd fallback added in plan review round 1, 2026-10-17, user-approved.)
 8. A missing, unreadable or too large (over `$.fs.read`'s 4 MiB) file shows a one-line message in the pane instead
    of the document.
 
@@ -50,7 +51,7 @@ conversation in view.
   element with `key`, `onLinkPress` and `pressableLinks`, its `text` the reply with matched paths rewritten to
   `[label](file:///abs/path)` links. Only a plugin-drawn `Markdown` with `onLinkPress` receives plain clicks; links
   left out of `pressableLinks` keep the surface's behaviour. `isSummary` blocks pass through untouched (`next(e)`).
-- A path becomes a link only if `$.fs.exists` says the file exists (the false-positive defence VS Code uses; see
+- A path becomes a link only if `$.fs.stat` says it is a file (not a folder) (the false-positive defence VS Code uses; see
   flow.md Prior art). Existence checks must not run per streamed token unbounded.
 - `file:` hrefs: absolute, percent-encoded outside printable ASCII (OSC 8 spec); the press handler decodes them.
 - Limits: 100 000 characters per drawing, `pressableLinks` ≤ 256 entries of ≤ 2048 characters. Past either, the

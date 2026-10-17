@@ -92,6 +92,26 @@ Cmd/Ctrl+click on a `.md` path, [docs](https://docs.warp.dev/terminal/more-featu
 
 ## Plan review
 
+Round 1 (2026-10-17): three reviewers (fable, opus, sonnet), each on correctness, fit and simpler; all three
+confirmed by experiment that `$.ui.mount` on `AssistantMessage`, `find` and `press({ key, link })` work in the kit.
+None dropped; one downgraded (pane placement: `PaneOpenArgs` docs say a press is placed at any width). User:
+"all recommendations" on every item.
+
+- B1 commits before Task 5 fail check-repo → listing moved into Task 1.
+- B2 `$.ui.scroll` missing in the test kit → call kept, guarded with `.catch`, no scroll assertions.
+- S1 races (fast clicks, close during load/refresh) → generation counter, tick in-flight skip, race tests.
+- S2 risky facts last → checkpoint after Task 2: the user tries it with `--plugin-dir`.
+- S3 checks during streaming → in-flight sharing, 2 s negative cache, links rewritten once at load.
+- S4 limits → over-long replies via `next` with rewritten text, hrefs > 2048 skipped, pane cut after rewrite at a
+  newline.
+- S5 code spans with extra text → a code span is one token, linked only when it is exactly a path.
+- S6 `file:` targets → treated as paths.
+- S7 refresh after reload → timer started by the pane's drawing, stopped by every close.
+- S8 plan mechanics → `plugin` in mounts, `key="q"`, `state.set` recording, module reset, awaited `env.get`.
+- C1 cwd fallback inside the pane (spec goal 7 amended); C2 de-duplicated hrefs; C3 `stat` kind check, errors
+  caught; C4 `/` separators internally; C5 size as well as mtime; C6 no non-terminal pane branch.
+- Co-author rule kept: it is the user's own startup-hook rule.
+
 ## Deviations
 
 ## Walkthrough
