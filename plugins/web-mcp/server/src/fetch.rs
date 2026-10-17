@@ -800,6 +800,7 @@ pub(crate) mod tests {
                     crtsh: Url::parse("https://crt.sh/").unwrap(),
                     cdx: Url::parse("https://web.archive.org/cdx/search/cdx").unwrap(),
                     wayback: Url::parse("https://web.archive.org/").unwrap(),
+                    internetdb: Url::parse("https://internetdb.shodan.io/").unwrap(),
                 },
                 lookup_deadline: None,
                 project,

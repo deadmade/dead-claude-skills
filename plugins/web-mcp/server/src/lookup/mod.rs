@@ -2,6 +2,7 @@
 
 mod certs;
 mod dns;
+mod ip;
 mod rdap;
 mod wayback;
 
@@ -32,6 +33,7 @@ pub enum Kind {
     Whois,
     Certs,
     Wayback,
+    Ip,
 }
 
 impl Kind {
@@ -41,6 +43,7 @@ impl Kind {
             Kind::Whois => "whois",
             Kind::Certs => "certs",
             Kind::Wayback => "wayback",
+            Kind::Ip => "ip",
         }
     }
 }
@@ -161,6 +164,7 @@ pub async fn run(ctx: &Arc<Ctx>, a: LookupArgs) -> CallToolResult {
             }
             Err(e) => CallToolResult::error(vec![ContentBlock::text(e)]),
         },
+        Kind::Ip => ip::run(ctx, &a.target).await,
         Kind::Wayback => wayback::run(ctx, &a.target, a.at.as_deref()).await,
         Kind::Certs => match dns::name(&a.target) {
             Ok(name) => {

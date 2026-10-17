@@ -54,9 +54,9 @@ pub struct FetchArgs {
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "schemars")]
 pub struct LookupArgs {
-    /// What to look up, and from where. dns: Cloudflare DNS over HTTPS. whois: RDAP. certs: crt.sh. wayback: Internet Archive
+    /// What to look up, and from where. dns: Cloudflare DNS over HTTPS. whois: RDAP. certs: crt.sh. wayback: Internet Archive. ip: Shodan's free IP database
     pub kind: lookup::Kind,
-    /// A domain name; whois also an IP or AS number.
+    /// A domain name; whois also an IP or AS number; ip an IP address.
     pub target: String,
     /// dns: a record type such as A, MX or TXT (default A, AAAA, CNAME, MX, NS and TXT).
     pub record: Option<String>,

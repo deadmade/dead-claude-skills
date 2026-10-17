@@ -548,3 +548,77 @@ fn wayback_at_must_be_digits() {
     assert!(is_error(&r), "{r}");
     assert!(text(&r).contains("digits"), "{r}");
 }
+
+fn ip_start(fx: &Fixture) -> Mcp {
+    Mcp::start_with(tempdir(), &[("WEB_MCP_INTERNETDB_URL", fx.url("/"))])
+}
+
+fn ip(mcp: &mut Mcp, target: &str) -> Value {
+    mcp.call("lookup", json!({"kind": "ip", "target": target}))
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn ip_returns_record() {
+    let fx = Fixture::start(PUBLIC);
+    let body = r#"{"cpes":["cpe:/a:isc:bind"],"hostnames":["dns.google"],"ip":"8.8.8.8","ports":[53,443],"tags":["cloud"],"vulns":[]}"#;
+    fx.route("/8.8.8.8", vec![Resp::new(200, "application/json", body)]);
+    let mut mcp = ip_start(&fx);
+    let r = ip(&mut mcp, "8.8.8.8");
+    assert!(!is_error(&r), "{r}");
+    let t = text(&r);
+    assert!(t.starts_with("Source: Shodan InternetDB "), "{t}");
+    assert!(t.contains(body), "{t}");
+    assert_eq!(fx.hits("/8.8.8.8"), 1);
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn ip_404_is_no_information() {
+    let fx = Fixture::start(PUBLIC);
+    fx.route(
+        "/8.8.4.4",
+        vec![Resp::new(
+            404,
+            "application/json",
+            r#"{"detail":"No information available"}"#,
+        )],
+    );
+    let mut mcp = ip_start(&fx);
+    let r = ip(&mut mcp, "8.8.4.4");
+    assert!(!is_error(&r), "{r}");
+    assert!(
+        text(&r).contains("InternetDB has no information on 8.8.4.4"),
+        "{r}"
+    );
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn ip_refuses_private_and_reserved() {
+    let fx = Fixture::start(PUBLIC);
+    let mut mcp = ip_start(&fx);
+    for a in [
+        "10.0.0.1",
+        "::1",
+        "169.254.169.254",
+        "224.0.0.1",
+        "192.0.2.1",
+        "2001:db8::1",
+    ] {
+        let r = ip(&mut mcp, a);
+        assert!(is_error(&r), "{a}: {r}");
+        assert!(text(&r).contains("private or reserved"), "{a}: {r}");
+        assert_eq!(fx.hits(&format!("/{a}")), 0, "{a}");
+    }
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn ip_rejects_names() {
+    let fx = Fixture::start(PUBLIC);
+    let mut mcp = ip_start(&fx);
+    let r = ip(&mut mcp, "example.com");
+    assert!(is_error(&r), "{r}");
+    assert!(text(&r).contains("dns"), "{r}");
+}

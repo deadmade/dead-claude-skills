@@ -19,6 +19,7 @@ pub struct LookupUrls {
     pub cdx: Url,
     /// The Wayback Machine's root, where `web/<timestamp>id_/<url>` serves a raw capture.
     pub wayback: Url,
+    pub internetdb: Url,
 }
 
 pub struct Config {
@@ -55,6 +56,7 @@ impl Config {
                 crtsh: url("WEB_MCP_CRTSH_URL", "https://crt.sh/")?,
                 cdx: url("WEB_MCP_CDX_URL", "https://web.archive.org/cdx/search/cdx")?,
                 wayback: url("WEB_MCP_WAYBACK_URL", "https://web.archive.org/")?,
+                internetdb: url("WEB_MCP_INTERNETDB_URL", "https://internetdb.shodan.io/")?,
             },
             lookup_deadline: var("WEB_MCP_LOOKUP_MS")
                 .and_then(|v| v.parse().ok())
