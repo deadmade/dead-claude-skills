@@ -228,6 +228,7 @@ spec; screenshots through `Archive::put`; SearXNG steps printed without Docker.
 | baseline (cloud, partial) | `node docs/features/web-mcp/bench/baseline.mjs --runs 3`                                                                                                                                                           | see below | 2026-10-16 |
 | baseline (your machine)   | `node docs/features/web-mcp/bench/baseline.mjs --runs 3 --out docs/features/web-mcp/bench/results/deadPc-2026-10-16`                                                                                               | see below | 2026-10-16 |
 | early fetch (Task 6)      | `node docs/features/web-mcp/bench/baseline.mjs --target web-mcp --bin plugins/web-mcp/server/target/release/web-mcp --only fetch --runs 3 --out docs/features/web-mcp/bench/results/deadPc-2026-10-17-fetch-early` | see below | 2026-10-17 |
+| H4 (Task 11)              | `cargo run --release --example h4 --features h4 -- --data /tmp/claude-1000/h4data` and the same with `--sweep` (in `plugins/web-mcp/server`)                                                                       | see below | 2026-10-17 |
 | feature                   |                                                                                                                                                                                                                    |           |            |
 
 **Early fetch measurement (Task 6), 2026-10-17** (deadPc, same machine and harness as the baseline, binary at
@@ -310,6 +311,24 @@ baseline: half the URLs and every scholarly API are blocked here.
 | rust-sdk README (raw GitHub)      | 3/3 | 5234   | 5789   | 1569       | 68995      | 0      |
 | pypi.org/project/requests         | 3/3 | 6288   | 8049   | 1545       | 76317      | 0      |
 | code.claude.com/docs/en/mcp       | 3/3 | 9137   | 9387   | 4129       | 121063     | 0      |
+
+**H4 measurement (Task 11), 2026-10-17** (deadPc sandbox; `plugins/web-mcp/server/examples/h4.rs`, BEIR test split,
+whole documents indexed as title + text, no `passages::split`; top 100 from each side, `rrf(k = 60)`; model2vec
+`minishlab/potion-base-8M`, brute-force cosine). Run with `HOME=/tmp/claude-1000/home` because the model download
+writes to `~/.cache/huggingface`. Recall@5 is BEIR's: per query the share of its relevant docs in the top 5, averaged.
+
+| dataset                    | BM25   | BM25 + model2vec (RRF) |
+| -------------------------- | ------ | ---------------------- |
+| SciFact (300 test queries) | 0.7059 | 0.7014                 |
+| FiQA (first 300 test qrys) | 0.2418 | 0.2335                 |
+| mean                       | 0.4739 | 0.4675                 |
+
+- **Gate 1:** hybrid − BM25 = **−0.0064**, short of the +0.02 needed. **Task 12 is skipped**; `model2vec-rs` stays
+  behind the `h4` feature only.
+- **Passage size** (`... --sweep`, SciFact BM25 recall@5, whitespace-token windows max-pooled to documents; not part
+  of H4): 128 tokens 0.6975, 256 tokens 0.7009, 512 tokens 0.7059. Best is 512, inside 256-512; no deviation.
+- Caveat: FiQA has 39 documents with a text identical to another's; the index stores each text once, so those ids
+  can't be hit (at most 39 of 57,638 docs).
 
 Verdict: supported | not supported | inconclusive. Threats that showed up. The user's decision.
 
