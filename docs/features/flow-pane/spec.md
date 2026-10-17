@@ -21,6 +21,9 @@ one glance says where the run stands without opening the file, and one key picks
 6. feature-flow and research-flow accept an existing run's slug as the argument and resume exactly that run, instead
    of starting a new feature.
 7. The band follows the file: edits by hand, by another session or by Claude show up within a few seconds.
+8. The band is right whether the session starts in the main checkout or in a worktree (user, 2026-10-17): during
+   execute, superpowers moves the work into a worktree and flow.md is updated there, while the main checkout's copy
+   stays behind until the branch merges.
 
 ## Non-goals
 
@@ -41,9 +44,13 @@ one glance says where the run stands without opening the file, and one key picks
 
 ## Decided
 
-- **Source and refresh (option A):** the mod reads `docs/features/*/flow.md` (relative to the working directory)
-  through `$.fs.list` / `$.fs.read`, polls on `$.clock.every` every few seconds, and re-reads only files whose
-  `mtimeMs` changed. No hook file, no file watcher.
+- **Source and refresh (option A):** the mod reads `docs/features/*/flow.md` through `$.fs.list` / `$.fs.read`,
+  polls on `$.clock.every` every few seconds, and re-reads only files whose `mtimeMs` changed. No hook file, no
+  file watcher.
+- **Where it looks (user, 2026-10-17):** the working directory, plus every worktree under `.worktrees/*/` and
+  `.claude/worktrees/*/` (the superpowers default and Claude Code's own). A run is one slug; when several copies of
+  its flow.md exist, the newest `mtimeMs` wins. The copy this session last wrote is always among them, whatever its
+  path.
 - **Lives in the `feature-flow` plugin** as its mod (`plugins/feature-flow/hooks/`), so installing the skill gives the
   marker. Pure parsing in its own `.ts` that the tests import, like `cswap/hooks/cswap.ts`.
 - **Surface:** `ui.render` on `{ component: 'AbovePrompt' }`. Yield with `next(e)` when there is no run to show, when
@@ -105,7 +112,8 @@ H: caching cuts p95 by 30% · baseline 412ms · feature 280ms · supported
 - **Resume argument:** an argument that names an existing `docs/features/<slug>/flow.md` never creates a new run
   over it. feature-flow resumes it when it isn't `flow: research`; for a research run it says the run belongs to
   `/research-flow` and stops. research-flow mirrors that. A `phase: done` run: say it's done and ask what to do.
-  Any other argument is a new feature, as today.
+  Any other argument is a new feature, as today. Resuming also reads the newest copy of that flow.md, the worktree
+  ones included, so the key and the skill agree on where the run stands.
 
 ## Constraints
 

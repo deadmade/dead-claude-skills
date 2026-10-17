@@ -1,5 +1,5 @@
 ---
-phase: brainstorm
+phase: grill
 ---
 
 # Flow pane: flow
@@ -79,6 +79,9 @@ phase: brainstorm
 - Source and refresh (2026-10-17): **A**, poll `docs/features/*/flow.md` by mtime and parse fixed tokens (user).
   Rejected: B FileChanged-driven redraw (needs a hook file, delivery to a mod unverified), C a separate `flow.json`
   (two files to keep in step, hand edits go stale).
+- Builder check (2026-10-17): minor findings settled as Claude's calls in the spec ($.command.run, yield to
+  night-city via next(e) first, "None…" deviations, positional gate dates, no overwrite of an existing slug).
+  Worktrees: user chose "handle both": scan `.worktrees/*/` and `.claude/worktrees/*/` too, newest copy wins.
 - Claude's calls: the mod lives in the feature-flow plugin; the band yields to night-city's Onibi; skills accept a
   slug to resume one run.
 
