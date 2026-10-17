@@ -22,7 +22,7 @@ atom and draws it on `AbovePrompt`. Both skills learn to resume a run named by i
 - The mod only reads. It never writes flow.md or any other file.
 - A field it can't read shows `?`, never a guess; a gate counts as approved only per the spec's date rule.
 - Poll interval: 5 seconds. Resume hotkey: `1`.
-- Scan base: `$.session.repo()?.root`, else `$.session.cwd()`; folders `<base>`, `<base>/.worktrees/*`,
+- Scan base: `(await $.session.repo())?.root ?? (await $.session.cwd())` (both async); folders `<base>`, `<base>/.worktrees/*`,
   `<base>/.claude/worktrees/*`, each with `docs/features/*/flow.md`; per slug the newest `mtimeMs` wins.
 - Yield (`next(e)`) when there is no run, when `e.props.hasSurvey`, when `e.props.view.agentId !== undefined`, and
   when a hook beneath drew a band (`next(e)` didn't come back as `{ type: 'engine' }`).
@@ -87,8 +87,8 @@ export function gateDate(line: string): string | null;
     - `'- Gate 1, spec approved: 2026-10-11, reopened: spec changed'` → `null`
     - `'- Gate 1, spec approved: 2026-10-11. reopened 2026-10-12, re-approved 2026-10-14'` → `'2026-10-14'`
   - `parseFlow`:
-    - the template from `references/flow-template.md` (inline) → `phase 'ground'`, `research false`,
-      `gates [null, null]`, `deviations false`
+    - the template from `references/flow-template.md` (inline) → `toMatchObject` (Task 5 adds fields)
+      `{ phase: 'ground', research: false, gates: [null, null], deviations: false }`
     - no frontmatter → `phase '?'`; `flow: research` → `research true`
     - Deviations whose first content line is `None that change an interface…` or `- None to the plan's interfaces`
       → `false`; `1. **Task 2: …**` → `true`; only an HTML comment → `false`
@@ -174,7 +174,9 @@ Lands before the key (Task 4): with today's skills, `/feature-flow <slug>` creat
   - **An existing run's slug** (`docs/features/<arg>/flow.md` exists in the repository root or a worktree under
     `.worktrees/*/` or `.claude/worktrees/*/`): read the newest copy. `flow: research` → say it belongs to
     `/research-flow` and stop. `phase: done` → say it's done and ask what to do. When the newest copy is in a
-    worktree, work in that worktree (EnterWorktree with its path) and write that copy. Then continue at its phase,
+    worktree, work in that worktree (EnterWorktree with its path) and write that copy; if the switch is refused
+    (EnterWorktree only switches into `.claude/worktrees/` from inside another worktree), say so and ask the user
+    to start the session in that worktree. Then continue at its phase,
     as "Without one" does. Never create a flow.md over an existing one.
   - **Anything else:** as today (derive a slug, create flow.md, Phase 1); if the derived slug exists, ask before
     choosing another.
@@ -212,11 +214,15 @@ declare module 'claude-code' {
 `showKey` is the touch half only (no write by this session yet, run not done); `isWorking` is checked while drawing.
 
 - [ ] **Step 1: Write the failing tests** in `register.test.ts`. A `host(on, files, { root })` helper fakes the
-      engine like `plugins/cswap/hooks/register.test.ts:21-47`: `mock.clock(on)`; `session.repo` answers
-      `{ root: '/repo', origin: null }`; `session.cwd` answers the given cwd; `fs.list` answers from a
-      `Record<absPath, { text, mtimeMs }>` (a directory lists its children; missing → `{ deny: 'ENOENT' }`);
-      `fs.read` from the same record; `command.list` returns the two feature-flow commands; `command.run` records
-      `{ command, args }`; `ui.toast` records. Draw with
+      engine like `plugins/cswap/hooks/register.test.ts:21-47`, every fake answering `{ value }`: `mock.clock(on)`;
+      `on('session.start', () => ({ cwd }))` and `await $.session.start(START)` in each test (cswap test:28, :53);
+      `session.repo` answers `{ root: '/repo', remote: null, internal: false }` (or null); `session.cwd` the given
+      cwd; `fs.list` from a `Record<absPath, { text, mtimeMs }>` (directories as `kind: 'dir'` entries; missing →
+      `{ deny: 'ENOENT' }`); `fs.read` and `fs.stat` from the same record; `command.list` returns the two
+      feature-flow commands; `command.run` records `{ command, args }`; `ui.toast` records; a bottom
+      `on('tool.call', () => ({ result: 'ok' }))` unless a test answers otherwise; a bottom
+      `on('ui.render', { component: 'AbovePrompt' }, () => ({ type: 'engine', ref: 0 }) as never)` (nothing sits
+      beneath test hooks, reference.md:81; night-city test:10-17). Draw with
       `$.ui.mount({ plugin: 'feature-flow', surface: 'terminal', component: 'AbovePrompt', props: { hasSurvey: false,
       isWorking: false, maxRows: 10, bodyColumns: 100, scroll: …, view: {} } })` and read it with `ui.find` /
       `ui.press({ key })`.
@@ -225,15 +231,17 @@ declare module 'claude-code' {
     `/repo/.worktrees/wt/docs/features/a/flow.md` at `phase: execute` (mtime 2) → shows `execute`.
   - "started inside a worktree": cwd `/repo/.worktrees/wt`, runs in `/repo/docs/features/{a,b}` → both counted
     (`+1 open`).
+  - "no repository": `session.repo` answers null → the scan uses cwd.
   - "follows edits": change a file's text and mtime, `clock.advance(5000)` → the new phase shows.
   - "copies drop out": a listed flow.md whose read denies, and a worktree removed between polls → the other copy
     shows.
-  - "survives a failed poll": `command.list` denies on the first poll only → the band shows after `advance(5000)`.
+  - "survives a failed poll": `session.repo` denies on the first call only → the band shows after `advance(5000)`.
   - "this session's write wins": a `Write` to `/repo/docs/features/b/flow.md` and an `Edit` with `agentId: 'x'` to
     another slug, each followed by a poll → the last-written slug is current even though another is newer; no
     Button `resume`.
-  - "a refused write doesn't count": a `Write` whose `next` answers `{ deny: 'no' }` → current unchanged, key still
-    there.
+  - "a refused or failed write doesn't count": a `Write` answered `{ deny: 'no' }`, and one answered
+    `{ isError: true, result: 'x' }` (night-city test:57) → current unchanged, key still there.
+  - "a write outside the scanned folders": a `Write` to `/elsewhere/docs/features/c/flow.md` → `c` is current.
   - "resume": `ui.find({ key: 'resume' })` has hotkey `1`; `ui.press({ key: 'resume' })` runs
     `{ command: 'feature-flow:feature-flow', args: 'a' }`; a `command.run` that rejects → a toast.
   - "no key while working": `isWorking: true` → no Button `resume`.
@@ -245,16 +253,18 @@ declare module 'claude-code' {
   - Atom `band` (`atom({ plugin: 'feature-flow', key: 'band' }, null)`); module `let touched: { slug, path } | null`,
     `let command: { feature: string | null; research: string | null }`, `const seen = new Map<path, Run>()` (parse
     cache keyed by path + mtime), and `busy` / `again` flags.
-  - `refresh($)`: if `busy`, set `again` and return; else loop while `again`. Base per Global Constraints. Each
+  - `refresh($)`: if `busy`, set `again` and return; else `busy = true` and loop while `again`, inside
+    `try { … } finally { busy = false }`. Base per Global Constraints. Each
     `$.fs.list` in try/catch → `[]`. For each folder: `list(<f>/docs/features)`, then for each `dir` entry
     `list(<f>/docs/features/<slug>)` and take its `flow.md` entry's `mtimeMs` (no entry → skip). Parse only when
     `seen` misses that path + mtime; a read that rejects drops the copy. Build the copies from this poll's listing
-    only (plus `touched.path`). `newest`, `pickCurrent`, `bandLines`; `update($, band, () => value)` on every poll.
+    only, plus `touched.path` with its `mtimeMs` from `$.fs.stat` (try/catch → left out). `newest`, `pickCurrent`, `bandLines`; `update($, band, () => value)` on every poll.
   - `session.start`: `command` from `$.command.list()` via `resumeCommand` (in try/catch); `$.clock.every(5000, …)`
     first, then the first refresh; every call is `void refresh($).catch(() => {})`. Return `next(e)`.
   - `tool.call` with `{ tool: 'Write' }` and `{ tool: 'Edit' }`: `const r = await next(e)`; when `slugOf(e.file_path)`
-    matches and `!('deny' in r)` and the result isn't an error, set `touched` and `void refresh($)`; return `r`.
-  - `ui.render` on `{ component: 'AbovePrompt' }`: yield per Global Constraints, then `const below = await next(e)`;
+    matches and `r.deny === undefined && r.isError !== true`, set `touched` and `void refresh($)`; return `r`.
+  - `ui.render` on `{ component: 'AbovePrompt' }`: `const b = await read($, band)` first (the read is what redraws
+    on update); yield per Global Constraints, then `const below = await next(e)`;
     return `below` unless `below.type === 'engine'`; else draw `lines` as `Text` rows and, when
     `showKey && !e.props.isWorking && command`, `<Button key="resume" hotkey="1" plain onPress={…}>resume</Button>`
     whose press runs `$.command.run({ command, args: run.slug })` and toasts the error on rejection.
@@ -279,7 +289,8 @@ declare module 'claude-code' {
 - `Run` gains `spec: string | null` (link target of `- Spec:` under `## Artifacts`, as written), `baseline: string`,
   `feature: string` (Results `numbers` cells, `''` when empty or absent), and
   `verdict: 'supported' | 'not supported' | 'inconclusive' | null`.
-- `flow.ts` gains `claimOf(spec: string): string | null`; `bandLines(run, others, columns, claim: string | null)`.
+- `flow.ts` gains `claimOf(spec: string): string | null`; `bandLines(run, others, columns, claim: string | null = null)`,
+  so Tasks 2 and 4's three-argument calls keep working.
 
 - [ ] **Step 1: Write the failing tests:**
   - `parseFlow` on the research template with `- Spec: [spec.md](spec.md)`, rows `| baseline | x | 412ms | d |` and

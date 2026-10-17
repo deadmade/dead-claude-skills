@@ -106,6 +106,13 @@ Round 1 (2026-10-17), three reviewers (correctness, fit, simpler). 25 findings m
   research line its own task; spec read caught; press by key, sentence before "Opt-in.".
 - Shape changed (task order, a new task), so round 2 re-reviews the changed parts.
 
+Round 2 (2026-10-17), one reviewer on Tasks 3–5 and the order. 8 findings, 0 dropped. Claude applied them as
+plan-only fixes, to be confirmed at Gate 2: test harness (bottom `ui.render`/`tool.call` hooks, `session.start`,
+`{ value }` fakes); `session.repo`/`cwd` are async and `SessionRepo` has `remote`, not `origin`, plus a no-repo test;
+`finally { busy = false }` and the failed-poll test fails `session.repo`; errored write = `isError: true`, tested;
+`touched.path` stat'ed for its mtime, tested; `toMatchObject` in Task 1 and a default `claim = null`; the render hook
+reads the atom; EnterWorktree refusal fallback in Task 3.
+
 ## Deviations
 
 ## Walkthrough

@@ -47,7 +47,7 @@ one glance says where the run stands without opening the file, and one key picks
 - **Source and refresh (option A):** the mod reads `docs/features/*/flow.md` through `$.fs.list` / `$.fs.read`,
   polls on `$.clock.every` every few seconds, and re-reads only files whose `mtimeMs` changed. No hook file, no
   file watcher.
-- **Where it looks (user, 2026-10-17):** the repository root (`$.session.repo()?.root`, the main working tree's
+- **Where it looks (user, 2026-10-17):** the repository root (`$.session.repo()`'s `root`, the main working tree's
   root even from inside a worktree; the session's directory when there is no repository), plus every worktree under `.worktrees/*/` and
   `.claude/worktrees/*/` (the superpowers default and Claude Code's own). A run is one slug; when several copies of
   its flow.md exist, the newest `mtimeMs` wins. The copy this session last wrote is always among them, whatever its
