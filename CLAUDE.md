@@ -17,12 +17,12 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   together.
 - `plugins/cswap/`: a mod wrapping the external `claude-swap` CLI, whose release tag is pinned in `installer/cswap.json`
   (bumped by `sync-cswap.yml`).
-- `plugins/web-mcp/`: a stdio MCP server (Rust, `server/`) with `search`, `fetch` and `browser`, built per platform like
+- `plugins/web-mcp/`: a stdio MCP server (Rust, `server/`) with `search`, `fetch`, `browser` and `lookup`, built per platform like
   brv (`build-web-mcp.yml`); the installer downloads it and sets `binPath`. Everything it pulls lands in
   `$CLAUDE_PROJECT_DIR/.web/` before Claude sees it. Ranking is BM25 only: the H4 experiment (`examples/h4.rs`, `h4`
   feature) showed embeddings don't help, so none ship. `browser` drives the npm CLI `agent-browser`, pinned in
   `installer/agent-browser.json` (bumped by `sync-agent-browser.yml`). Test-only hooks: `WEB_MCP_TEST_PUBLIC_IP`
-  (debug builds or the `test-hooks` feature) treats a comma-separated list of IPs as public; `WEB_MCP_FALLBACK_MS` shortens the fetch browser fallback's deadline, `WEB_MCP_PAPERS_MS` each paper source's (8 s).
+  (debug builds or the `test-hooks` feature) treats a comma-separated list of IPs as public; `WEB_MCP_FALLBACK_MS` shortens the fetch browser fallback's deadline, `WEB_MCP_PAPERS_MS` each paper source's (8 s), `WEB_MCP_LOOKUP_MS` each lookup source's.
 - `plugins/languages/`: a grouping folder (`GROUPS` in `scripts/plugin-dirs.mjs`); each folder under it is a plugin.
   `rust-skills` and `csharp-skills` are vendored (`sync-rust.mjs`, `sync-csharp.mjs`). `paths:` frontmatter doesn't
   gate plugin skills in Claude Code (checked on 2.1.272 and 2.1.296), so csharp-skills exposes six router skills over an

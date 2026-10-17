@@ -1,6 +1,6 @@
 # web-mcp
 
-A stdio MCP server (`web-mcp`, Rust) with three tools, available to Claude as `mcp__plugin_web-mcp_web__*`. Everything
+A stdio MCP server (`web-mcp`, Rust) with four tools, available to Claude as `mcp__plugin_web-mcp_web__*`. Everything
 they pull is archived in `.web/` in the project before Claude sees it.
 
 - `search { query, papers?, max_passages?, engines?, category?, since? }`: searches the local archive and the web
@@ -19,11 +19,28 @@ they pull is archived in `.web/` in the project before Claude sees it.
 - `browser { action, session, url?, ref?, text?, key?, js? }`: drives agent-browser. `session` is required, and each
   session is its own browser (named per server process, and closed again when the server exits). Actions: `open`, `snapshot`, `click`, `fill`, `type`, `press`, `scroll`, `screenshot`,
   `console`, `network`, `eval`, `close`.
+- `lookup { kind, target, record?, at?, ecosystem? }`: one record about a target from public sources, each reply kept
+  as the source sent it. `dns`: Cloudflare DNS over HTTPS (`record` such as MX or TXT; default A, AAAA, CNAME, MX, NS and
+  TXT). `whois`: RDAP for a domain, IP or AS number, from the registry IANA's bootstrap files name. `certs`: crt.sh
+  certificates for a domain and its subdomains, condensed to distinct names. `wayback`: a URL's Internet Archive
+  snapshots from the CDX index, or with `at` (a timestamp or prefix such as 2024) the nearest snapshot read like
+  `fetch`. `ip`: open ports, hostnames, CPEs, tags and known vulnerabilities from Shodan InternetDB. `vuln`: a CVE or
+  OSV id from OSV with EPSS (FIRST) and CISA KEV, NVD as fallback; or `name@version` with `ecosystem` (npm, PyPI,
+  crates.io, ...) for a package's known vulnerabilities.
+
+## What lookups disclose
+
+`lookup` is passive: the target itself is never contacted, but it is sent to the sources: Cloudflare (`dns`), IANA's
+RDAP servers and the registries they point to (`whois`), crt.sh (`certs`), archive.org (`wayback`), Shodan InternetDB
+(`ip`), and OSV, FIRST, CISA and NVD (`vuln`). No setting or prompt guards this, so a lookup tells those services what
+you are researching. Shodan InternetDB is free for non-commercial use only.
 
 ## The archive
 
 `.web/<date>_<run>/` holds an `index.jsonl` plus the searches, pages, PDFs and screenshots of one server run. `.web/`
-writes its own `.gitignore`. `.web/index/` is the BM25 passage index shared by all runs. Archived items are never
+writes its own `.gitignore`. `.web/index/` is the BM25 passage index shared by all runs. Every lookup reply goes under `lookups/<kind>/` as one JSON file per source. Lookups are not
+answered from the archive (each asks again) and not added to the search index; a wayback snapshot read with `at` is a
+page, and is. Archived items are never
 deleted, so it grows; delete it by hand only while no server is running, since the index is memory-mapped.
 
 ## Install
@@ -46,7 +63,9 @@ or set its path with `/plugin configure web-mcp`.
 
 Environment variables, set in `.mcp.json`: `CLAUDE_PROJECT_DIR` (where `.web/` lives), `WEB_MCP_SEARXNG_URL` (default
 `http://127.0.0.1:8888`) and `WEB_MCP_AGENT_BROWSER` (default `agent-browser`). `WEB_MCP_ARXIV_URL`,
-`WEB_MCP_OPENALEX_URL` and `WEB_MCP_CROSSREF_URL` repoint the paper APIs (for tests).
+`WEB_MCP_OPENALEX_URL` and `WEB_MCP_CROSSREF_URL` repoint the paper APIs (for tests). The lookup sources are repointed by `WEB_MCP_DOH_URL`, `WEB_MCP_RDAP_URL`, `WEB_MCP_CRTSH_URL`,
+`WEB_MCP_CDX_URL`, `WEB_MCP_WAYBACK_URL`, `WEB_MCP_INTERNETDB_URL`, `WEB_MCP_OSV_URL`, `WEB_MCP_NVD_URL`,
+`WEB_MCP_EPSS_URL` and `WEB_MCP_KEV_URL`; `WEB_MCP_LOOKUP_MS` shortens every lookup source's deadline (test-only).
 
 ## Limits and security
 

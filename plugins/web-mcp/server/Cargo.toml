@@ -3,7 +3,7 @@ name = "web-mcp"
 version = "0.3.0"
 edition = "2024"
 rust-version = "1.97"
-description = "Stdio MCP server for the web-mcp plugin: search, fetch and browser tools that archive everything in .web/."
+description = "Stdio MCP server for the web-mcp plugin: search, fetch, browser and lookup tools that archive everything in .web/."
 license = "MIT"
 publish = false
 
