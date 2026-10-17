@@ -163,16 +163,44 @@ fn file(path: &str) -> Resp {
 
 /// Scripts `fx` as a `SearXNG` answering the one-word `query` with `results` (url, title).
 pub fn searx(fx: &Fixture, query: &str, results: &[(String, &str)]) {
+    searx_with(fx, query, "", "bing", results);
+}
+
+/// Like `searx`, for a request with the extra query string `params` (e.g. `&engines=github`); every
+/// result comes from `engine`.
+pub fn searx_with(
+    fx: &Fixture,
+    query: &str,
+    params: &str,
+    engine: &str,
+    results: &[(String, &str)],
+) {
     let rs: Vec<Value> = results
         .iter()
-        .map(|(u, t)| json!({"url": u, "title": t, "content": "x"}))
+        .map(|(u, t)| json!({"url": u, "title": t, "content": "x", "engine": engine, "engines": [engine]}))
         .collect();
     fx.route(
-        &format!("/search?q={query}&format=json"),
+        &format!("/search?q={query}&format=json{params}"),
         vec![Resp::new(
             200,
             "application/json",
             json!({"query": query, "results": rs}).to_string(),
+        )],
+    );
+}
+
+/// Scripts `fx`'s `/config` with `engines` (name, categories, time-range support).
+pub fn searx_config(fx: &Fixture, engines: &[(&str, &[&str], bool)]) {
+    let es: Vec<Value> = engines
+        .iter()
+        .map(|(n, c, t)| json!({"name": n, "categories": c, "time_range_support": t}))
+        .collect();
+    fx.route(
+        "/config",
+        vec![Resp::new(
+            200,
+            "application/json",
+            json!({"engines": es}).to_string(),
         )],
     );
 }
@@ -252,6 +280,12 @@ impl Mcp {
 
     /// Sends all requests before reading any response, so they run concurrently.
     fn requests(&mut self, reqs: Vec<(String, Value)>) -> Vec<Value> {
+        let mut all = self.requests_raw(reqs);
+        all.iter_mut().map(|v| v["result"].take()).collect()
+    }
+
+    /// Like `requests`, with each whole JSON-RPC response.
+    fn requests_raw(&mut self, reqs: Vec<(String, Value)>) -> Vec<Value> {
         let ids: Vec<u64> = reqs
             .into_iter()
             .map(|(method, params)| {
@@ -267,7 +301,7 @@ impl Mcp {
             assert!(self.out.read_line(&mut line).unwrap() > 0, "server exited");
             let v: Value = serde_json::from_str(&line).unwrap();
             if let Some(id) = v["id"].as_u64() {
-                got.insert(id, v["result"].clone());
+                got.insert(id, v);
             }
         }
         ids.iter().map(|id| got.remove(id).unwrap()).collect()
@@ -275,6 +309,14 @@ impl Mcp {
 
     pub fn call(&mut self, tool: &str, args: Value) -> Value {
         self.calls(vec![(tool, args)]).remove(0)
+    }
+
+    /// The whole JSON-RPC response, so a protocol error (`error.code`) can be checked.
+    pub fn call_raw(&mut self, tool: &str, args: Value) -> Value {
+        let mut params = json!({"name": tool});
+        params["arguments"] = args;
+        self.requests_raw(vec![("tools/call".to_owned(), params)])
+            .remove(0)
     }
 
     pub fn calls(&mut self, calls: Vec<(&str, Value)>) -> Vec<Value> {

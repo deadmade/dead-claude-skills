@@ -42,7 +42,7 @@ fn bench(c: &mut Criterion) {
         .unwrap();
     c.bench_function("search/10k", |b| {
         b.iter(|| {
-            idx.search(black_box("w42 w1337 w4999 unique77"), 10)
+            idx.search(black_box("w42 w1337 w4999 unique77"), 10, None)
                 .unwrap()
         });
     });

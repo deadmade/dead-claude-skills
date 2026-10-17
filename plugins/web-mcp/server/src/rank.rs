@@ -1,6 +1,6 @@
 //! The archive's BM25 passage index at `.web/index/`, shared by every web-mcp process in the project.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -128,11 +128,17 @@ impl Index {
             .map_err(|e| anyhow!("indexing failed: {e}"))
     }
 
-    /// The best `k` passages by BM25; the query never fails on syntax.
+    /// The best `k` passages by BM25, only from the URLs in `only` when it is given; the query never fails
+    /// on syntax.
     ///
     /// # Errors
     /// When tantivy can't read the index.
-    pub fn search(&self, query: &str, k: usize) -> anyhow::Result<Vec<Hit>> {
+    pub fn search(
+        &self,
+        query: &str,
+        k: usize,
+        only: Option<&HashSet<String>>,
+    ) -> anyhow::Result<Vec<Hit>> {
         if k == 0 {
             return Ok(Vec::new());
         }
@@ -140,10 +146,15 @@ impl Index {
         let (q, _) =
             QueryParser::for_index(&self.tantivy, vec![self.f.text]).parse_query_lenient(query);
         // Extra candidates so collapsing duplicates still leaves `k`.
-        let top = searcher.search(
-            &q,
-            &TopDocs::with_limit(k.saturating_mul(2)).order_by_score(),
-        )?;
+        // shortcut: with `only` this post-filters tantivy's top 500 because url isn't indexed; indexing it
+        // changes the on-disk schema, so it needs a new index dir or a migration. Same-URL passages from
+        // earlier runs are accepted.
+        let limit = if only.is_some() {
+            500
+        } else {
+            k.saturating_mul(2)
+        };
+        let top = searcher.search(&q, &TopDocs::with_limit(limit).order_by_score())?;
         let mut hits: Vec<Hit> = Vec::new();
         let mut seen: HashMap<String, usize> = HashMap::new();
         for (score, addr) in top {
@@ -161,6 +172,9 @@ impl Index {
                 path: get(self.f.path),
                 fetched: get(self.f.fetched),
             };
+            if only.is_some_and(|o| !o.contains(&doc.url)) {
+                continue;
+            }
             // Equal hashes (two processes racing past the add-time check) keep the newest copy.
             if let Some(&i) = seen.get(&get(self.f.hash)) {
                 if newer(&doc.fetched, &hits[i].doc.fetched) {
@@ -407,13 +421,33 @@ mod tests {
         ])
         .await
         .unwrap();
-        let hits = idx.search("quick brown fox", 10).unwrap();
+        let hits = idx.search("quick brown fox", 10, None).unwrap();
         assert_eq!(hits[0].doc.url, "https://b/");
         assert!(hits.iter().all(|h| h.doc.url != "https://d/"));
         assert_eq!(hits[0].doc.title, "T");
         // Query syntax from a user never errors.
-        idx.search("fox AND (\"unclosed", 3).unwrap();
-        assert!(idx.search("fox", 0).unwrap().is_empty());
+        idx.search("fox AND (\"unclosed", 3, None).unwrap();
+        assert!(idx.search("fox", 0, None).unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn search_only_keeps_listed_urls() {
+        let idx = Index::open(&temp_web("only")).unwrap();
+        idx.add(vec![
+            doc("zebra stripes", "https://a/"),
+            doc("zebra herds", "https://b/"),
+        ])
+        .await
+        .unwrap();
+        let only: HashSet<String> = ["https://b/".to_owned()].into();
+        let hits = idx.search("zebra", 5, Some(&only)).unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].doc.url, "https://b/");
+        assert!(
+            idx.search("zebra", 5, Some(&HashSet::new()))
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -427,7 +461,7 @@ mod tests {
             )])
             .await
             .unwrap();
-            let hits = idx.search(&word, 5).unwrap();
+            let hits = idx.search(&word, 5, None).unwrap();
             assert_eq!(hits.len(), 1, "iteration {i}");
         }
     }
@@ -442,7 +476,7 @@ mod tests {
         let commits = idx.commits.load(Ordering::SeqCst);
         assert!((1..=2).contains(&commits), "{commits} commits");
         for i in 0..16 {
-            assert_eq!(idx.search(&format!("group{i}"), 5).unwrap().len(), 1);
+            assert_eq!(idx.search(&format!("group{i}"), 5, None).unwrap().len(), 1);
         }
     }
 
@@ -496,7 +530,7 @@ mod tests {
             segments < commits,
             "no merges ran: {segments} segments, {commits} commits"
         );
-        assert_eq!(idx.search("burst7", 5).unwrap().len(), 1);
+        assert_eq!(idx.search("burst7", 5, None).unwrap().len(), 1);
     }
 
     #[tokio::test]
@@ -508,12 +542,12 @@ mod tests {
             .unwrap();
         later.fetched = "2026-10-18T12:00:00Z".into();
         idx.add(vec![later.clone(), later]).await.unwrap();
-        assert_eq!(idx.search("same words", 10).unwrap().len(), 1);
+        assert_eq!(idx.search("same words", 10, None).unwrap().len(), 1);
         // The same text from another URL is another passage.
         idx.add(vec![doc("the same words again", "https://other/")])
             .await
             .unwrap();
-        assert_eq!(idx.search("same words", 10).unwrap().len(), 2);
+        assert_eq!(idx.search("same words", 10, None).unwrap().len(), 2);
     }
 
     #[test]
@@ -535,7 +569,7 @@ mod tests {
                         .await
                         .unwrap();
                     let start = Instant::now();
-                    while idx.search(other, 5).unwrap().is_empty() {
+                    while idx.search(other, 5, None).unwrap().is_empty() {
                         assert!(
                             start.elapsed() < Duration::from_secs(10),
                             "{me} never saw {other}"

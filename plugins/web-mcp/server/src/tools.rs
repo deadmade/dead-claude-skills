@@ -34,6 +34,12 @@ pub struct SearchArgs {
     pub papers: Option<bool>,
     /// Passages to return, 1-20 (default 8).
     pub max_passages: Option<u32>,
+    /// Comma-separated engines, e.g. github, stackoverflow, pypi, docker hub, mdn, arch linux wiki, crates.io, npm, pkg.go.dev, gitlab, codeberg
+    pub engines: Option<String>,
+    /// A category, e.g. it, repos, news, science
+    pub category: Option<String>,
+    /// Only results from the last day, week, month or year
+    pub since: Option<search::Since>,
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -304,7 +310,7 @@ impl Server {
 #[tool_router]
 impl Server {
     #[tool(
-        description = "Search the web (self-hosted SearXNG) and the local archive; returns ranked passages with sources. With papers: true it searches OpenAlex, arXiv and Crossref instead and recognises DOIs and arXiv ids in the query.",
+        description = "Search the web (self-hosted SearXNG) and the local archive; returns ranked passages with sources. With papers: true it searches OpenAlex, arXiv and Crossref instead and recognises DOIs and arXiv ids in the query. Optional engines, category and since (day, week, month, year) narrow the web side to those SearXNG engines; then only this search's pages are ranked.",
         annotations(read_only_hint = true)
     )]
     async fn search(&self, Parameters(args): Parameters<SearchArgs>) -> CallToolResult {
@@ -318,7 +324,18 @@ impl Server {
             };
         }
         let n = args.max_passages.map_or(8, |n| n.clamp(1, 20)) as usize;
-        match search::web(&self.ctx, &args.query, n).await {
+        let filter = search::Filter {
+            engines: args
+                .engines
+                .iter()
+                .flat_map(|e| e.split(','))
+                .map(|e| e.trim().to_owned())
+                .filter(|e| !e.is_empty())
+                .collect(),
+            category: args.category,
+            since: args.since,
+        };
+        match search::web(&self.ctx, &args.query, n, &filter).await {
             Ok(text) => CallToolResult::success(vec![ContentBlock::text(text)]),
             Err(e) => error(e.to_string()),
         }

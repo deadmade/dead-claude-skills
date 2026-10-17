@@ -160,7 +160,7 @@ async fn eval(dir: &Path, name: &str, max_q: usize, model: &StaticModel) -> Resu
         .collect();
     let (mut bm, mut hy) = (HashMap::new(), HashMap::new());
     for (qid, q) in &d.queries {
-        let bm25 = idx.search(q, POOL)?;
+        let bm25 = idx.search(q, POOL, None)?;
         let qe = unit(model.encode_single(q));
         let mut sc: Vec<(usize, f32)> = embs
             .iter()
@@ -203,7 +203,7 @@ async fn sweep(dir: &Path) -> Result<()> {
             // Max-pool: a doc ranks where its best passage does.
             let mut seen = HashSet::new();
             let docs: Vec<String> = idx
-                .search(q, POOL)?
+                .search(q, POOL, None)?
                 .into_iter()
                 .map(|h| h.doc.url)
                 .filter(|u| seen.insert(u.clone()))

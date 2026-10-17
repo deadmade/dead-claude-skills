@@ -919,7 +919,12 @@ mod tests {
             .map_err(|e| e.to_string())
             .unwrap();
         assert!(f.private);
-        assert!(ctx.index.search("devsite changing", 5).unwrap().is_empty());
+        assert!(
+            ctx.index
+                .search("devsite changing", 5, None)
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[tokio::test]

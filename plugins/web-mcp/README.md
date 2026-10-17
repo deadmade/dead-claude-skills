@@ -3,9 +3,14 @@
 A stdio MCP server (`web-mcp`, Rust) with three tools, available to Claude as `mcp__plugin_web-mcp_web__*`. Everything
 they pull is archived in `.web/` in the project before Claude sees it.
 
-- `search { query, papers?, max_passages? }`: searches the local archive and the web together (self-hosted SearXNG),
-  fetches the top five results, and returns the best passages word for word (default 8, at most 20), each with its URL,
-  title and archive path. Ranking is BM25; there are no embeddings. With `papers: true` it queries OpenAlex, arXiv and
+- `search { query, papers?, max_passages?, engines?, category?, since? }`: searches the local archive and the web
+  together (self-hosted SearXNG), fetches the top five results, and returns the best passages word for word (default 8,
+  at most 20), each with its URL, title and archive path. `engines` (comma-separated SearXNG engines such as `github`
+  or `pypi`), `category` and `since` (`day`, `week`, `month`, `year`) narrow the web side; a filtered search ranks only
+  its own pages, not the rest of the archive. `since` fails for engines without time-range support. An engine SearXNG
+  ships disabled (e.g. crates.io, npm) may need `disabled: false` under `engines:` in `~/.claude/searxng/settings.yml`,
+  then `docker restart searxng`, because the installer never overwrites that file. Ranking is BM25; there are no
+  embeddings. With `papers: true` it queries OpenAlex, arXiv and
   Crossref instead, merged by DOI or arXiv id, one record per paper with its abstract. If SearXNG can't be reached, the
   call fails and says how to start it.
 - `fetch { url, images? }`: a whole page as markdown (HTML main content, PDFs as text). With `images: true`, up to six

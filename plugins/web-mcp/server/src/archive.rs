@@ -18,6 +18,8 @@ use url::{Host, Url};
 pub enum Item {
     Search {
         query: String,
+        /// What the search was narrowed to; empty when unfiltered. Part of the file name.
+        filter: String,
         json: String,
     },
     Page {
@@ -204,8 +206,17 @@ impl Inner {
             path: self.rel(path).to_string_lossy().into_owned(),
         };
         let main = match item {
-            Item::Search { query, json } => {
-                let name = format!("{}-{}", sanitize(&query, 40), short_hash(&query));
+            Item::Search {
+                query,
+                filter,
+                json,
+            } => {
+                let hashed = if filter.is_empty() {
+                    query.clone()
+                } else {
+                    format!("{query}\n{filter}")
+                };
+                let name = format!("{}-{}", sanitize(&query, 40), short_hash(&hashed));
                 let path = self.run.join("searches").join(name + ".json");
                 Self::write(&path, json.as_bytes()).await?;
                 lines.push(entry(
@@ -528,6 +539,7 @@ mod tests {
                 tokio::spawn(async move {
                     a.put(Item::Search {
                         query: format!("q{i}"),
+                        filter: String::new(),
                         json: "{}".repeat(500),
                     })
                     .await

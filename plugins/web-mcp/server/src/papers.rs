@@ -639,6 +639,7 @@ pub async fn search(ctx: &Ctx, query: &str) -> PapersOutput {
         .archive
         .put(Item::Search {
             query: query.to_owned(),
+            filter: String::new(),
             json: json!({"query": query, "papers": records}).to_string(),
         })
         .await
