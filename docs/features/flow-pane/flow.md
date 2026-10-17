@@ -91,6 +91,21 @@ phase: evaluate
 
 ## Plan review
 
+Round 1 (2026-10-17), three reviewers (correctness, fit, simpler). 25 findings merged into 20, 0 dropped. User:
+"yes to all, go with your recommendations".
+
+- F1 (blocking): scan from `$.session.repo()?.root`, not the session's directory, which moves into a worktree. Spec
+  "Where it looks" made explicit (no change in intent).
+- F2 two-level scan by `$.fs.list`, built from each poll; F3 skill resume task moved before the key; F4 resuming a
+  worktree copy works in that worktree; F5 skill descriptions/argument hints; F6 README.md sentence, spec's
+  "feature-flow README" dropped (none exists) *(spec edit, reopens Gate 1 for that item)*; F7 timer first, every
+  refresh caught; F8 only successful writes count, no await on refresh; F9 one refresh at a time; F10 write the
+  atom every poll; F11 verdict regex + tests; F12 a "reopened" without a later date is open, limit noted *(spec
+  edit, reopens Gate 1 for the gate rule)*; F13 one atom, module variables for the rest; F14 test merges.
+- F15–F20: command looked up once with a name fallback and a toast; no tsconfig/tsc; hooks.json in Task 1;
+  research line its own task; spec read caught; press by key, sentence before "Opt-in.".
+- Shape changed (task order, a new task), so round 2 re-reviews the changed parts.
+
 ## Deviations
 
 ## Walkthrough

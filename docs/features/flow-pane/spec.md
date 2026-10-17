@@ -47,7 +47,8 @@ one glance says where the run stands without opening the file, and one key picks
 - **Source and refresh (option A):** the mod reads `docs/features/*/flow.md` through `$.fs.list` / `$.fs.read`,
   polls on `$.clock.every` every few seconds, and re-reads only files whose `mtimeMs` changed. No hook file, no
   file watcher.
-- **Where it looks (user, 2026-10-17):** the working directory, plus every worktree under `.worktrees/*/` and
+- **Where it looks (user, 2026-10-17):** the repository root (`$.session.repo()?.root`, the main working tree's
+  root even from inside a worktree; the session's directory when there is no repository), plus every worktree under `.worktrees/*/` and
   `.claude/worktrees/*/` (the superpowers default and Claude Code's own). A run is one slug; when several copies of
   its flow.md exist, the newest `mtimeMs` wins. The copy this session last wrote is always among them, whatever its
   path.
@@ -67,7 +68,8 @@ Real files drift from the template (`docs/features/*/flow.md`), so the reader ta
   No frontmatter or no `phase:` → phase `?`.
 - **Gates:** the lines under `## Gates` starting `- Gate 1` and `- Gate 2`. A gate is approved when the text after
   its first `:` holds an ISO date (`YYYY-MM-DD`) and its last date isn't the one right after the last "Reopened"
-  (any case); the band shows that last date. Otherwise the gate is open. Compare positions on the line, not values:
+  (any case); the band shows that last date. Otherwise the gate is open, and so is a gate whose last "Reopened" has
+  no date after it. Limit: a reopening recorded elsewhere in flow.md (Options, Plan review) isn't seen. Compare positions on the line, not values:
   `language-skills` has three equal dates on one Gate 1 line.
   Samples: `cyberpunk-theme` (free text after the date), `language-skills` (reopened, then re-approved),
   `flow-pane` (`<date>` placeholder = open).
@@ -136,7 +138,8 @@ H: caching cuts p95 by 30% · baseline 412ms · feature 280ms · supported
 - Mod tests run with `claude plugin test .` in `plugins/feature-flow`; CI needs a step for it in
   `.github/workflows/test.yml` next to cswap's and night-city's, on Linux and Windows. Tests fake files with
   `on('fs.list')` / `on('fs.read')` and inline flow.md samples (no file system in plugin tests).
-- README.md, the feature-flow README/description, and CLAUDE.md (layout + checks) describe the mod.
+- README.md, the feature-flow description (marketplace entry and `plugin.json`), and CLAUDE.md (layout + checks)
+  describe the mod. (feature-flow has no README of its own.)
 
 ## Left to the builder
 
