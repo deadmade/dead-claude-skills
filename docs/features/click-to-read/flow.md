@@ -119,6 +119,10 @@ can't raise it); missing stat answered `{ deny: 'ENOENT' }`; `load` stats direct
 the checkpoint toast lands in Task 2's commit; prettier limited to touched paths; over-long replies `next(e)`
 unchanged; polling runs on error documents too; race-test setup and `host()` parameters spelled out.
 
+## Execution
+
+- Task 1 (9fc8e1c) and Task 2 (a218a8f) done; waiting at the checkpoint for the user's terminal check.
+
 ## Deviations
 
 ## Walkthrough
