@@ -4,7 +4,7 @@ import { HINTS, TOGGLES, nameOf, withDependencies } from './core.mjs';
 
 const width = (s) => stripVTControlCharacters(s).length;
 
-// The named colours in Night City's palette (plugins/default/night-city/themes/night-city.json).
+// The named colours in Night City's palette (plugins/default/themes/night-city.json).
 const NIGHT_CITY = {
   magenta: [240, 139, 180],
   cyan: [124, 207, 224],

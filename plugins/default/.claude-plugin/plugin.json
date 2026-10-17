@@ -1,7 +1,7 @@
 {
-  "name": "night-city",
+  "name": "dead-skills",
   "version": "0.3.0",
-  "description": "Night City: a toned-down synthwave Claude Code theme with a matching terminal background, Night City spinner words, short status-line reactions and Onibi dropping by with a one-liner.",
+  "description": "Default bundle: global instructions, the Night City theme and mod, Context7, plus the core plugins of the dead-claude-skills marketplace as dependencies.",
   "author": {
     "name": "deadmade",
     "url": "https://github.com/deadmade"
@@ -16,5 +16,14 @@
       "default": "sometimes",
       "options": ["sometimes", "always", "off"]
     }
-  }
+  },
+  "dependencies": [
+    "code-review@claude-plugins-official",
+    "claude-code-setup@claude-plugins-official",
+    "claude-md-management@claude-plugins-official",
+    "security-guidance@claude-plugins-official",
+    "claude-security@claude-plugins-official",
+    "superpowers",
+    "ponytail"
+  ]
 }

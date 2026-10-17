@@ -19,7 +19,7 @@ note under the title covers leftover mentions, the frontmatter `description` is 
 Agent Skills" section is removed.
 The synced upstream commit is in `skills/paper-lookup/UPSTREAM`.
 
-## MCP servers (mcp-basic, mcp-github, mcp-azure)
+## MCP servers (dead-skills, mcp-github, mcp-azure)
 
 - **Context7**: hosted service by Upstash (https://context7.com), used over HTTP; nothing vendored.
 - **GitHub MCP server**: hosted by GitHub (https://github.com/github/github-mcp-server), used over HTTP; nothing vendored.
@@ -111,9 +111,9 @@ pr-review-toolkit agents (Apache License 2.0, Copyright Anthropic, PBC; `LICENSE
 `description:` rewritten, and [mattpocock/skills](https://github.com/mattpocock/skills)'s engineering code-review
 skill (MIT License, Copyright Matt Pocock; `LICENSE-MIT`), unmodified apart from a source comment.
 
-## night-city
+## Night City (dead-skills)
 
-The palette of `plugins/default/night-city/themes/night-city.json` is derived from the Cyberpunk Neon theme
+The palette of `plugins/default/themes/night-city.json` is derived from the Cyberpunk Neon theme
 (`plugins/theme-gallery/themes/cyberpunk.json`) of [livlign/ccthemes](https://github.com/livlign/ccthemes) (MIT
 License, Copyright its authors), with changed and added colors. Nothing is vendored or synced.
 

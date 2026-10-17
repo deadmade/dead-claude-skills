@@ -9,13 +9,13 @@ const ROOT = join(import.meta.dirname, '..');
 
 test('a GROUPS folder is replaced by its subfolders', () => {
   const fx = mkdtempSync(join(tmpdir(), 'pd-'));
-  for (const d of ['a', 'default/z', 'opt-in/x', 'opt-in/y', 'shared/w']) {
+  for (const d of ['a', 'default', 'opt-in/x', 'opt-in/y', 'shared/w']) {
     mkdirSync(join(fx, 'plugins', d, '.claude-plugin'), { recursive: true });
     writeFileSync(join(fx, 'plugins', d, '.claude-plugin', 'plugin.json'), '{}');
   }
   assert.deepEqual(pluginDirs(fx), [
     'plugins/a',
-    'plugins/default/z',
+    'plugins/default',
     'plugins/opt-in/x',
     'plugins/opt-in/y',
     'plugins/shared/w',

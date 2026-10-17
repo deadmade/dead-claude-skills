@@ -2,7 +2,7 @@
 // A folder without a manifest is skipped: a checkout keeps ignored build output in folders a move left behind.
 import { existsSync, readdirSync } from 'node:fs';
 
-export const GROUPS = ['default', 'shared', 'opt-in'];
+export const GROUPS = ['shared', 'opt-in'];
 
 export function pluginDirs(root = '.') {
   const subdirs = (rel) =>

@@ -10,7 +10,7 @@ It fires on:
 - a question from Claude (`PreToolUse` on `AskUserQuestion`, which raises no notification of its own): a waiting line and the
   question.
 
-The popup comes from Onibi, night-city's pixel-art netrunner: her face is the icon (`icon.png`, a brightened crop
+The popup comes from Onibi, Night City's pixel-art netrunner: her face is the icon (`icon.png`, a brightened crop
 written by `scripts/draw-mascot.mjs`; never edit it by hand) and, on Linux, she is the sender. The title is the
 project folder, then the status in bold and Claude's line below it. Windows shows "Windows PowerShell" as the
 sender, since the toast borrows PowerShell's app id.

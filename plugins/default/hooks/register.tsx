@@ -18,7 +18,7 @@ let glitched = false; // one glitch per main turn
 let reaction: Timer | undefined;
 
 // What Onibi says in the band above the prompt while she visits, else null.
-const onibi = atom({ plugin: 'night-city', key: 'onibi' } as const, null);
+const onibi = atom({ plugin: 'dead-skills', key: 'onibi' } as const, null);
 let visits: Cadence = 'sometimes';
 let visitedAt = -Infinity;
 let leave: Timer | undefined;

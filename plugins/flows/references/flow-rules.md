@@ -51,21 +51,21 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
 
 Say which plugin provides it, then use the fallback:
 
-| Missing                                                  | Plugin               | Fallback                                                     |
-| -------------------------------------------------------- | -------------------- | ------------------------------------------------------------ |
-| `brainstorming`, `writing-plans`, execution, TDD, verify | superpowers          | do the phase by hand with the same output                    |
-| `grilling`, `domain-modeling`, `teach`, `to-tickets`     | mattpocock-picks     | grill in rounds yourself, one numbered question per decision |
-| `how`, `why`, `blast-radius`, `recall`, `unslop`, …      | pstack-picks         | 1–3 Explore agents; `git log -S`/`git blame` for why         |
-| `mutation-testing`, `property-based-testing`, …          | tob-picks            | the language's own mutation or property tool, or by hand     |
-| `/self-review`                                           | self-review          | `/code-review` plus the built-in `security-review`           |
-| `search`, `fetch`, papers                                | web-mcp              | paper-lookup for papers, WebSearch/WebFetch for the rest     |
-| a knowledge graph                                        | graphify             | Explore agents                                               |
-| library docs                                             | mcp-basic (context7) | the library's docs via web-mcp `fetch` or WebFetch           |
-| the diff pane                                            | tui-review           | `git diff --stat`, then offer to walk the user through it    |
-| a desktop ping                                           | notify               | nothing                                                      |
-| `claude-security`                                        | claude-security      | the built-in `security-review`                               |
-| `claude-md-improver`, `revise-claude-md`                 | claude-md-management | read each CLAUDE.md against the code yourself                |
-| `ponytail-audit`, `ponytail-review`                      | ponytail             | `/simplify` on the scope, report only                        |
+| Missing                                                  | Plugin                 | Fallback                                                     |
+| -------------------------------------------------------- | ---------------------- | ------------------------------------------------------------ |
+| `brainstorming`, `writing-plans`, execution, TDD, verify | superpowers            | do the phase by hand with the same output                    |
+| `grilling`, `domain-modeling`, `teach`, `to-tickets`     | mattpocock-picks       | grill in rounds yourself, one numbered question per decision |
+| `how`, `why`, `blast-radius`, `recall`, `unslop`, …      | pstack-picks           | 1–3 Explore agents; `git log -S`/`git blame` for why         |
+| `mutation-testing`, `property-based-testing`, …          | tob-picks              | the language's own mutation or property tool, or by hand     |
+| `/self-review`                                           | self-review            | `/code-review` plus the built-in `security-review`           |
+| `search`, `fetch`, papers                                | web-mcp                | paper-lookup for papers, WebSearch/WebFetch for the rest     |
+| a knowledge graph                                        | graphify               | Explore agents                                               |
+| library docs                                             | dead-skills (context7) | the library's docs via web-mcp `fetch` or WebFetch           |
+| the diff pane                                            | tui-review             | `git diff --stat`, then offer to walk the user through it    |
+| a desktop ping                                           | notify                 | nothing                                                      |
+| `claude-security`                                        | claude-security        | the built-in `security-review`                               |
+| `claude-md-improver`, `revise-claude-md`                 | claude-md-management   | read each CLAUDE.md against the code yourself                |
+| `ponytail-audit`, `ponytail-review`                      | ponytail               | `/simplify` on the scope, report only                        |
 
 ## Scope (audits)
 

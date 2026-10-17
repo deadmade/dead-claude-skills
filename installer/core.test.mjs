@@ -589,6 +589,10 @@ test('Night City settings are always on, next to other env, and leave the theme 
   assert.equal(out.theme, 'dark');
 });
 
+test('Night City picked while it was its own plugin stays picked now that dead-skills ships it', () => {
+  assert.equal(mergeSettings({ theme: 'custom:night-city:night-city' }, {}).theme, 'custom:dead-skills:night-city');
+});
+
 test('notify turns the built-in notification off, and deselecting restores it', () => {
   const channel = (s, notify) => mergeSettings(s, { notify }).preferredNotifChannel;
   assert.equal(channel({}, true), 'notifications_disabled');

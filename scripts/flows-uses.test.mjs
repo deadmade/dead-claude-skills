@@ -7,14 +7,16 @@ import { checkUses, expectedDeps, readUses, renderTree, withTree } from './flows
 
 const ROOT = join(import.meta.dirname, '..');
 
-// A repo with one conductor `fix` using `uses`, and local plugins picks (a skill, an agent) and web (an MCP server).
-function fixture(uses, skillText = 'how reviewer search general-purpose deep') {
+// A repo with one conductor `fix` using `uses`, and local plugins picks (a skill, an agent, an MCP server) and web (an
+// MCP server).
+function fixture(uses, skillText = 'how reviewer docs search general-purpose deep') {
   const fx = mkdtempSync(join(tmpdir(), 'fu-'));
   const put = (p, s) => (mkdirSync(dirname(join(fx, p)), { recursive: true }), writeFileSync(join(fx, p), s));
   put('plugins/flows/skills/fix/SKILL.md', skillText);
   if (uses !== undefined) put('plugins/flows/skills/fix/uses.json', JSON.stringify(uses));
   put('plugins/picks/skills/how/SKILL.md', '');
   put('plugins/picks/agents/reviewer.md', '');
+  put('plugins/picks/.mcp.json', JSON.stringify({ docs: { type: 'http' } }));
   put('plugins/web/.mcp.json', '{}');
   const marketplace = {
     plugins: [
@@ -35,6 +37,10 @@ test('a valid map has no problems: local skill and agent, MCP tool, url plugin, 
     'claude-code': ['general-purpose'],
   };
   assert.deepEqual(fixture(uses), []);
+});
+
+test("an MCP server of a plugin that also has skills counts as that plugin's", () => {
+  assert.deepEqual(fixture({ picks: ['how', 'docs'] }), []);
 });
 
 test('each kind of problem is reported', () => {

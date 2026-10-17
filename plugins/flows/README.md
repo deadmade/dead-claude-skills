@@ -78,7 +78,7 @@ understand
 └ mattpocock-picks: teach, domain-modeling
 
 upgrade
-├ mcp-basic: context7
+├ dead-skills: context7
 ├ web-mcp: fetch
 └ pstack-picks: blast-radius
 

@@ -128,6 +128,10 @@ too). Findings, recommendation in brackets. **User: "apply all of them"** (2026-
   `build-tui-review.yml`). The userConfig key is `binPath`, like web-mcp's; the remembered base is `tuiReviewBase`, with
   `brvBase` still read; the cache moves to `<git common dir>/tui-review/` and its format to version 2 (magic `TRV*`,
   `manifest.bin`).
+- Asked after the PR (2026-10-18): night-city and mcp-basic folded into dead-skills, which is now `plugins/default/`
+  itself ("I use it, and I dont care" about losing a separate install or the Onibi setting). The installer retires the two
+  and moves a picked theme to `custom:dead-skills:night-city`; `/upgrade`'s context7 now comes from dead-skills, and the
+  uses check counts a plugin's `.mcp.json` servers.
 
 ## Walkthrough
 

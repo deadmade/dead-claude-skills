@@ -31,7 +31,7 @@ $fs.Write($b, 0, $b.Length); $fs.Close()`;
 export const SH_PATH = '/bin/sh';
 export const PS_PATH = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
 
-// The plugin theme's stored value is `custom:night-city:night-city` (undocumented, read from the binary).
+// The plugin theme's stored value is `custom:<plugin>:night-city`, so `custom:dead-skills:night-city` (undocumented, read from the binary).
 export const isNightCity = (theme: unknown) => typeof theme === 'string' && theme.endsWith(':night-city');
 
 // Mods have no platform API: try the POSIX route, fall back to PowerShell when sh is missing or finds no tty.

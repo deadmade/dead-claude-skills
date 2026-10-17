@@ -13,8 +13,8 @@
   "plugins": [
     {
       "name": "dead-skills",
-      "description": "Default bundle: global instructions, and pulls in the core plugins of this marketplace as dependencies.",
-      "source": "./plugins/default/dead-skills",
+      "description": "Default bundle: global instructions, the Night City theme and mod (spinner words, status-line reactions, Onibi dropping by), Context7, and the core plugins of this marketplace as dependencies.",
+      "source": "./plugins/default",
       "category": "productivity"
     },
     {
@@ -44,12 +44,6 @@
       "description": "Nix language server (nixd) for code intelligence (requires nixd on PATH)",
       "source": "./plugins/opt-in/nix-lsp",
       "category": "development"
-    },
-    {
-      "name": "mcp-basic",
-      "description": "Basic MCP servers for every machine: Context7 (up-to-date library docs).",
-      "source": "./plugins/default/mcp-basic",
-      "category": "productivity"
     },
     {
       "name": "mcp-github",
@@ -136,12 +130,6 @@
       "name": "paper-lookup",
       "description": "Paper lookup: search arXiv, Semantic Scholar, OpenAlex, Crossref, Unpaywall and other scholarly APIs (trimmed for computer science) for papers, citations and open-access full text. Vendored from K-Dense-AI/scientific-agent-skills. Opt-in.",
       "source": "./plugins/shared/paper-lookup",
-      "category": "development"
-    },
-    {
-      "name": "night-city",
-      "description": "Night City: a toned-down synthwave Claude Code theme with Night City spinner words, short status-line reactions and Onibi dropping by with a one-liner. Part of the default bundle.",
-      "source": "./plugins/default/night-city",
       "category": "development"
     },
     {

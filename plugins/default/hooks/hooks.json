@@ -1,5 +1,6 @@
 {
-  "description": "Global instructions: rules.md is added to the context on session start.",
+  "description": "Global instructions: rules.md is added to the context on session start. register.tsx is the Night City mod.",
+  "modules": ["./register.tsx"],
   "hooks": {
     "SessionStart": [
       {

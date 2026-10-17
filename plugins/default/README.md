@@ -1,9 +1,23 @@
-# night-city
+# dead-skills
+
+The default bundle, on every machine:
+
+- **Global rules**: `rules.md`, added to the context at session start.
+- **Context7** (`.mcp.json`): up-to-date library docs.
+- **Night City**: the theme and its mod, below.
+- The core plugins as dependencies: code-review, claude-code-setup, claude-md-management, security-guidance,
+  claude-security, superpowers and ponytail.
+
+  /plugin install dead-skills@dead-claude-skills
+
+Night City and Context7 were plugins of their own (night-city, mcp-basic) until 0.3.0; the installer removes those and keeps Night City picked in `/theme`.
+
+## Night City
 
 <img src="assets/mascot-512.png" width="192" align="right" alt="Onibi: a hooded netrunner in a respirator, her chrome cybereye a glowing eight-point spark">
 
 A toned-down synthwave Claude Code theme, "Night City": a dusk-indigo background, lavender text, dusty-pink Claude,
-peach inline code and permission prompts, soft teal suggestions and bash, muted violet instead of grey for dim text. It ships with the dead-skills bundle and is the house look: tui-review's pane,
+peach inline code and permission prompts, soft teal suggestions and bash, muted violet instead of grey for dim text. It is the house look: tui-review's pane,
 notify's popups and the installer's screens use the same palette. Pick it in `/theme` (Claude Code does not let a plugin
 select a custom theme).
 
@@ -30,12 +44,10 @@ Syntax highlighting: Claude Code colours code and diffs with a fixed Monokai pal
 theme can't change, and it ignores the theme's diff colours while highlighting is on (anthropics/claude-code#57036).
 With it off (ctrl+t in `/theme`), diffs use Night City's mint and coral and code takes the theme's text colour.
 
-    /plugin install dead-skills@dead-claude-skills
-
 The palette starts from the Cyberpunk Neon theme of [ccthemes](https://github.com/livlign/ccthemes) (MIT) and is
 retuned to softer synthwave colours; see `THIRD_PARTY.md` in the repository root.
 
-## Mascot
+### Mascot
 
 **Onibi** (鬼火, "demon fire": the ghost lights of Japanese folklore that drift through the dark and lead people to
 their end). The netrunner above is the theme's mascot, an original 64×64 pixel-art character in the theme's palette: a
@@ -44,7 +56,7 @@ spark, a nod to Claude rather than Anthropic's logo. `assets/mascot.png` is the 
 the 8x nearest-neighbour scale; she is also the notify plugin's notification icon. All are drawn by `scripts/draw-mascot.mjs` in the repository root; edit the drawing
 there and rerun it rather than editing the PNGs.
 
-## Contrast (WCAG)
+### Contrast (WCAG)
 
 Checked with relative luminance; all are at least 4.5:1. `background` is an undocumented token that the theme sets
 anyway.

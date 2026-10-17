@@ -1,12 +1,12 @@
 # dead-claude-skills
 
-<p align="center"><a href="plugins/default/night-city/README.md"><img src="plugins/default/night-city/assets/mascot-512.png" width="192" alt="Onibi, night-city's mascot: a hooded netrunner in a respirator, her chrome cybereye a glowing eight-point spark"></a></p>
+<p align="center"><a href="plugins/default/README.md"><img src="plugins/default/assets/mascot-512.png" width="192" alt="Onibi, Night City's mascot: a hooded netrunner in a respirator, her chrome cybereye a glowing eight-point spark"></a></p>
 
 My personal Claude Code setup as a plugin marketplace, so every machine (Linux, Windows) gets the same skills. It's
 built for me; use it if it fits, but expect it to change without notice.
 
-The default bundle, **dead-skills**, pulls in code-review, claude-code-setup, claude-md-management, security-guidance,
-claude-security, superpowers, ponytail, mcp-basic (context7), [night-city](plugins/default/night-city/README.md) (a
+The default bundle, **[dead-skills](plugins/default/README.md)**, pulls in code-review, claude-code-setup, claude-md-management, security-guidance,
+claude-security, superpowers, ponytail, and itself carries Context7, Night City (a
 toned-down synthwave theme that everything else here is painted in) and my global rules. Everything else is opt-in: language
 servers, language and database skills (rust, csharp, postgres), integrations (GitHub, Azure, Atlassian), skill packs
 like hallmark, paper-lookup, self-review, graphify and the mattpocock/pstack/Trail of Bits picks, and tools such as

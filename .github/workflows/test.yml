@@ -37,8 +37,8 @@ jobs:
         working-directory: plugins/opt-in/cswap
         run: claude plugin test .
 
-      - name: night-city mod tests
-        working-directory: plugins/default/night-city
+      - name: dead-skills mod tests
+        working-directory: plugins/default
         run: claude plugin test .
 
       - name: flows mod tests

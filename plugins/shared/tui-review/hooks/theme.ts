@@ -21,7 +21,7 @@ export const styleFg: readonly number[] = [
   0x7ccfe0, // escape
 ];
 
-// Night City (plugins/default/night-city/themes/night-city.json).
+// Night City (plugins/default/themes/night-city.json).
 export const theme = {
   barFg: 0xe6dcf7,
   barBg: 0x2a2340,

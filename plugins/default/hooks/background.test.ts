@@ -3,7 +3,7 @@ import type { On } from 'claude-code';
 
 import { PS_PATH, RESET, SET, SH_PATH, isNightCity } from './background';
 
-const NIGHT = 'custom:night-city:night-city';
+const NIGHT = 'custom:dead-skills:night-city';
 
 // Fakes the host beneath the plugin: the theme row, config writes and the child processes, recording what each ran.
 function host(on: On, { theme = NIGHT, shExit = 0 } = {}) {

@@ -154,6 +154,8 @@ export function mergeSettings(settings, { statusLine, sandbox, version, notify, 
   // Inside tmux Claude Code draws in 256 colours unless told otherwise, which turns the theme's indigos grey. Outside
   // tmux (and on Windows, which has none) the variable does nothing.
   out.env = { ...out.env, CLAUDE_CODE_TMUX_TRUECOLOR: '1' };
+  // The theme's id carries its plugin's name, and night-city became part of dead-skills.
+  if (out.theme === 'custom:night-city:night-city') out.theme = 'custom:dead-skills:night-city';
   // The notify plugin raises its own popups; Claude Code's built-in one would double them.
   // shortcut: deselecting also clears a `notifications_disabled` the user set themselves, and retiring notify from
   // the marketplace leaves the setting behind; remember who set it if anyone minds.

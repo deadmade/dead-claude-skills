@@ -53,10 +53,14 @@ export function checkUses(root, marketplace) {
       // Only local plugins with skills or agents can be checked offline; MCP servers and mods take tool names.
       const dir = typeof entry?.source === 'string' ? join(root, entry.source) : undefined;
       const checkable = dir && ['skills', 'agents', 'workflows'].some((d) => existsSync(join(dir, d)));
+      const mcp =
+        dir && existsSync(join(dir, '.mcp.json')) ? Object.keys(JSON.parse(readFileSync(join(dir, '.mcp.json')))) : [];
       for (const name of names) {
-        const found = ['skills/' + name + '/SKILL.md', 'agents/' + name + '.md', 'workflows/' + name + '.js'].some(
-          (f) => existsSync(join(dir ?? '', f)),
-        );
+        const found =
+          mcp.includes(name) ||
+          ['skills/' + name + '/SKILL.md', 'agents/' + name + '.md', 'workflows/' + name + '.js'].some((f) =>
+            existsSync(join(dir ?? '', f)),
+          );
         if (checkable && !found) problems.push(`${at}: ${plugin} has no skill, agent or workflow ${name}`);
         if (!skill.includes(name)) problems.push(`${at}: ${name} isn't mentioned in ${conductor}/SKILL.md`);
       }
