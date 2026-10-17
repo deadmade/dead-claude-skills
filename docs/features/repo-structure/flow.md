@@ -1,5 +1,5 @@
 ---
-phase: execute
+phase: finish
 ---
 
 # Repo structure refactor: flow
@@ -118,7 +118,22 @@ too). Findings, recommendation in brackets. **User: "apply all of them"** (2026-
   Before merging into the main checkout, remove its uncommitted copies of `docs/features/repo-structure/` and
   `GLOSSARY.md` (git refuses to overwrite untracked files).
 
+## Deviations (execution)
+
+- `nix build .#web-mcp` fails 17 network/socket tests inside the Nix sandbox; `main` (cc92d49) fails the same 17.
+  Pre-existing, out of scope; follow-up.
+- Review fix not in the plan: `pluginDirs()` skips folders without a manifest (ignored leftovers of old groups in other
+  checkouts would count as plugins).
+
 ## Walkthrough
 
-| spec goal | plan task | file:line | test |
-| --------- | --------- | --------- | ---- |
+| spec goal                                                | plan task  | file:line                                                                                | test                                                                                 |
+| -------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Four layers in `plugins/`                                | Task 3     | `scripts/plugin-dirs.mjs:5`, `.claude-plugin/marketplace.json:17`                        | `scripts/plugin-dirs.test.mjs`, check-repo                                           |
+| Crates in `crates/`                                      | Task 2     | `scripts/check-repo.mjs:74`, `flake.nix:82-102`, `.github/workflows/tui-review.yml:6,24` | cargo test + clippy both crates, tui-review mod 27/27                                |
+| Installer without fixed paths (fixes `main`)             | Task 1     | `installer/install.mjs:361,517`                                                          | `installer/core.test.mjs:401`                                                        |
+| Every layout path follows (CI, nix, pre-commit)          | Tasks 2–4  | `flake.nix:20`, `treefmt.toml:5-17`, `.github/workflows/*`                               | pre-commit all-files, `nix fmt` clean, 4 stale-path greps empty, workflow-path check |
+| npx package keeps every manifest                         | Task 3     | `package.json` `files`                                                                   | `npm pack --dry-run`: 21 = 21                                                        |
+| Installed users unaffected (names unchanged)             | Task 3     | marketplace `name`s                                                                      | check-repo, mod tests cswap 9 / night-city 21 / flows 43                             |
+| Other checkouts keep working after the pull (review fix) | final      | `scripts/plugin-dirs.mjs:14`                                                             | `scripts/plugin-dirs.test.mjs:31`                                                    |
+| Docs and glossary follow                                 | Tasks 0, 4 | `CLAUDE.md:15-35`, `GLOSSARY.md`                                                         | guards                                                                               |
