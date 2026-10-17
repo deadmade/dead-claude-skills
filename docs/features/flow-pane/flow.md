@@ -1,5 +1,5 @@
 ---
-phase: plan
+phase: evaluate
 ---
 
 # Flow pane: flow
@@ -14,7 +14,7 @@ phase: plan
 ## Artifacts
 
 - Spec: [spec.md](spec.md)
-- Plan:
+- Plan: [plan.md](plan.md)
 - ADRs:
 - CONTEXT.md:
 
