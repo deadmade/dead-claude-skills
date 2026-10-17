@@ -42,9 +42,9 @@ test("Onibi is night-city's mascot and notify's icon", () => {
   assert.deepEqual(
     OUTPUTS.map(({ file, scale }) => [rel(file), scale]),
     [
-      ['plugins/mods/night-city/assets/mascot.png', 1],
-      ['plugins/mods/night-city/assets/mascot-512.png', 8],
-      ['plugins/notify/icon.png', 6],
+      ['plugins/default/night-city/assets/mascot.png', 1],
+      ['plugins/default/night-city/assets/mascot-512.png', 8],
+      ['plugins/opt-in/notify/icon.png', 6],
     ],
   );
 });

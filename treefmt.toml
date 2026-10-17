@@ -2,19 +2,19 @@
 on-unmatched = "debug"
 # Vendored upstream files and the generated hook config: reformatting them would churn every sync.
 excludes = [
-  "plugins/hallmark/**",
-  "plugins/paper-lookup/skills/**",
-  "plugins/mattpocock-picks/**",
-  "plugins/pstack-picks/**",
-  "plugins/tob-picks/**",
-  "plugins/graphify/**",
-  "plugins/languages/*/library/**",
-  "plugins/languages/*/skills/**",
-  "plugins/languages/*/LICENSE",
-  "plugins/languages/*/UPSTREAM",
-  "plugins/database/*/skills/**",
-  "plugins/self-review/agents/**",
-  "plugins/self-review/skills/self-review/references/upstream/**",
+  "plugins/opt-in/hallmark/**",
+  "plugins/shared/paper-lookup/skills/**",
+  "plugins/shared/mattpocock-picks/**",
+  "plugins/shared/pstack-picks/**",
+  "plugins/shared/tob-picks/**",
+  "plugins/shared/graphify/**",
+  "plugins/opt-in/*-skills/library/**",
+  "plugins/opt-in/*-skills/skills/**",
+  "plugins/opt-in/*-skills/LICENSE",
+  "plugins/opt-in/*-skills/UPSTREAM",
+  "plugins/opt-in/postgres/skills/**",
+  "plugins/shared/self-review/agents/**",
+  "plugins/shared/self-review/skills/self-review/references/upstream/**",
   ".pre-commit-config.yaml",
 ]
 

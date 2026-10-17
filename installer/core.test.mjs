@@ -97,9 +97,9 @@ test('bundle ids resolve bare names to our marketplace', () => {
 });
 
 test('token plugins', () => {
-  assert.equal(needsToken(json('plugins/mcp/mcp-github/.claude-plugin/plugin.json')), true);
-  assert.equal(needsToken(json('plugins/mcp/mcp-azure/.claude-plugin/plugin.json')), true);
-  assert.equal(needsToken(json('plugins/graphify/.claude-plugin/plugin.json')), false);
+  assert.equal(needsToken(json('plugins/opt-in/mcp-github/.claude-plugin/plugin.json')), true);
+  assert.equal(needsToken(json('plugins/opt-in/mcp-azure/.claude-plugin/plugin.json')), true);
+  assert.equal(needsToken(json('plugins/shared/graphify/.claude-plugin/plugin.json')), false);
 });
 
 test('select installs, deselect uninstalls, token plugins hand off', () => {
@@ -390,7 +390,7 @@ test('web-mcp downloads its own archive, and each plugin is configured under its
   assert.equal(binAsset('web-mcp', 'linux', 'ia32', '1.0.0'), undefined);
   assert.deepEqual(BIN_PLUGINS['tui-review'], { name: 'brv', key: 'brvPath' });
   assert.deepEqual(BIN_PLUGINS['web-mcp'], { name: 'web-mcp', key: 'binPath' });
-  const dirs = { 'tui-review': 'plugins/mods/tui-review', 'web-mcp': 'plugins/mcp/web-mcp' };
+  const dirs = { 'tui-review': 'plugins/shared/tui-review', 'web-mcp': 'plugins/shared/web-mcp' };
   for (const [plugin, { key }] of Object.entries(BIN_PLUGINS))
     assert.ok(json(`${dirs[plugin]}/.claude-plugin/plugin.json`).userConfig[key], `${plugin} has userConfig ${key}`);
   assert.match(unavailable('web-mcp', 'linux', 'ia32', '1.0.0'), /no web-mcp build for linux-ia32/);
@@ -540,13 +540,13 @@ test('shippedVersions counts pinned url plugins and skips unpinned ones', () => 
 test('manifestPath finds a local plugin manifest, null for url sources and unknown names', () => {
   const m = {
     plugins: [
-      { name: 'rust-skills', source: './plugins/languages/rust-skills' },
+      { name: 'rust-skills', source: './plugins/opt-in/rust-skills' },
       { name: 'superpowers', source: { source: 'url' } },
     ],
   };
   assert.equal(
     manifestPath(m, 'rust-skills@dead-claude-skills'),
-    'plugins/languages/rust-skills/.claude-plugin/plugin.json',
+    'plugins/opt-in/rust-skills/.claude-plugin/plugin.json',
   );
   assert.equal(manifestPath(m, 'superpowers@dead-claude-skills'), null);
   assert.equal(manifestPath(m, 'nope@dead-claude-skills'), null);

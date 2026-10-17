@@ -20,9 +20,9 @@ jobs:
 
       - name: Sanity checks
         run: |
-          jq empty .claude-plugin/marketplace.json plugins/languages/rust-skills/.claude-plugin/plugin.json
-          grep -q '^paths:' plugins/languages/rust-skills/skills/rust-best-practices/SKILL.md
-          echo "sha=$(cat plugins/languages/rust-skills/UPSTREAM)" >> "$GITHUB_OUTPUT"
+          jq empty .claude-plugin/marketplace.json plugins/opt-in/rust-skills/.claude-plugin/plugin.json
+          grep -q '^paths:' plugins/opt-in/rust-skills/skills/rust-best-practices/SKILL.md
+          echo "sha=$(cat plugins/opt-in/rust-skills/UPSTREAM)" >> "$GITHUB_OUTPUT"
         id: check
 
       - name: Open pull request
@@ -37,4 +37,4 @@ jobs:
             https://github.com/apollographql/skills/commit/${{ steps.check.outputs.sha }}.
 
             cc @deadmade
-          add-paths: plugins/languages/rust-skills
+          add-paths: plugins/opt-in/rust-skills

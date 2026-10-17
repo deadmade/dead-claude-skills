@@ -7,7 +7,7 @@ import { ROOT, addPaths, fail, finish, git, sparseClone } from './sync-lib.mjs';
 const UPSTREAM_URL = 'https://github.com/apollographql/skills.git';
 const GLOBS = ['**/*.rs', '**/Cargo.toml', '**/Cargo.lock'];
 
-const PLUGIN = join(ROOT, 'plugins', 'languages', 'rust-skills');
+const PLUGIN = join(ROOT, 'plugins', 'opt-in', 'rust-skills');
 const DEST = join(PLUGIN, 'skills', 'rust-best-practices');
 
 const up = sparseClone(UPSTREAM_URL, ['skills/rust-best-practices']);

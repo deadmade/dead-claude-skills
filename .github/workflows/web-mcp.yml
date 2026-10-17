@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
       - 'crates/web-mcp/**'
-      - 'plugins/mcp/web-mcp/**'
+      - 'plugins/shared/web-mcp/**'
       - '.github/workflows/web-mcp.yml'
   workflow_dispatch:
 

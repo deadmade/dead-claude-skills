@@ -1,4 +1,4 @@
-// Vendor the review passes /self-review runs into plugins/self-review/, so none of the same-named upstream plugins
+// Vendor the review passes /self-review runs into plugins/shared/self-review/, so none of the same-named upstream plugins
 // (code-review, pr-review-toolkit, mattpocock's code-review) has to be installed:
 // - claude-plugins-official code-review's command → references/upstream/code-review.md (the bug pass)
 // - mattpocock/skills engineering/code-review → references/upstream/spec-standards-review.md (spec + standards)
@@ -19,7 +19,7 @@ const AGENTS = [
   'code-simplifier',
 ];
 
-const PLUGIN = join(ROOT, 'plugins', 'self-review');
+const PLUGIN = join(ROOT, 'plugins', 'shared', 'self-review');
 const AGENTS_DEST = join(PLUGIN, 'agents');
 const REFS_DEST = join(PLUGIN, 'skills', 'self-review', 'references', 'upstream');
 

@@ -1,7 +1,7 @@
 // Plugin folders as repo-relative `/` paths. A GROUPS folder holds plugins one level down and is not one itself.
 import { readdirSync } from 'node:fs';
 
-export const GROUPS = ['languages', 'database', 'mcp', 'mods'];
+export const GROUPS = ['default', 'shared', 'opt-in'];
 
 export function pluginDirs(root = '.') {
   const subdirs = (rel) =>

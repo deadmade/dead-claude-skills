@@ -6,7 +6,7 @@ Thumbs.db
 .direnv/
 .pre-commit-config.yaml
 target/
-plugins/mods/tui-review/tests/fixture.gen.ts
-plugins/*/.claude-plugin/types/
+plugins/shared/tui-review/tests/fixture.gen.ts
+plugins/**/.claude-plugin/types/
 node_modules/
 .superpowers/

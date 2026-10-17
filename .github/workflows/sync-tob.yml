@@ -51,9 +51,9 @@ jobs:
       - name: Sanity checks
         id: check
         run: |
-          jq empty .claude-plugin/marketplace.json plugins/tob-picks/.claude-plugin/plugin.json
-          test "$(find plugins/tob-picks/skills -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l)" -eq 4
-          echo "sha=$(cat plugins/tob-picks/UPSTREAM)" >> "$GITHUB_OUTPUT"
+          jq empty .claude-plugin/marketplace.json plugins/shared/tob-picks/.claude-plugin/plugin.json
+          test "$(find plugins/shared/tob-picks/skills -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l)" -eq 4
+          echo "sha=$(cat plugins/shared/tob-picks/UPSTREAM)" >> "$GITHUB_OUTPUT"
 
       - name: Open pull request
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
@@ -67,4 +67,4 @@ jobs:
             https://github.com/trailofbits/skills/commit/${{ steps.check.outputs.sha }}.
 
             cc @deadmade
-          add-paths: plugins/tob-picks
+          add-paths: plugins/shared/tob-picks

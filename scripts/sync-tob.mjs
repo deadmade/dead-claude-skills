@@ -1,4 +1,4 @@
-// Vendor a curated subset of Trail of Bits' skills (trailofbits/skills, one plugin per folder) into plugins/tob-picks/,
+// Vendor a curated subset of Trail of Bits' skills (trailofbits/skills, one plugin per folder) into plugins/shared/tob-picks/,
 // renaming upstream plugin namespaces to ours (REWRITES). Idempotent: same upstream commit, same output.
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
@@ -72,7 +72,7 @@ const REWRITES = [
   ['skills/property-based-testing/references/libraries.md', /\|invariant_"/g, '|invariant_|FsCheck|CsCheck"'],
 ];
 
-const PLUGIN = join(ROOT, 'plugins', 'tob-picks');
+const PLUGIN = join(ROOT, 'plugins', 'shared', 'tob-picks');
 
 const up = sparseClone(UPSTREAM_URL, ['.claude-plugin', ...SKILLS.map((s) => `plugins/${s}`)]);
 for (const s of SKILLS) {

@@ -1,4 +1,4 @@
-// Vendor graphify's Claude Code skill (bash variant + references/ sidecar) into plugins/graphify/skills/graphify/.
+// Vendor graphify's Claude Code skill (bash variant + references/ sidecar) into plugins/shared/graphify/skills/graphify/.
 // Upstream isn't a Claude Code plugin: `graphify install` copies these files into ~/.claude/skills. The plugin's
 // hooks/hooks.json is hand-written and not touched here. Idempotent: re-running against the same commit gives no diff.
 import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
@@ -17,7 +17,7 @@ const REFERENCES = [
   'update',
 ];
 
-const PLUGIN = join(ROOT, 'plugins', 'graphify');
+const PLUGIN = join(ROOT, 'plugins', 'shared', 'graphify');
 const DEST = join(PLUGIN, 'skills', 'graphify');
 
 const up = sparseClone(

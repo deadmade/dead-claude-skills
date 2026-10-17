@@ -10,7 +10,7 @@ import { pluginDirs as findPluginDirs } from './plugin-dirs.mjs';
 process.chdir(join(import.meta.dirname, '..'));
 
 const MARKETPLACE = '.claude-plugin/marketplace.json';
-const BUNDLE = 'plugins/dead-skills/.claude-plugin/plugin.json';
+const BUNDLE = 'plugins/default/dead-skills/.claude-plugin/plugin.json';
 const problems = [];
 const pluginDirs = findPluginDirs();
 

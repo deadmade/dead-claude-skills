@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
       - 'crates/brv/**'
-      - 'plugins/mods/tui-review/**'
+      - 'plugins/shared/tui-review/**'
       - '.github/workflows/tui-review.yml'
   workflow_dispatch:
 
@@ -47,10 +47,10 @@ jobs:
       - name: Mod fixture from brv gen
         run: |
           cargo run --release -- gen --out "$RUNNER_TEMP/brv-fixture" > /dev/null
-          node ../../plugins/mods/tui-review/tests/make-fixture.mjs "$RUNNER_TEMP/brv-fixture"
+          node ../../plugins/shared/tui-review/tests/make-fixture.mjs "$RUNNER_TEMP/brv-fixture"
 
       - name: Mod tests and speed budgets
-        working-directory: plugins/mods/tui-review
+        working-directory: plugins/shared/tui-review
         run: |
           npm install -g @anthropic-ai/claude-code
           claude plugin validate .
