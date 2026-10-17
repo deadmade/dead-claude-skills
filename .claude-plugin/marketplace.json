@@ -116,7 +116,7 @@
     },
     {
       "name": "feature-flow",
-      "description": "/feature-flow: brainstorm with prior art, grill with domain docs, plan, have Claude evaluate the plan, then execute and finish through superpowers. /research-flow does the same grounded in papers via paper-lookup, with a hypothesis measured before finishing. Two approval gates, no lock. A band above the prompt shows the current run's phase, gates and deviations; 1 resumes it from an idle prompt. Opt-in.",
+      "description": "/feature-flow: brainstorm with prior art, grill with domain docs, plan, have Claude evaluate the plan, then execute and finish through superpowers. /research-flow does the same grounded in papers (web-mcp's paper search, with paper-lookup as the fallback), with a hypothesis measured before finishing. Two approval gates, no lock. A band above the prompt shows the current run's phase, gates and deviations; 1 resumes it from an idle prompt. Opt-in.",
       "source": "./plugins/feature-flow",
       "category": "development"
     },
@@ -160,6 +160,12 @@
       "name": "tui-review",
       "description": "/tui-review: a fast, stacked-branch-aware diff pane beside the chat, so you can ask Claude about what you read. Needs the brv binary, which the installer downloads. Opt-in.",
       "source": "./plugins/tui-review",
+      "category": "development"
+    },
+    {
+      "name": "web-mcp",
+      "description": "Web research tools for Claude: search (self-hosted SearXNG, paper APIs and the archive, ranked with BM25), fetch (whole pages as markdown, optionally with images), browser (via agent-browser) and lookup (passive DNS, RDAP, certificate, Wayback, IP and vulnerability records). Everything is archived in .web/. Needs the web-mcp binary, which the installer downloads. Opt-in.",
+      "source": "./plugins/web-mcp",
       "category": "development"
     }
   ]

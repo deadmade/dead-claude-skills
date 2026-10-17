@@ -80,6 +80,7 @@
     packages = forAllSystems (system: let
       pkgs = nixpkgs.legacyPackages.${system};
       manifest = (pkgs.lib.importTOML ./plugins/tui-review/brv/Cargo.toml).package;
+      webMcp = (pkgs.lib.importTOML ./plugins/web-mcp/server/Cargo.toml).package;
     in {
       brv = pkgs.rustPlatform.buildRustPackage {
         pname = manifest.name;
@@ -91,6 +92,19 @@
         meta = {
           inherit (manifest) description;
           mainProgram = "brv";
+        };
+      };
+      # web-mcp, the web-mcp plugin's MCP server: `nix build .#web-mcp`.
+      web-mcp = pkgs.rustPlatform.buildRustPackage {
+        pname = webMcp.name;
+        inherit (webMcp) version;
+        src = ./plugins/web-mcp/server;
+        cargoLock.lockFile = ./plugins/web-mcp/server/Cargo.lock;
+        # Debug checks: the fetch tests' WEB_MCP_TEST_PUBLIC_IP hook exists only in debug builds or the `test-hooks` feature.
+        checkType = "debug";
+        meta = {
+          inherit (webMcp) description;
+          mainProgram = "web-mcp";
         };
       };
     });

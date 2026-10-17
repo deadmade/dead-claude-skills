@@ -33,10 +33,18 @@ function host(
       : { value: root ? { root, remote: null, internal: false } : null },
   );
   on('session.cwd', () => ({ value: cwd }));
+  // The engine resolves paths before the hooks see them: "/repo" becomes "D:\\repo" on Windows, and on Linux a
+  // Windows path ("C:\\...") lands under the cwd. Compare from the drive on, without it, with forward slashes.
+  const norm = (p: string) =>
+    p
+      .slice(Math.max(p.search(/[A-Za-z]:[\\/]/), 0))
+      .replace(/^[A-Za-z]:/, '')
+      .replace(/\\/g, '/');
+  const file = (p: string) => Object.entries(h.files).find(([k]) => norm(k) === norm(p))?.[1];
   on('fs.list', (_$, e) => {
-    const dir = `${e.path}/`;
+    const dir = `${norm(e.path)}/`;
     const names = new Map<string, string>();
-    for (const p of Object.keys(h.files)) {
+    for (const p of Object.keys(h.files).map(norm)) {
       if (!p.startsWith(dir)) continue;
       const [name, ...rest] = p.slice(dir.length).split('/');
       names.set(name!, rest.length ? 'dir' : 'file');
@@ -47,22 +55,19 @@ function host(
         name,
         kind,
         size: 0,
-        mtimeMs: kind === 'file' ? h.files[dir + name]!.mtimeMs : 0,
+        mtimeMs: kind === 'file' ? file(dir + name)!.mtimeMs : 0,
         isLink: false,
       })),
     } as never;
   });
-  // On Linux the engine resolves a Windows path ("C:\\...") against the cwd; the files are keyed by the path as written.
-  const keyOf = (p: string) => p.slice(Math.max(p.indexOf('C:\\'), 0));
   on('fs.read', (_$, e) => {
-    const text = h.files[keyOf(e.path)]?.text;
+    const text = file(e.path)?.text;
     return typeof text === 'string' ? { value: text } : { deny: 'EACCES' };
   });
-  on('fs.stat', (_$, e) =>
-    h.files[keyOf(e.path)]
-      ? ({ value: { kind: 'file', size: 0, mtimeMs: h.files[keyOf(e.path)]!.mtimeMs } } as never)
-      : { deny: 'ENOENT' },
-  );
+  on('fs.stat', (_$, e) => {
+    const f = file(e.path);
+    return f ? ({ value: { kind: 'file', size: 0, mtimeMs: f.mtimeMs } } as never) : { deny: 'ENOENT' };
+  });
   on('command.list', () => ({ value: COMMANDS }) as never);
   on('command.run', (_$, e) => {
     runs.push({ command: e.command, args: e.args });
