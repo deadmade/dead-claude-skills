@@ -47,6 +47,7 @@ import {
   marketplaceArg,
   missingBinaries,
   agentBrowserAction,
+  agentBrowserAsset,
   agentBrowserVersion,
   nameOf,
   manifestPath,
@@ -275,39 +276,6 @@ async function applyCswap(on) {
   else failures.push(`cswap: couldn't add ${dl.dir} to PATH; add it by hand`);
 }
 
-// web-mcp's `browser` tool drives the npm CLI agent-browser, pinned in installer/agent-browser.json. Asks first; every
-// failure is a summary line. Linux's --with-deps runs sudo, so it has its own prompt (default no).
-async function applyAgentBrowser() {
-  const pinned = readJson(join(PKG, 'installer', 'agent-browser.json')).upstream;
-  // The pin goes into a shell string on Windows (npm's .cmd shim), so it must be a plain version.
-  if (!/^\d+\.\d+\.\d+$/.test(pinned)) return failures.push(`agent-browser: bad pin ${JSON.stringify(pinned)}`);
-  const have = onPath('agent-browser')
-    ? spawnSync('agent-browser', ['--version'], { encoding: 'utf8', shell: WIN })
-    : undefined;
-  const installed = have?.status === 0 ? agentBrowserVersion(have.stdout) : undefined;
-  const action = agentBrowserAction({ installed, pinned });
-  if (action === 'skip') return;
-  const what = action === 'install' ? 'Install' : `Upgrade ${installed} to`;
-  if (!(await ask(`${what} agent-browser ${pinned} (npm -g, then its browser download)?`, true)))
-    return done.push('agent-browser: install skipped by you');
-  const deps =
-    process.platform === 'linux' &&
-    (await ask('Also install the browser system packages (agent-browser install --with-deps, runs sudo)?', false));
-  const steps = [
-    ['npm', ['install', '-g', `agent-browser@${pinned}`]],
-    ['agent-browser', deps ? ['install', '--with-deps'] : ['install']],
-  ];
-  for (const [bin, args] of steps) {
-    log('info', `Running ${bin} ${args.join(' ')}`);
-    const r = spawnSync(bin, args, { stdio: 'inherit', shell: WIN });
-    if (r.status !== 0)
-      return failures.push(
-        `agent-browser: \`${bin} ${args.join(' ')}\` failed (${r.error?.code ?? `exit ${r.status}`})`,
-      );
-  }
-  done.push(`agent-browser: ${action === 'install' ? 'installed' : 'upgraded to'} ${pinned}`);
-}
-
 // --- tui-review and web-mcp, the binaries of tui-review and web-mcp ---------------------------------------------------------
 const TUI_REVIEW = `tui-review@${MARKETPLACE}`;
 const WEB_MCP = `web-mcp@${MARKETPLACE}`;
@@ -328,27 +296,41 @@ async function fetchOk(url) {
 }
 
 // Downloads the release archive, checks it against its .sha256, and puts the binary at `bin` in one rename.
+// asset.digest: a pinned checksum instead of the .sha256 file; asset.raw: the download is the binary itself.
 async function downloadBin(name, asset, bin) {
-  const [archive, sum] = await Promise.all([
+  const [archive, want] = await Promise.all([
     fetchOk(asset.url).then((r) => r.arrayBuffer()),
-    fetchOk(asset.sha256).then((r) => r.text()),
+    asset.digest ??
+      fetchOk(asset.sha256)
+        .then((r) => r.text())
+        .then(sha256Of),
   ]);
   const bytes = Buffer.from(archive);
-  if (sha256Of(sum) !== createHash('sha256').update(bytes).digest('hex'))
+  if (want !== createHash('sha256').update(bytes).digest('hex'))
     throw new Error(`${asset.file}: checksum mismatch`);
   const tmp = mkdtempSync(join(tmpdir(), `${name}-`));
   try {
     const file = join(tmp, asset.file);
     writeFileSync(file, bytes);
-    // GNU tar on Linux, bsdtar on Windows 10+, which reads the zip too.
-    const r = spawnSync('tar', ['-xf', file, '-C', tmp], { encoding: 'utf8' });
-    if (r.status !== 0)
-      throw new Error(`could not unpack ${asset.file}: ${(r.stderr || r.error?.message || '').trim()}`);
+    if (!asset.raw) {
+      // GNU tar on Linux, bsdtar on Windows 10+, which reads the zip too.
+      const r = spawnSync('tar', ['-xf', file, '-C', tmp], { encoding: 'utf8' });
+      if (r.status !== 0)
+        throw new Error(`could not unpack ${asset.file}: ${(r.stderr || r.error?.message || '').trim()}`);
+    }
     mkdirSync(BIN_DIR, { recursive: true });
     const staged = `${bin}.tmp-${process.pid}`;
-    cpSync(join(tmp, asset.exe), staged);
+    cpSync(asset.raw ? file : join(tmp, asset.exe), staged);
     chmodSync(staged, 0o755);
+    // Windows can rename a running exe (agent-browser's daemon, a live web-mcp) but not replace it: move it aside first.
+    const old = `${bin}.old-${process.pid}`;
+    if (WIN && existsSync(bin)) renameSync(bin, old);
     renameSync(staged, bin);
+    try {
+      rmSync(old, { force: true });
+    } catch {
+      /* still running: left beside it */
+    }
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
@@ -385,6 +367,49 @@ async function applyBin(pluginName, plugin) {
     failures.push(
       `${pluginName}: could not set ${key} (${r.err}); set it to ${bin} with /plugin configure ${pluginName}`,
     );
+}
+
+// web-mcp's `browser` tool drives agent-browser. A current one on PATH is used as is; otherwise upstream's release
+// binary for the version pinned in installer/agent-browser.json goes to ~/.claude/bin and web-mcp's agentBrowserPath
+// points at it. Asks first; every failure is a summary line. Linux's --with-deps runs sudo, so it has its own prompt.
+async function applyAgentBrowser() {
+  const pin = readJson(join(PKG, 'installer', 'agent-browser.json'));
+  const pinned = pin.upstream;
+  // npm's .cmd shim on Windows needs a shell; our own binary doesn't.
+  const versionOf = (bin, shell) => {
+    const r = spawnSync(bin, ['--version'], { encoding: 'utf8', shell });
+    return r.status === 0 ? agentBrowserVersion(r.stdout) : undefined;
+  };
+  const theirs = onPath('agent-browser') ? versionOf('agent-browser', WIN) : undefined;
+  if (theirs && agentBrowserAction({ installed: theirs, pinned }) === 'skip') return;
+  const asset = agentBrowserAsset(process.platform, process.arch, pin);
+  if (!asset)
+    return failures.push(`agent-browser: no pinned ${pinned} build for ${process.platform}-${process.arch}`);
+  const bin = join(BIN_DIR, asset.exe);
+  const installed = versionOf(bin, false);
+  const action = agentBrowserAction({ installed, pinned });
+  if (action !== 'skip') {
+    const what = action === 'install' ? 'Download' : `Upgrade ${installed} to`;
+    if (!(await ask(`${what} agent-browser ${pinned} (upstream's release binary) to ${bin}, then its browser?`, true)))
+      return done.push('agent-browser: install skipped by you');
+    const deps =
+      process.platform === 'linux' &&
+      (await ask('Also install the browser system packages (agent-browser install --with-deps, runs sudo)?', false));
+    const r = await progress(`Downloading agent-browser ${pinned}`, async () => {
+      await downloadBin('agent-browser', asset, bin);
+      return { ok: true };
+    });
+    if (!r.ok) return failures.push(`agent-browser ${pinned}: ${r.err}`);
+    done.push(`agent-browser: ${action === 'install' ? 'installed' : 'upgraded to'} ${pinned} at ${bin}`);
+    const args = deps ? ['install', '--with-deps'] : ['install'];
+    log('info', `Running agent-browser ${args.join(' ')}`);
+    const run = spawnSync(bin, args, { stdio: 'inherit' });
+    if (run.status !== 0)
+      failures.push(`agent-browser: \`${bin} ${args.join(' ')}\` failed (${run.error?.code ?? `exit ${run.status}`})`);
+  }
+  const r = await claude(JSON.stringify({ agentBrowserPath: bin }), 'plugin', 'configure', WEB_MCP, '--values-stdin');
+  if (r.ok) done.push(`web-mcp: agentBrowserPath is ${bin}`);
+  else failures.push(`web-mcp: could not set agentBrowserPath (${r.err}); set it to ${bin} with /plugin configure web-mcp`);
 }
 
 // SearXNG in Docker for web-mcp's search. True when it answers JSON on 127.0.0.1:8888 within 30 s. Every failure is a

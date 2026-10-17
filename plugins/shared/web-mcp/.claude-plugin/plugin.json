@@ -13,6 +13,12 @@
       "title": "web-mcp binary",
       "description": "Path to the web-mcp binary. Default: web-mcp on PATH.",
       "default": "web-mcp"
+    },
+    "agentBrowserPath": {
+      "type": "string",
+      "title": "agent-browser binary",
+      "description": "Path to the agent-browser binary. Default: agent-browser on PATH.",
+      "default": "agent-browser"
     }
   }
 }
