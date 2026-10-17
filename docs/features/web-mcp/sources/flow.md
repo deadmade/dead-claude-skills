@@ -1,5 +1,5 @@
 ---
-phase: execute
+phase: finish
 ---
 
 # web-mcp optional search sources: flow
@@ -213,7 +213,56 @@ implement round 1 as decided:
 
 ## Deviations
 
+Rulings the controller made during execution (2026-10-17). The full ledger was in the git-ignored SDD workspace.
+
+- **R1:** the search filter enters the archived JSON and the file-name hash only when it is set, so unfiltered
+  archive files stay byte-identical.
+- **R2:** the user's SearXNG wasn't reachable from the sandbox.
+  - `/config` is parsed per SearXNG master's `webapp.py`.
+  - `installer/searxng.yml` is unchanged.
+  - The README says how to enable a disabled engine by hand.
+  - **Still to confirm against the real instance.**
+- **R3:** `bad_since_is_rejected` asserts rmcp 3.5.1's real behaviour. A bad `since` comes back as an `isError` tool
+  result, not the plan's JSON-RPC -32602 error.
+- **R4/R5:** lookup has its own 30k cut. It cuts at the last line break within the 1,000 characters before the limit,
+  or else at the limit, so a large JSON record still shows its start. `Failed:` lines come before the records.
+  `fetch::truncate` is unchanged.
+- **R6:** the KEV feed uses the spec's 8 s per-attempt deadline. The implementer had used 20 s.
+- **R7:** the final fix wave covered:
+  - the test-dir collision behind the `Archive::open` flake;
+  - the timing of the rank merge test (both flakes predate the branch);
+  - the wayback `..`/`%2e%2e` path escape;
+  - a KEV feed without a `vulnerabilities` array, now a load error;
+  - pretty-printed `ip` output;
+  - record types in the DoH sections;
+  - a bing-fallback test;
+  - a README note on worst-case lookup time.
+- **Open, for the user (spec goal 5 gap):** non-2xx source replies are named in the answer, but their bodies are not
+  archived in any kind.
+- **Not verified here:**
+  - the `examples/h4.rs` one-line edit, because the h4 crates aren't cached (needs a local
+    `cargo build --features h4 --examples`);
+  - NVD's real rate limit (6 s spacing, unverified);
+  - every source against the live service; all tests use stubs.
+
 ## Walkthrough
 
 | spec goal | plan task | file:line | test |
 | --------- | --------- | --------- | ---- |
+| 1 filters on `search` | 1, 2 | `server/src/search.rs:196` (check), `:250` (keep), `:397` (web), `:479` | `tests/search.rs:304` `filtered_search_with_no_results_says_so`, `search::tests::keeps_only_asked_engines` |
+| 2 `lookup` tool | 4 | `server/src/tools.rs:384`, `server/src/lookup/mod.rs:162` | `tests/mcp.rs:7` `lists_four_tools` |
+| 2 dns | 4 | `server/src/lookup/dns.rs:29` | `tests/lookup.rs:28` |
+| 2 whois | 5 | `server/src/lookup/rdap.rs:183` | `tests/lookup.rs:187` `whois_follows_registry_redirect` |
+| 2 certs | 6 | `server/src/lookup/certs.rs:15` | `tests/lookup.rs:400` `certs_502_twice_is_a_named_failure` |
+| 2 wayback | 7 | `server/src/lookup/wayback.rs:20`, `:66` | `tests/lookup.rs:442`, `:490` |
+| 2 ip | 8 | `server/src/lookup/ip.rs:37` | `tests/lookup.rs:622` `ip_refuses_private_and_reserved` |
+| 2 vuln | 9 | `server/src/lookup/vuln.rs:67` | `tests/lookup.rs:701` `cve_has_osv_epss_and_kev`, `:758` |
+| 3 records, cut at 30k | 4 | `server/src/lookup/mod.rs:99` (render), `:150` (cut) | `lookup::tests::long_output_is_cut_with_pointer` (`mod.rs:221`) |
+| 4 source lines, cite | 4 | `server/src/lookup/mod.rs:99`, `server/src/tools.rs:384` | `tests/mcp.rs:7` (description contains `cite`) |
+| 5 archive in `.web/lookups/` | 4 | `server/src/archive.rs:328` | `archive::tests::put_lookup_writes_pretty_json_and_index_line` (`archive.rs:762`) |
+| 6 etiquette (deadline, retry, redirects, UA, NVD 6 s) | 3, 9 | `server/src/api.rs:101`, `server/src/limits.rs` | `api::tests::*`, `tests/lookup.rs:187` |
+| 7 stub tests per failure mode | 1–9 | `server/tests/lookup.rs`, `server/tests/search.rs` | all of the above |
+| 8 docs | 2, 10 | `plugins/web-mcp/README.md`, `CLAUDE.md`, `plugin.json`, `marketplace.json` | `npm test` (check-repo) |
+
+Paths are relative to `plugins/web-mcp/`. Final checks on 6ac55a5: `cargo test` (all suites, 0 failed), `cargo clippy
+--all-targets -- -D warnings` (clean), `npm test` (123/123).
