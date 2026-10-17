@@ -48,6 +48,9 @@ import {
   outdated,
   shippedVersions,
   manifestPath,
+  INCLUDED,
+  idOf,
+  withDependencies,
 } from './core.mjs';
 
 const json = (p) => JSON.parse(readFileSync(new URL(`../${p}`, import.meta.url), 'utf8'));
@@ -64,7 +67,7 @@ test('opt-ins from the real manifests', () => {
         'atlassian',
         'csharp-skills',
         'cswap',
-        'feature-flow',
+        'flows',
         'graphify',
         'hallmark',
         'mattpocock-picks',
@@ -409,13 +412,36 @@ test('brv checksum lines and what to do about brv', () => {
   assert.equal(at({ supported: false }), 'unsupported');
 });
 
-test('every opt-in and toggle is on exactly one page', () => {
+test('every opt-in and toggle is on exactly one page, except the INCLUDED ones on none', () => {
   const keys = [...optIns(marketplace, bundle), ...TOGGLES];
   const pages = categorize(keys);
-  assert.deepEqual(pages.flatMap((p) => p.keys).sort(), [...keys].sort());
+  const shown = keys.filter((k) => !INCLUDED.includes(k.split('@')[0]));
+  assert.deepEqual(pages.flatMap((p) => p.keys).sort(), shown.sort());
   assert.ok(!pages.some((p) => p.id === 'other'), 'every real opt-in has a category');
   const listed = CATEGORIES.flatMap((c) => c.keys);
   assert.equal(new Set(listed).size, listed.length);
+});
+
+test('withDependencies adds opt-in dependencies transitively, once, and nothing for unselected plugins', () => {
+  const deps = { a: ['b', 'bundled'], b: ['c', 'a'], x: ['y'] };
+  const opts = ['a', 'b', 'c', 'x', 'y'];
+  assert.deepEqual(
+    withDependencies(['a'], (id) => deps[id], opts),
+    ['a', 'b', 'c'],
+  );
+  assert.deepEqual(
+    withDependencies([], (id) => deps[id], opts),
+    [],
+  );
+});
+
+test('flows brings every INCLUDED plugin, and its dependencies are marketplace or official plugins', () => {
+  const flows = json('plugins/flows/.claude-plugin/plugin.json').dependencies.map(idOf);
+  for (const n of INCLUDED) assert.ok(flows.includes(`${n}@${M}`), `${n} comes with flows`);
+  for (const id of flows) {
+    const [name, from] = id.split('@');
+    assert.ok(from === O || marketplace.plugins.some((p) => p.name === name), id);
+  }
 });
 
 test('an uncategorized plugin lands in Other, empty pages are dropped', () => {

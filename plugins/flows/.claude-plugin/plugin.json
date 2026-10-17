@@ -1,0 +1,25 @@
+{
+  "name": "flows",
+  "version": "0.3.0",
+  "description": "Conductor skills: each runs the skills this marketplace ships, in order, with approval gates and a state file to resume from. Build (/feature-flow, /research-flow, /implement, /fix-flow, /upgrade), check (/test-audit, /doc-audit, /harden, /verify), understand (/understand) and keep the lessons (/learn). Installing it installs every plugin its conductors use.",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "repository": "https://github.com/deadmade/dead-claude-skills",
+  "dependencies": [
+    "claude-md-management@claude-plugins-official",
+    "claude-security@claude-plugins-official",
+    "graphify",
+    "mattpocock-picks",
+    "mcp-basic",
+    "paper-lookup",
+    "ponytail",
+    "pstack-picks",
+    "self-review",
+    "superpowers",
+    "tob-picks",
+    "tui-review",
+    "web-mcp"
+  ]
+}

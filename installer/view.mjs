@@ -1,6 +1,6 @@
 // The installer's screens as pure functions: state + data in, next state or lines to draw out. ui.mjs runs them.
 import { stripVTControlCharacters, styleText } from 'node:util';
-import { HINTS, TOGGLES, nameOf } from './core.mjs';
+import { HINTS, TOGGLES, nameOf, withDependencies } from './core.mjs';
 
 const width = (s) => stripVTControlCharacters(s).length;
 const DANGER = ['strip-defaults', 'clean'];
@@ -57,9 +57,17 @@ export function changeList(s, data) {
   const diff = (k) => !!s.chosen[k] !== !!data.current[k];
   const plugin = (k) => !TOGGLES.includes(k);
   const toggle = (k) => TOGGLES.includes(k) && !DANGER.includes(k);
+  // data.deps: { id: dependency ids }. Dependencies of a chosen plugin are installed whatever their own row says.
+  const deps = data.deps ?? {};
+  const all = [...new Set([...keys.filter(plugin), ...Object.keys(deps), ...Object.values(deps).flat()])];
+  const wanted = withDependencies(
+    keys.filter((k) => plugin(k) && s.chosen[k]),
+    (k) => deps[k],
+    all,
+  );
   const r = {
-    install: keys.filter((k) => plugin(k) && diff(k) && s.chosen[k]),
-    remove: keys.filter((k) => plugin(k) && diff(k) && !s.chosen[k]),
+    install: all.filter((k) => wanted.includes(k) && !data.current[k]),
+    remove: all.filter((k) => !wanted.includes(k) && data.current[k]),
     on: keys.filter((k) => toggle(k) && diff(k) && s.chosen[k]),
     off: keys.filter((k) => toggle(k) && diff(k) && !s.chosen[k]),
     danger: keys.filter((k) => DANGER.includes(k) && s.chosen[k] && !data.current[k]),

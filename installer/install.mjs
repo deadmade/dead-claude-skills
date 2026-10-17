@@ -65,6 +65,9 @@ import {
   shippedVersions,
   stripDefaults,
   unavailable,
+  INCLUDED,
+  idOf,
+  withDependencies,
 } from './core.mjs';
 import { backup, clearTargets, writeAtomic, writeSearxng } from './files.mjs';
 import { confirm, line, log, note, progress, screen } from './ui.mjs';
@@ -521,6 +524,13 @@ const tokenPlugins = opts.filter((id) => {
   return needsToken((path && tryJson(join(PKG, path))) || {});
 });
 const BUNDLE_ID = `${BUNDLE}@${MARKETPLACE}`;
+const FLOWS = `flows@${MARKETPLACE}`;
+// Each opt-in's dependencies that are opt-ins too; bundle plugins are installed anyway.
+const depsOf = (id) => {
+  const path = manifestPath(manifest, id);
+  return ((path && tryJson(join(PKG, path))?.dependencies) || []).map(idOf).filter((d) => opts.includes(d));
+};
+const deps = Object.fromEntries(opts.map((id) => [id, depsOf(id)]).filter(([, d]) => d.length));
 const managed = [...bundleIds(bundle), ...opts];
 
 const installedIds = rows.map((pl) => pl.id);
@@ -542,6 +552,8 @@ const chosen = {
   ...current,
   'strip-defaults': FLAGS.includes('--strip-defaults') || current['strip-defaults'],
   clean: FLAGS.includes('--clean'),
+  // flows replaced feature-flow and brings the picks: a machine that had either keeps them.
+  [FLOWS]: current[FLOWS] || has(`feature-flow@${MARKETPLACE}`) || INCLUDED.some(has),
   // On by default where offered, until web-mcp is installed; then it keeps the user's choice. It does nothing unless
   // web-mcp is selected and SearXNG answers.
   'web-builtins-off': has(WEB_MCP)
@@ -561,6 +573,10 @@ function option(key) {
   const notes = [
     tokenPlugins.includes(key) && 'token entered in Claude Code',
     key.endsWith(`@${OFFICIAL}`) && `from ${OFFICIAL}`,
+    deps[key] && `brings ${deps[key].length} plugins`,
+    ...Object.keys(deps)
+      .filter((p) => deps[p].includes(key))
+      .map((p) => `comes with ${nameOf(p)}`),
   ].filter(Boolean);
   const detail = [HINTS[name] ?? describe[name] ?? '', ...notes].filter(Boolean).join(' · ');
   return { label: name, detail };
@@ -580,6 +596,7 @@ const data = {
   versions: Object.fromEntries(opts.flatMap((k) => (rowOf(k)?.version ? [[k, rowOf(k).version]] : []))),
   disabled: Object.fromEntries(opts.flatMap((k) => (rowOf(k)?.enabled === false ? [[k, true]] : []))),
   tokens: tokenPlugins,
+  deps,
   describe: option,
   updates: outdated(rows, shipped),
   core: `${BUNDLE} + ${bundle.dependencies.length}, always installed`,
@@ -654,7 +671,12 @@ const foreignMarkets = strip ? foreignMarketplaces(marketplaces.map((m) => m.nam
 for (const name of foreignMarkets)
   await run(`Removing marketplace ${name}`, `removed marketplace ${name}`, 'plugin', 'marketplace', 'remove', name);
 
-const selected = [BUNDLE_ID, ...opts.filter(on)];
+// INCLUDED plugins have no row: only a chosen plugin's dependencies select them.
+const selected = withDependencies(
+  [BUNDLE_ID, ...opts.filter((id) => on(id) && !INCLUDED.includes(nameOf(id)))],
+  (id) => deps[id],
+  opts,
+);
 const plan = planPlugins(
   selected,
   installedIds.filter((id) => [BUNDLE_ID, ...opts].includes(id)),

@@ -10,41 +10,31 @@ argument-hint: 'What do you want to build?'
 One entry point that runs the skills this marketplace already ships, in order, and stops at two gates for the user.
 Claude proposes and recommends; the user decides.
 
-| Phase        | Runs                                                               | Output                                       |
-| ------------ | ------------------------------------------------------------------ | -------------------------------------------- |
-| 1 Ground     | pstack `how` or Explore agents, a prior-art agent                  | grounding notes, prior-art report            |
-| 2 Brainstorm | superpowers `brainstorming`                                        | spec                                         |
-| 3 Grill      | mattpocock `grilling` + `domain-modeling`                          | sharper spec, `CONTEXT.md`, ADRs. **Gate 1** |
-| 4 Plan       | superpowers `writing-plans`                                        | plan                                         |
-| 5 Evaluate   | reviewer subagents per plan-review.md                              | revised plan. **Gate 2**                     |
-| 6 Execute    | superpowers `subagent-driven-development` or `executing-plans`     | code, tests                                  |
-| 7 Finish     | `verification-before-completion`, `finishing-a-development-branch` | walkthrough, branch handled                  |
+| Phase        | Runs                                                           | Output                                       |
+| ------------ | -------------------------------------------------------------- | -------------------------------------------- |
+| 1 Ground     | pstack `how` or Explore agents, a prior-art agent              | grounding notes, prior-art report            |
+| 2 Brainstorm | superpowers `brainstorming`                                    | spec                                         |
+| 3 Grill      | mattpocock `grilling` + `domain-modeling`                      | sharper spec, `CONTEXT.md`, ADRs. **Gate 1** |
+| 4 Plan       | superpowers `writing-plans`                                    | plan                                         |
+| 5 Evaluate   | reviewer subagents per plan-review.md                          | revised plan. **Gate 2**                     |
+| 6 Execute    | superpowers `subagent-driven-development` or `executing-plans` | code, tests                                  |
+| 7 Finish     | `/verify`, then `/learn`                                       | walkthrough, branch handled, lessons kept    |
 
 ## Rules for the whole run
 
-- Open a todo list with one entry per phase. After every phase update `docs/features/<slug>/flow.md` (`phase:` in
-  its frontmatter, links to every artifact). It is how the next session resumes.
-- **This skill overrides the handoffs of the skills it runs.** When a sub-skill says to invoke the next skill
-  (`brainstorming` → `writing-plans`, `writing-plans` → execution, execution → `finishing-a-development-branch`),
-  don't: come back here and run the next phase.
-- **Gates:** nothing is planned before Gate 1 and nothing is built before Gate 2. A gate passes only on the user's
-  explicit approval of the artifact it names, recorded with the date in flow.md. "Sounds good" to an idea isn't
-  approval of a document.
-- The user may skip a phase by saying so ("skip grilling"); record it in flow.md. Never skip one on your own, and
-  never skip a gate.
-- Options always come with a recommendation and its reason. Every claim about another project or a library cites a
-  source fetched in this session (rules in [references/prior-art.md](references/prior-art.md)).
-- A missing skill: say which plugin provides it (superpowers, mattpocock-picks, pstack-picks) and use the fallback
-  named in that phase. pstack skills can't be loaded with the Skill tool; read
-  `${CLAUDE_SKILL_DIR}/../../../../pstack-picks/*/skills/<name>/SKILL.md` and follow it.
-- Commit or push only when the user asks, unless a sub-skill's own step does it with the user's agreement.
+[flow-rules.md](../../references/flow-rules.md) applies: read it first. Only this differs:
+
+- After every phase update `docs/features/<slug>/flow.md` (`flow: feature`, `phase:`).
+- Nothing is planned before Gate 1 and nothing is built before Gate 2.
+- Every claim about another project or a library cites a source fetched in this session (rules in
+  [references/prior-art.md](references/prior-art.md)).
 
 ## Start or resume
 
 - **With an argument:** derive a kebab-case slug (`checkout-webhooks`), create `docs/features/<slug>/flow.md` from
   [references/flow-template.md](references/flow-template.md), then Phase 1.
-- **Without one:** find `docs/features/*/flow.md` files whose `phase:` isn't `done`, skipping those with
-  `flow: research` (they belong to `/research-flow`). One: read it and the artifacts
+- **Without one:** find `docs/features/*/flow.md` files whose `phase:` isn't `done` and whose `flow:` is `feature` or
+  missing (other values belong to other conductors). One: read it and the artifacts
   it links, then continue at its phase. Several: ask which. None: ask what to build.
 
 ## Phase 1: Ground
@@ -124,8 +114,8 @@ needs their approval of that change before work continues. Private helpers and l
 
 ## Phase 7: Verify and finish
 
-1. Invoke superpowers `verification-before-completion`: run the tests and checks, read their output.
-2. Walkthrough table in flow.md: every spec goal → plan task → `file:line` → test. A goal with no code, or code with
+1. Walkthrough table in flow.md: every spec goal → plan task → `file:line` → test. A goal with no code, or code with
    no goal, is a deviation: report it.
-3. If execution ran natively (no per-task reviews), offer `/code-review` or pstack `interrogate` on the branch.
-4. Invoke superpowers `finishing-a-development-branch` and let the user choose how to integrate. Set `phase: done`.
+2. Run `/verify` (read `${CLAUDE_SKILL_DIR}/../verify/SKILL.md`) on the branch, with the spec as its intent. If
+   execution ran natively (no per-task reviews), tell it so: it then also offers pstack `interrogate`.
+3. Run `/learn` (`${CLAUDE_SKILL_DIR}/../learn/SKILL.md`) on this flow. Set `phase: done`.

@@ -43,6 +43,14 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   script, async. Logic and tests in `hooks/lib.mjs`; Linux talks D-Bus via `busctl`, Windows runs an inline PowerShell
   WinRT toast, focus comes from tmux. With notify the installer sets `preferredNotifChannel: "notifications_disabled"`.
 - `plugins/dead-skills/`: the default bundle; its `dependencies` are the core plugins.
+- `plugins/flows/`: the conductor skills (`/feature-flow`, `/research-flow`, `/implement`, `/fix-flow`, `/upgrade`,
+  `/test-audit`, `/doc-audit`, `/harden`, `/verify`, `/understand`, `/learn`). Each runs other plugins' skills in order;
+  the rules they share (state files, gates, loading `disable-model-invocation` skills by path, fallbacks per missing
+  plugin, audit scope and report format) live once in `references/flow-rules.md`, so a SKILL.md only says what it runs.
+  Conductors call each other by reading the callee's SKILL.md (`/fix-flow` → `/verify` → `/doc-audit branch`). Each
+  conductor's `uses.json` lists what it runs; `scripts/flows-uses.mjs` generates flows' `dependencies` and the README
+  tree from them, and check-repo fails when a listed skill is gone or the generated parts are stale. The installer
+  hides `INCLUDED` plugins (`installer/core.mjs`): they arrive only as flows' dependencies (`withDependencies`).
 - `scripts/`: `check-repo.mjs` (marketplace/bundle/version consistency), `release.mjs`, `sync-*.mjs` (vendoring),
   `sync-plugins.mjs` (re-pins url-sourced plugins), `draw-mascot.mjs` (Onibi, night-city's pixel-art mascot, also notify's `icon.png`).
 

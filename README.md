@@ -13,6 +13,10 @@ like hallmark, paper-lookup, self-review, graphify and the mattpocock/pstack/Tra
 desktop notifications when a turn ends, [web-mcp](plugins/web-mcp/README.md) for web search, page fetching,
 passive lookups and a browser with an archive of everything it pulled, and [night-city](plugins/night-city/README.md), a toned-down synthwave theme.
 
+The opt-in [flows](plugins/flows/README.md) plugin ties the rest together: conductor skills (`/feature-flow`,
+`/fix-flow`, `/test-audit`, `/doc-audit`, `/verify`, `/learn` and more) that run the other plugins' skills in order,
+with approval gates and a state file to resume from. Picking flows installs every plugin its conductors use.
+
     npx --allow-git=root github:deadmade/dead-claude-skills#semver:*
 
 The installer (Node standard library only) shows one page per category where you pick what to install, remove or
