@@ -1,5 +1,5 @@
 ---
-phase: finish
+phase: done
 ---
 
 # Flow pane: flow
@@ -156,3 +156,5 @@ fixed and re-reviewed.
 Not verifiable here, needs a live session: the engine's real name for the skill command (tests fake
 `feature-flow:feature-flow`; the lookup also accepts any command whose `plugin` is `feature-flow`), and that a bare
 `1` in an empty prompt presses the band's Button in a real terminal.
+
+Finish (2026-10-17): the user chose "push and create a PR" (option 2): https://github.com/deadmade/dead-claude-skills/pull/46.
