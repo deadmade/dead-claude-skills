@@ -34,11 +34,11 @@ jobs:
         run: npm test
 
       - name: cswap mod tests
-        working-directory: plugins/mods/cswap
+        working-directory: plugins/opt-in/cswap
         run: claude plugin test .
 
-      - name: night-city mod tests
-        working-directory: plugins/mods/night-city
+      - name: dead-skills mod tests
+        working-directory: plugins/default
         run: claude plugin test .
 
       - name: flows mod tests
@@ -46,5 +46,5 @@ jobs:
         run: claude plugin test .
 
       - name: md-pane mod tests
-        working-directory: plugins/mods/md-pane
+        working-directory: plugins/opt-in/md-pane
         run: claude plugin test .

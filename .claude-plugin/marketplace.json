@@ -13,8 +13,8 @@
   "plugins": [
     {
       "name": "dead-skills",
-      "description": "Default bundle: global instructions, and pulls in the core plugins of this marketplace as dependencies.",
-      "source": "./plugins/dead-skills",
+      "description": "Default bundle: global instructions, the Night City theme and mod (spinner words, status-line reactions, Onibi dropping by), desktop notifications, Context7, and the core plugins of this marketplace as dependencies.",
+      "source": "./plugins/default",
       "category": "productivity"
     },
     {
@@ -42,25 +42,19 @@
     {
       "name": "nix-lsp",
       "description": "Nix language server (nixd) for code intelligence (requires nixd on PATH)",
-      "source": "./plugins/nix-lsp",
+      "source": "./plugins/opt-in/implementation/nix-lsp",
       "category": "development"
-    },
-    {
-      "name": "mcp-basic",
-      "description": "Basic MCP servers for every machine: Context7 (up-to-date library docs).",
-      "source": "./plugins/mcp/mcp-basic",
-      "category": "productivity"
     },
     {
       "name": "mcp-github",
       "description": "GitHub's hosted MCP server (repos, issues, PRs, Actions). Opt-in per machine.",
-      "source": "./plugins/mcp/mcp-github",
+      "source": "./plugins/opt-in/mcp/mcp-github",
       "category": "productivity"
     },
     {
       "name": "mcp-azure",
       "description": "Azure DevOps Server MCP server (self-hosted, PAT). Opt-in per machine, configure with /plugin configure.",
-      "source": "./plugins/mcp/mcp-azure",
+      "source": "./plugins/opt-in/mcp/mcp-azure",
       "category": "productivity"
     },
     {
@@ -75,43 +69,43 @@
     {
       "name": "mattpocock-picks",
       "description": "Curated Matt Pocock skills that complement superpowers: the productivity skills plus grilling with domain docs, spec → tickets and architecture deepening. Opt-in.",
-      "source": "./plugins/mattpocock-picks",
+      "source": "./plugins/shared/mattpocock-picks",
       "category": "development"
     },
     {
       "name": "pstack-picks",
       "description": "Curated skills from poteto's pstack, rewritten for Claude Code: how/why, adversarial review, unslop, architect/arena, principles. Opt-in.",
-      "source": "./plugins/pstack-picks",
+      "source": "./plugins/shared/pstack-picks",
       "category": "development"
     },
     {
       "name": "tob-picks",
       "description": "Curated Trail of Bits skills: property-based testing, spec-to-code compliance, sharp-edges API and config review, mutation-testing analysis. Opt-in.",
-      "source": "./plugins/tob-picks",
+      "source": "./plugins/shared/tob-picks",
       "category": "development"
     },
     {
       "name": "rust-skills",
       "description": "Rust best practices from Apollo GraphQL's handbook (rust-best-practices): ownership, errors, clippy, testing, dispatch. Vendored, synced weekly. Opt-in.",
-      "source": "./plugins/languages/rust-skills",
+      "source": "./plugins/opt-in/implementation/rust-skills",
       "category": "development"
     },
     {
       "name": "csharp-skills",
       "description": "Microsoft's .NET skills (dotnet/skills): C#, testing, MSBuild/NuGet, ASP.NET Core, Blazor, EF Core, MAUI, WinForms, behind six C#-only router skills. Vendored, synced weekly. Opt-in.",
-      "source": "./plugins/languages/csharp-skills",
+      "source": "./plugins/opt-in/implementation/csharp-skills",
       "category": "development"
     },
     {
       "name": "postgres",
       "description": "Postgres best practices (Neon's postgres-best-practices) and safe, non-blocking migrations (Timescale pg-aiguide's postgres-database-migration). Vendored, synced weekly. Opt-in.",
-      "source": "./plugins/database/postgres",
+      "source": "./plugins/opt-in/implementation/postgres",
       "category": "development"
     },
     {
       "name": "graphify",
       "description": "Graphify: turn a codebase into a queryable knowledge graph (/graphify). Needs the graphify CLI (uv tool install graphifyy). Opt-in.",
-      "source": "./plugins/graphify",
+      "source": "./plugins/shared/graphify",
       "category": "development"
     },
     {
@@ -123,55 +117,43 @@
     {
       "name": "self-review",
       "description": "/self-review: review your branch before opening a PR. Bug pass, spec and standards pass, security-review, a CLAUDE.md audit, and specialist agents (vendored from code-review, pr-review-toolkit and mattpocock) in one command, then fixes what you pick. Opt-in.",
-      "source": "./plugins/self-review",
+      "source": "./plugins/shared/self-review",
       "category": "development"
     },
     {
       "name": "hallmark",
       "description": "Hallmark: anti-AI-slop design skill for web frontends, scoped to browser UI work. Vendored from nutlope/hallmark. Opt-in.",
-      "source": "./plugins/hallmark",
+      "source": "./plugins/opt-in/hallmark",
       "category": "development"
     },
     {
       "name": "paper-lookup",
       "description": "Paper lookup: search arXiv, Semantic Scholar, OpenAlex, Crossref, Unpaywall and other scholarly APIs (trimmed for computer science) for papers, citations and open-access full text. Vendored from K-Dense-AI/scientific-agent-skills. Opt-in.",
-      "source": "./plugins/paper-lookup",
-      "category": "development"
-    },
-    {
-      "name": "night-city",
-      "description": "Night City: a toned-down synthwave Claude Code theme with Night City spinner words, short status-line reactions and Onibi dropping by with a one-liner. Part of the default bundle.",
-      "source": "./plugins/mods/night-city",
-      "category": "development"
-    },
-    {
-      "name": "notify",
-      "description": "Desktop notifications when a turn ends or Claude needs you, on Linux, Windows and macOS; quiet while you are looking at the session. Opt-in.",
-      "source": "./plugins/notify",
+      "source": "./plugins/shared/paper-lookup",
       "category": "development"
     },
     {
       "name": "cswap",
       "description": "claude-swap in Claude Code: accounts pane, /swap, usage status line, opt-in auto-switch. The installer downloads cswap.exe on Windows. Opt-in.",
-      "source": "./plugins/mods/cswap",
+      "source": "./plugins/opt-in/cswap",
       "category": "productivity"
     },
     {
       "name": "tui-review",
-      "description": "/tui-review: a fast, stacked-branch-aware diff pane beside the chat, so you can ask Claude about what you read. Needs the brv binary, which the installer downloads. Opt-in.",
-      "source": "./plugins/mods/tui-review",
+      "description": "/tui-review: a fast, stacked-branch-aware diff pane beside the chat, so you can ask Claude about what you read. Needs the tui-review binary, which the installer downloads. Opt-in.",
+      "source": "./plugins/shared/tui-review",
       "category": "development"
     },
     {
       "name": "web-mcp",
       "description": "Web research tools for Claude: search (self-hosted SearXNG, paper APIs and the archive, ranked with BM25), fetch (whole pages as markdown, optionally with images), browser (via agent-browser) and lookup (passive DNS, RDAP, certificate, Wayback, IP and vulnerability records). Everything is archived in .web/. Needs the web-mcp binary, which the installer downloads. Opt-in.",
-      "source": "./plugins/mcp/web-mcp",
+      "source": "./plugins/shared/web-mcp",
       "category": "development"
     },
     {
       "name": "md-pane",
       "description": "Click a .md path in Claude's reply to read it, rendered, in a pane beside the chat (fullscreen terminal). Opt-in.",
-      "source": "./plugins/mods/md-pane",
+      "source": "./plugins/opt-in/md-pane",
       "category": "productivity"
     }
   ]

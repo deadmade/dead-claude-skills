@@ -308,12 +308,10 @@ async function applyAgentBrowser() {
   done.push(`agent-browser: ${action === 'install' ? 'installed' : 'upgraded to'} ${pinned}`);
 }
 
-// --- brv and web-mcp, the binaries of tui-review and web-mcp ---------------------------------------------------------
+// --- tui-review and web-mcp, the binaries of tui-review and web-mcp ---------------------------------------------------------
 const TUI_REVIEW = `tui-review@${MARKETPLACE}`;
 const WEB_MCP = `web-mcp@${MARKETPLACE}`;
 const BIN_DIR = join(CONFIG, 'bin');
-// One repo version: tui-review's plugin.json is the release both binaries come from.
-const BIN_VERSION = readJson(join(PKG, 'plugins', 'tui-review', '.claude-plugin', 'plugin.json')).version;
 
 // The version a binary reports (`<name> <version>`), or undefined when there is none or it does not run.
 function binVersionAt(name, path) {
@@ -342,7 +340,7 @@ async function downloadBin(name, asset, bin) {
   try {
     const file = join(tmp, asset.file);
     writeFileSync(file, bytes);
-    // GNU tar on Linux, bsdtar on macOS and Windows 10+, which reads the zip too.
+    // GNU tar on Linux, bsdtar on Windows 10+, which reads the zip too.
     const r = spawnSync('tar', ['-xf', file, '-C', tmp], { encoding: 'utf8' });
     if (r.status !== 0)
       throw new Error(`could not unpack ${asset.file}: ${(r.stderr || r.error?.message || '').trim()}`);
@@ -360,7 +358,7 @@ async function downloadBin(name, asset, bin) {
 // ~/.claude/bin and the plugin's userConfig key points at it.
 async function applyBin(pluginName, plugin) {
   const { name, key } = BIN_PLUGINS[pluginName];
-  const version = BIN_VERSION;
+  const version = VERSION;
   const asset = binAsset(name, process.platform, process.arch, version);
   const bin = join(BIN_DIR, asset?.exe ?? (WIN ? `${name}.exe` : name));
   const action = binAction({
@@ -369,7 +367,7 @@ async function applyBin(pluginName, plugin) {
     version,
     supported: asset !== undefined,
   });
-  const build = `build it with \`cargo build --release\` in plugins/${pluginName}/${pluginName === 'web-mcp' ? 'server' : 'brv'} and set its path with /plugin configure ${pluginName}`;
+  const build = `build it with \`cargo build --release\` in crates/${pluginName === 'web-mcp' ? 'web-mcp' : 'tui-review'} and set its path with /plugin configure ${pluginName}`;
   if (action === 'skip') return done.push(`${name}: using the one on PATH`);
   if (action === 'unsupported')
     return failures.push(`${name}: no release build for ${process.platform}-${process.arch}; ${build}`);
@@ -516,7 +514,7 @@ const plugins = listed(
 const rows = Array.isArray(plugins) ? plugins : (plugins.installed ?? []);
 
 const manifest = readJson(join(PKG, '.claude-plugin', 'marketplace.json'));
-const bundle = readJson(join(PKG, 'plugins', BUNDLE, '.claude-plugin', 'plugin.json'));
+const bundle = readJson(join(PKG, manifestPath(manifest, BUNDLE)));
 const opts = optIns(manifest, bundle);
 const tokenPlugins = opts.filter((id) => {
   const path = manifestPath(manifest, id);
@@ -557,12 +555,12 @@ const chosen = {
   // web-mcp is selected and SearXNG answers.
   'web-builtins-off': has(WEB_MCP)
     ? current['web-builtins-off']
-    : unavailable('web-builtins-off', process.platform, process.arch, BIN_VERSION) === undefined,
+    : unavailable('web-builtins-off', process.platform, process.arch, VERSION) === undefined,
 };
 
 // Options that can't work here stay off the pages, unless they're on already: hiding never removes anything.
 const hidden = [...opts, ...TOGGLES]
-  .map((key) => ({ key, why: unavailable(key, process.platform, process.arch, BIN_VERSION) }))
+  .map((key) => ({ key, why: unavailable(key, process.platform, process.arch, VERSION) }))
   .filter((h) => h.why && !current[h.key]);
 const pages = categorize([...opts, ...TOGGLES].filter((k) => !hidden.some((h) => h.key === k)));
 
@@ -712,13 +710,11 @@ const webBuiltinsOff = webBuiltinsDecision({
   healthy: selected.includes(WEB_MCP) && (await applySearxng(current['web-builtins-off'])),
 });
 
-const notify = selected.some((id) => nameOf(id) === 'notify');
 const toggles = {
   statusLine: on('ccstatusline'),
   sandbox: on('sandbox'),
   dcg: on('dcg'),
   version: VERSION,
-  notify,
   webBuiltinsOff,
 };
 await applySettings(toggles, { strip, reset: clean });

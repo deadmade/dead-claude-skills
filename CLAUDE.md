@@ -1,6 +1,6 @@
 # dead-claude-skills
 
-A personal Claude Code plugin marketplace (`.claude-plugin/marketplace.json`, one plugin per folder under `plugins/`)
+A personal Claude Code plugin marketplace (`.claude-plugin/marketplace.json`, one plugin per folder under `plugins/`, grouped by install layer)
 plus the npx installer in `installer/` that sets up a machine from it. README.md is the user-facing description;
 keep it, plugin READMEs and plugin/marketplace `description`s true to what the code does.
 
@@ -12,30 +12,20 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   (settings merges, plugin plans, platform rules); `files.mjs` the file writes and clean-slate backup/delete;
   `view.mjs`/`ui.mjs` the screens. No npm dependencies: Node's standard library only. New logic goes into
   `core.mjs` or `files.mjs` with a test, not into `install.mjs`.
-- `plugins/mods/`: a `GROUPS` folder holding the Claude Code mods (`cswap`, `night-city`, `tui-review`, `md-pane`). notify
-  is plain `hooks.json`, not a mod, and stays at the top level.
-- `plugins/mods/tui-review/`: a Claude Code mod (TypeScript, `hooks/`) driving the Rust binary `brv` (`brv/`). The two
-  share a binary cache format (`brv/src/format.rs` ↔ `hooks/chunks.ts`) and a stdout line protocol; change both sides
-  together.
-- `plugins/mods/cswap/`: a mod wrapping the external `claude-swap` CLI, whose release tag is pinned in `installer/cswap.json`
-  (bumped by `sync-cswap.yml`).
-- `plugins/mcp/`: a `GROUPS` folder holding the MCP server plugins (`mcp-basic`, `mcp-github`, `mcp-azure`,
-  `web-mcp`). Folders keep their plugin's name.
-- `plugins/mcp/web-mcp/`: a stdio MCP server (Rust, `server/`) with `search`, `fetch`, `browser` and `lookup`, built for Windows and Linux
-  x64 only (`build-web-mcp.yml`, `BIN_ONLY` in `core.mjs`); the installer downloads it and sets `binPath`. Everything it pulls lands in
-  `$CLAUDE_PROJECT_DIR/.web/` before Claude sees it. Ranking is BM25 only: the H4 experiment (`examples/h4.rs`, `h4`
-  feature) showed embeddings don't help, so none ship. `browser` drives the npm CLI `agent-browser`, pinned in
-  `installer/agent-browser.json` (bumped by `sync-agent-browser.yml`). Test-only hooks: `WEB_MCP_TEST_PUBLIC_IP`
-  (debug builds or the `test-hooks` feature) treats a comma-separated list of IPs as public; `WEB_MCP_FALLBACK_MS` shortens the fetch browser fallback's deadline, `WEB_MCP_PAPERS_MS` each paper source's (8 s), `WEB_MCP_LOOKUP_MS` each lookup source's.
-- `plugins/languages/`: a grouping folder (`GROUPS` in `scripts/plugin-dirs.mjs`); each folder under it is a plugin.
-  `rust-skills` and `csharp-skills` are vendored (`sync-rust.mjs`, `sync-csharp.mjs`). `paths:` frontmatter doesn't
-  gate plugin skills in Claude Code (checked on 2.1.272 and 2.1.296), so csharp-skills exposes six router skills over an
-  unscanned `library/`; the router reads library files via the installer's `Read(~/.claude/plugins/**)` rule (without
-  the installer users get a permission prompt).
-- `plugins/database/`: a second `GROUPS` folder; each folder under it is a database plugin. `postgres` vendors
-  Neon's and Timescale's Postgres skills from two upstreams (`sync-postgres.mjs`), so each skill folder carries its
-  own LICENSE, NOTICE and UPSTREAM instead of one set at the plugin root.
-- `plugins/mods/night-city/`: a theme (`themes/night-city.json`) plus a mod, in the dead-skills bundle. It is the house
+- `plugins/` is grouped by how a plugin gets installed: `default/` (the bundle, dead-skills, on every machine),
+  `flows` (the conductors), both plain plugins at the top, then `shared/` (what flows pulls in) and `opt-in/` (extras
+  nothing else depends on; `opt-in/mcp/` holds the MCP configs, `opt-in/implementation/` the language, database and LSP
+  plugins). `shared`, `opt-in` and its two subfolders are `GROUPS` folders (`scripts/plugin-dirs.mjs`, which nests them):
+  each other folder under them is a plugin and keeps its plugin's name. A plugin sits with whatever pulls it in; tui-review and web-mcp
+  are also offered on their own but live in `shared/`. Moving a folder doesn't touch installs (they key on the
+  plugin `name`); renaming a plugin does.
+- `crates/`: the two Rust crates, `tui-review` (the tui-review plugin's binary, formerly `brv`) and `web-mcp` (web-mcp's server). Each keeps its own
+  `Cargo.lock`; nothing in the plugins reaches into them at runtime.
+- `plugins/default/`: the dead-skills bundle. Its `dependencies` are the core plugins; itself it carries the global rules
+  (`rules.md`, a SessionStart hook), Context7 (`.mcp.json`), Night City and the notifications. night-city, mcp-basic and notify were plugins of
+  their own until 0.3.0; the installer retires them, and `mergeSettings` moves a picked theme to its new id
+  (`custom:dead-skills:night-city`: a plugin theme's id carries the plugin name).
+- Night City (`plugins/default/`): a theme (`themes/night-city.json`) plus a mod (`hooks/`). It is the house
   look: tui-review's `hooks/theme.ts`, notify's wording and the installer's `paint` (`view.mjs`) use its palette, with no
   stock fallback. Claude Code hardcodes syntax colours per base theme (Monokai for dark), so the installer always turns
   highlighting off. It also sets `CLAUDE_CODE_TMUX_TRUECOLOR=1`: inside tmux Claude
@@ -46,13 +36,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   sign is one widget per glyph. The mod's Onibi visits (`hooks/onibi.ts`, the `onibi` userConfig) roll their dice from
   the turn id, not `Math.random`, which the mod test sandbox freezes. Its mascot PNGs (`assets/`) are generated by `scripts/draw-mascot.mjs`; never edit them by
   hand.
-- `plugins/notify/`: plain `hooks.json` (Stop, Notification, PreToolUse on AskUserQuestion) running one stdlib Node
-  script, async. Logic and tests in `hooks/lib.mjs`; Linux talks D-Bus via `busctl`, Windows runs an inline PowerShell
-  WinRT toast, focus comes from tmux. With notify the installer sets `preferredNotifChannel: "notifications_disabled"`.
-- `plugins/mods/md-pane/`: a mod. Pure path logic in `hooks/paths.ts`; `register.tsx` redraws replies that name an existing
-  `.md` file as its own `Markdown` (only a plugin-drawn `Markdown` with `onLinkPress` receives plain link clicks, and
-  only in the fullscreen terminal) and shows the clicked file in a pane, refreshed by a 1 s stat while open.
-- `plugins/dead-skills/`: the default bundle; its `dependencies` are the core plugins.
+- `plugins/opt-in/mcp/mcp-github/`, `plugins/opt-in/mcp/mcp-azure/`: MCP server configs only.
 - `plugins/flows/`: the conductor skills (`/feature-flow`, `/research-flow`, `/implement`, `/fix-flow`, `/upgrade`,
   `/test-audit`, `/doc-audit`, `/harden`, `/verify`, `/understand`, `/learn`). Each runs other plugins' skills in order;
   the rules they share (state files, gates, loading `disable-model-invocation` skills by path, fallbacks per missing
@@ -65,8 +49,33 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   (slug, phase, gates, deviations, research numbers), polls every 5 s across the repo root, `.worktrees/*` and
   `.claude/worktrees/*` (newest copy per run), and key `1` resumes the run with the conductor its `flow:` names
   (`SKILL` in `flow.ts`).
+- `plugins/shared/tui-review/`: a Claude Code mod (TypeScript, `hooks/`) driving the Rust binary `tui-review` (`crates/tui-review/`). The two
+  share a binary cache format (`crates/tui-review/src/format.rs` ↔ `hooks/chunks.ts`) and a stdout line protocol; change both sides
+  together.
+- `plugins/shared/web-mcp/`: a stdio MCP server (Rust, `crates/web-mcp/`) with `search`, `fetch`, `browser` and `lookup`, built for Windows and Linux
+  x64 only, like tui-review's binary (`build-web-mcp.yml`, `BIN_TARGETS` in `core.mjs`; no macOS or ARM builds); the installer downloads it and sets `binPath`. Everything it pulls lands in
+  `$CLAUDE_PROJECT_DIR/.web/` before Claude sees it. Ranking is BM25 only: the H4 experiment (`examples/h4.rs`, `h4`
+  feature) showed embeddings don't help, so none ship. `browser` drives the npm CLI `agent-browser`, pinned in
+  `installer/agent-browser.json` (bumped by `sync-agent-browser.yml`). Test-only hooks: `WEB_MCP_TEST_PUBLIC_IP`
+  (debug builds or the `test-hooks` feature) treats a comma-separated list of IPs as public; `WEB_MCP_FALLBACK_MS` shortens the fetch browser fallback's deadline, `WEB_MCP_PAPERS_MS` each paper source's (8 s), `WEB_MCP_LOOKUP_MS` each lookup source's.
+- `plugins/opt-in/md-pane/`: a mod. Pure path logic in `hooks/paths.ts`; `register.tsx` redraws replies that name an existing
+  `.md` file as its own `Markdown` (only a plugin-drawn `Markdown` with `onLinkPress` receives plain link clicks, and
+  only in the fullscreen terminal) and shows the clicked file in a pane, refreshed by a 1 s stat while open.
+- `plugins/opt-in/cswap/`: a mod wrapping the external `claude-swap` CLI, whose release tag is pinned in `installer/cswap.json`
+  (bumped by `sync-cswap.yml`).
+- Notifications (`plugins/default/`, formerly the notify plugin): `hooks.json` entries (Stop, Notification, PreToolUse
+  on AskUserQuestion) running one stdlib Node script, `hooks/notify.mjs`, async. Logic and tests in `hooks/lib.mjs`; Linux
+  talks D-Bus via `busctl`, Windows runs an inline PowerShell WinRT toast, focus comes from tmux. The installer always
+  sets `preferredNotifChannel: "notifications_disabled"`.
+- `plugins/opt-in/implementation/rust-skills/`, `plugins/opt-in/implementation/csharp-skills/`: vendored (`sync-rust.mjs`, `sync-csharp.mjs`). `paths:` frontmatter doesn't
+  gate plugin skills in Claude Code (checked on 2.1.272 and 2.1.296), so csharp-skills exposes six router skills over an
+  unscanned `library/`; the router reads library files via the installer's `Read(~/.claude/plugins/**)` rule (without
+  the installer users get a permission prompt).
+- `plugins/opt-in/implementation/postgres/`: a database plugin. It vendors
+  Neon's and Timescale's Postgres skills from two upstreams (`sync-postgres.mjs`), so each skill folder carries its
+  own LICENSE, NOTICE and UPSTREAM instead of one set at the plugin root.
 - `scripts/`: `check-repo.mjs` (marketplace/bundle/version consistency), `release.mjs`, `sync-*.mjs` (vendoring),
-  `sync-plugins.mjs` (re-pins url-sourced plugins), `draw-mascot.mjs` (Onibi, night-city's pixel-art mascot, also notify's `icon.png`).
+  `sync-plugins.mjs` (re-pins url-sourced plugins), `draw-mascot.mjs` (Onibi, Night City's pixel-art mascot, also notify's `icon.png`).
 
 The url-sourced marketplace entries superpowers and ponytail are pinned by `ref` (release tag) and `sha` (its commit);
 `sync-plugins.yml` opens a PR per plugin when upstream tags a newer `vX.Y.Z`. The installer reads the version from
@@ -75,39 +84,40 @@ the `ref`, so it must match upstream's `plugin.json`. Atlassian is deliberately 
 ## Vendored content: don't edit
 
 These are copied from upstream by `scripts/sync-*.mjs` (weekly workflows open the PRs) and overwritten on every
-sync: `plugins/hallmark/`, `plugins/paper-lookup/skills/`, `plugins/graphify/skills/`, `plugins/mattpocock-picks/`, `plugins/pstack-picks/`,
-`plugins/tob-picks/` (CC BY-SA 4.0), `plugins/languages/*/{library,skills}/`, `plugins/languages/*/LICENSE` and `UPSTREAM` (their `plugin.json` and `evals/` are hand-written), `plugins/database/*/skills/` (their `plugin.json` is hand-written), `plugins/self-review/agents/`,
-`plugins/self-review/skills/self-review/references/upstream/`. To change them, change the sync script's transform.
+sync: `plugins/opt-in/hallmark/`, `plugins/shared/paper-lookup/skills/`, `plugins/shared/graphify/skills/`, `plugins/shared/mattpocock-picks/`, `plugins/shared/pstack-picks/`,
+`plugins/shared/tob-picks/` (CC BY-SA 4.0), `plugins/opt-in/implementation/*-skills/{library,skills}/`, `plugins/opt-in/implementation/*-skills/LICENSE` and `UPSTREAM` (their `plugin.json` and `evals/` are hand-written), `plugins/opt-in/implementation/postgres/skills/` (their `plugin.json` is hand-written), `plugins/shared/self-review/agents/`,
+`plugins/shared/self-review/skills/self-review/references/upstream/`. To change them, change the sync script's transform.
 When what's vendored or its license changes, update THIRD_PARTY.md.
 
 ## Versions and releases
 
-Everything ships as one version: `package.json`, the marketplace's `metadata.version`, every `plugins/*/.claude-plugin/plugin.json`
-and brv's `Cargo.toml`/`Cargo.lock`. `check-repo.mjs` fails on drift. Never bump by hand:
+Everything ships as one version: `package.json`, the marketplace's `metadata.version`, every plugin's `.claude-plugin/plugin.json`
+and both crates' `Cargo.toml`/`Cargo.lock`. `check-repo.mjs` fails on drift. Never bump by hand:
 
     npm run release -- patch      # on main, clean tree; bumps, runs npm test, commits and tags
     git push --follow-tags origin main
 
-The `v*` tag runs `release.yml`, which builds brv, web-mcp and cswap.exe and publishes the GitHub release the installer
+The `v*` tag runs `release.yml`, which builds tui-review, web-mcp and cswap.exe and publishes the GitHub release the installer
 downloads from. Removing a plugin from the marketplace is enough to retire it: the installer uninstalls installed
 plugins of ours that the manifest no longer lists.
 
 ## Checks
 
-- `npm test`: repo checks plus all `installer/*.test.mjs`, `scripts/*.test.mjs` and `plugins/notify/hooks/*.test.mjs` (`claude plugin validate` is skipped when `claude` isn't
+- `npm test`: repo checks plus all `installer/*.test.mjs`, `scripts/*.test.mjs` and `plugins/default/hooks/*.test.mjs` (`claude plugin validate` is skipped when `claude` isn't
   on PATH).
-- brv: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `plugins/mods/tui-review/brv`.
-- web-mcp: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `plugins/mcp/web-mcp/server`.
-- tui-review mod tests need a generated fixture first, from `plugins/mods/tui-review/brv`:
-  `cargo run --release -- gen --out <dir> && node ../tests/make-fixture.mjs <dir>`, then `claude plugin test .` in
-  `plugins/mods/tui-review`.
-- mod tests: `claude plugin test .` in `plugins/mods/cswap`, `plugins/mods/night-city`, `plugins/mods/md-pane` and
+- tui-review: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/tui-review`.
+- web-mcp: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/web-mcp`.
+- tui-review mod tests need a generated fixture first, from `crates/tui-review`:
+  `cargo run --release -- gen --out <dir> && node ../../plugins/shared/tui-review/tests/make-fixture.mjs <dir>`, then `claude plugin test .` in
+  `plugins/shared/tui-review`.
+- mod tests: `claude plugin test .` in `plugins/opt-in/cswap`, `plugins/default`, `plugins/opt-in/md-pane` and
   `plugins/flows`. `tsc -p .` there needs the engine's typings in `.claude-plugin/types/` (gitignored; the engine
   writes them when it loads the mod).
 - `nix develop` (or direnv) gives the toolchain and installs the pre-commit hooks (treefmt, merge conflicts, JSON,
-  check-repo, installer and scripts tests, end-of-file; vendored paths excluded).
+  check-repo, installer and scripts tests, end-of-file; vendored paths excluded). Enter it from the repo root only:
+  started in a subfolder, its hook setup treats that folder as the repo and uninstalls the pre-commit hook.
 - `nix fmt` formats everything per `treefmt.toml` (alejandra, prettier for js/ts/json/md/yaml, rustfmt).
 
-CI: `test.yml` (npm test and the cswap, night-city, md-pane and flows mod tests, Linux and Windows) on every PR and push to main; `tui-review.yml` on
-PRs touching tui-review; `web-mcp.yml` on PRs touching web-mcp; `build-brv.yml`/`build-web-mcp.yml`/`build-cswap.yml` on PRs touching the workflow (or the cswap pin) and from `release.yml`; `sync-*.yml`
+CI: `test.yml` (npm test and the cswap, dead-skills, md-pane and flows mod tests, Linux and Windows) on every PR and push to main; `tui-review.yml` on
+PRs touching tui-review; `web-mcp.yml` on PRs touching web-mcp; `build-tui-review.yml`/`build-web-mcp.yml`/`build-cswap.yml` on PRs touching the workflow (or the cswap pin) and from `release.yml`; `sync-*.yml`
 weekly.

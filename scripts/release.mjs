@@ -1,5 +1,5 @@
-// Cuts a release: one version for package.json, the marketplace, every local plugin and brv, committed and tagged
-// vX.Y.Z on main. Pushing the tag runs .github/workflows/release.yml, which builds cswap.exe and brv and publishes the
+// Cuts a release: one version for package.json, the marketplace, every local plugin and tui-review, committed and tagged
+// vX.Y.Z on main. Pushing the tag runs .github/workflows/release.yml, which builds cswap.exe and tui-review and publishes the
 // GitHub release. Claude Code only offers plugin updates when this version changes.
 // Usage: npm run release -- patch|minor|major|X.Y.Z
 import { spawnSync } from 'node:child_process';
@@ -41,8 +41,8 @@ const bumps = [
   ['.claude-plugin/marketplace.json', json],
   ...pluginDirs().map((p) => [`${p}/.claude-plugin/plugin.json`, json]),
   ...[
-    ['plugins/mods/tui-review/brv', 'brv'],
-    ['plugins/mcp/web-mcp/server', 'web-mcp'],
+    ['crates/tui-review', 'tui-review'],
+    ['crates/web-mcp', 'web-mcp'],
   ].flatMap(([dir, name]) => [
     [`${dir}/Cargo.toml`, /^(version = )"[^"]*"/m],
     [`${dir}/Cargo.lock`, new RegExp(`^(name = "${name}"\\r?\\nversion = )"[^"]*"`, 'm')],

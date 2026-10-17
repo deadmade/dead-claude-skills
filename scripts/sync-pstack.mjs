@@ -1,4 +1,4 @@
-// Vendor a curated subset of Cursor's pstack (cursor/plugins/pstack) into plugins/pstack-picks/,
+// Vendor a curated subset of Cursor's pstack (cursor/plugins/pstack) into plugins/shared/pstack-picks/,
 // rewrite its Cursor-specific instructions for Claude Code (REWRITES below), and refuse
 // to publish if any Cursor-ism survives. Idempotent: same upstream commit, same output.
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -163,7 +163,7 @@ const files = (dir) =>
     .map((f) => join(dir, f).replaceAll('\\', '/'))
     .filter((f) => statSync(f).isFile());
 
-const PLUGIN = join(ROOT, 'plugins', 'pstack-picks');
+const PLUGIN = join(ROOT, 'plugins', 'shared', 'pstack-picks');
 
 const up = sparseClone(
   UPSTREAM_URL,

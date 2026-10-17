@@ -98,10 +98,10 @@ Round 1 (2026-10-17), three reviewers (correctness, fit, simpler). 25 findings m
   "Where it looks" made explicit (no change in intent).
 - F2 two-level scan by `$.fs.list`, built from each poll; F3 skill resume task moved before the key; F4 resuming a
   worktree copy works in that worktree; F5 skill descriptions/argument hints; F6 README.md sentence, spec's
-  "feature-flow README" dropped (none exists) *(spec edit, reopens Gate 1 for that item)*; F7 timer first, every
+  "feature-flow README" dropped (none exists) _(spec edit, reopens Gate 1 for that item)_; F7 timer first, every
   refresh caught; F8 only successful writes count, no await on refresh; F9 one refresh at a time; F10 write the
-  atom every poll; F11 verdict regex + tests; F12 a "reopened" without a later date is open, limit noted *(spec
-  edit, reopens Gate 1 for the gate rule)*; F13 one atom, module variables for the rest; F14 test merges.
+  atom every poll; F11 verdict regex + tests; F12 a "reopened" without a later date is open, limit noted _(spec
+  edit, reopens Gate 1 for the gate rule)_; F13 one atom, module variables for the rest; F14 test merges.
 - F15–F20: command looked up once with a name fallback and a toast; no tsconfig/tsc; hooks.json in Task 1;
   research line its own task; spec read caught; press by key, sentence before "Opt-in.".
 - Shape changed (task order, a new task), so round 2 re-reviews the changed parts.
@@ -133,19 +133,19 @@ final fix wave with review items 3 (Windows separator in the spec lookup) and 4 
 
 ## Walkthrough
 
-| spec goal | plan task | file:line | test |
-| --------- | --------- | --------- | ---- |
-| 1. band: slug, phase, gates, deviations | T1, T2, T4 | `hooks/flow.ts:9,37,112`; `hooks/register.tsx:140` | `flow.test.ts` gateDate/parseFlow/bandLines; `register.test.ts:123,275` |
-| 2. research: claim, baseline, feature, verdict | T5 | `hooks/flow.ts:29,57,112`; `hooks/register.tsx:62,80` | `flow.test.ts` research cases; `register.test.ts:341,352,364` |
-| 3. `+N open` | T2, T4 | `hooks/flow.ts:91,112` | `flow.test.ts` pickCurrent/bandLines; `register.test.ts:140` |
-| 4. current run = this session's last write, else newest open | T2, T4 | `hooks/flow.ts:80,91`; `hooks/register.tsx:121,129` | `register.test.ts:194,214,230,298,314,324` |
-| 5. key `1` resumes via `$.command.run` | T2, T4 | `hooks/flow.ts:130`; `hooks/register.tsx:108,140` | `register.test.ts:241,254` |
-| 6. skills resume by slug, never overwrite | T3 | `skills/feature-flow/SKILL.md:44-56`, `skills/research-flow/SKILL.md:43-52` | grep + `npm test` (prose) |
-| 7. follows edits within a poll | T4 | `hooks/register.tsx:108` (5 s `$.clock.every`) | `register.test.ts:165,173,186` |
-| 8. right from main checkout or a worktree | T4 | `hooks/register.tsx` `copies()` (repo root + `.worktrees/*` + `.claude/worktrees/*`) | `register.test.ts:123,134,140,155` |
-| anti-goal: never hide a survey/agent view/other band | T4 | `hooks/register.tsx:140` | `register.test.ts:262,269` |
-| CI + docs | T6 | `.github/workflows/test.yml`, `CLAUDE.md`, `README.md`, descriptions | `npm test` 116/0; `claude plugin test .` 43/0 |
-| D1 reopen on the Gate line; D2 merged runs done | final fix | both SKILL.md; four flow.md frontmatters | re-review |
+| spec goal                                                    | plan task  | file:line                                                                            | test                                                                    |
+| ------------------------------------------------------------ | ---------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| 1. band: slug, phase, gates, deviations                      | T1, T2, T4 | `hooks/flow.ts:9,37,112`; `hooks/register.tsx:140`                                   | `flow.test.ts` gateDate/parseFlow/bandLines; `register.test.ts:123,275` |
+| 2. research: claim, baseline, feature, verdict               | T5         | `hooks/flow.ts:29,57,112`; `hooks/register.tsx:62,80`                                | `flow.test.ts` research cases; `register.test.ts:341,352,364`           |
+| 3. `+N open`                                                 | T2, T4     | `hooks/flow.ts:91,112`                                                               | `flow.test.ts` pickCurrent/bandLines; `register.test.ts:140`            |
+| 4. current run = this session's last write, else newest open | T2, T4     | `hooks/flow.ts:80,91`; `hooks/register.tsx:121,129`                                  | `register.test.ts:194,214,230,298,314,324`                              |
+| 5. key `1` resumes via `$.command.run`                       | T2, T4     | `hooks/flow.ts:130`; `hooks/register.tsx:108,140`                                    | `register.test.ts:241,254`                                              |
+| 6. skills resume by slug, never overwrite                    | T3         | `skills/feature-flow/SKILL.md:44-56`, `skills/research-flow/SKILL.md:43-52`          | grep + `npm test` (prose)                                               |
+| 7. follows edits within a poll                               | T4         | `hooks/register.tsx:108` (5 s `$.clock.every`)                                       | `register.test.ts:165,173,186`                                          |
+| 8. right from main checkout or a worktree                    | T4         | `hooks/register.tsx` `copies()` (repo root + `.worktrees/*` + `.claude/worktrees/*`) | `register.test.ts:123,134,140,155`                                      |
+| anti-goal: never hide a survey/agent view/other band         | T4         | `hooks/register.tsx:140`                                                             | `register.test.ts:262,269`                                              |
+| CI + docs                                                    | T6         | `.github/workflows/test.yml`, `CLAUDE.md`, `README.md`, descriptions                 | `npm test` 116/0; `claude plugin test .` 43/0                           |
+| D1 reopen on the Gate line; D2 merged runs done              | final fix  | both SKILL.md; four flow.md frontmatters                                             | re-review                                                               |
 
 No goal without code, no code without a goal (paths relative to `plugins/feature-flow/` where not given). Verified
 2026-10-17: `claude plugin test .` 43 pass / 0 fail, `claude plugin validate .` passed, `npm test` 116 pass / 0 fail /

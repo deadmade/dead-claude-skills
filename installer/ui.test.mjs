@@ -106,7 +106,7 @@ test('line returns the typed text, ctrl-c is null', async () => {
 });
 
 test('progress turns a throw into failed', async () => {
-  const r = await progress('Downloading brv', async () => {
+  const r = await progress('Downloading tui-review', async () => {
     throw new Error('boom');
   });
   assert.deepEqual(r, { ok: false, err: 'boom' });

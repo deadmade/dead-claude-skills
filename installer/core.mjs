@@ -146,7 +146,7 @@ export const searxngSettings = (template, secret) => template.replace(/^(\s*secr
 export const webBuiltinsDecision = ({ toggle, was, healthy, installed }) =>
   toggle ? healthy || undefined : was && installed ? false : undefined;
 
-export function mergeSettings(settings, { statusLine, sandbox, version, notify, webBuiltinsOff }) {
+export function mergeSettings(settings, { statusLine, sandbox, version, webBuiltinsOff }) {
   const out = structuredClone(settings);
   // Night City ships with the bundle. Claude Code colours code in a fixed Monokai a theme can't change; off, diffs take
   // Night City's own diff colours.
@@ -154,11 +154,10 @@ export function mergeSettings(settings, { statusLine, sandbox, version, notify, 
   // Inside tmux Claude Code draws in 256 colours unless told otherwise, which turns the theme's indigos grey. Outside
   // tmux (and on Windows, which has none) the variable does nothing.
   out.env = { ...out.env, CLAUDE_CODE_TMUX_TRUECOLOR: '1' };
-  // The notify plugin raises its own popups; Claude Code's built-in one would double them.
-  // shortcut: deselecting also clears a `notifications_disabled` the user set themselves, and retiring notify from
-  // the marketplace leaves the setting behind; remember who set it if anyone minds.
-  if (notify) out.preferredNotifChannel = 'notifications_disabled';
-  if (notify === false && out.preferredNotifChannel === 'notifications_disabled') delete out.preferredNotifChannel;
+  // The theme's id carries its plugin's name, and night-city became part of dead-skills.
+  if (out.theme === 'custom:night-city:night-city') out.theme = 'custom:dead-skills:night-city';
+  // dead-skills raises its own popups; Claude Code's built-in one would double them.
+  out.preferredNotifChannel = 'notifications_disabled';
   const allow = out.permissions?.allow ?? [];
   const deny = out.permissions?.deny ?? [];
   let denied = [...deny, ...SECRET_DENIES.filter((d) => !deny.includes(d))];
@@ -343,26 +342,22 @@ export function missingBinaries(platform, wanted, onPath) {
   });
 }
 
-// The binaries releases ship, built per platform by .github/workflows/build-{brv,web-mcp}.yml and attached to the
+// The binaries releases ship, built per platform by .github/workflows/build-{tui-review,web-mcp}.yml and attached to the
 // vX.Y.Z release by release.yml. plugin: which plugin needs it; key: its userConfig key for the binary's path.
 export const BIN_PLUGINS = {
-  'tui-review': { name: 'brv', key: 'brvPath' },
+  'tui-review': { name: 'tui-review', key: 'binPath' },
   'web-mcp': { name: 'web-mcp', key: 'binPath' },
 };
+// Windows and Linux x64 only: no macOS or ARM builds.
 const BIN_TARGETS = {
   'win32-x64': 'x86_64-pc-windows-msvc',
   'linux-x64': 'x86_64-unknown-linux-musl',
-  'linux-arm64': 'aarch64-unknown-linux-musl',
-  'darwin-arm64': 'aarch64-apple-darwin',
-  'darwin-x64': 'x86_64-apple-darwin',
 };
-// Binaries built for fewer platforms than BIN_TARGETS.
-const BIN_ONLY = { 'web-mcp': ['win32-x64', 'linux-x64'] };
 
-// The release archive of binary `name` ('brv' or 'web-mcp') at `version` for this machine, or undefined where none is built.
+// The release archive of binary `name` ('tui-review' or 'web-mcp') at `version` for this machine, or undefined where none is built.
 export function binAsset(name, platform, arch, version) {
   const target = BIN_TARGETS[`${platform}-${arch}`];
-  if (!target || BIN_ONLY[name]?.includes(`${platform}-${arch}`) === false) return undefined;
+  if (!target) return undefined;
   const file = `${name}-${target}.${platform === 'win32' ? 'zip' : 'tar.gz'}`;
   const url = `${RELEASES}/v${version}/${file}`;
   return { file, url, sha256: `${url}.sha256`, exe: platform === 'win32' ? `${name}.exe` : name };
@@ -425,8 +420,8 @@ export const CATEGORIES = [
   {
     id: 'system',
     title: 'System',
-    blurb: 'Status line, sandbox, command guard and notifications.',
-    keys: ['ccstatusline', 'sandbox', 'dcg', 'notify'],
+    blurb: 'Status line, sandbox and command guard.',
+    keys: ['ccstatusline', 'sandbox', 'dcg'],
   },
   // bulk: false, so no single key ticks every option here.
   {

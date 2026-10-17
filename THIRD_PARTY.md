@@ -2,7 +2,7 @@
 
 ## Hallmark
 
-`plugins/hallmark/skills/hallmark/` is vendored from [nutlope/hallmark](https://github.com/nutlope/hallmark)
+`plugins/opt-in/hallmark/skills/hallmark/` is vendored from [nutlope/hallmark](https://github.com/nutlope/hallmark)
 (MIT License, Copyright (c) 2026 Hallmark contributors; full text in `skills/hallmark/LICENSE`).
 It is synced by `scripts/sync-hallmark.mjs` (weekly via GitHub Actions); the only local change is a
 "WEB FRONTEND ONLY" prefix on the frontmatter `description`. The synced upstream commit is in
@@ -10,7 +10,7 @@ It is synced by `scripts/sync-hallmark.mjs` (weekly via GitHub Actions); the onl
 
 ## paper-lookup
 
-`plugins/paper-lookup/skills/paper-lookup/` is vendored from the paper-lookup skill of
+`plugins/shared/paper-lookup/skills/paper-lookup/` is vendored from the paper-lookup skill of
 [K-Dense-AI/scientific-agent-skills](https://github.com/K-Dense-AI/scientific-agent-skills) (MIT License, Copyright (c)
 2025 K-Dense Inc.; full text in `skills/paper-lookup/LICENSE.md`). It is synced by `scripts/sync-paper-lookup.mjs`
 (weekly via GitHub Actions), which trims it for computer science: the reference files for PubMed, PMC, Europe PMC,
@@ -19,7 +19,7 @@ note under the title covers leftover mentions, the frontmatter `description` is 
 Agent Skills" section is removed.
 The synced upstream commit is in `skills/paper-lookup/UPSTREAM`.
 
-## MCP servers (mcp-basic, mcp-github, mcp-azure)
+## MCP servers (dead-skills, mcp-github, mcp-azure)
 
 - **Context7**: hosted service by Upstash (https://context7.com), used over HTTP; nothing vendored.
 - **GitHub MCP server**: hosted by GitHub (https://github.com/github/github-mcp-server), used over HTTP; nothing vendored.
@@ -28,53 +28,53 @@ The synced upstream commit is in `skills/paper-lookup/UPSTREAM`.
 
 ## mattpocock-picks
 
-`plugins/mattpocock-picks/skills/` vendors a picked set of skills from [mattpocock/skills](https://github.com/mattpocock/skills)
-(MIT License, Copyright (c) 2026 Matt Pocock; full text in `plugins/mattpocock-picks/LICENSE`), unmodified
+`plugins/shared/mattpocock-picks/skills/` vendors a picked set of skills from [mattpocock/skills](https://github.com/mattpocock/skills)
+(MIT License, Copyright (c) 2026 Matt Pocock; full text in `plugins/shared/mattpocock-picks/LICENSE`), unmodified
 apart from flattening `engineering/` and `productivity/` into one folder. Synced by `scripts/sync-mattpocock.mjs`
-(weekly via GitHub Actions); the synced upstream commit is in `plugins/mattpocock-picks/UPSTREAM`.
+(weekly via GitHub Actions); the synced upstream commit is in `plugins/shared/mattpocock-picks/UPSTREAM`.
 
 ## pstack-picks
 
-`plugins/pstack-picks/` vendors a picked set of skills and the `comment-sicko` agent from
+`plugins/shared/pstack-picks/` vendors a picked set of skills and the `comment-sicko` agent from
 [pstack](https://github.com/cursor/plugins/tree/main/pstack) (MIT License, Copyright (c) 2026 Lauren Tan;
-full text in `plugins/pstack-picks/LICENSE`). Modified mechanically for Claude Code by
+full text in `plugins/shared/pstack-picks/LICENSE`). Modified mechanically for Claude Code by
 `scripts/sync-pstack.mjs` (tool names, subagent types, model names, paths, and an added port note
-under each file's frontmatter). The synced upstream commit is in `plugins/pstack-picks/UPSTREAM`.
+under each file's frontmatter). The synced upstream commit is in `plugins/shared/pstack-picks/UPSTREAM`.
 
 ## tob-picks
 
-`plugins/tob-picks/` vendors four skills (property-based-testing, spec-to-code-compliance, sharp-edges,
+`plugins/shared/tob-picks/` vendors four skills (property-based-testing, spec-to-code-compliance, sharp-edges,
 mutation-testing), the `spec-compliance-checker` and `sharp-edges-analyzer` agents and the `spec-compliance` workflow
 from [trailofbits/skills](https://github.com/trailofbits/skills) (Creative Commons Attribution-ShareAlike 4.0,
-Copyright Trail of Bits; full text in `plugins/tob-picks/LICENSE`). The vendored files stay under CC BY-SA 4.0.
+Copyright Trail of Bits; full text in `plugins/shared/tob-picks/LICENSE`). The vendored files stay under CC BY-SA 4.0.
 Modified by `scripts/sync-tob.mjs`: each upstream plugin's skill, agents and workflow are merged into one plugin,
 the Codex-only `agents/openai.yaml` and its icon are dropped, the `spec-to-code-compliance:` namespace is renamed to
 `tob-picks:`, and `FsCheck|CsCheck` is added to property-based-testing's library detection command. Synced weekly via
-GitHub Actions; the synced upstream commit is in `plugins/tob-picks/UPSTREAM`.
+GitHub Actions; the synced upstream commit is in `plugins/shared/tob-picks/UPSTREAM`.
 
 ## rust-skills
 
-`plugins/languages/rust-skills/` vendors the rust-best-practices skill from
-[apollographql/skills](https://github.com/apollographql/skills) (MIT License; `plugins/languages/rust-skills/LICENSE`).
+`plugins/opt-in/implementation/rust-skills/` vendors the rust-best-practices skill from
+[apollographql/skills](https://github.com/apollographql/skills) (MIT License; `plugins/opt-in/implementation/rust-skills/LICENSE`).
 Modified by `scripts/sync-rust.mjs`: a `paths:` block (`**/*.rs`, `**/Cargo.toml`, `**/Cargo.lock`) is added to
 SKILL.md's frontmatter. Synced weekly via GitHub Actions (`sync-rust.yml`); the synced upstream commit is in
-`plugins/languages/rust-skills/UPSTREAM`.
+`plugins/opt-in/implementation/rust-skills/UPSTREAM`.
 
 ## csharp-skills
 
-`plugins/languages/csharp-skills/` vendors the skills of [dotnet/skills](https://github.com/dotnet/skills) (MIT License,
-Copyright (c) .NET Foundation and Contributors; `plugins/languages/csharp-skills/LICENSE`). Modified by
+`plugins/opt-in/implementation/csharp-skills/` vendors the skills of [dotnet/skills](https://github.com/dotnet/skills) (MIT License,
+Copyright (c) .NET Foundation and Contributors; `plugins/opt-in/implementation/csharp-skills/LICENSE`). Modified by
 `scripts/sync-csharp.mjs`: the 102 skills are copied to `library/`, and six generated router skills in `skills/` (core,
 testing, build, web, data, desktop) index them; the four skills upstream marks `disable-model-invocation: true` are
 left out of the indexes. csharp-expert gets a note that its specialists are already installed in csharp-skills, its
 install, restart and update blocks are rewritten, and it gets a fixed index summary. Upstream's agents, binlog MCP
 server, bundled LSP and dotnet-experimental plugin are not vendored. Synced weekly via GitHub Actions
 (`sync-csharp.yml`), which lists added, removed, skipped and unmapped skills and agent mentions in the PR body; the
-synced upstream commit is in `plugins/languages/csharp-skills/UPSTREAM`.
+synced upstream commit is in `plugins/opt-in/implementation/csharp-skills/UPSTREAM`.
 
 ## postgres
 
-`plugins/database/postgres/skills/` vendors two skills. Each folder carries its upstream's license and an `UPSTREAM`
+`plugins/opt-in/implementation/postgres/skills/` vendors two skills. Each folder carries its upstream's license and an `UPSTREAM`
 file with the synced commit:
 
 - `postgres-best-practices/` from [neondatabase/postgres-skills](https://github.com/neondatabase/postgres-skills)
@@ -88,32 +88,32 @@ Modified by `scripts/sync-postgres.mjs`: a `paths:` block (`**/*.sql`, `**/migra
 
 ## graphify
 
-`plugins/graphify/skills/graphify/` vendors the Claude Code skill (`graphify/skill.md`) and its `references/`
+`plugins/shared/graphify/skills/graphify/` vendors the Claude Code skill (`graphify/skill.md`) and its `references/`
 from [Graphify-Labs/graphify](https://github.com/Graphify-Labs/graphify) (Apache License 2.0, Copyright 2026
-Safi Shamsi and the Graphify contributors; `LICENSE`, `LICENSE-MIT` and `NOTICE` in `plugins/graphify/`),
-unmodified. `plugins/graphify/hooks/hooks.json` reproduces the hooks upstream's installer writes and calls the
+Safi Shamsi and the Graphify contributors; `LICENSE`, `LICENSE-MIT` and `NOTICE` in `plugins/shared/graphify/`),
+unmodified. `plugins/shared/graphify/hooks/hooks.json` reproduces the hooks upstream's installer writes and calls the
 separately installed `graphifyy` CLI. Synced by `scripts/sync-graphify.mjs` (weekly via GitHub Actions); the
-synced upstream commit is in `plugins/graphify/UPSTREAM`.
+synced upstream commit is in `plugins/shared/graphify/UPSTREAM`.
 
 ## claude-swap (cswap)
 
-`plugins/mods/cswap/` is a front end for [realiti4/claude-swap](https://github.com/realiti4/claude-swap) (MIT License,
+`plugins/opt-in/cswap/` is a front end for [realiti4/claude-swap](https://github.com/realiti4/claude-swap) (MIT License,
 Copyright (c) Onur Cetinkol); it runs the `cswap` binary and vendors none of its code.
 `.github/workflows/build-cswap.yml` compiles the upstream tag pinned in `installer/cswap.json` with Nuitka;
 `release.yml` attaches the result as `cswap.exe` to each `vX.Y.Z` release, and `sync-cswap.yml` bumps the pin weekly.
 
 ## self-review
 
-`plugins/self-review/` vendors review passes from two upstreams, synced by `scripts/sync-self-review.mjs` (weekly via
-GitHub Actions; the synced commits are in `plugins/self-review/UPSTREAM`):
+`plugins/shared/self-review/` vendors review passes from two upstreams, synced by `scripts/sync-self-review.mjs` (weekly via
+GitHub Actions; the synced commits are in `plugins/shared/self-review/UPSTREAM`):
 [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official)'s code-review command and
 pr-review-toolkit agents (Apache License 2.0, Copyright Anthropic, PBC; `LICENSE` and `NOTICE`), with the agents'
 `description:` rewritten, and [mattpocock/skills](https://github.com/mattpocock/skills)'s engineering code-review
 skill (MIT License, Copyright Matt Pocock; `LICENSE-MIT`), unmodified apart from a source comment.
 
-## night-city
+## Night City (dead-skills)
 
-The palette of `plugins/mods/night-city/themes/night-city.json` is derived from the Cyberpunk Neon theme
+The palette of `plugins/default/themes/night-city.json` is derived from the Cyberpunk Neon theme
 (`plugins/theme-gallery/themes/cyberpunk.json`) of [livlign/ccthemes](https://github.com/livlign/ccthemes) (MIT
 License, Copyright its authors), with changed and added colors. Nothing is vendored or synced.
 

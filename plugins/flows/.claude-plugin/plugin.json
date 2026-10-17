@@ -11,9 +11,9 @@
   "dependencies": [
     "claude-md-management@claude-plugins-official",
     "claude-security@claude-plugins-official",
+    "dead-skills",
     "graphify",
     "mattpocock-picks",
-    "mcp-basic",
     "paper-lookup",
     "ponytail",
     "pstack-picks",

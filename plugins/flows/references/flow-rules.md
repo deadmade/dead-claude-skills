@@ -42,7 +42,7 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
   mattpocock-picks skills (`teach`, `to-tickets`, `to-spec`, `improve-codebase-architecture`, `handoff`,
   `grill-with-docs`), `self-review`, and every conductor here. Read its SKILL.md and follow it:
   - another plugin: `${CLAUDE_SKILL_DIR}/../../../../<plugin>/*/skills/<name>/SKILL.md` (in a checkout of this
-    marketplace: `plugins/<plugin>/skills/<name>/SKILL.md`)
+    marketplace: the folder the plugin's marketplace `source` names, then `skills/<name>/SKILL.md`)
   - a conductor of this plugin: `${CLAUDE_SKILL_DIR}/../<name>/SKILL.md`
 - **Calling another conductor** (`/fix-flow` → `/verify`): read its SKILL.md and run it inline. Skip its start and
   resume step (the caller hands it the input), keep its gates, then return to the caller's next phase.
@@ -51,27 +51,27 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
 
 Say which plugin provides it, then use the fallback:
 
-| Missing                                                  | Plugin               | Fallback                                                     |
-| -------------------------------------------------------- | -------------------- | ------------------------------------------------------------ |
-| `brainstorming`, `writing-plans`, execution, TDD, verify | superpowers          | do the phase by hand with the same output                    |
-| `grilling`, `domain-modeling`, `teach`, `to-tickets`     | mattpocock-picks     | grill in rounds yourself, one numbered question per decision |
-| `how`, `why`, `blast-radius`, `recall`, `unslop`, …      | pstack-picks         | 1–3 Explore agents; `git log -S`/`git blame` for why         |
-| `mutation-testing`, `property-based-testing`, …          | tob-picks            | the language's own mutation or property tool, or by hand     |
-| `/self-review`                                           | self-review          | `/code-review` plus the built-in `security-review`           |
-| `search`, `fetch`, papers                                | web-mcp              | paper-lookup for papers, WebSearch/WebFetch for the rest     |
-| a knowledge graph                                        | graphify             | Explore agents                                               |
-| library docs                                             | mcp-basic (context7) | the library's docs via web-mcp `fetch` or WebFetch           |
-| the diff pane                                            | tui-review           | `git diff --stat`, then offer to walk the user through it    |
-| a desktop ping                                           | notify               | nothing                                                      |
-| `claude-security`                                        | claude-security      | the built-in `security-review`                               |
-| `claude-md-improver`, `revise-claude-md`                 | claude-md-management | read each CLAUDE.md against the code yourself                |
-| `ponytail-audit`, `ponytail-review`                      | ponytail             | `/simplify` on the scope, report only                        |
+| Missing                                                  | Plugin                 | Fallback                                                     |
+| -------------------------------------------------------- | ---------------------- | ------------------------------------------------------------ |
+| `brainstorming`, `writing-plans`, execution, TDD, verify | superpowers            | do the phase by hand with the same output                    |
+| `grilling`, `domain-modeling`, `teach`, `to-tickets`     | mattpocock-picks       | grill in rounds yourself, one numbered question per decision |
+| `how`, `why`, `blast-radius`, `recall`, `unslop`, …      | pstack-picks           | 1–3 Explore agents; `git log -S`/`git blame` for why         |
+| `mutation-testing`, `property-based-testing`, …          | tob-picks              | the language's own mutation or property tool, or by hand     |
+| `/self-review`                                           | self-review            | `/code-review` plus the built-in `security-review`           |
+| `search`, `fetch`, papers                                | web-mcp                | paper-lookup for papers, WebSearch/WebFetch for the rest     |
+| a knowledge graph                                        | graphify               | Explore agents                                               |
+| library docs                                             | dead-skills (context7) | the library's docs via web-mcp `fetch` or WebFetch           |
+| the diff pane                                            | tui-review             | `git diff --stat`, then offer to walk the user through it    |
+| a desktop ping                                           | dead-skills            | nothing                                                      |
+| `claude-security`                                        | claude-security        | the built-in `security-review`                               |
+| `claude-md-improver`, `revise-claude-md`                 | claude-md-management   | read each CLAUDE.md against the code yourself                |
+| `ponytail-audit`, `ponytail-review`                      | ponytail               | `/simplify` on the scope, report only                        |
 
 ## Scope (audits)
 
 The argument is `branch` (default) or `all`.
 
-- **branch:** the base is a named base, else `git config branch.<current>.brvBase` (tui-review's remembered base),
+- **branch:** the base is a named base, else `git config branch.<current>.tuiReviewBase` (tui-review's remembered base),
   else `origin/HEAD`, else `origin/main` or `origin/master`. The scope is the working tree against
   `git merge-base <base> HEAD`, untracked files included, plus what the change should have touched and didn't: the
   tests of changed code, the docs that describe it.

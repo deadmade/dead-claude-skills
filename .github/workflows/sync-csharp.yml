@@ -22,10 +22,10 @@ jobs:
 
       - name: Sanity checks
         run: |
-          jq empty .claude-plugin/marketplace.json plugins/languages/csharp-skills/.claude-plugin/plugin.json
-          test "$(ls plugins/languages/csharp-skills/skills | wc -l)" -eq 6
-          test "$(find plugins/languages/csharp-skills/library -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l)" -ge 90
-          echo "sha=$(cat plugins/languages/csharp-skills/UPSTREAM)" >> "$GITHUB_OUTPUT"
+          jq empty .claude-plugin/marketplace.json plugins/opt-in/implementation/csharp-skills/.claude-plugin/plugin.json
+          test "$(ls plugins/opt-in/implementation/csharp-skills/skills | wc -l)" -eq 6
+          test "$(find plugins/opt-in/implementation/csharp-skills/library -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l)" -ge 90
+          echo "sha=$(cat plugins/opt-in/implementation/csharp-skills/UPSTREAM)" >> "$GITHUB_OUTPUT"
         id: check
 
       - name: Write pull request body
@@ -52,4 +52,4 @@ jobs:
           commit-message: 'Sync csharp-skills to ${{ steps.check.outputs.sha }}'
           title: 'Sync csharp-skills to ${{ steps.check.outputs.sha }}'
           body-path: /tmp/csharp-pr-body.md
-          add-paths: plugins/languages/csharp-skills
+          add-paths: plugins/opt-in/implementation/csharp-skills

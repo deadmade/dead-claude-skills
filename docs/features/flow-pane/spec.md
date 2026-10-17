@@ -14,8 +14,8 @@ one glance says where the run stands without opening the file, and one key picks
    and the verdict once it is written.
 3. The band shows how many other runs are open (`+3 open`).
 4. **Current run:** the run whose `flow.md` this session last wrote through a Write or Edit tool call. Until there is
-   one, the open run whose `flow.md` changed most recently. A run created in this session (`/feature-flow <new
-   thing>`) becomes current as soon as its `flow.md` is written; no key press.
+   one, the open run whose `flow.md` changed most recently. A run created in this session
+   (`/feature-flow <new thing>`) becomes current as soon as its `flow.md` is written; no key press.
 5. One key resumes the shown run where it stopped: it runs `/feature-flow <slug>` (or `/research-flow <slug>` for a
    research run) through `$.command.run`, as if the user typed it.
 6. feature-flow and research-flow accept an existing run's slug as the argument and resume exactly that run, instead

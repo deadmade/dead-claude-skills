@@ -50,11 +50,12 @@ import {
   INCLUDED,
   idOf,
   withDependencies,
+  BUNDLE,
 } from './core.mjs';
 
 const json = (p) => JSON.parse(readFileSync(new URL(`../${p}`, import.meta.url), 'utf8'));
 const marketplace = json('.claude-plugin/marketplace.json');
-const bundle = json('plugins/dead-skills/.claude-plugin/plugin.json');
+const bundle = json(manifestPath(marketplace, BUNDLE));
 const M = 'dead-claude-skills';
 const O = 'claude-plugins-official';
 
@@ -74,7 +75,6 @@ test('opt-ins from the real manifests', () => {
         'mcp-github',
         'md-pane',
         'nix-lsp',
-        'notify',
         'paper-lookup',
         'postgres',
         'pstack-picks',
@@ -97,9 +97,9 @@ test('bundle ids resolve bare names to our marketplace', () => {
 });
 
 test('token plugins', () => {
-  assert.equal(needsToken(json('plugins/mcp/mcp-github/.claude-plugin/plugin.json')), true);
-  assert.equal(needsToken(json('plugins/mcp/mcp-azure/.claude-plugin/plugin.json')), true);
-  assert.equal(needsToken(json('plugins/graphify/.claude-plugin/plugin.json')), false);
+  assert.equal(needsToken(json('plugins/opt-in/mcp/mcp-github/.claude-plugin/plugin.json')), true);
+  assert.equal(needsToken(json('plugins/opt-in/mcp/mcp-azure/.claude-plugin/plugin.json')), true);
+  assert.equal(needsToken(json('plugins/shared/graphify/.claude-plugin/plugin.json')), false);
 });
 
 test('select installs, deselect uninstalls, token plugins hand off', () => {
@@ -352,45 +352,42 @@ test('cswap missing on Linux points at uv', () => {
   );
 });
 
-test('brv downloads the release archive built for this machine', () => {
-  const win = binAsset('brv', 'win32', 'x64', '1.2.3');
+test('tui-review downloads the release archive built for this machine', () => {
+  const win = binAsset('tui-review', 'win32', 'x64', '1.2.3');
   assert.equal(
     win.url,
-    'https://github.com/deadmade/dead-claude-skills/releases/download/v1.2.3/brv-x86_64-pc-windows-msvc.zip',
+    'https://github.com/deadmade/dead-claude-skills/releases/download/v1.2.3/tui-review-x86_64-pc-windows-msvc.zip',
   );
   assert.equal(win.sha256, `${win.url}.sha256`);
-  assert.equal(win.exe, 'brv.exe');
-  assert.equal(binAsset('brv', 'linux', 'x64', '1.0.0').file, 'brv-x86_64-unknown-linux-musl.tar.gz');
-  assert.equal(binAsset('brv', 'linux', 'arm64', '1.0.0').file, 'brv-aarch64-unknown-linux-musl.tar.gz');
-  assert.equal(binAsset('brv', 'darwin', 'arm64', '1.0.0').exe, 'brv');
-  assert.equal(binAsset('brv', 'win32', 'arm64', '1.0.0'), undefined);
-  assert.equal(binAsset('brv', 'freebsd', 'x64', '1.0.0'), undefined);
+  assert.equal(win.exe, 'tui-review.exe');
+  assert.equal(binAsset('tui-review', 'linux', 'x64', '1.0.0').file, 'tui-review-x86_64-unknown-linux-musl.tar.gz');
+  for (const [platform, arch] of [
+    ['linux', 'arm64'],
+    ['darwin', 'arm64'],
+    ['darwin', 'x64'],
+    ['win32', 'arm64'],
+  ])
+    assert.equal(binAsset('tui-review', platform, arch, '1.0.0'), undefined, `no build for ${platform}-${arch}`);
+  assert.equal(binAsset('tui-review', 'freebsd', 'x64', '1.0.0'), undefined);
 });
 
 test('web-mcp downloads its own archive, and each plugin is configured under its own key', () => {
   const t = {
     'win32-x64': 'x86_64-pc-windows-msvc',
     'linux-x64': 'x86_64-unknown-linux-musl',
-    'linux-arm64': 'aarch64-unknown-linux-musl',
-    'darwin-arm64': 'aarch64-apple-darwin',
-    'darwin-x64': 'x86_64-apple-darwin',
   };
   for (const [k, target] of Object.entries(t)) {
     const [platform, arch] = k.split('-');
-    for (const name of ['brv', 'web-mcp']) {
-      if (name === 'web-mcp' && !['win32-x64', 'linux-x64'].includes(k)) {
-        assert.equal(binAsset(name, platform, arch, '1.2.3'), undefined);
-        continue;
-      }
+    for (const name of ['tui-review', 'web-mcp']) {
       const a = binAsset(name, platform, arch, '1.2.3');
       assert.equal(a.file, `${name}-${target}.${platform === 'win32' ? 'zip' : 'tar.gz'}`);
       assert.equal(a.exe, name + (platform === 'win32' ? '.exe' : ''));
     }
   }
   assert.equal(binAsset('web-mcp', 'linux', 'ia32', '1.0.0'), undefined);
-  assert.deepEqual(BIN_PLUGINS['tui-review'], { name: 'brv', key: 'brvPath' });
+  assert.deepEqual(BIN_PLUGINS['tui-review'], { name: 'tui-review', key: 'binPath' });
   assert.deepEqual(BIN_PLUGINS['web-mcp'], { name: 'web-mcp', key: 'binPath' });
-  const dirs = { 'tui-review': 'plugins/mods/tui-review', 'web-mcp': 'plugins/mcp/web-mcp' };
+  const dirs = { 'tui-review': 'plugins/shared/tui-review', 'web-mcp': 'plugins/shared/web-mcp' };
   for (const [plugin, { key }] of Object.entries(BIN_PLUGINS))
     assert.ok(json(`${dirs[plugin]}/.claude-plugin/plugin.json`).userConfig[key], `${plugin} has userConfig ${key}`);
   assert.match(unavailable('web-mcp', 'linux', 'ia32', '1.0.0'), /no web-mcp build for linux-ia32/);
@@ -398,14 +395,19 @@ test('web-mcp downloads its own archive, and each plugin is configured under its
   assert.match(unavailable('web-mcp', 'darwin', 'arm64', '1.0.0'), /no web-mcp build for darwin-arm64/);
 });
 
-test('brv versions match the release the installer fetches', () => {
-  const cargo = readFileSync(new URL('../plugins/mods/tui-review/brv/Cargo.toml', import.meta.url), 'utf8');
-  assert.equal(/^version = "(.+)"/m.exec(cargo)[1], json('plugins/mods/tui-review/.claude-plugin/plugin.json').version);
+test('install.mjs finds plugin folders through the marketplace, never by a literal plugins/ path', () => {
+  const src = readFileSync(new URL('./install.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /join\(PKG, 'plugins'/);
 });
 
-test('brv checksum lines and what to do about brv', () => {
+test('tui-review versions match the release the installer fetches', () => {
+  const cargo = readFileSync(new URL('../crates/tui-review/Cargo.toml', import.meta.url), 'utf8');
+  assert.equal(/^version = "(.+)"/m.exec(cargo)[1], json('package.json').version);
+});
+
+test('tui-review checksum lines and what to do about tui-review', () => {
   const hex = 'AB'.repeat(32);
-  assert.equal(sha256Of(`${hex}  brv-x.tar.gz\n`), hex.toLowerCase());
+  assert.equal(sha256Of(`${hex}  tui-review-x.tar.gz\n`), hex.toLowerCase());
   assert.equal(sha256Of(`${hex}`), hex.toLowerCase());
   assert.equal(sha256Of('Not Found'), undefined);
   assert.equal(sha256Of(`${hex}ff  x`), undefined);
@@ -486,10 +488,13 @@ test('options hidden per platform', () => {
   assert.equal(unavailable(`cswap@${M}`, 'win32', 'x64', '1.0.0'), undefined);
   assert.ok(unavailable(`cswap@${M}`, 'linux', 'x64', '1.0.0'));
   assert.ok(unavailable(`cswap@${M}`, 'darwin', 'arm64', '1.0.0'));
-  for (const k of ['sandbox', `nix-lsp@${M}`, `tui-review@${M}`, 'dcg']) {
+  assert.ok(unavailable(`tui-review@${M}`, 'darwin', 'arm64', '1.0.0'));
+  assert.ok(unavailable(`tui-review@${M}`, 'linux', 'arm64', '1.0.0'));
+  for (const k of ['sandbox', `nix-lsp@${M}`, 'dcg']) {
     assert.equal(unavailable(k, 'linux', 'x64', '1.0.0'), undefined);
     assert.equal(unavailable(k, 'darwin', 'arm64', '1.0.0'), undefined);
   }
+  assert.equal(unavailable(`tui-review@${M}`, 'linux', 'x64', '1.0.0'), undefined);
 });
 
 test('outdated compares our shipped versions only, once per id, never downgrading', () => {
@@ -535,13 +540,13 @@ test('shippedVersions counts pinned url plugins and skips unpinned ones', () => 
 test('manifestPath finds a local plugin manifest, null for url sources and unknown names', () => {
   const m = {
     plugins: [
-      { name: 'rust-skills', source: './plugins/languages/rust-skills' },
+      { name: 'rust-skills', source: './plugins/opt-in/implementation/rust-skills' },
       { name: 'superpowers', source: { source: 'url' } },
     ],
   };
   assert.equal(
     manifestPath(m, 'rust-skills@dead-claude-skills'),
-    'plugins/languages/rust-skills/.claude-plugin/plugin.json',
+    'plugins/opt-in/implementation/rust-skills/.claude-plugin/plugin.json',
   );
   assert.equal(manifestPath(m, 'superpowers@dead-claude-skills'), null);
   assert.equal(manifestPath(m, 'nope@dead-claude-skills'), null);
@@ -584,12 +589,13 @@ test('Night City settings are always on, next to other env, and leave the theme 
   assert.equal(out.theme, 'dark');
 });
 
-test('notify turns the built-in notification off, and deselecting restores it', () => {
-  const channel = (s, notify) => mergeSettings(s, { notify }).preferredNotifChannel;
-  assert.equal(channel({}, true), 'notifications_disabled');
-  assert.equal(channel({ preferredNotifChannel: 'notifications_disabled' }, false), undefined);
-  assert.equal(channel({ preferredNotifChannel: 'kitty' }, false), 'kitty');
-  assert.equal(channel({ preferredNotifChannel: 'kitty' }, true), 'notifications_disabled');
+test('Night City picked while it was its own plugin stays picked now that dead-skills ships it', () => {
+  assert.equal(mergeSettings({ theme: 'custom:night-city:night-city' }, {}).theme, 'custom:dead-skills:night-city');
+});
+
+test('the built-in notification is always off, since dead-skills raises its own', () => {
+  assert.equal(mergeSettings({}, {}).preferredNotifChannel, 'notifications_disabled');
+  assert.equal(mergeSettings({ preferredNotifChannel: 'kitty' }, {}).preferredNotifChannel, 'notifications_disabled');
 });
 
 test('searxng binds loopback, mounts the config dir and takes the secret', () => {

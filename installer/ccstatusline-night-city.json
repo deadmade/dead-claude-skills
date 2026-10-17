@@ -2,28 +2,166 @@
   "version": 4,
   "lines": [
     [
-      { "id": "1", "type": "custom-text", "color": "hex:1A1626", "backgroundColor": "hex:F08BB4", "customText": "\udb81\udea9 ", "merge": "no-padding", "bold": true },
-      { "id": "2", "type": "model", "color": "hex:1A1626", "backgroundColor": "hex:F08BB4", "rawValue": true, "bold": true },
-      { "id": "3", "type": "custom-text", "color": "hex:F5D07A", "backgroundColor": "hex:362D52", "customText": "\uf0e7 ", "merge": "no-padding" },
-      { "id": "4", "type": "thinking-effort", "color": "hex:B79CF0", "backgroundColor": "hex:362D52", "rawValue": true },
-      { "id": "5", "type": "custom-text", "color": "hex:7CCFE0", "backgroundColor": "hex:2A2340", "customText": "\uf2db ", "merge": "no-padding" },
-      { "id": "6", "type": "context-length", "color": "hex:E6DCF7", "backgroundColor": "hex:2A2340", "rawValue": true, "merge": true },
-      { "id": "7", "type": "context-percentage-usable", "color": "hex:7CCFE0", "backgroundColor": "hex:2A2340", "rawValue": true },
-      { "id": "8", "type": "custom-text", "color": "hex:1A1626", "backgroundColor": "hex:F5B97A", "customText": "\u20ac", "merge": "no-padding", "bold": true },
-      { "id": "9", "type": "session-cost", "color": "hex:1A1626", "backgroundColor": "hex:F5B97A", "rawValue": true, "bold": true },
-      { "id": "10", "type": "custom-text", "color": "hex:9A90C2", "backgroundColor": "hex:362D52", "customText": "\uf017 ", "merge": "no-padding" },
+      {
+        "id": "1",
+        "type": "custom-text",
+        "color": "hex:1A1626",
+        "backgroundColor": "hex:F08BB4",
+        "customText": "\udb81\udea9 ",
+        "merge": "no-padding",
+        "bold": true
+      },
+      {
+        "id": "2",
+        "type": "model",
+        "color": "hex:1A1626",
+        "backgroundColor": "hex:F08BB4",
+        "rawValue": true,
+        "bold": true
+      },
+      {
+        "id": "3",
+        "type": "custom-text",
+        "color": "hex:F5D07A",
+        "backgroundColor": "hex:362D52",
+        "customText": "\uf0e7 ",
+        "merge": "no-padding"
+      },
+      {
+        "id": "4",
+        "type": "thinking-effort",
+        "color": "hex:B79CF0",
+        "backgroundColor": "hex:362D52",
+        "rawValue": true
+      },
+      {
+        "id": "5",
+        "type": "custom-text",
+        "color": "hex:7CCFE0",
+        "backgroundColor": "hex:2A2340",
+        "customText": "\uf2db ",
+        "merge": "no-padding"
+      },
+      {
+        "id": "6",
+        "type": "context-length",
+        "color": "hex:E6DCF7",
+        "backgroundColor": "hex:2A2340",
+        "rawValue": true,
+        "merge": true
+      },
+      {
+        "id": "7",
+        "type": "context-percentage-usable",
+        "color": "hex:7CCFE0",
+        "backgroundColor": "hex:2A2340",
+        "rawValue": true
+      },
+      {
+        "id": "8",
+        "type": "custom-text",
+        "color": "hex:1A1626",
+        "backgroundColor": "hex:F5B97A",
+        "customText": "\u20ac",
+        "merge": "no-padding",
+        "bold": true
+      },
+      {
+        "id": "9",
+        "type": "session-cost",
+        "color": "hex:1A1626",
+        "backgroundColor": "hex:F5B97A",
+        "rawValue": true,
+        "bold": true
+      },
+      {
+        "id": "10",
+        "type": "custom-text",
+        "color": "hex:9A90C2",
+        "backgroundColor": "hex:362D52",
+        "customText": "\uf017 ",
+        "merge": "no-padding"
+      },
       { "id": "11", "type": "session-clock", "color": "hex:9A90C2", "backgroundColor": "hex:362D52", "rawValue": true },
-      { "id": "12", "type": "custom-text", "color": "hex:F08BB4", "backgroundColor": "hex:2A2340", "customText": "\u30ca", "merge": "no-padding", "bold": true },
-      { "id": "13", "type": "custom-text", "color": "hex:D894CC", "backgroundColor": "hex:2A2340", "customText": "\u30a4", "merge": "no-padding", "bold": true },
-      { "id": "14", "type": "custom-text", "color": "hex:C79AF0", "backgroundColor": "hex:2A2340", "customText": "\u30c8", "merge": "no-padding", "bold": true },
-      { "id": "15", "type": "custom-text", "color": "hex:A9A6EC", "backgroundColor": "hex:2A2340", "customText": "\u30b7", "merge": "no-padding", "bold": true },
-      { "id": "16", "type": "custom-text", "color": "hex:92BCE6", "backgroundColor": "hex:2A2340", "customText": "\u30c6", "merge": "no-padding", "bold": true },
-      { "id": "17", "type": "custom-text", "color": "hex:7CCFE0", "backgroundColor": "hex:2A2340", "customText": "\u30a3", "bold": true }
+      {
+        "id": "12",
+        "type": "custom-text",
+        "color": "hex:F08BB4",
+        "backgroundColor": "hex:2A2340",
+        "customText": "\u30ca",
+        "merge": "no-padding",
+        "bold": true
+      },
+      {
+        "id": "13",
+        "type": "custom-text",
+        "color": "hex:D894CC",
+        "backgroundColor": "hex:2A2340",
+        "customText": "\u30a4",
+        "merge": "no-padding",
+        "bold": true
+      },
+      {
+        "id": "14",
+        "type": "custom-text",
+        "color": "hex:C79AF0",
+        "backgroundColor": "hex:2A2340",
+        "customText": "\u30c8",
+        "merge": "no-padding",
+        "bold": true
+      },
+      {
+        "id": "15",
+        "type": "custom-text",
+        "color": "hex:A9A6EC",
+        "backgroundColor": "hex:2A2340",
+        "customText": "\u30b7",
+        "merge": "no-padding",
+        "bold": true
+      },
+      {
+        "id": "16",
+        "type": "custom-text",
+        "color": "hex:92BCE6",
+        "backgroundColor": "hex:2A2340",
+        "customText": "\u30c6",
+        "merge": "no-padding",
+        "bold": true
+      },
+      {
+        "id": "17",
+        "type": "custom-text",
+        "color": "hex:7CCFE0",
+        "backgroundColor": "hex:2A2340",
+        "customText": "\u30a3",
+        "bold": true
+      }
     ],
     [
-      { "id": "18", "type": "custom-text", "color": "hex:1A1626", "backgroundColor": "hex:7CCFE0", "customText": "\uf07c ", "merge": "no-padding" },
-      { "id": "19", "type": "current-working-dir", "color": "hex:1A1626", "backgroundColor": "hex:7CCFE0", "rawValue": true, "metadata": { "fishStyle": "true" } },
-      { "id": "20", "type": "custom-text", "color": "hex:1A1626", "backgroundColor": "hex:A98BE6", "customText": "\ue0a0 ", "merge": "no-padding" },
+      {
+        "id": "18",
+        "type": "custom-text",
+        "color": "hex:1A1626",
+        "backgroundColor": "hex:7CCFE0",
+        "customText": "\uf07c ",
+        "merge": "no-padding"
+      },
+      {
+        "id": "19",
+        "type": "current-working-dir",
+        "color": "hex:1A1626",
+        "backgroundColor": "hex:7CCFE0",
+        "rawValue": true,
+        "metadata": { "fishStyle": "true" }
+      },
+      {
+        "id": "20",
+        "type": "custom-text",
+        "color": "hex:1A1626",
+        "backgroundColor": "hex:A98BE6",
+        "customText": "\ue0a0 ",
+        "merge": "no-padding"
+      },
       { "id": "21", "type": "git-branch", "color": "hex:1A1626", "backgroundColor": "hex:A98BE6", "rawValue": true },
       { "id": "22", "type": "git-insertions", "color": "hex:8FDDB0", "backgroundColor": "hex:2A2340", "merge": true },
       { "id": "23", "type": "git-deletions", "color": "hex:F2788C", "backgroundColor": "hex:2A2340" },

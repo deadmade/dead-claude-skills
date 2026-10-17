@@ -1,7 +1,7 @@
 # Vendor the language skills behind router skills instead of pointing at upstream marketplaces
 
 The C# skills come from `dotnet/skills` and the Rust skill from `apollographql/skills`. Both are published as Claude
-Code marketplaces, but we copy them into `plugins/languages/` with sync scripts. That costs a sync script per upstream
+Code marketplaces, but we copy them into `plugins/opt-in/` with sync scripts. That costs a sync script per upstream
 and a weekly PR. We pay it because a direct `url`-sourced entry can't do either of these:
 
 - **Keep the listing small.** Claude Code lists every plugin skill in every project. `paths` frontmatter only gates

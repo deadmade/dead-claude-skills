@@ -10,7 +10,7 @@ import { pluginDirs as findPluginDirs } from './plugin-dirs.mjs';
 process.chdir(join(import.meta.dirname, '..'));
 
 const MARKETPLACE = '.claude-plugin/marketplace.json';
-const BUNDLE = 'plugins/dead-skills/.claude-plugin/plugin.json';
+const BUNDLE = 'plugins/default/.claude-plugin/plugin.json';
 const problems = [];
 const pluginDirs = findPluginDirs();
 
@@ -71,8 +71,8 @@ for (const dir of pluginDirs) {
   if (v !== version) problems.push(`${manifest}: version is ${v}, package.json has ${version}`);
 }
 const CRATES = [
-  { cargo: 'plugins/mods/tui-review/brv/Cargo.toml', lock: 'plugins/mods/tui-review/brv/Cargo.lock', name: 'brv' },
-  { cargo: 'plugins/mcp/web-mcp/server/Cargo.toml', lock: 'plugins/mcp/web-mcp/server/Cargo.lock', name: 'web-mcp' },
+  { cargo: 'crates/tui-review/Cargo.toml', lock: 'crates/tui-review/Cargo.lock', name: 'tui-review' },
+  { cargo: 'crates/web-mcp/Cargo.toml', lock: 'crates/web-mcp/Cargo.lock', name: 'web-mcp' },
 ];
 for (const { cargo, lock, name } of CRATES) {
   const crate = /^version = "(.*)"/m.exec(readFileSync(cargo, 'utf8'))?.[1];
