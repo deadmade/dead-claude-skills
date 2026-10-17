@@ -340,7 +340,7 @@ async function downloadBin(name, asset, bin) {
   try {
     const file = join(tmp, asset.file);
     writeFileSync(file, bytes);
-    // GNU tar on Linux, bsdtar on macOS and Windows 10+, which reads the zip too.
+    // GNU tar on Linux, bsdtar on Windows 10+, which reads the zip too.
     const r = spawnSync('tar', ['-xf', file, '-C', tmp], { encoding: 'utf8' });
     if (r.status !== 0)
       throw new Error(`could not unpack ${asset.file}: ${(r.stderr || r.error?.message || '').trim()}`);

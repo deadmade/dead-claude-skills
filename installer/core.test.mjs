@@ -361,7 +361,12 @@ test('tui-review downloads the release archive built for this machine', () => {
   assert.equal(win.sha256, `${win.url}.sha256`);
   assert.equal(win.exe, 'tui-review.exe');
   assert.equal(binAsset('tui-review', 'linux', 'x64', '1.0.0').file, 'tui-review-x86_64-unknown-linux-musl.tar.gz');
-  for (const [platform, arch] of [['linux', 'arm64'], ['darwin', 'arm64'], ['darwin', 'x64'], ['win32', 'arm64']])
+  for (const [platform, arch] of [
+    ['linux', 'arm64'],
+    ['darwin', 'arm64'],
+    ['darwin', 'x64'],
+    ['win32', 'arm64'],
+  ])
     assert.equal(binAsset('tui-review', platform, arch, '1.0.0'), undefined, `no build for ${platform}-${arch}`);
   assert.equal(binAsset('tui-review', 'freebsd', 'x64', '1.0.0'), undefined);
 });

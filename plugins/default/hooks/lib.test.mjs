@@ -131,14 +131,6 @@ test('windows passes text by env, never in the script', () => {
   assert.equal(env.PATH, process.env.PATH);
 });
 
-test('mac passes raw text as argv', () => {
-  const [{ argv }, ...rest] = notifiers('darwin', { title: 'T', status: 'Done', detail: 'a <b> & c' }, '/p/icon.png');
-  assert.deepEqual(rest, []);
-  assert.equal(argv[0], 'osascript');
-  assert.equal(argv[1], '-e');
-  assert.deepEqual(argv.slice(3), ['--', 'T', 'Done\na <b> & c']);
-});
-
 test('no detail leaves the status alone', () => {
   const msg = { title: 'T', status: 'Done', detail: '' };
   assert.equal(notifiers('linux', msg, '/i')[0].argv[13], '<b>Done</b>');
@@ -147,7 +139,7 @@ test('no detail leaves the status alone', () => {
 
 test('a title starting with a dash is never read as an option', () => {
   const msg = { title: '-u', status: 'Done', detail: '' };
-  for (const platform of ['linux', 'darwin']) {
+  for (const platform of ['linux']) {
     for (const { argv } of notifiers(platform, msg, '/i')) {
       const at = argv.indexOf('-u');
       assert.ok(argv.indexOf('--') !== -1 && argv.indexOf('--') < at, `${argv[0]}: -- before the title`);
@@ -155,8 +147,9 @@ test('a title starting with a dash is never read as an option', () => {
   }
 });
 
-test('unknown platform gives nothing', () => {
-  assert.deepEqual(notifiers('aix', { title: 'T', status: 'S', detail: 'D' }, '/p/icon.png'), []);
+test('macOS and unknown platforms give nothing', () => {
+  for (const platform of ['darwin', 'aix'])
+    assert.deepEqual(notifiers(platform, { title: 'T', status: 'S', detail: 'D' }, '/p/icon.png'), []);
 });
 
 test('tmux is asked for our pane and every client of its session', () => {

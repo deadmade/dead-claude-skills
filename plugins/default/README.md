@@ -25,7 +25,7 @@ select a custom theme).
 Beyond the theme:
 
 - While Night City is the selected theme, the terminal's own background turns the theme's dusk indigo, so
-  the empty space matches (OSC 11, reset when Claude exits or you pick another theme). Linux and macOS; Windows
+  the empty space matches (OSC 11, reset when Claude exits or you pick another theme). Linux; Windows
   Terminal untested. If Claude is killed, the color stays until you run `printf '\033]111\007'`.
 - Night City spinner words and turn-end verbs ("Jacked out for 3s").
 - Short status-line reactions: `▚▞ FLATLINE ▞▚` once per turn on a failing tool, `◢◤ JACKED OUT ◢◤` when a main turn
@@ -97,7 +97,7 @@ It stays quiet:
 - on Windows, when Windows Terminal is the foreground app (any tab counts);
 - for subagents, Stop-hook continuations and headless runs (`claude -p`, the Agent SDK, CI).
 
-Outside tmux on Linux and macOS it always notifies.
+Outside tmux on Linux it always notifies. macOS gets no notifications.
 
 ### Delivery
 
@@ -105,7 +105,6 @@ Outside tmux on Linux and macOS it always notifies.
 | -------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | Linux    | `busctl --user` to `org.freedesktop.Notifications`, falling back to `notify-send` | systemd's `busctl` or libnotify's `notify-send`; a notification daemon |
 | Windows  | a WinRT toast from Windows PowerShell, under PowerShell's app id                  | Windows PowerShell 5.1 (built in); notifications on for it in Settings |
-| macOS    | `osascript` `display notification` (best effort, untested, no icon)               | nothing extra                                                          |
 
 Talking to the notification daemon directly means tmux needs no `allow-passthrough`. The hook runs in the background
 (`async`), so a slow PowerShell start doesn't hold up the turn. Claude's text reaches the notifier as an argument or
