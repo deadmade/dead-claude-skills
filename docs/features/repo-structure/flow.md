@@ -1,5 +1,5 @@
 ---
-phase: finish
+phase: done
 ---
 
 # Repo structure refactor: flow
@@ -137,3 +137,5 @@ too). Findings, recommendation in brackets. **User: "apply all of them"** (2026-
 | Installed users unaffected (names unchanged)             | Task 3     | marketplace `name`s                                                                      | check-repo, mod tests cswap 9 / night-city 21 / flows 43                             |
 | Other checkouts keep working after the pull (review fix) | final      | `scripts/plugin-dirs.mjs:14`                                                             | `scripts/plugin-dirs.test.mjs:31`                                                    |
 | Docs and glossary follow                                 | Tasks 0, 4 | `CLAUDE.md:15-35`, `GLOSSARY.md`                                                         | guards                                                                               |
+
+- Finished 2026-10-18: PR #50 (https://github.com/deadmade/dead-claude-skills/pull/50), worktree kept for review.
