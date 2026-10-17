@@ -1,5 +1,5 @@
 ---
-phase: finish
+phase: done
 ---
 
 # Installer rewrite: flow

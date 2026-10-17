@@ -112,7 +112,8 @@ flow.md and go to Phase 5.
 
 Follow [references/plan-review.md](references/plan-review.md): 2–3 reviewer subagents with different angles, then
 you synthesize and screen. Present the findings, each with options and a recommendation. The user decides each one;
-you edit the plan, and the spec too if a decision changes it (say so: that edit reopens Gate 1 for that item).
+you edit the plan, and the spec too if a decision changes it (say so: that edit reopens Gate 1 for that item). Record a
+reopening on its Gate line in flow.md as `Reopened <date>: <why>`, and the re-approval date after it.
 
 Optional, for a large or ambiguous design, offer before the review: pstack `architect` (sketch types and signatures
 first) or `arena` (several models draft the plan, best one wins). Only on the user's yes.
