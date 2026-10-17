@@ -4,6 +4,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { checkUses, expectedDeps, FLOWS, readUses, renderTree, withTree } from './flows-uses.mjs';
 import { pluginDirs as findPluginDirs } from './plugin-dirs.mjs';
 
 process.chdir(join(import.meta.dirname, '..'));
@@ -46,6 +47,18 @@ for (const { source } of market) {
 for (const dir of pluginDirs) {
   if (!market.some((p) => p.source === `./${dir}`)) problems.push(`${dir} is not listed in ${MARKETPLACE}`);
 }
+
+// --- flows: each conductor's uses.json, and what is generated from them (scripts/flows-uses.mjs) ---
+problems.push(...checkUses('.', { plugins: market }));
+const uses = readUses('.');
+const flowsManifest = `${FLOWS}/.claude-plugin/plugin.json`;
+const regen = 'run node scripts/flows-uses.mjs';
+if (JSON.stringify(JSON.parse(readFileSync(flowsManifest, 'utf8')).dependencies) !== JSON.stringify(expectedDeps(uses)))
+  problems.push(`${flowsManifest}: dependencies differ from the conductors' uses.json: ${regen}`);
+// A Windows checkout has CRLF; the generated tree is LF.
+const flowsReadme = readFileSync(`${FLOWS}/README.md`, 'utf8').replace(/\r\n/g, '\n');
+if (withTree(flowsReadme, renderTree(uses)) !== flowsReadme)
+  problems.push(`${FLOWS}/README.md: uses tree is stale: ${regen}`);
 
 // --- one version: package.json, marketplace metadata.version, every local plugin.json and each Rust crate (scripts/release.mjs) ---
 const { version } = JSON.parse(readFileSync('package.json', 'utf8'));

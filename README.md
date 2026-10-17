@@ -12,8 +12,12 @@ servers, language and database skills (rust, csharp, postgres), integrations (Gi
 like hallmark, paper-lookup, self-review, graphify and the mattpocock/pstack/Trail of Bits picks, and tools such as
 [tui-review](plugins/mods/tui-review/README.md), cswap for multi-account switching, [notify](plugins/notify/README.md) for
 desktop notifications when a turn ends, [web-mcp](plugins/mcp/web-mcp/README.md) for web search, page fetching,
-passive lookups and a browser with an archive of everything it pulled, and feature-flow, whose band above the prompt
-shows the current run's phase, gates and deviations (`1` resumes it from an idle prompt).
+passive lookups and a browser with an archive of everything it pulled.
+
+The opt-in [flows](plugins/flows/README.md) plugin ties the rest together: conductor skills (`/feature-flow`,
+`/fix-flow`, `/test-audit`, `/doc-audit`, `/verify`, `/learn` and more) that run the other plugins' skills in order,
+with approval gates and a state file to resume from; a band above the prompt shows the current run's phase, gates and
+deviations (`1` resumes it from an idle prompt). Picking flows installs every plugin its conductors use.
 
     npx --allow-git=root github:deadmade/dead-claude-skills#semver:*
 

@@ -70,6 +70,7 @@ export function parseFlow(text: string): Omit<Run, 'slug' | 'path' | 'mtimeMs'> 
     baseline: numbers('baseline'),
     feature: numbers('feature'),
     verdict: (verdict as Run['verdict']) ?? null,
+    flow: field('flow') || 'feature',
     research: field('flow') === 'research',
     phase: field('phase') || '?',
     gates: [gate(1), gate(2)],
@@ -127,10 +128,20 @@ export function bandLines(run: Run, others: number, columns: number, claim: stri
   return lines;
 }
 
-export function resumeCommand(commands: CommandInfo[], research: boolean): string | null {
-  const tail = research ? 'research-flow' : 'feature-flow';
+// The conductor skill each `flow:` value belongs to.
+const SKILL: Record<string, string> = {
+  feature: 'feature-flow',
+  research: 'research-flow',
+  implement: 'implement',
+  fix: 'fix-flow',
+  upgrade: 'upgrade',
+};
+
+export function resumeCommand(commands: CommandInfo[], flow: string): string | null {
+  const tail = SKILL[flow];
+  if (!tail) return null;
   const hit = commands.find(
-    (c) => (c.plugin === 'feature-flow' || c.name.startsWith('feature-flow:')) && c.name.endsWith(tail),
+    (c) => (c.plugin === 'flows' || c.name.startsWith('flows:')) && (c.name === tail || c.name.endsWith(`:${tail}`)),
   );
   return hit?.name ?? null;
 }

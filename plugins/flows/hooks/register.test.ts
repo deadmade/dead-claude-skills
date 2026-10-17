@@ -11,8 +11,8 @@ const research = (spec = '- Spec: [spec.md](spec.md)') =>
 const SPEC = '## Hypothesis\n\n- **Claim:** caching cuts p95 by 30%\n';
 const START = { cwd: '/repo', surface: null, isInteractive: true } as const;
 const COMMANDS = [
-  { name: 'feature-flow:feature-flow', description: '', source: 'plugin', plugin: 'feature-flow' },
-  { name: 'feature-flow:research-flow', description: '', source: 'plugin', plugin: 'feature-flow' },
+  { name: 'flows:feature-flow', description: '', source: 'plugin', plugin: 'flows' },
+  { name: 'flows:research-flow', description: '', source: 'plugin', plugin: 'flows' },
 ];
 
 // Fakes the host: a file tree from `files` (directories implied by the paths), the repo, commands, toasts, tool calls.
@@ -101,7 +101,7 @@ const PROPS = {
 
 function band($: Engine, props: Partial<typeof PROPS> = {}, surface: 'terminal' | 'desktop' = 'terminal') {
   return $.ui.mount({
-    plugin: 'feature-flow',
+    plugin: 'flows',
     surface,
     component: 'AbovePrompt',
     props: { ...PROPS, ...props },
@@ -249,7 +249,7 @@ test('resume', async ($, on) => {
   const ui = await band($);
   expect((await ui.find({ key: 'resume' }))?.props.hotkey).toBe('1');
   await ui.press({ key: 'resume' });
-  expect(h.runs).toEqual([{ command: 'feature-flow:feature-flow', args: 'a' }]);
+  expect(h.runs).toEqual([{ command: 'flows:feature-flow', args: 'a' }]);
   h.isUnknown = true;
   await ui.press({ key: 'resume' });
   expect(h.toasts).toHaveLength(1);

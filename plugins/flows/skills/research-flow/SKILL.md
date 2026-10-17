@@ -43,8 +43,8 @@ differs.
 ## Start or resume
 
 - **With an argument, an existing run's slug** (`docs/features/<arg>/flow.md` exists in the repository root or a
-  worktree under `.worktrees/*/` or `.claude/worktrees/*/`): read the newest copy. Not `flow: research` → say it
-  belongs to `/feature-flow` and stop. `phase: done` → say it's done and ask what to do. When the newest copy is in
+  worktree under `.worktrees/*/` or `.claude/worktrees/*/`): read the newest copy. Not `flow: research` → say which
+  conductor it belongs to and stop. `phase: done` → say it's done and ask what to do. When the newest copy is in
   a worktree, work in that worktree (EnterWorktree with its path) and write that copy; if the switch is refused
   (EnterWorktree only switches into `.claude/worktrees/` from inside another worktree), say so and ask the user to
   start the session in that worktree. Then continue at its phase, as "Without one" does. Never create a flow.md over

@@ -1,0 +1,5 @@
+{
+  "claude-code": ["general-purpose"],
+  "web-mcp": ["search"],
+  "paper-lookup": ["paper-lookup"]
+}

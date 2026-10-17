@@ -55,6 +55,24 @@ test('changeList respects skip and counts the pending update', () => {
   assert.equal(changeList(initial(chosen), data).count, 1);
 });
 
+test('changeList installs the dependencies of a chosen plugin and removes them with it', () => {
+  const flows = `flows@${M}`;
+  const picks = `tob-picks@${M}`;
+  const withFlows = {
+    ...data,
+    pages: [{ ...pages[0], keys: [...pages[0].keys, flows] }],
+    current: { ...current, [flows]: false, [picks]: false },
+    deps: { [flows]: [picks, azure] },
+  };
+  const on = changeList({ ...initial(chosen), chosen: { ...chosen, [flows]: true } }, withFlows);
+  // azure's own row is off, but flows needs it.
+  assert.deepEqual(on.install.sort(), [azure, flows, picks].sort());
+  const had = { ...withFlows, current: { ...withFlows.current, [flows]: true, [picks]: true } };
+  const off = changeList({ ...initial(chosen), chosen: { ...chosen, [flows]: false, [picks]: true } }, had);
+  // tob-picks has no row: only flows keeps it.
+  assert.deepEqual(off.remove.sort(), [flows, picks].sort());
+});
+
 test('down/up wrap over start rows: pages, Updates, Apply, Quit', () => {
   const s = press(initial(chosen), 'up');
   assert.equal(s.cursor, 4);

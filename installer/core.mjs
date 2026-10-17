@@ -63,7 +63,7 @@ export function pinMarketplace(settings, version) {
 }
 const marketOf = (id) => id.split('@')[1];
 // Bare dependency names resolve against our marketplace, like Claude Code does.
-const idOf = (dep) => (dep.includes('@') ? dep : `${dep}@${MARKETPLACE}`);
+export const idOf = (dep) => (dep.includes('@') ? dep : `${dep}@${MARKETPLACE}`);
 
 export const bundleIds = (bundle) => [idOf(BUNDLE), ...bundle.dependencies.map(idOf)];
 
@@ -82,6 +82,17 @@ export function planPlugins(selected, installedIds, tokenPlugins) {
     handoff: missing.filter((id) => tokenPlugins.includes(id)),
     uninstall: installedIds.filter((id) => !selected.includes(id)),
   };
+}
+
+// Plugins only the flows conductors use: they come with flows (its dependencies) and get no row of their own.
+export const INCLUDED = ['mattpocock-picks', 'pstack-picks', 'tob-picks', 'self-review', 'paper-lookup'];
+
+// selected plus the opt-ins among their dependencies, transitively. depsOf(id): a plugin's dependency ids, if any.
+export function withDependencies(selected, depsOf, opts) {
+  const out = [...selected];
+  for (let i = 0; i < out.length; i++)
+    for (const d of depsOf(out[i]) ?? []) if (opts.includes(d) && !out.includes(d)) out.push(d);
+  return out;
 }
 
 // A plugin we manage, installed from a marketplace we don't take it from (it'd load twice).
@@ -375,19 +386,9 @@ export const TOGGLES = ['ccstatusline', 'sandbox', 'dcg', 'strip-defaults', 'cle
 export const CATEGORIES = [
   {
     id: 'workflow',
-    title: 'Workflows & skills',
-    blurb: 'Slash commands and skills that shape how Claude works.',
-    keys: [
-      'feature-flow',
-      'self-review',
-      'mattpocock-picks',
-      'pstack-picks',
-      'tob-picks',
-      'hallmark',
-      'paper-lookup',
-      'skill-creator',
-      'hookify',
-    ],
+    title: 'Conductors & skills',
+    blurb: 'flows runs the other skills in order and brings the ones it uses; plus standalone skills.',
+    keys: ['flows', 'hallmark', 'skill-creator', 'hookify'],
   },
   {
     id: 'lsp',
@@ -441,7 +442,7 @@ export const CATEGORIES = [
 export function categorize(keys) {
   const known = CATEGORIES.flatMap((c) => c.keys);
   const pages = CATEGORIES.map((c) => ({ ...c, keys: c.keys.flatMap((n) => keys.filter((k) => nameOf(k) === n)) }));
-  const rest = keys.filter((k) => !known.includes(nameOf(k)));
+  const rest = keys.filter((k) => !known.includes(nameOf(k)) && !INCLUDED.includes(nameOf(k)));
   if (rest.length) pages.push({ id: 'other', title: 'Other', blurb: 'Not sorted into a category yet.', keys: rest });
   return pages.filter((c) => c.keys.length);
 }

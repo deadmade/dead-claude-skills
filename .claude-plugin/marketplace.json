@@ -115,9 +115,9 @@
       "category": "development"
     },
     {
-      "name": "feature-flow",
-      "description": "/feature-flow: brainstorm with prior art, grill with domain docs, plan, have Claude evaluate the plan, then execute and finish through superpowers. /research-flow does the same grounded in papers (web-mcp's paper search, with paper-lookup as the fallback), with a hypothesis measured before finishing. Two approval gates, no lock. A band above the prompt shows the current run's phase, gates and deviations; 1 resumes it from an idle prompt. Opt-in.",
-      "source": "./plugins/feature-flow",
+      "name": "flows",
+      "description": "Conductor skills that run the rest of the marketplace in order, with approval gates and resumable state: /feature-flow, /research-flow, /implement, /fix-flow and /upgrade build; /test-audit, /doc-audit and /harden check a branch or the whole repo; /verify proves a branch is ready for a PR; /understand teaches a codebase; /learn saves what a flow taught. A band above the prompt shows the current run's phase, gates and deviations; 1 resumes it from an idle prompt. Installs every plugin its conductors use. Opt-in.",
+      "source": "./plugins/flows",
       "category": "development"
     },
     {

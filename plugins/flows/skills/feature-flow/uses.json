@@ -1,0 +1,6 @@
+{
+  "pstack-picks": ["how", "architect", "arena"],
+  "claude-code": ["general-purpose"],
+  "superpowers": ["brainstorming", "writing-plans", "subagent-driven-development", "executing-plans"],
+  "mattpocock-picks": ["grilling", "domain-modeling"]
+}

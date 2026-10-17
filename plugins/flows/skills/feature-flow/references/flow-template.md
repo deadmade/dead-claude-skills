@@ -9,6 +9,7 @@ frontmatter first.
 
 ```markdown
 ---
+flow: feature
 phase: ground
 ---
 

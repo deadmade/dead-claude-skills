@@ -72,6 +72,7 @@ test('gateDate: reopened and re-approved', () => {
 test('parseFlow: the template', () => {
   expect(parseFlow(TEMPLATE)).toMatchObject({
     phase: 'ground',
+    flow: 'feature',
     research: false,
     gates: [null, null],
     deviations: false,
@@ -83,7 +84,12 @@ test('parseFlow: gates, phase and flow from frontmatter', () => {
     '- Gate 1, spec approved:',
     '- Gate 1, spec approved: 2026-10-13 ("ok")',
   );
-  expect(parseFlow(text)).toMatchObject({ phase: 'plan', research: true, gates: ['2026-10-13', null] });
+  expect(parseFlow(text)).toMatchObject({
+    phase: 'plan',
+    flow: 'research',
+    research: true,
+    gates: ['2026-10-13', null],
+  });
 });
 
 test('parseFlow: no frontmatter gives phase ?', () => {
@@ -109,6 +115,7 @@ const run = (slug: string, mtimeMs: number, phase = 'plan'): Run => ({
   slug,
   path: `/r/docs/features/${slug}/flow.md`,
   mtimeMs,
+  flow: 'feature',
   research: false,
   phase,
   gates: ['2026-10-17', null],
@@ -204,7 +211,7 @@ test('claimOf', () => {
 });
 
 test('bandLines: research second line', () => {
-  const r: Run = { ...run('rs', 1), research: true, baseline: '412ms', verdict: 'supported' };
+  const r: Run = { ...run('rs', 1), flow: 'research', research: true, baseline: '412ms', verdict: 'supported' };
   const lines = bandLines(r, 0, 100, 'caching cuts p95');
   expect(lines).toHaveLength(2);
   for (const s of ['caching cuts p95', '412ms', 'supported']) expect(lines[1]).toContain(s);
@@ -218,11 +225,14 @@ test('bandLines: research second line', () => {
 test('resumeCommand', () => {
   const c = (name: string, plugin?: string): CommandInfo =>
     ({ name, description: '', source: 'plugin', plugin }) as CommandInfo;
-  const cmds = [c('feature-flow:feature-flow', 'feature-flow'), c('feature-flow:research-flow', 'feature-flow')];
-  expect(resumeCommand(cmds, false)).toBe('feature-flow:feature-flow');
-  expect(resumeCommand(cmds, true)).toBe('feature-flow:research-flow');
-  expect(resumeCommand([c('feature-flow:feature-flow'), c('feature-flow:research-flow')], true)).toBe(
-    'feature-flow:research-flow',
-  );
-  expect(resumeCommand([c('other:feature-flow', 'other')], false)).toBeNull();
+  const cmds = [c('flows:feature-flow', 'flows'), c('flows:research-flow', 'flows')];
+  expect(resumeCommand(cmds, 'feature')).toBe('flows:feature-flow');
+  expect(resumeCommand(cmds, 'research')).toBe('flows:research-flow');
+  expect(resumeCommand([c('flows:feature-flow'), c('flows:research-flow')], 'research')).toBe('flows:research-flow');
+  expect(resumeCommand([c('other:feature-flow', 'other')], 'feature')).toBeNull();
+  const more = [c('flows:implement', 'flows'), c('flows:fix-flow', 'flows'), c('flows:upgrade', 'flows')];
+  expect(resumeCommand(more, 'implement')).toBe('flows:implement');
+  expect(resumeCommand(more, 'fix')).toBe('flows:fix-flow');
+  expect(resumeCommand(more, 'upgrade')).toBe('flows:upgrade');
+  expect(resumeCommand(more, 'nope')).toBeNull();
 });

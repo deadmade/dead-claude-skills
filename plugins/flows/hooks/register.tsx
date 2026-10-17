@@ -1,17 +1,17 @@
-// The current feature-flow run in a band above the prompt, with a key to resume it. Only reads; never writes.
+// The current flow run (feature, research, implement, fix, upgrade) in a band above the prompt, with a key to resume it. Only reads; never writes.
 import { atom, read, update } from 'claude-code';
-import type { EngineInterface as $, Register } from 'claude-code';
+import type { CommandInfo, EngineInterface as $, Register } from 'claude-code';
 
 import type { Band, Run } from '../types';
 import { bandLines, claimOf, newest, parseFlow, pickCurrent, resumeCommand, slugOf } from './flow';
 
 const POLL_MS = 5000;
 
-const band = atom({ plugin: 'feature-flow', key: 'band' } as const, null);
+const band = atom({ plugin: 'flows', key: 'band' } as const, null);
 
 // Module state: a reload starts it over.
 let touched: { slug: string; path: string } | null = null; // the flow.md this session last wrote
-let command: { feature: string | null; research: string | null } = { feature: null, research: null };
+let commands: CommandInfo[] = [];
 const seen = new Map<string, Run>(); // parsed copies, keyed by path, valid while mtimeMs matches
 let busy = false;
 let again = false;
@@ -76,7 +76,7 @@ async function poll($: $) {
     run: current,
     others,
     showKey: touched?.slug !== current.slug && current.phase !== 'done',
-    command: command[current.research ? 'research' : 'feature'],
+    command: resumeCommand(commands, current.flow),
     claim: await claimFor($, current),
   };
   await update($, band, () => value);
@@ -100,15 +100,14 @@ async function refresh($: $) {
 
 export const register: Register = (on) => {
   touched = null;
-  command = { feature: null, research: null };
+  commands = [];
   seen.clear();
   busy = false;
   again = false;
 
   on('session.start', async ($, e, next) => {
     try {
-      const commands = await $.command.list();
-      command = { feature: resumeCommand(commands, false), research: resumeCommand(commands, true) };
+      commands = await $.command.list();
     } catch {
       // no resume key without the command
     }
