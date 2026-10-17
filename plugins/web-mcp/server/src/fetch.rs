@@ -15,7 +15,7 @@ use url::{Host, Url};
 
 use crate::Ctx;
 use crate::archive::{Archived, Item, is_private, is_private_ip};
-use crate::extract::{Page, extract_html, extract_pdf};
+use crate::extract::{Page, extract_html, extract_pdf, near_empty};
 use crate::images;
 use crate::limits::HostPermit;
 use crate::rank::PassageDoc;
@@ -29,7 +29,7 @@ const MAX_REDIRECTS: usize = 10;
 
 #[derive(Clone, Copy)]
 pub struct GetOpts {
-    #[allow(dead_code)] // read by the browser fallback (Task 10)
+    /// Re-render a near-empty (client-rendered) page in agent-browser.
     pub browser_fallback: bool,
     /// Also download and archive the page's content images.
     pub images: bool,
@@ -54,6 +54,8 @@ pub struct Fetched {
     pub private: bool,
     pub archived: Archived,
     pub page: Page,
+    /// Something the caller should be told, e.g. that an empty page could not be re-rendered.
+    pub note: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -230,6 +232,7 @@ async fn from_cache(ctx: &Ctx, archived: Archived) -> Result<Fetched, FetchError
             markdown,
             images: Vec::new(),
         },
+        note: None,
     })
 }
 
@@ -278,6 +281,7 @@ async fn run(
     let blocking = |f: Box<dyn FnOnce() -> Page + Send>| async move {
         tokio::task::spawn_blocking(f).await.map_err(net)
     };
+    let mut note = None;
     let (page, item) = match dl.kind {
         Kind::Pdf => {
             let bytes = dl.body;
@@ -304,9 +308,25 @@ async fn run(
         kind => {
             let raw = dl.body;
             let text = String::from_utf8_lossy(&raw).into_owned(); // shortcut: non-UTF-8 pages decode lossily
+            let mut rendered = None;
             let page = if let Kind::Html = kind {
                 let base = final_url.clone();
-                blocking(Box::new(move || extract_html(&text, &base))).await?
+                let mut page = {
+                    let base = base.clone();
+                    blocking(Box::new(move || extract_html(&text, &base))).await?
+                };
+                // A private page that this fetch may not reach was refused in `download` already.
+                if opts.browser_fallback && near_empty(&page) {
+                    match browser_page(ctx, &final_url, opts.allow_private).await {
+                        Ok(html) => {
+                            let h = html.clone();
+                            page = blocking(Box::new(move || extract_html(&h, &base))).await?;
+                            rendered = Some(html);
+                        }
+                        Err(why) => note = Some(why),
+                    }
+                }
+                page
             } else {
                 Page {
                     title: String::new(),
@@ -329,7 +349,7 @@ async fn run(
                 final_url: final_url.clone(),
                 raw,
                 raw_ext,
-                rendered: None,
+                rendered,
                 markdown: page.markdown.clone(),
                 images,
                 cache: !private,
@@ -351,7 +371,37 @@ async fn run(
         private,
         archived,
         page,
+        note,
     })
+}
+
+/// The page rendered by agent-browser. The browser follows redirects on its own, so where it ended
+/// is checked like a fetch hop: a landing on a private address is dropped unless `allow_private`.
+/// The `Err` is a note for the reader.
+async fn browser_page(ctx: &Ctx, url: &Url, allow_private: bool) -> Result<String, String> {
+    let (html, landed) = ctx.browser.rendered_html(url).await.map_err(|e| {
+        format!("(This page looks empty without JavaScript, and the browser fallback failed: {e})")
+    })?;
+    if !allow_private && private_landing(&landed).await {
+        return Err(format!(
+            "(This page looks empty without JavaScript; the browser ended on {landed}, a private-network address this fetch may not reach, so its content was dropped.)"
+        ));
+    }
+    Ok(html)
+}
+
+/// Private by URL or by any resolved address; unresolvable counts as private.
+async fn private_landing(url: &Url) -> bool {
+    if is_private(url) {
+        return true;
+    }
+    let (Some(host), Some(port)) = (url.host_str(), url.port_or_known_default()) else {
+        return true;
+    };
+    match tokio::net::lookup_host((host.trim_matches(['[', ']']), port)).await {
+        Ok(addrs) => addrs.into_iter().any(|a| is_private_ip(a.ip())),
+        Err(_) => true,
+    }
 }
 
 /// Adds the page's passages to the archive index. A failure only costs search recall, so it is
@@ -637,7 +687,11 @@ pub async fn render(ctx: &Ctx, f: &Fetched, with_images: bool) -> CallToolResult
     let limit = cap.saturating_sub(source.chars().count() + 2 + other_line.chars().count());
     let note = format!("[… truncated: the full page is at .web/{full}]");
     let md = truncate(&f.page.markdown, limit, &note);
-    let mut text = format!("{source}\n\n{md}{other_line}");
+    let note_line = f
+        .note
+        .as_ref()
+        .map_or_else(String::new, |n| format!("\n\n{n}"));
+    let mut text = format!("{source}\n\n{md}{other_line}{note_line}");
     // Only an absurdly long URL gets here: cut the block hard rather than break the cap.
     if let Some((i, _)) = text.char_indices().nth(cap) {
         text.truncate(i);
@@ -702,6 +756,10 @@ mod tests {
     }
 
     fn test_ctx() -> Arc<Ctx> {
+        test_ctx_with(crate::browser::Browser::new("agent-browser"))
+    }
+
+    fn test_ctx_with(browser: crate::browser::Browser) -> Arc<Ctx> {
         let _ = rustls::crypto::ring::default_provider().install_default();
         let project = std::env::temp_dir().join(format!(
             "web-mcp-fetch-unit-{}-{}",
@@ -731,6 +789,7 @@ mod tests {
             http_public: client(true).unwrap(),
             limits: crate::limits::HostLimits::default(),
             inflight: Inflight::default(),
+            browser,
         })
     }
 
@@ -764,6 +823,23 @@ mod tests {
         assert!(matches!(restricted, Err(FetchError::Blocked(_))));
         let ok = first.await.unwrap().map_err(|e| e.to_string()).unwrap();
         assert_eq!(ok.page.markdown, "# hi\n");
+    }
+
+    #[tokio::test]
+    async fn fallback_landing_on_private_url_is_dropped() {
+        // The fake sits next to the test binary's deps/ folder; cargo builds it for the integration tests.
+        let exe = std::env::current_exe().unwrap();
+        let fake = exe.parent().and_then(Path::parent).unwrap().join(format!(
+            "fake-agent-browser{}",
+            std::env::consts::EXE_SUFFIX
+        ));
+        assert!(fake.is_file(), "build the fake first: cargo build --bins");
+        let ctx = test_ctx_with(crate::browser::Browser { bin: fake });
+        let url = Url::parse("http://example.com/redirect-private").unwrap();
+        let dropped = browser_page(&ctx, &url, false).await.unwrap_err();
+        assert!(dropped.contains("http://127.0.0.1/admin"), "{dropped}");
+        let own = browser_page(&ctx, &url, true).await.unwrap();
+        assert!(own.contains("Rendered page for"), "{own}");
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -813,6 +889,7 @@ mod tests {
                 markdown: "hi".into(),
                 images: Vec::new(),
             },
+            note: None,
         };
         let r = render(&ctx, &f, false).await;
         let t = &r.content[0].as_text().unwrap().text;

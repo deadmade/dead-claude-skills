@@ -1,0 +1,212 @@
+//! agent-browser, driven as a child process: one `--json` call per action, one named session per browser.
+
+use std::ffi::OsStr;
+use std::fmt;
+use std::path::{Path, PathBuf};
+use std::process::Stdio;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Duration;
+
+use serde_json::{Value, json};
+use tokio::io::AsyncWriteExt as _;
+use tokio::process::Command;
+use url::Url;
+
+/// Per call; a browser that hangs is killed.
+const CALL_TIMEOUT: Duration = Duration::from_secs(60);
+/// Characters of page output per call: under Claude Code's 25,000-token cap on MCP results.
+const MAX_OUTPUT: &str = "40000";
+
+#[derive(Debug)]
+pub enum BrowserError {
+    Missing,
+    Failed(String),
+}
+
+impl fmt::Display for BrowserError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Missing => f.write_str(
+                "agent-browser is not installed. Install it with the web-mcp installer, or `npm install -g agent-browser && agent-browser install`.",
+            ),
+            Self::Failed(m) => f.write_str(m),
+        }
+    }
+}
+
+pub struct Browser {
+    pub bin: PathBuf,
+}
+
+impl Browser {
+    /// `name` as configured: found on PATH, or kept as given so that running it reports `Missing`.
+    #[must_use]
+    pub fn new(name: &str) -> Self {
+        Self {
+            bin: Self::resolve(name).unwrap_or_else(|| name.into()),
+        }
+    }
+
+    /// A path to an existing file, or `name` found on PATH. On Windows each `PATHEXT` extension is
+    /// tried too, so npm's `agent-browser.cmd` resolves (Rust runs `.cmd` files through cmd.exe itself).
+    #[must_use]
+    pub fn resolve(name: &str) -> Option<PathBuf> {
+        let exts = std::env::var("PATHEXT").unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".into());
+        let path = std::env::var_os("PATH").unwrap_or_default();
+        resolve_in(name, &path, cfg!(windows).then_some(exts.as_str()))
+    }
+
+    /// Runs `agent-browser --session <session> --json … <args>` and returns its `data`.
+    ///
+    /// # Errors
+    /// `Missing` when the binary can't be started; `Failed` when the call times out, answers
+    /// `{"success": false}`, or answers no JSON.
+    pub async fn run(&self, session: &str, args: &[String]) -> Result<Value, BrowserError> {
+        self.run_with(session, args, None).await
+    }
+
+    async fn run_with(
+        &self,
+        session: &str,
+        args: &[String],
+        stdin: Option<&str>,
+    ) -> Result<Value, BrowserError> {
+        let mut child = Command::new(&self.bin)
+            .args(["--session", session, "--json", "--max-output", MAX_OUTPUT])
+            .arg("--content-boundaries")
+            .args(args)
+            .stdin(if stdin.is_some() {
+                Stdio::piped()
+            } else {
+                Stdio::null()
+            })
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .kill_on_drop(true)
+            .spawn()
+            .map_err(|e| match e.kind() {
+                std::io::ErrorKind::NotFound => BrowserError::Missing,
+                _ => BrowserError::Failed(format!("could not start agent-browser: {e}")),
+            })?;
+        if let (Some(input), Some(mut pipe)) = (stdin, child.stdin.take()) {
+            let _ = pipe.write_all(input.as_bytes()).await; // a dead child shows in its output
+        }
+        // Dropping the future on timeout kills the child (kill_on_drop).
+        let out = tokio::time::timeout(CALL_TIMEOUT, child.wait_with_output())
+            .await
+            .map_err(|_| BrowserError::Failed("agent-browser did not answer within 60 s".into()))?
+            .map_err(|e| BrowserError::Failed(e.to_string()))?;
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        let Ok(v) = serde_json::from_str::<Value>(stdout.trim()) else {
+            let err = String::from_utf8_lossy(&out.stderr);
+            let msg = format!("{}{}", stdout.trim(), err.trim());
+            return Err(BrowserError::Failed(if msg.is_empty() {
+                format!("agent-browser exited with {} and no output", out.status)
+            } else {
+                msg
+            }));
+        };
+        if v["success"] == false {
+            return Err(BrowserError::Failed(failure(&v)));
+        }
+        Ok(v.get("data").cloned().unwrap_or(v))
+    }
+
+    /// Runs `commands` as one `batch --json` (read from stdin, so no value is parsed as a flag) and
+    /// returns each command's result.
+    ///
+    /// # Errors
+    /// As `run`, or when the answer is not one result per command or a command failed.
+    pub async fn batch(
+        &self,
+        session: &str,
+        commands: &[Vec<&str>],
+    ) -> Result<Vec<Value>, BrowserError> {
+        let input = json!(commands).to_string();
+        let args = ["batch".to_owned(), "--json".to_owned()];
+        let answer = self.run_with(session, &args, Some(&input)).await?;
+        // One entry per command: {"command", "success", "result"}.
+        let entries = answer.as_array().ok_or_else(|| {
+            BrowserError::Failed("agent-browser's batch answer is not a list".into())
+        })?;
+        if let Some(bad) = entries.iter().find(|e| e["success"] == false) {
+            return Err(BrowserError::Failed(failure(bad)));
+        }
+        if entries.len() != commands.len() {
+            return Err(BrowserError::Failed(
+                "agent-browser's batch answered fewer results than commands".into(),
+            ));
+        }
+        Ok(entries
+            .iter()
+            .map(|e| e.get("result").unwrap_or(&e["data"]).clone())
+            .collect())
+    }
+
+    /// The rendered `<body>` of `url` and the URL the browser ended on (redirects included), from one
+    /// batch in a session of its own that is closed again.
+    ///
+    /// # Errors
+    /// As `batch`, or when it answers no HTML or no URL.
+    pub async fn rendered_html(&self, url: &Url) -> Result<(String, Url), BrowserError> {
+        static N: AtomicU64 = AtomicU64::new(0);
+        let session = format!("web-mcp-fetch-{}", N.fetch_add(1, Ordering::Relaxed));
+        let cmds = [
+            vec!["open", url.as_str()],
+            vec!["get", "html", "body"],
+            vec!["get", "url"],
+        ];
+        let answer = self.batch(&session, &cmds).await;
+        let _ = self.run(&session, &["close".to_owned()]).await;
+        let answer = answer?;
+        let field =
+            |v: &Value, key: &str| v.as_str().or_else(|| v[key].as_str()).map(str::to_owned);
+        let html = field(&answer[1], "html");
+        let landed = field(&answer[2], "url").and_then(|u| Url::parse(&u).ok());
+        html.zip(landed)
+            .ok_or_else(|| BrowserError::Failed("agent-browser returned no HTML or URL".into()))
+    }
+}
+
+fn failure(v: &Value) -> String {
+    match v.get("error").or_else(|| v.get("message")) {
+        Some(Value::String(s)) => s.clone(),
+        Some(e) => e.to_string(),
+        None => "agent-browser reported a failure".into(),
+    }
+}
+
+fn resolve_in(name: &str, path: &OsStr, pathext: Option<&str>) -> Option<PathBuf> {
+    let exts = pathext
+        .into_iter()
+        .flat_map(|e| e.split(';'))
+        .filter(|e| !e.is_empty());
+    let exts: Vec<&str> = std::iter::once("").chain(exts).collect();
+    let find = |dir: &Path| {
+        exts.iter().find_map(|ext| {
+            let p = dir.join(format!("{name}{ext}"));
+            p.is_file().then_some(p)
+        })
+    };
+    if name.contains(['/', '\\']) {
+        return find(Path::new(""));
+    }
+    std::env::split_paths(path).find_map(|d| find(&d))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolve_finds_cmd_via_pathext() {
+        let dir = std::env::temp_dir().join(format!("web-mcp-resolve-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("agent-browser.CMD"), "").unwrap();
+        let path = std::env::join_paths([&dir]).unwrap();
+        let got = resolve_in("agent-browser", &path, Some(".COM;.EXE;.CMD"));
+        assert_eq!(got, Some(dir.join("agent-browser.CMD")));
+        assert_eq!(resolve_in("agent-browser", &path, None), None);
+        assert_eq!(resolve_in("nope", &path, Some(".CMD")), None);
+    }
+}

@@ -1,4 +1,5 @@
 mod archive;
+mod browser;
 mod config;
 mod extract;
 mod fetch;
@@ -25,6 +26,7 @@ pub struct Ctx {
     pub inflight: fetch::Inflight,
     pub index: rank::Index,
     pub search: search::SearxNg,
+    pub browser: browser::Browser,
 }
 
 #[tokio::main]
@@ -45,6 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         index: rank::Index::open(archive.web())?,
         archive,
+        browser: browser::Browser::new(&cfg.agent_browser),
         http,
         http_public: fetch::client(true)?,
         limits: limits::HostLimits::default(),
