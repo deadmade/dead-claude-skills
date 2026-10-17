@@ -89,11 +89,19 @@ const session = await mcpSession(bin, { ...env, CLAUDE_PROJECT_DIR: dir });
 const p95 = (xs) => [...xs].sort((a, b) => a - b)[Math.ceil(xs.length * 0.95) - 1];
 let code = 0;
 try {
-  const search = (i) => session.call('search', { query: queries[i % queries.length] });
-  const warm = await search(0);
-  if (!live && /No passages matched/.test(warm.text)) {
-    throw new Error('the warm-up search returned no passages: is this a --features test-hooks build?');
-  }
+  // A hung server fails the run instead of waiting forever; an answer without passages isn't a timed search.
+  const search = async (i) => {
+    let timer;
+    const r = await Promise.race([
+      session.call('search', { query: queries[i % queries.length] }),
+      new Promise((_, reject) => (timer = setTimeout(() => reject(new Error('search took over 60 s')), 60_000))),
+    ]).finally(() => clearTimeout(timer));
+    if (!live && /No passages matched/.test(r.text)) {
+      throw new Error('a search returned no passages: is this a --features test-hooks build?');
+    }
+    return r;
+  };
+  await search(0);
   const single = [];
   for (let i = 0; i < SINGLE; i++) single.push((await search(i)).ms);
   const conc = [];
