@@ -507,8 +507,11 @@ const chosen = {
   ...current,
   'strip-defaults': FLAGS.includes('--strip-defaults') || current['strip-defaults'],
   clean: FLAGS.includes('--clean'),
-  // On by default where offered; it does nothing unless web-mcp is selected and SearXNG answers.
-  'web-builtins-off': unavailable('web-builtins-off', process.platform, process.arch, BIN_VERSION) === undefined,
+  // On by default where offered, until web-mcp is installed; then it keeps the user's choice. It does nothing unless
+  // web-mcp is selected and SearXNG answers.
+  'web-builtins-off': has(WEB_MCP)
+    ? current['web-builtins-off']
+    : unavailable('web-builtins-off', process.platform, process.arch, BIN_VERSION) === undefined,
 };
 
 // Options that can't work here stay off the pages, unless they're on already: hiding never removes anything.
