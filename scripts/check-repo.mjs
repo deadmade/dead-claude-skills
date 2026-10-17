@@ -55,7 +55,8 @@ const flowsManifest = `${FLOWS}/.claude-plugin/plugin.json`;
 const regen = 'run node scripts/flows-uses.mjs';
 if (JSON.stringify(JSON.parse(readFileSync(flowsManifest, 'utf8')).dependencies) !== JSON.stringify(expectedDeps(uses)))
   problems.push(`${flowsManifest}: dependencies differ from the conductors' uses.json: ${regen}`);
-const flowsReadme = readFileSync(`${FLOWS}/README.md`, 'utf8');
+// A Windows checkout has CRLF; the generated tree is LF.
+const flowsReadme = readFileSync(`${FLOWS}/README.md`, 'utf8').replace(/\r\n/g, '\n');
 if (withTree(flowsReadme, renderTree(uses)) !== flowsReadme)
   problems.push(`${FLOWS}/README.md: uses tree is stale: ${regen}`);
 
