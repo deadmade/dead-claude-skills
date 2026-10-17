@@ -30,9 +30,10 @@ import {
   cswapDownload,
   cswapCurrent,
   pathWith,
-  brvAsset,
+  BIN_PLUGINS,
+  binAsset,
   sha256Of,
-  brvAction,
+  binAction,
   CATEGORIES,
   TOGGLES,
   categorize,
@@ -343,18 +344,43 @@ test('cswap missing on Linux points at uv', () => {
 });
 
 test('brv downloads the release archive built for this machine', () => {
-  const win = brvAsset('win32', 'x64', '1.2.3');
+  const win = binAsset('brv', 'win32', 'x64', '1.2.3');
   assert.equal(
     win.url,
     'https://github.com/deadmade/dead-claude-skills/releases/download/v1.2.3/brv-x86_64-pc-windows-msvc.zip',
   );
   assert.equal(win.sha256, `${win.url}.sha256`);
   assert.equal(win.exe, 'brv.exe');
-  assert.equal(brvAsset('linux', 'x64', '1.0.0').file, 'brv-x86_64-unknown-linux-musl.tar.gz');
-  assert.equal(brvAsset('linux', 'arm64', '1.0.0').file, 'brv-aarch64-unknown-linux-musl.tar.gz');
-  assert.equal(brvAsset('darwin', 'arm64', '1.0.0').exe, 'brv');
-  assert.equal(brvAsset('win32', 'arm64', '1.0.0'), undefined);
-  assert.equal(brvAsset('freebsd', 'x64', '1.0.0'), undefined);
+  assert.equal(binAsset('brv', 'linux', 'x64', '1.0.0').file, 'brv-x86_64-unknown-linux-musl.tar.gz');
+  assert.equal(binAsset('brv', 'linux', 'arm64', '1.0.0').file, 'brv-aarch64-unknown-linux-musl.tar.gz');
+  assert.equal(binAsset('brv', 'darwin', 'arm64', '1.0.0').exe, 'brv');
+  assert.equal(binAsset('brv', 'win32', 'arm64', '1.0.0'), undefined);
+  assert.equal(binAsset('brv', 'freebsd', 'x64', '1.0.0'), undefined);
+});
+
+test('web-mcp downloads its own archive, and each plugin is configured under its own key', () => {
+  const t = {
+    'win32-x64': 'x86_64-pc-windows-msvc',
+    'linux-x64': 'x86_64-unknown-linux-musl',
+    'linux-arm64': 'aarch64-unknown-linux-musl',
+    'darwin-arm64': 'aarch64-apple-darwin',
+    'darwin-x64': 'x86_64-apple-darwin',
+  };
+  for (const [k, target] of Object.entries(t)) {
+    const [platform, arch] = k.split('-');
+    for (const name of ['brv', 'web-mcp']) {
+      const a = binAsset(name, platform, arch, '1.2.3');
+      assert.equal(a.file, `${name}-${target}.${platform === 'win32' ? 'zip' : 'tar.gz'}`);
+      assert.equal(a.exe, name + (platform === 'win32' ? '.exe' : ''));
+    }
+  }
+  assert.equal(binAsset('web-mcp', 'linux', 'ia32', '1.0.0'), undefined);
+  assert.deepEqual(BIN_PLUGINS['tui-review'], { name: 'brv', key: 'brvPath' });
+  assert.deepEqual(BIN_PLUGINS['web-mcp'], { name: 'web-mcp', key: 'binPath' });
+  for (const [plugin, { key }] of Object.entries(BIN_PLUGINS))
+    assert.ok(json(`plugins/${plugin}/.claude-plugin/plugin.json`).userConfig[key], `${plugin} has userConfig ${key}`);
+  assert.match(unavailable('web-mcp', 'linux', 'ia32', '1.0.0'), /no web-mcp build for linux-ia32/);
+  assert.equal(unavailable('web-mcp', 'linux', 'x64', '1.0.0'), undefined);
 });
 
 test('brv versions match the release the installer fetches', () => {
@@ -368,7 +394,7 @@ test('brv checksum lines and what to do about brv', () => {
   assert.equal(sha256Of(`${hex}`), hex.toLowerCase());
   assert.equal(sha256Of('Not Found'), undefined);
   assert.equal(sha256Of(`${hex}ff  x`), undefined);
-  const at = (o) => brvAction({ onPath: false, installed: undefined, version: '0.2.0', supported: true, ...o });
+  const at = (o) => binAction({ onPath: false, installed: undefined, version: '0.2.0', supported: true, ...o });
   assert.equal(at({ onPath: true }), 'skip');
   assert.equal(at({ installed: '0.2.0' }), 'configure');
   assert.equal(at({ installed: '0.1.0' }), 'download');

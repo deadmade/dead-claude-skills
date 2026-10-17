@@ -301,9 +301,13 @@ export function missingBinaries(platform, wanted, onPath) {
   });
 }
 
-// brv, the tui-review plugin's binary, built per platform by .github/workflows/build-brv.yml and attached to the
-// vX.Y.Z release by release.yml.
-const BRV_TARGETS = {
+// The binaries releases ship, built per platform by .github/workflows/build-{brv,web-mcp}.yml and attached to the
+// vX.Y.Z release by release.yml. plugin: which plugin needs it; key: its userConfig key for the binary's path.
+export const BIN_PLUGINS = {
+  'tui-review': { name: 'brv', key: 'brvPath' },
+  'web-mcp': { name: 'web-mcp', key: 'binPath' },
+};
+const BIN_TARGETS = {
   'win32-x64': 'x86_64-pc-windows-msvc',
   'linux-x64': 'x86_64-unknown-linux-musl',
   'linux-arm64': 'aarch64-unknown-linux-musl',
@@ -311,22 +315,22 @@ const BRV_TARGETS = {
   'darwin-x64': 'x86_64-apple-darwin',
 };
 
-// The release archive of brv `version` for this machine, or undefined where none is built.
-export function brvAsset(platform, arch, version) {
-  const target = BRV_TARGETS[`${platform}-${arch}`];
+// The release archive of binary `name` ('brv' or 'web-mcp') at `version` for this machine, or undefined where none is built.
+export function binAsset(name, platform, arch, version) {
+  const target = BIN_TARGETS[`${platform}-${arch}`];
   if (!target) return undefined;
-  const file = `brv-${target}.${platform === 'win32' ? 'zip' : 'tar.gz'}`;
+  const file = `${name}-${target}.${platform === 'win32' ? 'zip' : 'tar.gz'}`;
   const url = `${RELEASES}/v${version}/${file}`;
-  return { file, url, sha256: `${url}.sha256`, exe: platform === 'win32' ? 'brv.exe' : 'brv' };
+  return { file, url, sha256: `${url}.sha256`, exe: platform === 'win32' ? `${name}.exe` : name };
 }
 
 // The checksum a `sha256sum` line starts with, lowercased; undefined when the text is not one.
 export const sha256Of = (text) => /^[0-9a-f]{64}(?=\s|$)/i.exec(text.trim())?.[0].toLowerCase();
 
-// What to do about brv: `skip` (a brv on PATH is the user's own), `configure` (ours is current, point the plugin at
+// What to do about a binary: `skip` (one on PATH is the user's own), `configure` (ours is current, point the plugin at
 // it), `download` (none, or an older one), or `unsupported` (no build for this machine).
 // installed: the version our copy reports, or undefined when there is none.
-export function brvAction({ onPath, installed, version, supported }) {
+export function binAction({ onPath, installed, version, supported }) {
   if (onPath) return 'skip';
   if (installed === version) return 'configure';
   return supported ? 'download' : 'unsupported';
@@ -424,13 +428,14 @@ export const HINTS = {
   clean: `clean slate: back up, then reset settings.json and delete ${CLEAN_TARGETS.join(', ')}`,
 };
 
-// Why an option can't work on this machine, or undefined when it can. version: the brv release to look for.
+// Why an option can't work on this machine, or undefined when it can. version: the release whose binaries to look for.
 export function unavailable(key, platform, arch, version) {
   const name = nameOf(key);
   if (platform === 'win32' && name === 'sandbox') return 'needs WSL2';
   if (platform === 'win32' && name === 'nix-lsp') return 'nixd is not available on Windows';
   if (platform !== 'win32' && name === 'cswap') return 'releases ship cswap.exe for Windows only';
-  if (name === 'tui-review' && !brvAsset(platform, arch, version)) return `no brv build for ${platform}-${arch}`;
+  const bin = BIN_PLUGINS[name];
+  if (bin && !binAsset(bin.name, platform, arch, version)) return `no ${bin.name} build for ${platform}-${arch}`;
   return undefined;
 }
 
