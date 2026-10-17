@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use serde_json::{Value, json};
 
-use super::{Outcome, Part, deadline};
+use super::{Outcome, Part, deadline, pretty};
 use crate::Ctx;
 use crate::api::Answer;
 
@@ -101,13 +101,6 @@ async fn get(ctx: &Ctx, url: &url::Url) -> Result<Answer, String> {
         true,
     )
     .await
-}
-
-fn pretty(body: &str) -> String {
-    serde_json::from_str::<Value>(body)
-        .ok()
-        .and_then(|v| serde_json::to_string_pretty(&v).ok())
-        .unwrap_or_else(|| body.to_owned())
 }
 
 fn part(source: &'static str, got: Answer, shown: String, id: &str) -> Part {
@@ -237,6 +230,9 @@ async fn kev(ctx: &Ctx, id: &str) -> Outcome {
             }
             let v: Value =
                 serde_json::from_str(&got.body).map_err(|e| format!("not JSON ({e})"))?;
+            if !v["vulnerabilities"].is_array() {
+                return Err("no vulnerabilities array in the feed".to_owned());
+            }
             o.parts.push(Part {
                 source: KEV_FEED,
                 url: got.url,

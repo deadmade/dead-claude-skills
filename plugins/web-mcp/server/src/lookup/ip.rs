@@ -69,7 +69,7 @@ async fn ask(ctx: &Ctx, ip: IpAddr) -> Result<Part, String> {
     )
     .await?;
     let shown = match got.status {
-        200..=299 => got.body.clone(),
+        200..=299 => super::pretty(&got.body),
         // InternetDB answers 404 for an address it has never seen.
         404 => format!("InternetDB has no information on {ip}."),
         s => return Err(format!("HTTP {s}")),

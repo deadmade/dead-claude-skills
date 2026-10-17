@@ -83,6 +83,14 @@ pub struct Outcome {
 }
 
 /// `WEB_MCP_LOOKUP_MS` if set, else the source's own `default`.
+/// `body` as indented JSON, or unchanged when it isn't JSON.
+pub fn pretty(body: &str) -> String {
+    serde_json::from_str::<Value>(body)
+        .ok()
+        .and_then(|v| serde_json::to_string_pretty(&v).ok())
+        .unwrap_or_else(|| body.to_owned())
+}
+
 pub fn deadline(ctx: &Ctx, default: Duration) -> Duration {
     ctx.cfg.lookup_deadline.unwrap_or(default)
 }

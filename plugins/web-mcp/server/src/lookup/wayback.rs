@@ -36,6 +36,11 @@ pub async fn run(ctx: &Arc<Ctx>, target: &str, at: Option<&str>) -> CallToolResu
         Ok(u) => u,
         Err(e) => return error(format!("{target}: not a URL ({e})")),
     };
+    // Dot segments (also %2e%2e) in the target must not climb out of /web/<at>id_/.
+    let base = ctx.cfg.lookup_urls.wayback.path();
+    if !url.path().starts_with(&format!("{base}web/{at}id_/")) {
+        return error(format!("{target}: path escapes the snapshot prefix"));
+    }
     // A capture never changes, so it is cached and indexed like any page; no browser re-render of a raw capture.
     let opts = GetOpts {
         browser_fallback: false,

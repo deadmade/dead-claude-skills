@@ -778,9 +778,13 @@ pub(crate) mod tests {
     fn test_ctx_with(browser: crate::browser::Browser) -> Arc<Ctx> {
         let _ = rustls::crypto::ring::default_provider().install_default();
         let project = std::env::temp_dir().join(format!(
-            "web-mcp-fetch-unit-{}-{}",
+            "web-mcp-fetch-unit-{}-{}-{}",
             std::process::id(),
-            jiff::Timestamp::now().as_nanosecond()
+            jiff::Timestamp::now().as_nanosecond(),
+            {
+                static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+                N.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            }
         ));
         std::fs::create_dir_all(&project).unwrap();
         let archive = crate::archive::Archive::open(&project, &jiff::Zoned::now()).unwrap();

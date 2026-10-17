@@ -382,9 +382,13 @@ mod tests {
 
     fn temp_web(name: &str) -> PathBuf {
         let p = std::env::temp_dir().join(format!(
-            "web-mcp-rank-{name}-{}-{}",
+            "web-mcp-rank-{name}-{}-{}-{}",
             std::process::id(),
-            jiff::Timestamp::now().as_nanosecond()
+            jiff::Timestamp::now().as_nanosecond(),
+            {
+                static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+                N.fetch_add(1, Ordering::Relaxed)
+            }
         ));
         std::fs::create_dir_all(&p).unwrap();
         p
@@ -483,7 +487,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn queued_batches_dont_wait_for_merges() {
         let idx = Arc::new(Index::open(&temp_web("merges")).unwrap());
-        // An add every 200 µs for 1 s: the queue refills during every commit, and the many small
+        // An add every 200 µs until 9 commits (20 s cap): the queue refills during every commit, and the many small
         // segments push the merge policy (layer of 100 docs, 8 segments) into merging.
         let handle = tokio::runtime::Handle::current();
         let producer = {
@@ -492,9 +496,15 @@ mod tests {
                 let start = Instant::now();
                 let mut adds = Vec::new();
                 for i in 0.. {
-                    if start.elapsed() > Duration::from_secs(1) {
+                    let done = idx.commits.load(Ordering::SeqCst) >= 9;
+                    if done && start.elapsed() > Duration::from_secs(1) {
                         break;
                     }
+                    assert!(
+                        start.elapsed() < Duration::from_secs(20),
+                        "only {} commits after 20 s",
+                        idx.commits.load(Ordering::SeqCst)
+                    );
                     let idx = Arc::clone(&idx);
                     adds.push(handle.spawn(async move {
                         idx.add(vec![doc(&format!("burst{i}"), "https://m/")]).await

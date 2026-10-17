@@ -51,6 +51,9 @@ fn dns_default_asks_six_types() {
         );
     }
     assert!(t.contains(r#""data": "data-A-\"x\"""#), "{t}");
+    for ty in TYPES {
+        assert!(t.contains(&format!("Type: {ty}\n")), "{ty}: {t}");
+    }
     let dir = mcp.run_dir().join("lookups/dns");
     assert_eq!(std::fs::read_dir(dir).unwrap().count(), 6);
 }
@@ -538,6 +541,24 @@ fn wayback_snapshot_is_cut_at_30k() {
 }
 
 #[test]
+fn wayback_at_refuses_dot_segment_escape() {
+    let fx = Fixture::start(PUBLIC);
+    let mut mcp = wayback_start(&fx);
+    for target in [
+        "http://x/../../../../../cdx?url=a",
+        "http://x/%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/cdx?url=a",
+    ] {
+        let r = mcp.call(
+            "lookup",
+            json!({"kind": "wayback", "target": target, "at": "2024"}),
+        );
+        assert!(is_error(&r), "{r}");
+        assert!(text(&r).contains("escapes"), "{r}");
+    }
+    assert_eq!(fx.hits("/cdx?url=a"), 0);
+}
+
+#[test]
 fn wayback_at_must_be_digits() {
     let fx = Fixture::start(PUBLIC);
     let mut mcp = wayback_start(&fx);
@@ -568,7 +589,10 @@ fn ip_returns_record() {
     assert!(!is_error(&r), "{r}");
     let t = text(&r);
     assert!(t.starts_with("Source: Shodan InternetDB "), "{t}");
-    assert!(t.contains(body), "{t}");
+    assert!(
+        t.contains("\"hostnames\": [\n    \"dns.google\"\n  ]"),
+        "{t}"
+    );
     assert_eq!(fx.hits("/8.8.8.8"), 1);
 }
 
@@ -714,6 +738,19 @@ fn lowercase_cve_asks_osv_uppercase() {
     assert!(!is_error(&r), "{r}");
     assert_eq!(fx.hits(&format!("/osv/vulns/{LOG4SHELL}")), 1);
     assert_eq!(fx.hits(&format!("/epss?cve={LOG4SHELL}")), 1);
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn kev_feed_without_vulnerabilities_fails() {
+    let fx = Fixture::start(PUBLIC);
+    vuln_sources(&fx, LOG4SHELL);
+    fx.route("/kev.json", json_resp(200, &json!({"title": "empty"})));
+    let mut mcp = vuln_start(&fx);
+    let r = vuln(&mut mcp, LOG4SHELL);
+    let t = text(&r);
+    assert!(t.contains("CISA KEV feed: no vulnerabilities array"), "{t}");
+    assert!(!t.contains("not in CISA"), "{t}");
 }
 
 #[cfg(debug_assertions)]

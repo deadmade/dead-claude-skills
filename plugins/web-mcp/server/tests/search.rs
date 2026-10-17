@@ -317,6 +317,29 @@ fn filtered_search_with_no_results_says_so() {
 
 #[cfg(debug_assertions)]
 #[test]
+fn filtered_search_ignores_fallback_engine_rows() {
+    let fx = Fixture::start(PUBLIC);
+    fx.route("/b", vec![page("Zebra bing", "zebra", 3)]);
+    searx_config(&fx, ENGINES);
+    // SearXNG falls back to its default categories and answers with bing rows only.
+    searx_with(
+        &fx,
+        "zebra",
+        "&engines=github",
+        "bing",
+        &[(fx.url("/b"), "Zebra bing")],
+    );
+    let mut mcp = start(&fx);
+    let r = filtered(&mut mcp, json!({"query": "zebra", "engines": "github"}));
+    assert!(!is_error(&r), "{r}");
+    let t = text(&r);
+    assert!(t.contains("No results from engines: github."), "{t}");
+    assert!(!t.contains(&fx.url("/b")), "{t}");
+    assert_eq!(fx.hits("/b"), 0);
+}
+
+#[cfg(debug_assertions)]
+#[test]
 fn filtered_results_but_no_passages_lists_results() {
     let fx = Fixture::start(PUBLIC);
     searx_config(&fx, ENGINES);

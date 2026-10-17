@@ -64,8 +64,8 @@ async fn ask(ctx: &Ctx, name: &str, t: &str) -> Result<Part, String> {
     let v: Value = serde_json::from_str(&got.body).map_err(|e| fail(format!("not JSON ({e})")))?;
     let pretty = serde_json::to_string_pretty(&v).unwrap_or_else(|_| got.body.clone());
     let shown = match note(name, &v) {
-        Some(n) => format!("{n}\n\n{pretty}"),
-        None => pretty,
+        Some(n) => format!("Type: {t}\n{n}\n\n{pretty}"),
+        None => format!("Type: {t}\n\n{pretty}"),
     };
     Ok(Part {
         source: SOURCE,

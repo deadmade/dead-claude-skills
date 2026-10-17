@@ -26,7 +26,9 @@ they pull is archived in `.web/` in the project before Claude sees it.
   snapshots from the CDX index, or with `at` (a timestamp or prefix such as 2024) the nearest snapshot read like
   `fetch`. `ip`: open ports, hostnames, CPEs, tags and known vulnerabilities from Shodan InternetDB. `vuln`: a CVE or
   OSV id from OSV with EPSS (FIRST) and CISA KEV, NVD as fallback; or `name@version` with `ecosystem` (npm, PyPI,
-  crates.io, ...) for a package's known vulnerabilities.
+  crates.io, ...) for a package's known vulnerabilities. Each source's deadline is per attempt (8 s, crt.sh 25 s), a 5xx
+  or 429 is retried once and redirects are followed up to 3 hops, so a slow source can take noticeably longer than its
+  deadline (about 50 s for crt.sh in the worst case).
 
 ## What lookups disclose
 
