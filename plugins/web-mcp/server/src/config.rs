@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::time::Duration;
 
 use url::Url;
 
@@ -11,6 +12,8 @@ pub struct PaperUrls {
 
 pub struct Config {
     pub papers: PaperUrls,
+    /// How long each paper source may take before a search answers without it.
+    pub papers_deadline: Duration,
     pub project: PathBuf,
     pub searxng: Url,
     pub agent_browser: String,
@@ -18,7 +21,8 @@ pub struct Config {
 
 impl Config {
     /// Reads `CLAUDE_PROJECT_DIR`, `WEB_MCP_SEARXNG_URL`, `WEB_MCP_AGENT_BROWSER` and
-    /// `WEB_MCP_{ARXIV,OPENALEX,CROSSREF}_URL`, each with its default.
+    /// `WEB_MCP_{ARXIV,OPENALEX,CROSSREF}_URL`, each with its default, and `WEB_MCP_PAPERS_MS` (8 s; shorter for
+    /// tests).
     ///
     /// # Errors
     /// When one of the URL variables is not a URL.
@@ -31,6 +35,9 @@ impl Config {
                 openalex: url("WEB_MCP_OPENALEX_URL", "https://api.openalex.org/works")?,
                 crossref: url("WEB_MCP_CROSSREF_URL", "https://api.crossref.org/works")?,
             },
+            papers_deadline: var("WEB_MCP_PAPERS_MS")
+                .and_then(|v| v.parse().ok())
+                .map_or(Duration::from_secs(8), Duration::from_millis),
             project: var("CLAUDE_PROJECT_DIR").map_or_else(|| PathBuf::from("."), PathBuf::from),
             searxng: Url::parse(
                 &var("WEB_MCP_SEARXNG_URL").unwrap_or_else(|| "http://127.0.0.1:8888".into()),

@@ -793,6 +793,7 @@ mod tests {
                     openalex: Url::parse("https://api.openalex.org/works").unwrap(),
                     crossref: Url::parse("https://api.crossref.org/works").unwrap(),
                 },
+                papers_deadline: std::time::Duration::from_secs(8),
                 project,
                 searxng: Url::parse("http://127.0.0.1:8888").unwrap(),
                 agent_browser: "agent-browser".into(),

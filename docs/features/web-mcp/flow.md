@@ -366,7 +366,12 @@ see Deviations.
   311 vs 452, S2-as-arXiv 159 vs 504) and slower on arxiv id (374 vs 85, the expected two-source wait). The miss is the
   two phrase searches: **20,003 ms** p50 (pipelines 76 and 1,048). Phrase searches ask OpenAlex and arXiv together and
   wait for both; arXiv's search request ran into the 20 s `REQUEST_TIMEOUT` (`papers.rs:20`) on 5 of 6 calls while
-  OpenAlex had answered. Not investigated why arXiv stalled; a per-source deadline is a follow-up.
+  OpenAlex had answered. Cause, probed with curl the same day: arXiv's search API itself took 28 s or never answered
+  (`x-timer` backend 27.9 s, one 429), while `id_list` lookups took 0.19 s; the baseline's 76 ms likely came from
+  arXiv's Varnish cache, as it sent the same URL three times. **Fixed after the measurement:** each source now has
+  its own 8 s deadline (`WEB_MCP_PAPERS_MS`, `papers.rs` `ask`) and the search answers with what arrived, listing
+  "arXiv: no answer within 8 s" under Failed. Test: `a_stalled_source_is_cut_at_the_deadline_and_the_others_answer`.
+  Not re-measured; a phrase search is now bounded by 8 s instead of 20 s.
 - **Threats that showed up:** SearXNG's default engines blocked this machine outright (fixed in the template, see
   Deviations); H3 rests on bing and yahoo, which serve one index. The user's binary and the measured one are the same
   commit; only the SearXNG template changed after it.
@@ -397,8 +402,6 @@ Agreed with the user on 2026-10-17, out of scope for this branch:
   anchor or pattern).
 - **`--direct` bench mode**: call web-mcp's tools over stdio without `claude -p`, as a quick repeatable check beside
   the official run.
-- **Papers phrase search waits 20 s for arXiv**: give each source its own deadline (OpenAlex answers in ~1 s) and
-  return what arrived, noting the source that timed out; find out why arXiv's search request stalled (Task 18).
 - **Paid search API backend** (Brave or Mojeek, key in a sensitive user config) in front of SearXNG, if Bing starts
   blocking too.
 - **Staan (EUSP, Ecosia + Qwant) as a search source** once individuals can use it: it has API docs and a sign-up, but as of 2026-10-17 even the free trial asks for company and billing details (the user checked).

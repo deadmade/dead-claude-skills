@@ -17,7 +17,6 @@ use crate::rank::PassageDoc;
 
 /// Records asked of a list query.
 const LIMIT: &str = "5";
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
 const MAX_RETRY_WAIT: Duration = Duration::from_secs(10);
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -417,7 +416,6 @@ async fn get_text(ctx: &Ctx, url: &Url) -> Result<String, String> {
         let resp = ctx
             .http_public
             .get(url.clone())
-            .timeout(REQUEST_TIMEOUT)
             .send()
             .await
             .map_err(|e| e.without_url().to_string())?;
@@ -437,10 +435,13 @@ async fn get_text(ctx: &Ctx, url: &Url) -> Result<String, String> {
     }
 }
 
+/// One source, cut at the deadline (retry wait included) so a stalled API can't hold up the others' answers.
 async fn ask(ctx: &Ctx, source: &'static str, url: Url, parse: Parse) -> Answer {
-    let got = match get_text(ctx, &url).await {
-        Ok(body) => parse(&body).map_err(|e| e.to_string()),
-        Err(e) => Err(e),
+    let deadline = ctx.cfg.papers_deadline;
+    let got = match tokio::time::timeout(deadline, get_text(ctx, &url)).await {
+        Ok(Ok(body)) => parse(&body).map_err(|e| e.to_string()),
+        Ok(Err(e)) => Err(e),
+        Err(_) => Err(format!("no answer within {} s", deadline.as_secs_f32())),
     };
     (source, got)
 }

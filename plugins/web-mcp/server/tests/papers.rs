@@ -1,6 +1,8 @@
 //! `search` with `papers: true` against stub `OpenAlex`, arXiv and Crossref servers. No `SearXNG` runs.
 mod common;
 
+use std::time::{Duration, Instant};
+
 use common::{Fixture, Mcp, PUBLIC, Resp, is_error, searx, tempdir, text};
 use serde_json::json;
 use url::Url;
@@ -170,4 +172,42 @@ fn nothing_found_is_an_error_listing_the_failures() {
     let r = papers(&mut mcp, "1706.03762");
     assert!(is_error(&r), "{r}");
     assert!(text(&r).contains("Failed: arXiv: throttled"), "{r}");
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn a_stalled_source_is_cut_at_the_deadline_and_the_others_answer() {
+    let fx = Fixture::start(PUBLIC);
+    fx.route(
+        &with_query("/openalex", &[("search", "attention"), ("per_page", "5")]),
+        ok("application/json", "openalex-search.json"),
+    );
+    fx.route(
+        &with_query(
+            "/arxiv",
+            &[("search_query", "all:\"attention\""), ("max_results", "5")],
+        ),
+        vec![
+            Resp::new(200, "application/atom+xml", fixture("arxiv-ok.xml"))
+                .delay(Duration::from_secs(10)),
+        ],
+    );
+    let mut mcp = Mcp::start_with(
+        tempdir(),
+        &[
+            ("WEB_MCP_ARXIV_URL", fx.url("/arxiv")),
+            ("WEB_MCP_OPENALEX_URL", fx.url("/openalex")),
+            ("WEB_MCP_PAPERS_MS", "500".to_owned()),
+        ],
+    );
+    let t0 = Instant::now();
+    let r = papers(&mut mcp, "attention");
+    assert!(
+        t0.elapsed() < Duration::from_secs(5),
+        "waited {:?}",
+        t0.elapsed()
+    );
+    let t = text(&r);
+    assert!(t.contains("## [1] Attention Is All You Need (2017)"), "{t}");
+    assert!(t.contains("Failed: arXiv: no answer within 0.5 s"), "{t}");
 }
