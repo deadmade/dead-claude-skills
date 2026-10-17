@@ -115,6 +115,19 @@ reads the atom; EnterWorktree refusal fallback in Task 3.
 
 ## Deviations
 
+From the final whole-branch review (2026-10-17), outside the plan:
+
+- **D1 – where a reopening is written.** The band only sees "Reopened <date>" on the `- Gate N` line (the spec's
+  stated limit), but feature-flow `SKILL.md:115` and research-flow `SKILL.md:38-39` don't say where to record a
+  reopening, so it lands under Plan review and the band shows `gate 1 ✓` for an open gate. Options: (a) one sentence
+  in each skill: record it on the Gate line as `Reopened <date>: <why>`, the re-approval date after it; (b) leave it,
+  accept the limit. Recommendation: (a), it makes the anti-goal hold for new runs at the cost of one line per skill.
+- **D2 – stale open runs on main.** cyberpunk-theme (`execute`) and installer-rewrite, installer-ux, language-skills
+  (`finish`) are merged but not `done`. In a fresh clone every mtime is checkout time, so the fallback picks one
+  arbitrarily and shows a shipped run with a resume key plus `+3 open`. Grill Q1 called marking them done separate
+  housekeeping. Options: (a) set `phase: done` in those four files in this branch; (b) leave them for later.
+  Recommendation: (a), four one-line edits that make the band useful from the first session.
+
 ## Walkthrough
 
 | spec goal | plan task | file:line | test |
