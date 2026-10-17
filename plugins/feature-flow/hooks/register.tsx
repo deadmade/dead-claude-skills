@@ -59,7 +59,7 @@ async function parse($: $, path: string, mtimeMs: number): Promise<Run | null> {
 async function claimFor($: $, run: Run): Promise<string | null> {
   if (!run.research || !run.spec) return null;
   try {
-    return claimOf(await $.fs.read(`${run.path.replace(/[^/]*$/, '')}${run.spec.split('#')[0]}`));
+    return claimOf(await $.fs.read(`${run.path.replace(/[^/\\]*$/, '')}${run.spec.split('#')[0]}`));
   } catch {
     return null;
   }

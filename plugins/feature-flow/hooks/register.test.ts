@@ -52,13 +52,15 @@ function host(
       })),
     } as never;
   });
+  // On Linux the engine resolves a Windows path ("C:\\...") against the cwd; the files are keyed by the path as written.
+  const keyOf = (p: string) => p.slice(Math.max(p.indexOf('C:\\'), 0));
   on('fs.read', (_$, e) => {
-    const text = h.files[e.path]?.text;
+    const text = h.files[keyOf(e.path)]?.text;
     return typeof text === 'string' ? { value: text } : { deny: 'EACCES' };
   });
   on('fs.stat', (_$, e) =>
-    h.files[e.path]
-      ? ({ value: { kind: 'file', size: 0, mtimeMs: h.files[e.path]!.mtimeMs } } as never)
+    h.files[keyOf(e.path)]
+      ? ({ value: { kind: 'file', size: 0, mtimeMs: h.files[keyOf(e.path)]!.mtimeMs } } as never)
       : { deny: 'ENOENT' },
   );
   on('command.list', () => ({ value: COMMANDS }) as never);
@@ -345,6 +347,18 @@ test('research line', async ($, on) => {
   const { texts } = await shown($);
   expect(texts).toContain('r · validate');
   expect(texts).toContain('caching cuts p95 by 30% · baseline 412ms · supported');
+});
+
+test('research claim: the spec resolves next to a Windows-style touched path', async ($, on) => {
+  const dir = 'C:\\r\\docs\\features\\x\\';
+  const h = host(on, {
+    [`${dir}flow.md`]: { text: research(), mtimeMs: 1 },
+    [`${dir}spec.md`]: { text: SPEC, mtimeMs: 1 },
+  });
+  await start($, h);
+  await write($, `${dir}flow.md`);
+  await h.clock.settle();
+  expect((await shown($)).texts).toContain('caching cuts p95 by 30%');
 });
 
 test('spec unreadable: no claim, first line still drawn', async ($, on) => {
