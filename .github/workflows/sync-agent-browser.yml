@@ -1,0 +1,38 @@
+name: Sync agent-browser
+
+on:
+  schedule:
+    - cron: '45 7 * * 1' # Mondays 07:15 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Pin the newest agent-browser release
+        id: pin
+        run: |
+          tag=$(npm view agent-browser version)
+          echo "$tag" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'
+          jq --arg t "$tag" '.upstream = $t' installer/agent-browser.json > agent-browser.json.tmp && mv agent-browser.json.tmp installer/agent-browser.json
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          branch: sync/agent-browser
+          delete-branch: true
+          commit-message: 'Pin agent-browser to ${{ steps.pin.outputs.tag }}'
+          title: 'Pin agent-browser to ${{ steps.pin.outputs.tag }}'
+          body: |
+            Bumps installer/agent-browser.json to https://www.npmjs.com/package/agent-browser/v/${{ steps.pin.outputs.tag }}.
+            The installer installs this version for web-mcp users.
+
+            cc @deadmade
+          add-paths: installer/agent-browser.json

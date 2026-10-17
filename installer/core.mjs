@@ -322,6 +322,8 @@ const BINARIES = [
   ['socat', 'sandbox', 'nix: socat', 'WSL2 only'],
   ['ccstatusline', 'ccstatusline', 'nix: ccstatusline', 'npm i -g ccstatusline'],
   ['docker', 'web-mcp', 'nix: docker', 'winget install -e --id Docker.DockerDesktop'],
+  ['npm', 'web-mcp', 'nix: nodejs', 'winget install -e --id OpenJS.NodeJS.LTS'],
+  ['agent-browser', 'web-mcp', 'nix: agent-browser', 'npm i -g agent-browser && agent-browser install'],
   ['cswap', 'cswap', 'uv tool install claude-swap', 'rerun this installer (cswap.exe download)'],
 ];
 
@@ -481,6 +483,13 @@ const newer = (a, b) => {
   const i = x.findIndex((n, k) => n !== y[k]);
   return i >= 0 && x[i] > y[i];
 };
+
+// installed: version from `agent-browser --version` or undefined; pinned: installer/agent-browser.json. A newer one stays.
+export const agentBrowserAction = ({ installed, pinned }) =>
+  !installed ? 'install' : installed === pinned || newer(installed, pinned) ? 'skip' : 'upgrade';
+
+// `agent-browser --version` may print a name prefix ("agent-browser 0.39.1"); undefined when no version is in it.
+export const agentBrowserVersion = (out) => /(\d+\.\d+\.\d+)/.exec(out ?? '')?.[1];
 
 // { name: version } this release ships: a local plugin's plugin.json version (via localVersion(source)), or a url
 // plugin's pinned vX.Y.Z ref. Plugins without either (unpinned url sources) are left out.

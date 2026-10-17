@@ -11,6 +11,8 @@ import {
   NIGHT_CITY_THEME,
   safeArg,
   missingBinaries,
+  agentBrowserAction,
+  agentBrowserVersion,
   SECRET_DENIES,
   isSandboxOn,
   hasDcgHook,
@@ -616,4 +618,14 @@ test('web builtins decision table', () => {
   assert.equal(webBuiltinsDecision({ toggle: false, was: true, healthy: false }), false);
   assert.equal(webBuiltinsDecision({ toggle: false, was: false, healthy: true }), undefined);
   assert.equal(webBuiltinsDecision({ toggle: false, was: false, healthy: false }), undefined);
+});
+
+test('agent-browser: install when missing, upgrade when older, keep when equal or newer', () => {
+  const pinned = '0.39.1';
+  assert.equal(agentBrowserAction({ installed: undefined, pinned }), 'install');
+  assert.equal(agentBrowserAction({ installed: '0.38.0', pinned }), 'upgrade');
+  assert.equal(agentBrowserAction({ installed: '0.39.1', pinned }), 'skip');
+  assert.equal(agentBrowserAction({ installed: '0.40.0', pinned }), 'skip');
+  assert.equal(agentBrowserVersion('agent-browser 0.39.1\n'), '0.39.1');
+  assert.equal(agentBrowserVersion('nope'), undefined);
 });

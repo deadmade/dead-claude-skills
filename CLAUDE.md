@@ -17,6 +17,8 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   together.
 - `plugins/cswap/`: a mod wrapping the external `claude-swap` CLI, whose release tag is pinned in `installer/cswap.json`
   (bumped by `sync-cswap.yml`).
+- `plugins/web-mcp/`: its `browser` tool drives the npm CLI `agent-browser`, whose version is pinned in
+  `installer/agent-browser.json` (bumped by `sync-agent-browser.yml`).
 - `plugins/languages/`: a grouping folder (`GROUPS` in `scripts/plugin-dirs.mjs`); each folder under it is a plugin.
   `rust-skills` and `csharp-skills` are vendored (`sync-rust.mjs`, `sync-csharp.mjs`). `paths:` frontmatter doesn't
   gate plugin skills in Claude Code (checked on 2.1.272 and 2.1.296), so csharp-skills exposes six router skills over an

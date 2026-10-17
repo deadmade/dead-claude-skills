@@ -47,6 +47,8 @@ import {
   isShipped,
   marketplaceArg,
   missingBinaries,
+  agentBrowserAction,
+  agentBrowserVersion,
   nameOf,
   manifestPath,
   needsToken,
@@ -269,6 +271,39 @@ async function applyCswap(on) {
   const r = ps("[Environment]::SetEnvironmentVariable('Path', $env:DCS_PATH, 'User')", { DCS_PATH: next });
   if (r.status === 0) done.push(`cswap: added ${dl.dir} to your user PATH (new terminals see it)`);
   else failures.push(`cswap: couldn't add ${dl.dir} to PATH; add it by hand`);
+}
+
+// web-mcp's `browser` tool drives the npm CLI agent-browser, pinned in installer/agent-browser.json. Asks first; every
+// failure is a summary line. Linux's --with-deps runs sudo, so it has its own prompt (default no).
+async function applyAgentBrowser() {
+  const pinned = readJson(join(PKG, 'installer', 'agent-browser.json')).upstream;
+  // The pin goes into a shell string on Windows (npm's .cmd shim), so it must be a plain version.
+  if (!/^\d+\.\d+\.\d+$/.test(pinned)) return failures.push(`agent-browser: bad pin ${JSON.stringify(pinned)}`);
+  const have = onPath('agent-browser')
+    ? spawnSync('agent-browser', ['--version'], { encoding: 'utf8', shell: WIN })
+    : undefined;
+  const installed = have?.status === 0 ? agentBrowserVersion(have.stdout) : undefined;
+  const action = agentBrowserAction({ installed, pinned });
+  if (action === 'skip') return;
+  const what = action === 'install' ? 'Install' : `Upgrade ${installed} to`;
+  if (!(await ask(`${what} agent-browser ${pinned} (npm -g, then its browser download)?`, true)))
+    return done.push('agent-browser: install skipped by you');
+  const deps =
+    process.platform === 'linux' &&
+    (await ask('Also install the browser system packages (agent-browser install --with-deps, runs sudo)?', false));
+  const steps = [
+    ['npm', ['install', '-g', `agent-browser@${pinned}`]],
+    ['agent-browser', deps ? ['install', '--with-deps'] : ['install']],
+  ];
+  for (const [bin, args] of steps) {
+    log('info', `Running ${bin} ${args.join(' ')}`);
+    const r = spawnSync(bin, args, { stdio: 'inherit', shell: WIN });
+    if (r.status !== 0)
+      return failures.push(
+        `agent-browser: \`${bin} ${args.join(' ')}\` failed (${r.error?.code ?? `exit ${r.status}`})`,
+      );
+  }
+  done.push(`agent-browser: ${action}d ${pinned}`);
 }
 
 // --- brv and web-mcp, the binaries of tui-review and web-mcp ---------------------------------------------------------
@@ -670,6 +705,7 @@ await applySettings(toggles, { strip, reset: clean });
 const autoUpdate = tryJson(join(CONFIG, 'plugins', 'known_marketplaces.json'))?.[MARKETPLACE]?.autoUpdate;
 await applyCcstatusline(current.ccstatusline, on('ccstatusline'), nightCity);
 await applyDcg(current.dcg, on('dcg'));
+if (selected.includes(WEB_MCP)) await applyAgentBrowser();
 await applyCswap(selected.some((id) => nameOf(id) === 'cswap'));
 if (clean) done.push(...clearTargets(CONFIG));
 // The global instructions moved into a dead-skills SessionStart hook; the old file would duplicate them.
