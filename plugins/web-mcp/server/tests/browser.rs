@@ -265,7 +265,7 @@ fn dash_leading_ref_is_rejected() {
     );
     assert!(is_error(&r));
     assert!(text(&r).contains("`ref`"), "{r}");
-    assert!(calls(&log).is_empty());
+    assert_eq!(calls(&log), Vec::<Value>::new());
 }
 
 #[test]
@@ -293,7 +293,7 @@ fn dash_leading_text_is_rejected() {
         assert!(is_error(&r), "{r}");
         assert!(text(&r).contains("text may not start with '-'"), "{r}");
     }
-    assert!(calls(&log).is_empty());
+    assert_eq!(calls(&log), Vec::<Value>::new());
 }
 
 #[test]
@@ -325,7 +325,7 @@ fn reserved_and_invalid_session_names_are_rejected() {
         assert!(is_error(&r), "{bad:?}: {r}");
         assert!(text(&r).contains("session"), "{r}");
     }
-    assert!(calls(&log).is_empty());
+    assert_eq!(calls(&log), Vec::<Value>::new());
     let ok = mcp.call(
         "browser",
         json!({"action": "snapshot", "session": "Ok_1-a"}),
@@ -343,7 +343,7 @@ fn bad_scroll_is_rejected_and_split() {
         );
         assert!(is_error(&r), "{bad}: {r}");
     }
-    assert!(calls(&log).is_empty());
+    assert_eq!(calls(&log), Vec::<Value>::new());
     mcp.call(
         "browser",
         json!({"action": "scroll", "session": "s", "text": "up 300"}),
@@ -409,7 +409,7 @@ fn open_rejects_non_http_schemes() {
         assert!(is_error(&r), "{url}");
         assert!(text(&r).contains(scheme), "{r}");
     }
-    assert!(calls(&log).is_empty());
+    assert_eq!(calls(&log), Vec::<Value>::new());
 }
 
 #[test]

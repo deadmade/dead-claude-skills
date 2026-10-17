@@ -263,7 +263,7 @@ fn zip_is_unsupported_and_not_archived() {
     let r = fetch(&mut mcp, &fx.url("/a.zip"));
     assert!(is_error(&r));
     assert!(text(&r).contains("application/zip"), "{}", text(&r));
-    assert!(stored_files(&mcp).is_empty());
+    assert_eq!(stored_files(&mcp), Vec::<String>::new());
 }
 
 #[test]
@@ -274,7 +274,7 @@ fn oversize_body_is_too_large() {
     let r = fetch(&mut mcp, &fx.url("/big"));
     assert!(is_error(&r));
     assert!(text(&r).contains("20 MB"), "{}", text(&r));
-    assert!(stored_files(&mcp).is_empty());
+    assert_eq!(stored_files(&mcp), Vec::<String>::new());
 }
 
 #[cfg(debug_assertions)]

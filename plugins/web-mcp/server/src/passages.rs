@@ -161,7 +161,7 @@ mod tests {
             let bare = |s: &str| s.split_whitespace().collect::<String>();
             assert_eq!(bare(&out.concat()), bare(&md));
         }
-        assert!(split("").is_empty());
+        assert_eq!(split(""), Vec::<String>::new());
         assert_eq!(split("short\n\nand small"), ["short\n\nand small"]);
     }
 }

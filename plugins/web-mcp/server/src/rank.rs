@@ -431,7 +431,7 @@ mod tests {
         assert_eq!(hits[0].doc.title, "T");
         // Query syntax from a user never errors.
         idx.search("fox AND (\"unclosed", 3, None).unwrap();
-        assert!(idx.search("fox", 0, None).unwrap().is_empty());
+        assert_eq!(idx.search("fox", 0, None).unwrap().len(), 0);
     }
 
     #[tokio::test]
