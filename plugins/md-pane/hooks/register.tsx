@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code';
-import type { EngineInterface, Register } from 'claude-code';
+import type { EngineInterface, Register, Timer } from 'claude-code';
 
 import type { Doc } from '../types';
 import { findPaths, fromHref, linkify, resolvePath, toHref } from './paths';
@@ -11,6 +11,7 @@ const MAX_LINKS = 256;
 const MAX_HREF = 2048;
 const MISS_MS = 2000;
 const MAX_FILE = 4 * 1024 * 1024;
+const REFRESH_MS = 1000;
 const CUT_NOTE = '\n\n_Cut at 99 000 characters; open the file elsewhere for the rest._';
 
 export const doc = atom({ plugin: 'md-pane', key: 'doc' } as const, null as Doc | null);
@@ -21,6 +22,8 @@ type Stat = { size: number; mtimeMs: number };
 let files = new Map<string, Promise<Stat | null>>();
 // Bumped by every press and close: a load that finishes after the counter moved is dropped.
 let generation = 0;
+let timer: Timer | null = null;
+let ticking = false;
 
 // Whether `path` is a file, shared while in flight; a file is remembered for the session, a miss for MISS_MS.
 export function isFile($: EngineInterface, path: string): Promise<Stat | null> {
@@ -110,7 +113,34 @@ export async function onPress($: EngineInterface, href: string): Promise<void> {
   if (swap) void $.ui.scroll({ in: PANE, to: 'start' }).catch(() => {});
 }
 
+function unwatch(): void {
+  timer?.cancel();
+  timer = null;
+}
+
+// One refresh: re-load the open document when its stat changed, unless a press or close moved on meanwhile.
+async function tick($: EngineInterface): Promise<void> {
+  if (ticking) return;
+  ticking = true;
+  try {
+    const open = (await $.state.get({ plugin: 'md-pane', key: 'doc' })).value;
+    if (!open) return unwatch();
+    const gen = generation;
+    const now = await $.fs.stat(open.path).then(
+      (s) => `${s.mtimeMs}:${s.size}`,
+      () => 'gone',
+    );
+    const was = open.error === 'not found' ? 'gone' : `${open.mtimeMs}:${open.size}`;
+    if (now === was) return;
+    const fresh = await load($, open.path);
+    if (gen === generation) await update($, doc, (cur) => (cur?.path === open.path ? fresh : cur));
+  } finally {
+    ticking = false;
+  }
+}
+
 export async function close($: EngineInterface): Promise<void> {
+  unwatch();
   generation++;
   await $.ui.close({ id: PANE });
   await update($, doc, () => null);
@@ -119,6 +149,8 @@ export async function close($: EngineInterface): Promise<void> {
 export const register: Register = (on) => {
   files = new Map();
   generation = 0;
+  timer = null;
+  ticking = false;
 
   on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
     if (e.surface !== 'terminal' || e.viewport?.isFullscreen !== true || e.props.isSummary) return next(e);
@@ -132,6 +164,7 @@ export const register: Register = (on) => {
     const { Box, Text, Markdown, Button } = $.ui.resolve(e);
     const open = await read($, doc);
     if (!open) return <Text dimColor>Nothing open.</Text>;
+    timer ??= $.clock.every(REFRESH_MS, () => void tick($));
     const name = basename(open.path);
     return (
       <Box flexDirection="column">
@@ -154,6 +187,7 @@ export const register: Register = (on) => {
   });
 
   on('ui.close', { id: PANE }, async ($, e, next) => {
+    unwatch();
     generation++;
     await update($, doc, () => null);
     return next(e);

@@ -299,3 +299,106 @@ test('a Windows path opens', async ($, on) => {
   await m.press({ key: 'reply', link: { href } });
   expect(h.reads['C:/proj/docs/a.md']).toBe(1);
 });
+
+const statCount = (h: ReturnType<typeof host>) => Object.values(h.stats).reduce((a, b) => a + b, 0);
+
+test('an edit to the open file redraws the pane', async ($, on) => {
+  const h = host(on, { files: { '/proj/a.md': 'old' } });
+  await press($, 'a.md', 'file:///proj/a.md');
+  const p = await $.ui.mount(PANE_TARGET);
+  h.files['/proj/a.md'] = 'new';
+  h.mtimes['/proj/a.md'] = 2;
+  await h.clock.advance(1000);
+  expect(await docText(p)).toBe('new');
+});
+
+test('an edit that keeps the mtime but changes the size redraws too', async ($, on) => {
+  const h = host(on, { files: { '/proj/a.md': 'old' } });
+  await press($, 'a.md', 'file:///proj/a.md');
+  const p = await $.ui.mount(PANE_TARGET);
+  h.files['/proj/a.md'] = 'longer';
+  await h.clock.advance(1000);
+  expect(await docText(p)).toBe('longer');
+});
+
+test('an unchanged file is not re-read', async ($, on) => {
+  const h = host(on, { files: { '/proj/a.md': 'A' } });
+  await press($, 'a.md', 'file:///proj/a.md');
+  await $.ui.mount(PANE_TARGET);
+  await h.clock.advance(3000);
+  expect(h.reads['/proj/a.md']).toBe(1);
+});
+
+test('a deleted then recreated file recovers', async ($, on) => {
+  const h = host(on, { files: { '/proj/a.md': 'A' } });
+  await press($, 'a.md', 'file:///proj/a.md');
+  const p = await $.ui.mount(PANE_TARGET);
+  delete h.files['/proj/a.md'];
+  await h.clock.advance(1000);
+  expect(await message(p)).toBe("Can't show a.md: not found.");
+  h.files['/proj/a.md'] = 'again';
+  await h.clock.advance(1000);
+  expect(await docText(p)).toBe('again');
+});
+
+test('nothing polls once the pane is closed by q', async ($, on) => {
+  const h = host(on, { files: { '/proj/a.md': 'A' } });
+  await press($, 'a.md', 'file:///proj/a.md');
+  const p = await $.ui.mount(PANE_TARGET);
+  await h.clock.advance(1000);
+  await p.press({ key: 'q' });
+  const before = statCount(h);
+  await h.clock.advance(3000);
+  expect(statCount(h)).toBe(before);
+});
+
+test('nothing polls once the session ends', async ($, on) => {
+  const h = host(on, { files: { '/proj/a.md': 'A' } });
+  await press($, 'a.md', 'file:///proj/a.md');
+  await $.ui.mount(PANE_TARGET);
+  await $.session.end({ reason: 'clear', sessionId: 'old', resume: { id: 'old' } } as never);
+  const before = statCount(h);
+  await h.clock.advance(3000);
+  expect(statCount(h)).toBe(before);
+});
+
+test('a pane opened on a missing file recovers', async ($, on) => {
+  const h = host(on, { files: { '/proj/gone.md': 'G' } });
+  const m = await reply($, 'gone.md');
+  delete h.files['/proj/gone.md'];
+  await m.press({ key: 'reply', link: { href: 'file:///proj/gone.md' } });
+  const p = await $.ui.mount(PANE_TARGET);
+  expect(await message(p)).toBe("Can't show gone.md: not found.");
+  h.files['/proj/gone.md'] = 'back';
+  await h.clock.advance(1000);
+  expect(await docText(p)).toBe('back');
+});
+
+test('a swap during a refresh keeps the new document', async ($, on) => {
+  const h = host(on, { files: { '/proj/a.md': 'A', '/proj/b.md': 'B' } });
+  await press($, 'a.md', 'file:///proj/a.md');
+  const p = await $.ui.mount(PANE_TARGET);
+  h.mtimes['/proj/a.md'] = 2;
+  const a = hold(h, '/proj/a.md');
+  const ticking = h.clock.advance(1000);
+  await a.reading;
+  await press($, 'b.md', 'file:///proj/b.md');
+  a.release();
+  await ticking;
+  expect(await header(p)).toBe('b.md');
+  expect(await docText(p)).toBe('B');
+});
+
+test('a slow refresh is not overlapped by the next ticks', async ($, on) => {
+  const h = host(on, { files: { '/proj/a.md': 'A' } });
+  await press($, 'a.md', 'file:///proj/a.md');
+  await $.ui.mount(PANE_TARGET);
+  h.mtimes['/proj/a.md'] = 2;
+  const a = hold(h, '/proj/a.md');
+  await h.clock.advance(3000);
+  await a.reading;
+  a.release();
+  // Let every started refresh finish inside the test, then count the reads they made.
+  for (let i = 0; i < 20; i++) await h.clock.advance(0);
+  expect(h.reads['/proj/a.md']).toBe(2);
+});
