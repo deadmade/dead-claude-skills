@@ -7,3 +7,11 @@ export type Run = {
   gates: [string | null, string | null]; // approved date (YYYY-MM-DD) or null = open
   deviations: boolean;
 };
+
+export type Band = { run: Run; lines: string[]; showKey: boolean; command: string | null };
+
+declare module 'claude-code' {
+  interface PluginState {
+    'feature-flow': { band: Band | null };
+  }
+}
