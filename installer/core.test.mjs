@@ -50,11 +50,12 @@ import {
   INCLUDED,
   idOf,
   withDependencies,
+  BUNDLE,
 } from './core.mjs';
 
 const json = (p) => JSON.parse(readFileSync(new URL(`../${p}`, import.meta.url), 'utf8'));
 const marketplace = json('.claude-plugin/marketplace.json');
-const bundle = json('plugins/dead-skills/.claude-plugin/plugin.json');
+const bundle = json(manifestPath(marketplace, BUNDLE));
 const M = 'dead-claude-skills';
 const O = 'claude-plugins-official';
 
@@ -397,9 +398,14 @@ test('web-mcp downloads its own archive, and each plugin is configured under its
   assert.match(unavailable('web-mcp', 'darwin', 'arm64', '1.0.0'), /no web-mcp build for darwin-arm64/);
 });
 
+test('install.mjs finds plugin folders through the marketplace, never by a literal plugins/ path', () => {
+  const src = readFileSync(new URL('./install.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /join\(PKG, 'plugins'/);
+});
+
 test('brv versions match the release the installer fetches', () => {
   const cargo = readFileSync(new URL('../plugins/mods/tui-review/brv/Cargo.toml', import.meta.url), 'utf8');
-  assert.equal(/^version = "(.+)"/m.exec(cargo)[1], json('plugins/mods/tui-review/.claude-plugin/plugin.json').version);
+  assert.equal(/^version = "(.+)"/m.exec(cargo)[1], json('package.json').version);
 });
 
 test('brv checksum lines and what to do about brv', () => {

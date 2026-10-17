@@ -312,8 +312,6 @@ async function applyAgentBrowser() {
 const TUI_REVIEW = `tui-review@${MARKETPLACE}`;
 const WEB_MCP = `web-mcp@${MARKETPLACE}`;
 const BIN_DIR = join(CONFIG, 'bin');
-// One repo version: tui-review's plugin.json is the release both binaries come from.
-const BIN_VERSION = readJson(join(PKG, 'plugins', 'tui-review', '.claude-plugin', 'plugin.json')).version;
 
 // The version a binary reports (`<name> <version>`), or undefined when there is none or it does not run.
 function binVersionAt(name, path) {
@@ -360,7 +358,7 @@ async function downloadBin(name, asset, bin) {
 // ~/.claude/bin and the plugin's userConfig key points at it.
 async function applyBin(pluginName, plugin) {
   const { name, key } = BIN_PLUGINS[pluginName];
-  const version = BIN_VERSION;
+  const version = VERSION;
   const asset = binAsset(name, process.platform, process.arch, version);
   const bin = join(BIN_DIR, asset?.exe ?? (WIN ? `${name}.exe` : name));
   const action = binAction({
@@ -516,7 +514,7 @@ const plugins = listed(
 const rows = Array.isArray(plugins) ? plugins : (plugins.installed ?? []);
 
 const manifest = readJson(join(PKG, '.claude-plugin', 'marketplace.json'));
-const bundle = readJson(join(PKG, 'plugins', BUNDLE, '.claude-plugin', 'plugin.json'));
+const bundle = readJson(join(PKG, manifestPath(manifest, BUNDLE)));
 const opts = optIns(manifest, bundle);
 const tokenPlugins = opts.filter((id) => {
   const path = manifestPath(manifest, id);
@@ -557,12 +555,12 @@ const chosen = {
   // web-mcp is selected and SearXNG answers.
   'web-builtins-off': has(WEB_MCP)
     ? current['web-builtins-off']
-    : unavailable('web-builtins-off', process.platform, process.arch, BIN_VERSION) === undefined,
+    : unavailable('web-builtins-off', process.platform, process.arch, VERSION) === undefined,
 };
 
 // Options that can't work here stay off the pages, unless they're on already: hiding never removes anything.
 const hidden = [...opts, ...TOGGLES]
-  .map((key) => ({ key, why: unavailable(key, process.platform, process.arch, BIN_VERSION) }))
+  .map((key) => ({ key, why: unavailable(key, process.platform, process.arch, VERSION) }))
   .filter((h) => h.why && !current[h.key]);
 const pages = categorize([...opts, ...TOGGLES].filter((k) => !hidden.some((h) => h.key === k)));
 
