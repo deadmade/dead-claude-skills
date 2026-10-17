@@ -89,11 +89,21 @@ impl WebSearch for SearxNg {
                     failed(&e)
                 }
             })?;
-        if !resp.status().is_success() {
-            return Err(SearchError::Failed(format!("HTTP {}", resp.status())));
+        let no_json = || {
+            SearchError::Failed(
+                "SearXNG answered without JSON; enable `json` under `search.formats` in its settings.yml"
+                    .into(),
+            )
+        };
+        let status = resp.status();
+        if status == reqwest::StatusCode::FORBIDDEN {
+            return Err(no_json());
+        }
+        if !status.is_success() {
+            return Err(SearchError::Failed(format!("HTTP {status}")));
         }
         let body = resp.bytes().await.map_err(|e| failed(&e))?;
-        let reply: Reply = serde_json::from_slice(&body).map_err(|e| failed(&e))?;
+        let reply: Reply = serde_json::from_slice(&body).map_err(|_| no_json())?;
         Ok(reply
             .results
             .into_iter()
@@ -140,12 +150,12 @@ pub async fn web(ctx: &Arc<Ctx>, query: &str, max_passages: usize) -> Result<Str
         (&r.url, got)
     }))
     .await;
-    let (mut slow, mut failed) = (Vec::new(), Vec::new());
+    let (mut slow, mut failed, mut fetched) = (Vec::new(), Vec::new(), 0);
     for (url, got) in outcomes {
         match got {
             Err(_) => slow.push(url.to_string()),
             Ok(Err(e)) => failed.push(format!("{url} ({e})")),
-            Ok(Ok(_)) => {}
+            Ok(Ok(_)) => fetched += 1,
         }
     }
 
@@ -162,7 +172,8 @@ pub async fn web(ctx: &Arc<Ctx>, query: &str, max_passages: usize) -> Result<Str
     );
     for (i, h) in hits.iter().enumerate() {
         let d = &h.doc;
-        let title = if d.title.is_empty() { &d.url } else { &d.title };
+        let title = d.title.split_whitespace().collect::<Vec<_>>().join(" ");
+        let title = if title.is_empty() { &d.url } else { &title };
         let date = d.fetched.split('T').next().unwrap_or(&d.fetched);
         let _ = write!(
             out,
@@ -180,9 +191,9 @@ pub async fn web(ctx: &Arc<Ctx>, query: &str, max_passages: usize) -> Result<Str
         let _ = write!(out, "\n\nNot fetched within 3 s: {}", slow.join(", "));
     }
     if !failed.is_empty() {
-        let _ = write!(out, "\nNot fetched: {}", failed.join(", "));
+        let _ = write!(out, "\n\nNot fetched: {}", failed.join(", "));
     }
-    if results.is_empty() {
+    if fetched == 0 {
         out.push_str("\n\nThe web side returned nothing; archive passages only.");
     }
     Ok(out)

@@ -117,6 +117,53 @@ fn all_five_slow_still_returns_archive() {
     for (u, _) in &results {
         assert!(t.contains(u), "{t}");
     }
+    assert!(
+        t.contains("The web side returned nothing; archive passages only."),
+        "{t}"
+    );
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn failed_and_blocked_results_are_named() {
+    let fx = Fixture::start(PUBLIC);
+    let private = Fixture::start("127.0.0.1");
+    private.route("/p", vec![page("Private", "zebra", 3)]);
+    searx(
+        &fx,
+        "zebra",
+        &[(fx.url("/missing"), "Gone"), (private.url("/p"), "Private")],
+    );
+    let mut mcp = start(&fx);
+    let t = text(&search(&mut mcp, "zebra")).to_owned();
+    let line = t
+        .lines()
+        .find(|l| l.starts_with("Not fetched: "))
+        .expect(&t);
+    assert!(
+        line.contains(&format!("{} (HTTP 404)", fx.url("/missing"))),
+        "{t}"
+    );
+    assert!(line.contains(&private.url("/p")), "{t}");
+    assert!(t.contains("\n\nNot fetched: "), "{t}");
+    assert_eq!(private.hits("/p"), 0);
+    assert!(
+        t.contains("The web side returned nothing; archive passages only."),
+        "{t}"
+    );
+}
+
+#[test]
+fn searxng_without_json_explains_settings() {
+    let fx = Fixture::start(PUBLIC);
+    fx.route(
+        "/search?q=zebra&format=json",
+        vec![Resp::new(403, "text/html", "<html>Forbidden</html>")],
+    );
+    let mut mcp = start(&fx);
+    let r = search(&mut mcp, "zebra");
+    assert!(is_error(&r));
+    assert!(text(&r).contains("search.formats"), "{}", text(&r));
 }
 
 #[cfg(debug_assertions)]
