@@ -95,8 +95,8 @@ test('bundle ids resolve bare names to our marketplace', () => {
 });
 
 test('token plugins', () => {
-  assert.equal(needsToken(json('plugins/mcp-github/.claude-plugin/plugin.json')), true);
-  assert.equal(needsToken(json('plugins/mcp-azure/.claude-plugin/plugin.json')), true);
+  assert.equal(needsToken(json('plugins/mcp/mcp-github/.claude-plugin/plugin.json')), true);
+  assert.equal(needsToken(json('plugins/mcp/mcp-azure/.claude-plugin/plugin.json')), true);
   assert.equal(needsToken(json('plugins/graphify/.claude-plugin/plugin.json')), false);
 });
 
@@ -384,15 +384,16 @@ test('web-mcp downloads its own archive, and each plugin is configured under its
   assert.equal(binAsset('web-mcp', 'linux', 'ia32', '1.0.0'), undefined);
   assert.deepEqual(BIN_PLUGINS['tui-review'], { name: 'brv', key: 'brvPath' });
   assert.deepEqual(BIN_PLUGINS['web-mcp'], { name: 'web-mcp', key: 'binPath' });
+  const dirs = { 'tui-review': 'plugins/mods/tui-review', 'web-mcp': 'plugins/mcp/web-mcp' };
   for (const [plugin, { key }] of Object.entries(BIN_PLUGINS))
-    assert.ok(json(`plugins/${plugin}/.claude-plugin/plugin.json`).userConfig[key], `${plugin} has userConfig ${key}`);
+    assert.ok(json(`${dirs[plugin]}/.claude-plugin/plugin.json`).userConfig[key], `${plugin} has userConfig ${key}`);
   assert.match(unavailable('web-mcp', 'linux', 'ia32', '1.0.0'), /no web-mcp build for linux-ia32/);
   assert.equal(unavailable('web-mcp', 'linux', 'x64', '1.0.0'), undefined);
 });
 
 test('brv versions match the release the installer fetches', () => {
-  const cargo = readFileSync(new URL('../plugins/tui-review/brv/Cargo.toml', import.meta.url), 'utf8');
-  assert.equal(/^version = "(.+)"/m.exec(cargo)[1], json('plugins/tui-review/.claude-plugin/plugin.json').version);
+  const cargo = readFileSync(new URL('../plugins/mods/tui-review/brv/Cargo.toml', import.meta.url), 'utf8');
+  assert.equal(/^version = "(.+)"/m.exec(cargo)[1], json('plugins/mods/tui-review/.claude-plugin/plugin.json').version);
 });
 
 test('brv checksum lines and what to do about brv', () => {

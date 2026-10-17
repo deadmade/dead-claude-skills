@@ -34,9 +34,9 @@ jobs:
         run: npm test
 
       - name: cswap mod tests
-        working-directory: plugins/cswap
+        working-directory: plugins/mods/cswap
         run: claude plugin test .
 
       - name: night-city mod tests
-        working-directory: plugins/night-city
+        working-directory: plugins/mods/night-city
         run: claude plugin test .

@@ -27,16 +27,16 @@ fi
 echo "SearXNG answers"
 
 echo "== build"
-(cd plugins/web-mcp/server &&
+(cd plugins/mcp/web-mcp/server &&
   cargo build --release &&
   cargo build --release --features test-hooks --target-dir target/test-hooks)
-bin=plugins/web-mcp/server/target/release/web-mcp
+bin=plugins/mcp/web-mcp/server/target/release/web-mcp
 
 echo "== H1-H3, H6: baseline.mjs through claude -p (the long part)"
 node docs/features/web-mcp/bench/baseline.mjs --target web-mcp --bin "$bin" --runs 3 \
   --only search,fetch,parallel,papers --out "$out"
 
 echo "== H5: concurrency on local stub pages (judged)"
-node docs/features/web-mcp/bench/concurrency.mjs --bin plugins/web-mcp/server/target/test-hooks/release/web-mcp
+node docs/features/web-mcp/bench/concurrency.mjs --bin plugins/mcp/web-mcp/server/target/test-hooks/release/web-mcp
 
 echo "== done: results in $out, log in $log"

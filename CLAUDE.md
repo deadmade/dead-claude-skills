@@ -12,12 +12,16 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   (settings merges, plugin plans, platform rules); `files.mjs` the file writes and clean-slate backup/delete;
   `view.mjs`/`ui.mjs` the screens. No npm dependencies: Node's standard library only. New logic goes into
   `core.mjs` or `files.mjs` with a test, not into `install.mjs`.
-- `plugins/tui-review/`: a Claude Code mod (TypeScript, `hooks/`) driving the Rust binary `brv` (`brv/`). The two
+- `plugins/mods/`: a `GROUPS` folder holding the Claude Code mods (`cswap`, `night-city`, `tui-review`). notify
+  is plain `hooks.json`, not a mod, and stays at the top level.
+- `plugins/mods/tui-review/`: a Claude Code mod (TypeScript, `hooks/`) driving the Rust binary `brv` (`brv/`). The two
   share a binary cache format (`brv/src/format.rs` ↔ `hooks/chunks.ts`) and a stdout line protocol; change both sides
   together.
-- `plugins/cswap/`: a mod wrapping the external `claude-swap` CLI, whose release tag is pinned in `installer/cswap.json`
+- `plugins/mods/cswap/`: a mod wrapping the external `claude-swap` CLI, whose release tag is pinned in `installer/cswap.json`
   (bumped by `sync-cswap.yml`).
-- `plugins/web-mcp/`: a stdio MCP server (Rust, `server/`) with `search`, `fetch`, `browser` and `lookup`, built per platform like
+- `plugins/mcp/`: a `GROUPS` folder holding the MCP server plugins (`mcp-basic`, `mcp-github`, `mcp-azure`,
+  `web-mcp`). Folders keep their plugin's name.
+- `plugins/mcp/web-mcp/`: a stdio MCP server (Rust, `server/`) with `search`, `fetch`, `browser` and `lookup`, built per platform like
   brv (`build-web-mcp.yml`); the installer downloads it and sets `binPath`. Everything it pulls lands in
   `$CLAUDE_PROJECT_DIR/.web/` before Claude sees it. Ranking is BM25 only: the H4 experiment (`examples/h4.rs`, `h4`
   feature) showed embeddings don't help, so none ship. `browser` drives the npm CLI `agent-browser`, pinned in
@@ -31,7 +35,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
 - `plugins/database/`: a second `GROUPS` folder; each folder under it is a database plugin. `postgres` vendors
   Neon's and Timescale's Postgres skills from two upstreams (`sync-postgres.mjs`), so each skill folder carries its
   own LICENSE, NOTICE and UPSTREAM instead of one set at the plugin root.
-- `plugins/night-city/`: a theme (`themes/night-city.json`) plus a mod. Claude Code hardcodes syntax colours per base
+- `plugins/mods/night-city/`: a theme (`themes/night-city.json`) plus a mod. Claude Code hardcodes syntax colours per base
   theme (Monokai for dark), so the installer turns highlighting off with night-city. It also sets `CLAUDE_CODE_TMUX_TRUECOLOR=1`: inside tmux Claude
   Code otherwise draws in 256 colours and the theme's indigos turn grey.
   With night-city it also writes `installer/ccstatusline-night-city.json` instead of the stock ccstatusline config:
@@ -74,12 +78,12 @@ plugins of ours that the manifest no longer lists.
 
 - `npm test`: repo checks plus all `installer/*.test.mjs`, `scripts/*.test.mjs` and `plugins/notify/hooks/*.test.mjs` (`claude plugin validate` is skipped when `claude` isn't
   on PATH).
-- brv: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `plugins/tui-review/brv`.
-- web-mcp: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `plugins/web-mcp/server`.
-- tui-review mod tests need a generated fixture first, from `plugins/tui-review/brv`:
+- brv: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `plugins/mods/tui-review/brv`.
+- web-mcp: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `plugins/mcp/web-mcp/server`.
+- tui-review mod tests need a generated fixture first, from `plugins/mods/tui-review/brv`:
   `cargo run --release -- gen --out <dir> && node ../tests/make-fixture.mjs <dir>`, then `claude plugin test .` in
-  `plugins/tui-review`.
-- cswap mod tests: `claude plugin test .` in `plugins/cswap`.
+  `plugins/mods/tui-review`.
+- cswap mod tests: `claude plugin test .` in `plugins/mods/cswap`.
 - `nix develop` (or direnv) gives the toolchain and installs the pre-commit hooks (treefmt, merge conflicts, JSON,
   check-repo, installer and scripts tests, end-of-file; vendored paths excluded).
 - `nix fmt` formats everything per `treefmt.toml` (alejandra, prettier for js/ts/json/md/yaml, rustfmt).
