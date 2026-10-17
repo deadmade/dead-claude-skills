@@ -40,3 +40,7 @@ jobs:
       - name: night-city mod tests
         working-directory: plugins/night-city
         run: claude plugin test .
+
+      - name: md-pane mod tests
+        working-directory: plugins/md-pane
+        run: claude plugin test .
