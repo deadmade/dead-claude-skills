@@ -51,6 +51,25 @@ phase: ground
 
 ## Prior art
 
+- [Kiro specs](https://kiro.dev/docs/specs/best-practices/): per-feature markdown in the repo, an IDE task view on top,
+  and a "Sync Files" button because the files drift from the UI.
+- [Spec Kit](https://github.com/github/spec-kit/blob/main/spec-driven.md): one folder and one git branch per feature;
+  the branch says which run is active; no status UI.
+- [Taskmaster](https://docs.task-master.dev/capabilities/task-structure) and
+  [BMAD](https://docs.bmad-method.org/plan/choose-a-planning-path/): machine state in JSON/TOML, markdown as the view.
+  [MLflow tracking](https://mlflow.org/docs/latest/ml/tracking/): hypothesis-style params and metrics as typed fields.
+- [Cline Memory Bank](https://docs.cline.bot/prompting/cline-memory-bank): markdown only, no UI, freshness relies on
+  the agent writing.
+- [Statusline](https://code.claude.com/docs/en/statusline): display only (no keys), event-driven, 300ms debounce.
+- [Mods reference](https://code.claude.com/docs/en/plugins/mods/reference): `$.fs` has no watch; `ui.render` re-runs
+  only on prop/width change, so poll with `$.clock.every` or `$.ui.invalidate`; draw to `e.props.bodyColumns`; a pane
+  a mod opens by itself shows only at ≥144 columns (110 once the user opened it); `$.state` resets on `/clear` and
+  `/resume`.
+- [Hooks, FileChanged](https://code.claude.com/docs/en/hooks): a real watcher, but paths outside the cwd root need
+  absolute `watchPaths` from SessionStart; how it reaches a mod is unverified.
+- Approaches: A band polled from frontmatter; B FileChanged-driven redraw; C statusline segment (no resume key); D a
+  separate machine-readable state file next to flow.md.
+
 ## Options
 
 ## Plan review
