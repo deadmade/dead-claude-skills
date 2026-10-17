@@ -1,5 +1,5 @@
 ---
-phase: evaluate
+phase: execute
 ---
 
 # Click-to-read file pane: flow
@@ -21,7 +21,7 @@ chat; ctrl/cmd+click keeps the system opener.
 ## Gates
 
 - Gate 1, spec approved: 2026-10-17
-- Gate 2, plan approved:
+- Gate 2, plan approved: 2026-10-17, execution: native
 
 ## Skipped
 
