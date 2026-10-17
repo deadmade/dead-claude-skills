@@ -611,13 +611,15 @@ test('web builtins: tri-state merge keeps other denies, toggle reads deny', () =
 
 test('web builtins decision table', () => {
   for (const was of [true, false]) {
-    assert.equal(webBuiltinsDecision({ toggle: true, was, healthy: true }), true);
+    assert.equal(webBuiltinsDecision({ toggle: true, was, healthy: true, installed: true }), true);
     assert.equal(webBuiltinsDecision({ toggle: true, was, healthy: false }), undefined);
   }
-  assert.equal(webBuiltinsDecision({ toggle: false, was: true, healthy: true }), false);
-  assert.equal(webBuiltinsDecision({ toggle: false, was: true, healthy: false }), false);
+  assert.equal(webBuiltinsDecision({ toggle: false, was: true, healthy: true, installed: true }), false);
+  assert.equal(webBuiltinsDecision({ toggle: false, was: true, healthy: false, installed: true }), false);
   assert.equal(webBuiltinsDecision({ toggle: false, was: false, healthy: true }), undefined);
   assert.equal(webBuiltinsDecision({ toggle: false, was: false, healthy: false }), undefined);
+  // Hand-added denies of someone who never had web-mcp stay.
+  assert.equal(webBuiltinsDecision({ toggle: false, was: true, healthy: false, installed: false }), undefined);
 });
 
 test('agent-browser: install when missing, upgrade when older, keep when equal or newer', () => {

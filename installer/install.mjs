@@ -687,6 +687,7 @@ if (selected.includes(WEB_MCP)) await applyBin('web-mcp', WEB_MCP);
 const webBuiltinsOff = webBuiltinsDecision({
   toggle: selected.includes(WEB_MCP) && on('web-builtins-off'),
   was: current['web-builtins-off'],
+  installed: has(WEB_MCP),
   healthy: selected.includes(WEB_MCP) && (await applySearxng(current['web-builtins-off'])),
 });
 

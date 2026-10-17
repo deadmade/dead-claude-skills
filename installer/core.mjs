@@ -132,10 +132,11 @@ export const searxngRun = (configDir) => [
 export const searxngSettings = (template, secret) => template.replace(/^(\s*secret_key:).*$/m, `$1 "${secret}"`);
 
 // The built-in web tools' new state: true deny them, false allow them again, undefined leave them.
-// toggle: the choice; was: it was on before; healthy: SearXNG answered JSON.
+// toggle: the choice; was: it was on before; healthy: SearXNG answered JSON; installed: web-mcp was installed before
+// this run (only then can the denies be ours; someone who never had web-mcp keeps theirs).
 // Only an explicit on to off allows them again: a down SearXNG must not undo denies that are already there.
-export const webBuiltinsDecision = ({ toggle, was, healthy }) =>
-  toggle ? healthy || undefined : was ? false : undefined;
+export const webBuiltinsDecision = ({ toggle, was, healthy, installed }) =>
+  toggle ? healthy || undefined : was && installed ? false : undefined;
 
 export function mergeSettings(settings, { statusLine, sandbox, version, nightCity, notify, webBuiltinsOff }) {
   const out = structuredClone(settings);
