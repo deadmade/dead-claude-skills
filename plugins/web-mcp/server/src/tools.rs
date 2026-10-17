@@ -9,6 +9,7 @@ use serde_json::{Value, json};
 use base64::Engine as _;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -139,16 +140,16 @@ async fn browse(ctx: &Ctx, args: BrowserArgs) -> Result<CallToolResult, CallTool
     browser::check_session(&args.session).map_err(|e| error(format!("browser: {e}")))?;
     let mut cmd = vec![name.to_owned()];
     // Written by agent-browser into web-mcp's own folder, and removed on every path out.
-    let shot = Scratch(
-        ctx.archive
+    let shot = if matches!(args.action, Screenshot) {
+        let dir = ctx
+            .archive
             .scratch()
-            .map_err(|e| error(format!("no scratch folder for the screenshot: {e}")))?
-            .join(format!(
-                "{}-{}.jpg",
-                std::process::id(),
-                SHOTS.fetch_add(1, Ordering::Relaxed)
-            )),
-    );
+            .map_err(|e| error(format!("no scratch folder for the screenshot: {e}")))?;
+        let n = SHOTS.fetch_add(1, Ordering::Relaxed);
+        Some(Scratch(dir.join(format!("{}-{n}.jpg", std::process::id()))))
+    } else {
+        None
+    };
     match args.action {
         Open => {
             let u = need(args.url.as_ref(), name, "url")?;
@@ -196,7 +197,9 @@ async fn browse(ctx: &Ctx, args: BrowserArgs) -> Result<CallToolResult, CallTool
         Network => cmd.push("requests".into()),
         Screenshot => cmd.extend(
             [
-                &*shot.0.to_string_lossy(),
+                &*shot
+                    .as_ref()
+                    .map_or_else(Default::default, |s| s.0.to_string_lossy()),
                 "--screenshot-format",
                 "jpeg",
                 "--screenshot-quality",
@@ -229,7 +232,7 @@ async fn browse(ctx: &Ctx, args: BrowserArgs) -> Result<CallToolResult, CallTool
             show(&data)
         ))]));
     }
-    let jpeg = tokio::fs::read(&shot.0)
+    let jpeg = tokio::fs::read(shot.as_ref().map_or(Path::new(""), |s| &s.0))
         .await
         .map_err(|e| error(format!("agent-browser wrote no screenshot: {e}")))?;
     // Shown downscaled like fetch's images; the archive keeps the original.

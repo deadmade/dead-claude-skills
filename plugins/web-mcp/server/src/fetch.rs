@@ -25,8 +25,6 @@ const ACCEPT_VALUE: &str = "text/markdown, text/html;q=0.9, */*;q=0.8";
 // shortcut: pages with more content images than this archive only the first ones; raise if that bites.
 const MAX_IMAGES: usize = 24;
 const SHOWN_IMAGES: usize = 6;
-/// The whole browser fallback: open, read, close.
-const FALLBACK_DEADLINE: Duration = Duration::from_secs(30);
 const MAX_REDIRECTS: usize = 10;
 
 #[derive(Clone, Copy)]
@@ -388,9 +386,10 @@ fn wants_fallback(opts: GetOpts, page: &Page) -> bool {
 /// The `Err` is a note for the reader.
 async fn browser_page(ctx: &Ctx, url: &Url, allow_private: bool) -> Result<String, String> {
     let why = "(This page looks empty without JavaScript, and the browser fallback";
-    let (html, landed) = tokio::time::timeout(FALLBACK_DEADLINE, ctx.browser.rendered_html(url))
+    let (html, landed) = ctx
+        .browser
+        .rendered_html(url)
         .await
-        .map_err(|_| format!("{why} took over 30 s.)"))?
         .map_err(|e| format!("{why} failed: {e})"))?;
     if !allow_private && private_landing(&landed).await {
         return Err(format!(
@@ -864,7 +863,7 @@ mod tests {
             std::env::consts::EXE_SUFFIX
         ));
         assert!(fake.is_file(), "build the fake first: cargo build --bins");
-        let ctx = test_ctx_with(crate::browser::Browser { bin: fake });
+        let ctx = test_ctx_with(crate::browser::Browser::new(&fake.to_string_lossy()));
         let url = Url::parse("http://example.com/redirect-private").unwrap();
         let dropped = browser_page(&ctx, &url, false).await.unwrap_err();
         assert!(dropped.contains("http://127.0.0.1/admin"), "{dropped}");

@@ -60,6 +60,8 @@ impl fmt::Display for BrowserError {
 
 pub struct Browser {
     pub bin: PathBuf,
+    /// How long the fetch fallback's batch may take.
+    pub fallback_deadline: Duration,
 }
 
 impl Browser {
@@ -68,6 +70,7 @@ impl Browser {
     pub fn new(name: &str) -> Self {
         Self {
             bin: Self::resolve(name).unwrap_or_else(|| name.into()),
+            fallback_deadline: Duration::from_secs(30),
         }
     }
 
@@ -207,7 +210,18 @@ impl Browser {
             vec!["get", "url"],
         ];
         // The HTML is data for the extractor: no output cap, no boundary markers.
-        let answer = self.batch_with(&session, &cmds, false).await;
+        let answer = tokio::time::timeout(
+            self.fallback_deadline,
+            self.batch_with(&session, &cmds, false),
+        )
+        .await
+        .unwrap_or_else(|_| {
+            Err(BrowserError::Failed(format!(
+                "the page did not finish within {} s",
+                self.fallback_deadline.as_secs_f32()
+            )))
+        });
+        // Whatever happened, the session (a daemon and its Chromium) must not outlive the fetch.
         let _ = self
             .run_with(&session, &["close".to_owned()], None, false)
             .await;

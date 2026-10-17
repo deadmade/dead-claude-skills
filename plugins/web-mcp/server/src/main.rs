@@ -47,7 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         index: rank::Index::open(archive.web())?,
         archive,
-        browser: browser::Browser::new(&cfg.agent_browser),
+        browser: browser_from(&cfg),
         http,
         http_public: fetch::client(true)?,
         limits: limits::HostLimits::default(),
@@ -57,4 +57,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let server = tools::Server::new(Arc::new(ctx));
     server.serve(stdio()).await?.waiting().await?;
     Ok(())
+}
+
+/// `WEB_MCP_FALLBACK_MS` shortens the fetch fallback's deadline (for tests).
+fn browser_from(cfg: &config::Config) -> browser::Browser {
+    let mut b = browser::Browser::new(&cfg.agent_browser);
+    if let Some(ms) = std::env::var("WEB_MCP_FALLBACK_MS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+    {
+        b.fallback_deadline = std::time::Duration::from_millis(ms);
+    }
+    b
 }

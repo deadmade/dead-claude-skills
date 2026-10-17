@@ -371,3 +371,36 @@ fn open_rejects_non_http_schemes() {
     }
     assert!(calls(&log).is_empty());
 }
+
+#[test]
+fn slow_fallback_still_closes_its_session() {
+    let fx = Fixture::start(PUBLIC);
+    let shell = std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/app-shell.html"
+    ))
+    .unwrap();
+    fx.route("/slow.html", vec![common::Resp::html(shell)]);
+    let log = tempdir().join("calls.jsonl");
+    let mut mcp = Mcp::start_with(
+        tempdir(),
+        &[
+            ("WEB_MCP_AGENT_BROWSER", FAKE.to_owned()),
+            ("FAKE_AB_LOG", log.display().to_string()),
+            ("WEB_MCP_FALLBACK_MS", "300".to_owned()),
+        ],
+    );
+    let started = std::time::Instant::now();
+    let r = mcp.call("fetch", json!({"url": fx.url("/slow.html")}));
+    assert!(started.elapsed() < std::time::Duration::from_secs(3));
+    assert!(!is_error(&r), "{r}");
+    assert!(text(&r).contains("browser fallback"), "{r}");
+    let c = calls(&log);
+    let batch = c.iter().find(|c| args(c).contains(&"batch")).unwrap();
+    let session = args(batch)[1];
+    assert!(
+        c.iter()
+            .any(|c| args(c)[1] == session && args(c).last() == Some(&"close")),
+        "{c:?}"
+    );
+}

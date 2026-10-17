@@ -36,6 +36,9 @@ fn main() {
     let out = match rest.first().map(String::as_str) {
         Some("batch") => {
             let cmds: Vec<Vec<String>> = serde_json::from_str(&stdin).unwrap();
+            if stdin.contains("/slow") {
+                std::thread::sleep(std::time::Duration::from_secs(3)); // a page that hangs
+            }
             let url = cmds
                 .iter()
                 .find(|c| c[0] == "open")
