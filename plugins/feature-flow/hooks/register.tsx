@@ -13,7 +13,6 @@ const band = atom({ plugin: 'feature-flow', key: 'band' } as const, null);
 let touched: { slug: string; path: string } | null = null; // the flow.md this session last wrote
 let command: { feature: string | null; research: string | null } = { feature: null, research: null };
 const seen = new Map<string, Run>(); // parsed copies, keyed by path, valid while mtimeMs matches
-let columns = 100; // the band's last bodyColumns; lines are laid out to it
 let busy = false;
 let again = false;
 
@@ -65,8 +64,8 @@ async function poll($: $) {
   const { current, others } = pickCurrent(newest(runs), touched?.slug ?? null);
   const value: Band | null = current && {
     run: current,
-    lines: bandLines(current, others, columns),
-    showKey: touched === null && current.phase !== 'done',
+    others,
+    showKey: touched?.slug !== current.slug && current.phase !== 'done',
     command: command[current.research ? 'research' : 'feature'],
   };
   await update($, band, () => value);
@@ -92,7 +91,6 @@ export const register: Register = (on) => {
   touched = null;
   command = { feature: null, research: null };
   seen.clear();
-  columns = 100;
   busy = false;
   again = false;
 
@@ -104,6 +102,13 @@ export const register: Register = (on) => {
       // no resume key without the command
     }
     $.clock.every(POLL_MS, () => void refresh($).catch(() => {}));
+    void refresh($).catch(() => {});
+    return next(e);
+  });
+
+  // A /clear ends the session too (no session.start follows): the runs it wrote stop being this session's.
+  on('session.end', ($, e, next) => {
+    touched = null;
     void refresh($).catch(() => {});
     return next(e);
   });
@@ -123,10 +128,6 @@ export const register: Register = (on) => {
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const b = await read($, band); // the read is what redraws on update
-    if (e.props.bodyColumns !== columns) {
-      columns = e.props.bodyColumns;
-      void refresh($).catch(() => {});
-    }
     if (b === null || e.props.hasSurvey || e.props.view.agentId !== undefined) return next(e);
     const below = await next(e);
     if ((below as { type?: unknown }).type !== 'engine') return below; // a hook beneath drew a band
@@ -141,7 +142,7 @@ export const register: Register = (on) => {
     return (
       <Box flexDirection="row">
         <Box flexDirection="column" flexGrow={1}>
-          {b.lines.map((line) => (
+          {bandLines(b.run, b.others, e.props.bodyColumns).map((line) => (
             <Text>{line}</Text>
           ))}
         </Box>

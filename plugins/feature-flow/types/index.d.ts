@@ -8,7 +8,13 @@ export type Run = {
   deviations: boolean;
 };
 
-export type Band = { run: Run; lines: string[]; showKey: boolean; command: string | null };
+// What the band draws; its line is laid out at render, to each surface's bodyColumns.
+export type Band = {
+  run: Run;
+  others: number; // open runs besides this one
+  showKey: boolean; // this session hasn't written this run's flow.md, and it isn't done
+  command: string | null; // the resume command for this run's flow
+};
 
 declare module 'claude-code' {
   interface PluginState {

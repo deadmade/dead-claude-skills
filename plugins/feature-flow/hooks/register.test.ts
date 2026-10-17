@@ -89,10 +89,10 @@ const PROPS = {
   view: {},
 };
 
-function band($: Engine, props: Partial<typeof PROPS> = {}) {
+function band($: Engine, props: Partial<typeof PROPS> = {}, surface: 'terminal' | 'desktop' = 'terminal') {
   return $.ui.mount({
     plugin: 'feature-flow',
-    surface: 'terminal',
+    surface,
     component: 'AbovePrompt',
     props: { ...PROPS, ...props },
   } as never);
@@ -271,9 +271,64 @@ test('lays the line out to bodyColumns', async ($, on) => {
   const h = host(on, { '/repo/docs/features/a-rather-long-slug/flow.md': { text: flow('plan'), mtimeMs: 1 } });
   await start($, h);
   const ui = await band($, { bodyColumns: 30 });
-  await h.clock.settle();
   const line = (await ui.find({ type: 'Text' }))!.text;
   expect(line.length).toBeLessThanOrEqual(20);
   expect(line).toContain('a-rather-long-slug');
   await ui.unmount();
+});
+
+test('each surface gets a line for its own width', async ($, on) => {
+  const h = host(on, { '/repo/docs/features/a-rather-long-slug/flow.md': { text: flow('plan'), mtimeMs: 1 } });
+  await start($, h);
+  const terminal = await band($, { bodyColumns: 30 }, 'terminal');
+  const desktop = await band($, { bodyColumns: 50 }, 'desktop');
+  const line = async (ui: typeof terminal) => (await ui.find({ type: 'Text' }))!.text;
+  expect((await line(terminal)).length).toBeLessThanOrEqual(20);
+  expect((await line(desktop)).length).toBeLessThanOrEqual(40);
+  expect((await line(desktop)).length).toBeGreaterThan(20);
+  await terminal.unmount();
+  await desktop.unmount();
+});
+
+test('the key comes back when the written run is gone', async ($, on) => {
+  const h = host(on, {
+    '/repo/docs/features/a/flow.md': { text: flow('plan'), mtimeMs: 1 },
+    '/repo/docs/features/b/flow.md': { text: flow('spec'), mtimeMs: 2 },
+  });
+  await start($, h);
+  await write($, '/repo/docs/features/a/flow.md');
+  await h.clock.settle();
+  expect((await shown($)).resume).toBeUndefined();
+  delete h.files['/repo/docs/features/a/flow.md'];
+  await h.clock.advance(5000);
+  const s = await shown($);
+  expect(s.texts).toContain('b · spec');
+  expect(s.resume).toBeDefined();
+});
+
+test('a done run shows without the key', async ($, on) => {
+  const h = host(on, { '/repo/docs/features/a/flow.md': { text: flow('done'), mtimeMs: 1 } });
+  await start($, h);
+  await write($, '/repo/docs/features/a/flow.md');
+  await h.clock.settle();
+  const s = await shown($);
+  expect(s.texts).toContain('a · done');
+  expect(s.resume).toBeUndefined();
+});
+
+test('session end (a /clear too) forgets the written run', async ($, on) => {
+  const h = host(on, {
+    '/repo/docs/features/a/flow.md': { text: flow('done'), mtimeMs: 1 },
+    '/repo/docs/features/b/flow.md': { text: flow('spec'), mtimeMs: 2 },
+  });
+  on('session.end', (_$, e) => ({ sessionId: e.sessionId }));
+  await start($, h);
+  await write($, '/repo/docs/features/a/flow.md');
+  await h.clock.settle();
+  expect((await shown($)).texts).toContain('a · done');
+  await $.session.end({ reason: 'clear', sessionId: 's' } as never);
+  await h.clock.settle();
+  const s = await shown($);
+  expect(s.texts).toContain('b · spec');
+  expect(s.resume).toBeDefined();
 });
