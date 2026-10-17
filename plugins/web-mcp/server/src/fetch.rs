@@ -657,7 +657,7 @@ fn slash(p: &Path) -> String {
 }
 
 /// Cuts markdown over `limit` chars at the last paragraph break before `limit - 1000`, then adds `note`.
-pub(crate) fn truncate(md: &str, limit: usize, note: &str) -> String {
+fn truncate(md: &str, limit: usize, note: &str) -> String {
     if md.chars().count() <= limit {
         return md.to_owned();
     }
