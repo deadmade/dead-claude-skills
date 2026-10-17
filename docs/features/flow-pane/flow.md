@@ -128,6 +128,9 @@ From the final whole-branch review (2026-10-17), outside the plan:
   housekeeping. Options: (a) set `phase: done` in those four files in this branch; (b) leave them for later.
   Recommendation: (a), four one-line edits that make the band useful from the first session.
 
+Decision (2026-10-17): the user chose (a) for both ("yes to both, go with your recommendations"). Folded into the
+final fix wave with review items 3 (Windows separator in the spec lookup) and 4 ("1 resumes it from an idle prompt").
+
 ## Walkthrough
 
 | spec goal | plan task | file:line | test |
