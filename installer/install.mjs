@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Interactive installer for the dead-claude-skills marketplace. Decisions live in core.mjs.
 import { spawn, spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import {
   chmodSync,
   cpSync,
@@ -39,6 +39,9 @@ import {
   hasDcgHook,
   isOurStatusLine,
   isSandboxOn,
+  isWebBuiltinsOff,
+  searxngRun,
+  webBuiltinsDecision,
   isStripped,
   mergeSettings,
   isShipped,
@@ -61,13 +64,14 @@ import {
   stripDefaults,
   unavailable,
 } from './core.mjs';
-import { backup, clearTargets, writeAtomic } from './files.mjs';
+import { backup, clearTargets, writeAtomic, writeSearxng } from './files.mjs';
 import { confirm, line, log, note, progress, screen } from './ui.mjs';
 import { changeList, initial, move, render } from './view.mjs';
 
 const PKG = join(import.meta.dirname, '..');
 const CONFIG = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude');
 const SETTINGS = join(CONFIG, 'settings.json');
+const SEARXNG = join(CONFIG, 'searxng');
 const RULES = join(CONFIG, 'rules', 'dead-claude-skills.md');
 const CCSL = join(homedir(), '.config', 'ccstatusline', 'settings.json');
 const WIN = process.platform === 'win32';
@@ -348,6 +352,55 @@ async function applyBin(pluginName, plugin) {
     );
 }
 
+// SearXNG in Docker for web-mcp's search. True when it answers JSON on 127.0.0.1:8888 within 30 s. Every failure is a
+// summary line, never a crash. An existing settings.yml is kept so the running container's secret stays valid.
+async function applySearxng() {
+  if (!onPath('docker')) {
+    failures.push(
+      `SearXNG: docker not found; write ${join(SEARXNG, 'settings.yml')} (see installer/searxng.yml) and run: docker ${searxngRun(SEARXNG).join(' ')}`,
+    );
+    return false;
+  }
+  const docker = (...args) => spawnSync('docker', args, { encoding: 'utf8' });
+  try {
+    if (
+      writeSearxng(
+        SEARXNG,
+        readFileSync(join(PKG, 'installer', 'searxng.yml'), 'utf8'),
+        randomBytes(32).toString('hex'),
+      )
+    )
+      done.push(`wrote ${join(SEARXNG, 'settings.yml')}`);
+    const exists = docker('container', 'inspect', 'searxng').status === 0;
+    const r = exists ? docker('start', 'searxng') : docker(...searxngRun(SEARXNG));
+    if (r.status !== 0) {
+      failures.push(
+        `SearXNG: docker ${exists ? 'start' : 'run'} failed (${r.error?.code ?? (r.stderr || `exit ${r.status}`).trim()})`,
+      );
+      return false;
+    }
+  } catch (e) {
+    failures.push(`SearXNG: ${e.message}`);
+    return false;
+  }
+  const healthy = await progress('Waiting for SearXNG', async () => {
+    for (const end = Date.now() + 30000; Date.now() < end; await new Promise((r) => setTimeout(r, 1000))) {
+      try {
+        const res = await fetch('http://127.0.0.1:8888/search?q=test&format=json', {
+          signal: AbortSignal.timeout(3000),
+        });
+        if (res.ok && (await res.json())) return { ok: true };
+      } catch {
+        /* not up yet */
+      }
+    }
+    return { ok: false };
+  });
+  if (healthy.ok) done.push('SearXNG answers on 127.0.0.1:8888');
+  else failures.push('SearXNG did not answer JSON within 30 s; the built-in WebSearch and WebFetch stay on');
+  return healthy.ok;
+}
+
 function onPath(bin) {
   const exts = WIN ? (process.env.PATHEXT || '.EXE;.CMD;.BAT').split(';') : [''];
   return (process.env.PATH || '').split(delimiter).some((d) => exts.some((e) => existsSync(join(d, bin + e))));
@@ -444,11 +497,14 @@ const current = {
   dcg: hasDcgHook(settingsNow),
   'strip-defaults': isStripped(settingsNow),
   clean: false,
+  'web-builtins-off': isWebBuiltinsOff(settingsNow),
 };
 const chosen = {
   ...current,
   'strip-defaults': FLAGS.includes('--strip-defaults') || current['strip-defaults'],
   clean: FLAGS.includes('--clean'),
+  // On by default once web-mcp is installed; on a first install tick it with web-mcp.
+  'web-builtins-off': current['web-builtins-off'] || has(WEB_MCP),
 };
 
 // Options that can't work here stay off the pages, unless they're on already: hiding never removes anything.
@@ -586,6 +642,12 @@ if (plan.uninstall.length || data.retired.length || dupes.length || foreign.leng
 if (selected.includes(TUI_REVIEW)) await applyBin('tui-review', TUI_REVIEW);
 if (selected.includes(WEB_MCP)) await applyBin('web-mcp', WEB_MCP);
 
+const webBuiltinsOff = webBuiltinsDecision({
+  toggle: selected.includes(WEB_MCP) && on('web-builtins-off'),
+  was: current['web-builtins-off'],
+  healthy: selected.includes(WEB_MCP) && (await applySearxng()),
+});
+
 const nightCity = selected.some((id) => nameOf(id) === 'night-city');
 const notify = selected.some((id) => nameOf(id) === 'notify');
 const toggles = {
@@ -595,6 +657,7 @@ const toggles = {
   version: VERSION,
   nightCity,
   notify,
+  webBuiltinsOff,
 };
 await applySettings(toggles, { strip, reset: clean });
 const autoUpdate = tryJson(join(CONFIG, 'plugins', 'known_marketplaces.json'))?.[MARKETPLACE]?.autoUpdate;

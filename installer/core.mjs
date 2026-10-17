@@ -110,7 +110,32 @@ export const isShipped = (text, shippedTexts) => {
   }
 };
 
-export function mergeSettings(settings, { statusLine, sandbox, version, nightCity, notify }) {
+const WEB_BUILTINS = ['WebFetch', 'WebSearch'];
+export const isWebBuiltinsOff = (s) => WEB_BUILTINS.every((d) => s?.permissions?.deny?.includes(d));
+
+// The SearXNG container web-mcp searches through, bound to loopback only; configDir holds settings.yml.
+// shortcut: unpinned latest tag, pin when an upgrade breaks the JSON API.
+export const searxngRun = (configDir) => [
+  'run',
+  '-d',
+  '--name',
+  'searxng',
+  '--restart',
+  'unless-stopped',
+  '-p',
+  '127.0.0.1:8888:8080',
+  '-v',
+  `${configDir}:/etc/searxng/`,
+  'docker.io/searxng/searxng:latest',
+];
+
+export const searxngSettings = (template, secret) => template.replace(/^(\s*secret_key:).*$/m, `$1 "${secret}"`);
+
+// The built-in web tools' new state: true deny them, false allow them again, undefined leave them.
+// toggle: the choice; was: it was on before; healthy: SearXNG answered JSON.
+export const webBuiltinsDecision = ({ toggle, was, healthy }) => (toggle ? healthy : was ? false : undefined);
+
+export function mergeSettings(settings, { statusLine, sandbox, version, nightCity, notify, webBuiltinsOff }) {
   const out = structuredClone(settings);
   if (nightCity === false && out.theme === NIGHT_CITY_THEME) delete out.theme;
   // Claude Code colours code in a fixed Monokai a theme can't change; off, diffs take Night City's own diff colours.
@@ -132,10 +157,15 @@ export function mergeSettings(settings, { statusLine, sandbox, version, nightCit
   if (notify === false && out.preferredNotifChannel === 'notifications_disabled') delete out.preferredNotifChannel;
   const allow = out.permissions?.allow ?? [];
   const deny = out.permissions?.deny ?? [];
+  let denied = [...deny, ...SECRET_DENIES.filter((d) => !deny.includes(d))];
+  // web-mcp replaces the built-in web tools once SearXNG answers.
+  // shortcut: false also removes WebFetch/WebSearch entries the user added by hand; remember who set them if anyone minds.
+  if (webBuiltinsOff) denied = [...denied, ...WEB_BUILTINS.filter((d) => !denied.includes(d))];
+  if (webBuiltinsOff === false) denied = denied.filter((d) => !WEB_BUILTINS.includes(d));
   out.permissions = {
     ...out.permissions,
     allow: allow.includes(PERMISSION) ? allow : [...allow, PERMISSION],
-    deny: [...deny, ...SECRET_DENIES.filter((d) => !deny.includes(d))],
+    deny: denied,
   };
   out.extraKnownMarketplaces = {
     ...out.extraKnownMarketplaces,
@@ -289,6 +319,7 @@ const BINARIES = [
   ['bwrap', 'sandbox', 'nix: bubblewrap', 'WSL2 only'],
   ['socat', 'sandbox', 'nix: socat', 'WSL2 only'],
   ['ccstatusline', 'ccstatusline', 'nix: ccstatusline', 'npm i -g ccstatusline'],
+  ['docker', 'web-mcp', 'nix: docker', 'winget install -e --id Docker.DockerDesktop'],
   ['cswap', 'cswap', 'uv tool install claude-swap', 'rerun this installer (cswap.exe download)'],
 ];
 
@@ -338,7 +369,7 @@ export function binAction({ onPath, installed, version, supported }) {
 
 // The installer's pages, in order. keys: plugin names and installer toggles; an opt-in not listed here lands in Other,
 // so a new marketplace plugin is never left out.
-export const TOGGLES = ['ccstatusline', 'sandbox', 'dcg', 'strip-defaults', 'clean'];
+export const TOGGLES = ['ccstatusline', 'sandbox', 'dcg', 'strip-defaults', 'clean', 'web-builtins-off'];
 export const CATEGORIES = [
   {
     id: 'workflow',
@@ -386,7 +417,7 @@ export const CATEGORIES = [
     id: 'tools',
     title: 'Tools',
     blurb: 'Plugins that bring their own binary or pane.',
-    keys: ['graphify', 'cswap', 'tui-review', 'web-mcp'],
+    keys: ['graphify', 'cswap', 'tui-review', 'web-mcp', 'web-builtins-off'],
   },
   {
     id: 'system',
@@ -425,6 +456,7 @@ export const HINTS = {
   sandbox: 'Bash sandbox, no unsandboxed fallback',
   dcg: 'destructive command guard, runs its own installer',
   'strip-defaults': `remove other marketplaces + plugins (keeps the ${OFFICIAL} ones used here), claude.ai connectors, synced skills/plugins, builtins`,
+  'web-builtins-off': 'Turn off the built-in WebSearch and WebFetch (web-mcp replaces them)',
   clean: `clean slate: back up, then reset settings.json and delete ${CLEAN_TARGETS.join(', ')}`,
 };
 
@@ -434,6 +466,7 @@ export function unavailable(key, platform, arch, version) {
   if (platform === 'win32' && name === 'sandbox') return 'needs WSL2';
   if (platform === 'win32' && name === 'nix-lsp') return 'nixd is not available on Windows';
   if (platform !== 'win32' && name === 'cswap') return 'releases ship cswap.exe for Windows only';
+  if (name === 'web-builtins-off') return unavailable(`web-mcp@${MARKETPLACE}`, platform, arch, version);
   const bin = BIN_PLUGINS[name];
   if (bin && !binAsset(bin.name, platform, arch, version)) return `no ${bin.name} build for ${platform}-${arch}`;
   return undefined;

@@ -38,6 +38,11 @@ import {
   TOGGLES,
   categorize,
   unavailable,
+  searxngRun,
+  searxngSettings,
+  webBuiltinsDecision,
+  isWebBuiltinsOff,
+  HINTS,
   outdated,
   shippedVersions,
   manifestPath,
@@ -573,4 +578,42 @@ test('notify turns the built-in notification off, and deselecting restores it', 
   assert.equal(channel({ preferredNotifChannel: 'notifications_disabled' }, false), undefined);
   assert.equal(channel({ preferredNotifChannel: 'kitty' }, false), 'kitty');
   assert.equal(channel({ preferredNotifChannel: 'kitty' }, true), 'notifications_disabled');
+});
+
+test('searxng binds loopback, mounts the config dir and takes the secret', () => {
+  const args = searxngRun('/c/searxng');
+  assert.ok(args.includes('127.0.0.1:8888:8080'));
+  assert.ok(args.includes('/c/searxng:/etc/searxng/'));
+  const tpl = readFileSync(new URL('./searxng.yml', import.meta.url), 'utf8');
+  const out = searxngSettings(tpl, 'abc123');
+  assert.match(out, /secret_key: "abc123"/);
+  assert.doesNotMatch(out, /changeme/);
+  assert.match(out, /- json/);
+});
+
+test('web builtins: tri-state merge keeps other denies, toggle reads deny', () => {
+  const base = { permissions: { deny: ['Bash(sudo:*)'] } };
+  const off = mergeSettings(base, { webBuiltinsOff: true });
+  assert.ok(['Bash(sudo:*)', 'WebFetch', 'WebSearch'].every((d) => off.permissions.deny.includes(d)));
+  assert.ok(isWebBuiltinsOff(off));
+  assert.deepEqual(mergeSettings(off, { webBuiltinsOff: true }), off);
+  assert.deepEqual(mergeSettings(off, {}).permissions.deny, off.permissions.deny);
+  const back = mergeSettings(off, { webBuiltinsOff: false });
+  assert.ok(!back.permissions.deny.includes('WebFetch') && !back.permissions.deny.includes('WebSearch'));
+  assert.ok(back.permissions.deny.includes('Bash(sudo:*)'));
+  assert.ok(!isWebBuiltinsOff(back));
+  assert.ok(!isWebBuiltinsOff({ permissions: { deny: ['WebFetch'] } }));
+  assert.ok(TOGGLES.includes('web-builtins-off') && HINTS['web-builtins-off']);
+  assert.ok(missingBinaries('linux', ['web-mcp'], () => false).some((r) => r.binary === 'docker'));
+});
+
+test('web builtins decision table', () => {
+  for (const was of [true, false]) {
+    assert.equal(webBuiltinsDecision({ toggle: true, was, healthy: true }), true);
+    assert.equal(webBuiltinsDecision({ toggle: true, was, healthy: false }), false);
+  }
+  assert.equal(webBuiltinsDecision({ toggle: false, was: true, healthy: true }), false);
+  assert.equal(webBuiltinsDecision({ toggle: false, was: true, healthy: false }), false);
+  assert.equal(webBuiltinsDecision({ toggle: false, was: false, healthy: true }), undefined);
+  assert.equal(webBuiltinsDecision({ toggle: false, was: false, healthy: false }), undefined);
 });
