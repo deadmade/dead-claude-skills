@@ -1,5 +1,5 @@
 ---
-phase: finish
+phase: done
 ---
 
 # web-mcp optional search sources: flow
@@ -247,22 +247,26 @@ Rulings the controller made during execution (2026-10-17). The full ledger was i
 
 ## Walkthrough
 
-| spec goal | plan task | file:line | test |
-| --------- | --------- | --------- | ---- |
-| 1 filters on `search` | 1, 2 | `server/src/search.rs:196` (check), `:250` (keep), `:397` (web), `:479` | `tests/search.rs:304` `filtered_search_with_no_results_says_so`, `search::tests::keeps_only_asked_engines` |
-| 2 `lookup` tool | 4 | `server/src/tools.rs:384`, `server/src/lookup/mod.rs:162` | `tests/mcp.rs:7` `lists_four_tools` |
-| 2 dns | 4 | `server/src/lookup/dns.rs:29` | `tests/lookup.rs:28` |
-| 2 whois | 5 | `server/src/lookup/rdap.rs:183` | `tests/lookup.rs:187` `whois_follows_registry_redirect` |
-| 2 certs | 6 | `server/src/lookup/certs.rs:15` | `tests/lookup.rs:400` `certs_502_twice_is_a_named_failure` |
-| 2 wayback | 7 | `server/src/lookup/wayback.rs:20`, `:66` | `tests/lookup.rs:442`, `:490` |
-| 2 ip | 8 | `server/src/lookup/ip.rs:37` | `tests/lookup.rs:622` `ip_refuses_private_and_reserved` |
-| 2 vuln | 9 | `server/src/lookup/vuln.rs:67` | `tests/lookup.rs:701` `cve_has_osv_epss_and_kev`, `:758` |
-| 3 records, cut at 30k | 4 | `server/src/lookup/mod.rs:99` (render), `:150` (cut) | `lookup::tests::long_output_is_cut_with_pointer` (`mod.rs:221`) |
-| 4 source lines, cite | 4 | `server/src/lookup/mod.rs:99`, `server/src/tools.rs:384` | `tests/mcp.rs:7` (description contains `cite`) |
-| 5 archive in `.web/lookups/` | 4 | `server/src/archive.rs:328` | `archive::tests::put_lookup_writes_pretty_json_and_index_line` (`archive.rs:762`) |
-| 6 etiquette (deadline, retry, redirects, UA, NVD 6 s) | 3, 9 | `server/src/api.rs:101`, `server/src/limits.rs` | `api::tests::*`, `tests/lookup.rs:187` |
-| 7 stub tests per failure mode | 1–9 | `server/tests/lookup.rs`, `server/tests/search.rs` | all of the above |
-| 8 docs | 2, 10 | `plugins/web-mcp/README.md`, `CLAUDE.md`, `plugin.json`, `marketplace.json` | `npm test` (check-repo) |
+| spec goal                                             | plan task | file:line                                                                   | test                                                                                                       |
+| ----------------------------------------------------- | --------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| 1 filters on `search`                                 | 1, 2      | `server/src/search.rs:196` (check), `:250` (keep), `:397` (web), `:479`     | `tests/search.rs:304` `filtered_search_with_no_results_says_so`, `search::tests::keeps_only_asked_engines` |
+| 2 `lookup` tool                                       | 4         | `server/src/tools.rs:384`, `server/src/lookup/mod.rs:162`                   | `tests/mcp.rs:7` `lists_four_tools`                                                                        |
+| 2 dns                                                 | 4         | `server/src/lookup/dns.rs:29`                                               | `tests/lookup.rs:28`                                                                                       |
+| 2 whois                                               | 5         | `server/src/lookup/rdap.rs:183`                                             | `tests/lookup.rs:187` `whois_follows_registry_redirect`                                                    |
+| 2 certs                                               | 6         | `server/src/lookup/certs.rs:15`                                             | `tests/lookup.rs:400` `certs_502_twice_is_a_named_failure`                                                 |
+| 2 wayback                                             | 7         | `server/src/lookup/wayback.rs:20`, `:66`                                    | `tests/lookup.rs:442`, `:490`                                                                              |
+| 2 ip                                                  | 8         | `server/src/lookup/ip.rs:37`                                                | `tests/lookup.rs:622` `ip_refuses_private_and_reserved`                                                    |
+| 2 vuln                                                | 9         | `server/src/lookup/vuln.rs:67`                                              | `tests/lookup.rs:701` `cve_has_osv_epss_and_kev`, `:758`                                                   |
+| 3 records, cut at 30k                                 | 4         | `server/src/lookup/mod.rs:99` (render), `:150` (cut)                        | `lookup::tests::long_output_is_cut_with_pointer` (`mod.rs:221`)                                            |
+| 4 source lines, cite                                  | 4         | `server/src/lookup/mod.rs:99`, `server/src/tools.rs:384`                    | `tests/mcp.rs:7` (description contains `cite`)                                                             |
+| 5 archive in `.web/lookups/`                          | 4         | `server/src/archive.rs:328`                                                 | `archive::tests::put_lookup_writes_pretty_json_and_index_line` (`archive.rs:762`)                          |
+| 6 etiquette (deadline, retry, redirects, UA, NVD 6 s) | 3, 9      | `server/src/api.rs:101`, `server/src/limits.rs`                             | `api::tests::*`, `tests/lookup.rs:187`                                                                     |
+| 7 stub tests per failure mode                         | 1–9       | `server/tests/lookup.rs`, `server/tests/search.rs`                          | all of the above                                                                                           |
+| 8 docs                                                | 2, 10     | `plugins/web-mcp/README.md`, `CLAUDE.md`, `plugin.json`, `marketplace.json` | `npm test` (check-repo)                                                                                    |
 
 Paths are relative to `plugins/web-mcp/`. Final checks on 6ac55a5: `cargo test` (all suites, 0 failed), `cargo clippy
 --all-targets -- -D warnings` (clean), `npm test` (123/123).
+
+## Finish
+
+2026-10-17: merged locally into `feat/web-mcp` (fast-forward, tests green on the merged result) at the user's choice; a PR for `feat/web-mcp` into `main` follows.
