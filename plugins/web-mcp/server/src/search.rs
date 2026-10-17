@@ -1,12 +1,15 @@
 //! The `search` tool's web side: `SearXNG`, the top pages fetched, then BM25 over the whole archive.
 
+use std::collections::HashMap;
 use std::fmt::{self, Write as _};
 use std::sync::Arc;
 use std::time::Duration;
 
 use futures::future::join_all;
+use rmcp::schemars::{self, JsonSchema};
 use serde::Deserialize;
 use serde_json::json;
+use tokio::sync::OnceCell;
 use url::Url;
 
 use crate::Ctx;
@@ -31,6 +34,8 @@ pub struct WebResult {
 pub enum SearchError {
     Unreachable(Url),
     Failed(String),
+    /// The filter can't match anything; the text says why.
+    Filter(String),
 }
 
 impl fmt::Display for SearchError {
@@ -41,19 +46,86 @@ impl fmt::Display for SearchError {
                 "SearXNG is not reachable at {u}; start SearXNG (with the installer's Docker setup: `docker start searxng`)."
             ),
             Self::Failed(m) => write!(f, "SearXNG search failed: {m}"),
+            Self::Filter(m) => f.write_str(m),
         }
     }
 }
 
+/// How far back a search reaches (`SearXNG`'s `time_range`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum Since {
+    Day,
+    Week,
+    Month,
+    Year,
+}
+
+impl Since {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Day => "day",
+            Self::Week => "week",
+            Self::Month => "month",
+            Self::Year => "year",
+        }
+    }
+}
+
+/// What a search is narrowed to; the default narrows nothing.
+#[derive(Debug, Default)]
+pub struct Filter {
+    pub engines: Vec<String>,
+    pub category: Option<String>,
+    pub since: Option<Since>,
+}
+
+impl Filter {
+    pub fn is_set(&self) -> bool {
+        !self.engines.is_empty() || self.category.is_some() || self.since.is_some()
+    }
+}
+
+/// One engine as `SearXNG`'s `/config` lists it.
+#[derive(Debug)]
+pub struct EngineInfo {
+    pub categories: Vec<String>,
+    pub time_range: bool,
+}
+
+/// The engines `SearXNG` knows, by name.
+#[derive(Debug)]
+pub struct Engines(HashMap<String, EngineInfo>);
+
+#[derive(Deserialize)]
+struct Config {
+    engines: Vec<ConfigEngine>,
+}
+
+#[derive(Deserialize)]
+struct ConfigEngine {
+    name: String,
+    #[serde(default)]
+    categories: Vec<String>,
+    #[serde(default)]
+    time_range_support: bool,
+}
+
 pub trait WebSearch: Send + Sync {
-    fn search(&self, q: &str) -> impl Future<Output = Result<Vec<WebResult>, SearchError>> + Send;
+    fn search(
+        &self,
+        q: &str,
+        f: &Filter,
+    ) -> impl Future<Output = Result<Vec<WebResult>, SearchError>> + Send;
 }
 
 /// Our own local `SearXNG`. It skips `HostLimits` (many searches may run at once) and follows no
 /// redirects: a 3xx is an error.
 pub struct SearxNg {
-    pub base: Url,
-    pub http: reqwest::Client,
+    base: Url,
+    http: reqwest::Client,
+    /// `/config`, read on the first filtered search. `None`: this `SearXNG` has no usable `/config`.
+    config: OnceCell<Option<Engines>>,
 }
 
 #[derive(Deserialize)]
@@ -67,28 +139,165 @@ struct Raw {
     url: String,
     #[serde(default)]
     title: String,
+    #[serde(default)]
+    engine: String,
+    #[serde(default)]
+    engines: Vec<String>,
+}
+
+/// The `SearXNG` query string's pairs, in order.
+fn query_pairs(q: &str, f: &Filter) -> Vec<(&'static str, String)> {
+    let mut v = vec![("q", q.to_owned()), ("format", "json".to_owned())];
+    if !f.engines.is_empty() {
+        v.push(("engines", f.engines.join(",")));
+    }
+    if let Some(c) = &f.category {
+        v.push(("categories", c.clone()));
+    }
+    if let Some(s) = f.since {
+        v.push(("time_range", s.as_str().to_owned()));
+    }
+    v
+}
+
+/// Whether engine `e` is in category `c` (case-insensitive).
+fn in_category(e: &EngineInfo, c: &str) -> bool {
+    e.categories.iter().any(|x| x.eq_ignore_ascii_case(c))
+}
+
+/// Refuses a filter that can't match, before any search is sent. Without `/config` nothing is checked.
+fn check(f: &Filter, known: Option<&Engines>) -> Result<(), SearchError> {
+    let Some(Engines(known)) = known else {
+        return Ok(());
+    };
+    for e in &f.engines {
+        if !known.contains_key(e) {
+            let mut names: Vec<_> = known.keys().map(String::as_str).collect();
+            names.sort_unstable();
+            return Err(SearchError::Filter(format!(
+                "unknown engine {e}; known engines: {}",
+                names.join(", ")
+            )));
+        }
+    }
+    if f.since.is_none() {
+        return Ok(());
+    }
+    let mut asked: Vec<_> = if !f.engines.is_empty() {
+        f.engines.iter().map(String::as_str).collect()
+    } else if let Some(c) = &f.category {
+        known
+            .iter()
+            .filter(|(_, i)| in_category(i, c))
+            .map(|(n, _)| n.as_str())
+            .collect()
+    } else {
+        return Ok(());
+    };
+    asked.sort_unstable();
+    if !asked.is_empty() && !asked.iter().any(|n| known[*n].time_range) {
+        let verb = if asked.len() == 1 { "doesn't" } else { "don't" };
+        return Err(SearchError::Filter(format!(
+            "{} {verb} support since",
+            asked.join(", ")
+        )));
+    }
+    Ok(())
+}
+
+/// Whether a result passes the filter, judged by the engines that returned it.
+fn keep(r: &Raw, f: &Filter, known: Option<&Engines>) -> bool {
+    let names = || std::iter::once(&r.engine).chain(&r.engines);
+    if !f.engines.is_empty() && !names().any(|n| f.engines.contains(n)) {
+        return false;
+    }
+    match (&f.category, known) {
+        (Some(c), Some(Engines(known))) => {
+            names().any(|n| known.get(n).is_some_and(|i| in_category(i, c)))
+        }
+        _ => true,
+    }
+}
+
+impl SearxNg {
+    pub fn new(base: Url, http: reqwest::Client) -> Self {
+        Self {
+            base,
+            http,
+            config: OnceCell::new(),
+        }
+    }
+
+    /// The engines from `/config`. A missing or unreadable `/config` is `None` for good; an unreachable
+    /// or failing `SearXNG` is an error and the next call asks again.
+    async fn engines(&self) -> Result<Option<&Engines>, SearchError> {
+        let cell = self
+            .config
+            .get_or_try_init(|| async {
+                let failed = |e: &dyn fmt::Display| SearchError::Failed(e.to_string());
+                let url = self.base.join("config").map_err(|e| failed(&e))?;
+                let resp = self
+                    .http
+                    .get(url)
+                    .timeout(SEARX_TIMEOUT)
+                    .send()
+                    .await
+                    .map_err(|e| self.send_error(&e))?;
+                let status = resp.status();
+                if status.is_server_error() {
+                    return Err(SearchError::Failed(format!("HTTP {status} from /config")));
+                }
+                if !status.is_success() {
+                    return Ok(None);
+                }
+                let body = resp.bytes().await.map_err(|e| failed(&e))?;
+                Ok(serde_json::from_slice::<Config>(&body).ok().map(|c| {
+                    Engines(
+                        c.engines
+                            .into_iter()
+                            .map(|e| {
+                                let info = EngineInfo {
+                                    categories: e.categories,
+                                    time_range: e.time_range_support,
+                                };
+                                (e.name, info)
+                            })
+                            .collect(),
+                    )
+                }))
+            })
+            .await?;
+        Ok(cell.as_ref())
+    }
+
+    fn send_error(&self, e: &reqwest::Error) -> SearchError {
+        if e.is_connect() {
+            SearchError::Unreachable(self.base.clone())
+        } else {
+            SearchError::Failed(e.to_string())
+        }
+    }
 }
 
 impl WebSearch for SearxNg {
-    async fn search(&self, q: &str) -> Result<Vec<WebResult>, SearchError> {
+    async fn search(&self, q: &str, f: &Filter) -> Result<Vec<WebResult>, SearchError> {
         let failed = |e: &dyn fmt::Display| SearchError::Failed(e.to_string());
+        let known = if f.is_set() {
+            let known = self.engines().await?;
+            check(f, known)?;
+            known
+        } else {
+            None
+        };
         let mut url = self.base.join("search").map_err(|e| failed(&e))?;
-        url.query_pairs_mut()
-            .append_pair("q", q)
-            .append_pair("format", "json");
+        url.query_pairs_mut().extend_pairs(query_pairs(q, f));
         let resp = self
             .http
             .get(url)
             .timeout(SEARX_TIMEOUT)
             .send()
             .await
-            .map_err(|e| {
-                if e.is_connect() {
-                    SearchError::Unreachable(self.base.clone())
-                } else {
-                    failed(&e)
-                }
-            })?;
+            .map_err(|e| self.send_error(&e))?;
         let no_json = || {
             SearchError::Failed(
                 "SearXNG answered without JSON; enable `json` under `search.formats` in its settings.yml"
@@ -107,6 +316,7 @@ impl WebSearch for SearxNg {
         Ok(reply
             .results
             .into_iter()
+            .filter(|r| keep(r, f, known))
             .filter_map(|r| {
                 let url = Url::parse(&r.url)
                     .ok()
@@ -125,7 +335,7 @@ impl WebSearch for SearxNg {
 /// # Errors
 /// When `SearXNG` can't be reached or answers badly.
 pub async fn web(ctx: &Arc<Ctx>, query: &str, max_passages: usize) -> Result<String, SearchError> {
-    let results = ctx.search.search(query).await?;
+    let results = ctx.search.search(query, &Filter::default()).await?;
     let listing: Vec<_> = results
         .iter()
         .map(|r| json!({"url": r.url.as_str(), "title": r.title}))
@@ -197,4 +407,120 @@ pub async fn web(ctx: &Arc<Ctx>, query: &str, max_passages: usize) -> Result<Str
         out.push_str("\n\nThe web side returned nothing; archive passages only.");
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn engines(list: &[(&str, &[&str], bool)]) -> Engines {
+        Engines(
+            list.iter()
+                .map(|(n, c, t)| {
+                    let info = EngineInfo {
+                        categories: c.iter().map(|s| (*s).to_owned()).collect(),
+                        time_range: *t,
+                    };
+                    ((*n).to_owned(), info)
+                })
+                .collect(),
+        )
+    }
+
+    fn known() -> Engines {
+        engines(&[
+            ("github", &["it", "repos"], true),
+            ("gitlab", &["it"], false),
+            ("bing", &["general"], true),
+            ("yahoo", &["general"], true),
+        ])
+    }
+
+    fn raw(engine: &str, engines: &[&str]) -> Raw {
+        Raw {
+            url: "https://example.com".into(),
+            title: String::new(),
+            engine: engine.into(),
+            engines: engines.iter().map(|s| (*s).to_owned()).collect(),
+        }
+    }
+
+    fn filter(engines: &[&str], category: Option<&str>, since: Option<Since>) -> Filter {
+        Filter {
+            engines: engines.iter().map(|s| (*s).to_owned()).collect(),
+            category: category.map(str::to_owned),
+            since,
+        }
+    }
+
+    fn err(f: &Filter, k: Option<&Engines>) -> String {
+        check(f, k).unwrap_err().to_string()
+    }
+
+    #[test]
+    fn filter_params_in_order() {
+        let f = filter(&["github", "gitlab"], Some("it"), Some(Since::Week));
+        let q = url::form_urlencoded::Serializer::new(String::new())
+            .extend_pairs(query_pairs("x", &f))
+            .finish();
+        assert_eq!(
+            q,
+            "q=x&format=json&engines=github%2Cgitlab&categories=it&time_range=week"
+        );
+    }
+
+    #[test]
+    fn keeps_only_asked_engines() {
+        let k = known();
+        let f = filter(&["github"], None, None);
+        let rs = [raw("github", &["github"]), raw("bing", &["bing", "yahoo"])];
+        assert_eq!(rs.iter().filter(|r| keep(r, &f, Some(&k))).count(), 1);
+    }
+
+    #[test]
+    fn category_keeps_engines_in_it() {
+        let k = known();
+        let f = filter(&[], Some("IT"), None);
+        assert!(keep(&raw("github", &["github"]), &f, Some(&k)));
+        assert!(!keep(&raw("bing", &["bing", "yahoo"]), &f, Some(&k)));
+    }
+
+    #[test]
+    fn engines_and_category_must_both_match() {
+        let k = known();
+        let f = filter(&["github", "bing"], Some("it"), None);
+        assert!(keep(&raw("github", &[]), &f, Some(&k)));
+        assert!(!keep(&raw("bing", &[]), &f, Some(&k)));
+        assert!(!keep(&raw("gitlab", &[]), &f, Some(&k)));
+    }
+
+    #[test]
+    fn unknown_engine_is_a_filter_error() {
+        let e = err(&filter(&["nosuch"], None, None), Some(&known()));
+        assert!(e.contains("unknown engine nosuch"), "{e}");
+        assert!(e.contains("bing, github, gitlab, yahoo"), "{e}");
+    }
+
+    #[test]
+    fn since_unsupported_by_all_engines_is_a_filter_error() {
+        let k = engines(&[("github", &["it"], false)]);
+        let e = err(&filter(&["github"], None, Some(Since::Day)), Some(&k));
+        assert!(e.contains("github doesn't support since"), "{e}");
+    }
+
+    #[test]
+    fn since_unsupported_in_category_is_a_filter_error() {
+        let k = engines(&[("gitlab", &["it"], false), ("bing", &["general"], true)]);
+        let f = filter(&[], Some("it"), Some(Since::Day));
+        assert!(err(&f, Some(&k)).contains("gitlab doesn't support since"));
+        assert!(check(&filter(&[], Some("general"), Some(Since::Day)), Some(&k)).is_ok());
+    }
+
+    #[test]
+    fn no_config_skips_checks() {
+        let f = filter(&["nosuch"], Some("it"), Some(Since::Day));
+        assert!(check(&f, None).is_ok());
+        assert!(keep(&raw("nosuch", &[]), &f, None));
+        assert!(!keep(&raw("bing", &[]), &f, None));
+    }
 }

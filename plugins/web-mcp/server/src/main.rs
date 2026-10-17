@@ -41,10 +41,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let archive = archive::Archive::open(&cfg.project, &jiff::Zoned::now())?;
     let http = fetch::client(false)?;
     let ctx = Ctx {
-        search: search::SearxNg {
-            base: cfg.searxng.clone(),
-            http: http.clone(),
-        },
+        search: search::SearxNg::new(cfg.searxng.clone(), http.clone()),
         index: rank::Index::open(archive.web())?,
         archive,
         browser: browser_from(&cfg),
