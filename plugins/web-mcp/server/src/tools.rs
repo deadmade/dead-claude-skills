@@ -20,7 +20,7 @@ use crate::archive::Item;
 use crate::browser;
 use crate::fetch::{self, GetOpts};
 use crate::images;
-use crate::{papers, search};
+use crate::{lookup, papers, search};
 
 static SHOTS: AtomicU64 = AtomicU64::new(0);
 const FETCH_DEADLINE: Duration = Duration::from_secs(30);
@@ -49,6 +49,17 @@ pub struct FetchArgs {
     pub url: String,
     /// Also return the page's images (default false).
     pub images: Option<bool>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[schemars(crate = "schemars")]
+pub struct LookupArgs {
+    /// What to look up, and from where. dns: Cloudflare DNS over HTTPS
+    pub kind: lookup::Kind,
+    /// dns: a domain name.
+    pub target: String,
+    /// dns: a record type such as A, MX or TXT (default A, AAAA, CNAME, MX, NS and TXT).
+    pub record: Option<String>,
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -360,6 +371,14 @@ impl Server {
             Ok(f) => fetch::render(&self.ctx, &f, images).await,
             Err(e) => error(format!("Fetching {url} failed: {e}")),
         }
+    }
+
+    #[tool(
+        description = "Look up one record about a target from public sources, without contacting the target. Records come back as the source sent them and are archived under .web/. When you answer, cite the source URLs and .web paths you used.",
+        annotations(read_only_hint = true)
+    )]
+    async fn lookup(&self, Parameters(args): Parameters<LookupArgs>) -> CallToolResult {
+        lookup::run(&self.ctx, args).await
     }
 
     #[tool(

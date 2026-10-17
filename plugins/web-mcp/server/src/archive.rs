@@ -44,6 +44,16 @@ pub enum Item {
         session: String,
         jpeg: Vec<u8>,
     },
+    /// One source's reply to a lookup, kept as the source sent it. Never cached: lookups always ask again.
+    Lookup {
+        kind: &'static str,
+        target: String,
+        source: &'static str,
+        url: Url,
+        status: u16,
+        query: serde_json::Value,
+        reply: String,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -65,6 +75,7 @@ pub enum Kind {
     Pdf,
     Image,
     Screenshot,
+    Lookup,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -313,6 +324,53 @@ impl Inner {
                     &path,
                 ));
                 (path, sha(&jpeg))
+            }
+            Item::Lookup {
+                kind,
+                target,
+                source,
+                url,
+                status,
+                query,
+                reply,
+            } => {
+                #[derive(Serialize)]
+                struct Record<'a> {
+                    query: &'a serde_json::Value,
+                    source: &'a str,
+                    url: &'a str,
+                    time: &'a str,
+                    status: u16,
+                    reply: serde_json::Value,
+                }
+                let n = self.seq.fetch_add(1, Ordering::Relaxed);
+                let path = self.run.join("lookups").join(kind).join(format!(
+                    "{}-{}-{}-{n}.json",
+                    sanitize(&target, 40),
+                    sanitize(source, 20),
+                    short_hash(url.as_str())
+                ));
+                let reply =
+                    serde_json::from_str(&reply).unwrap_or(serde_json::Value::String(reply));
+                let record = Record {
+                    query: &query,
+                    source,
+                    url: url.as_str(),
+                    time: &time,
+                    status,
+                    reply,
+                };
+                let json = serde_json::to_vec_pretty(&record).map_err(io::Error::other)?;
+                Self::write(&path, &json).await?;
+                lines.push(entry(
+                    url.to_string(),
+                    Some(format!("{kind} {target}")),
+                    Kind::Lookup,
+                    sha(&json),
+                    &path,
+                ));
+                url_out = url.to_string();
+                (path, sha(&json))
             }
         };
         {
@@ -686,6 +744,51 @@ mod tests {
                 && s.chars()
                     .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
         );
+    }
+
+    fn lookup() -> Item {
+        Item::Lookup {
+            kind: "dns",
+            target: "example.com".into(),
+            source: "Cloudflare DoH",
+            url: u("https://cloudflare-dns.com/dns-query?name=example.com&type=A"),
+            status: 200,
+            query: serde_json::json!({"kind": "dns", "target": "example.com", "record": "A"}),
+            reply: r#"{"Status":0}"#.into(),
+        }
+    }
+
+    #[tokio::test]
+    async fn put_lookup_writes_pretty_json_and_index_line() {
+        let d = tempdir();
+        let a = open(&d);
+        let got = a.put(lookup()).await.unwrap();
+        assert!(
+            got.path.starts_with(a.0.rel(&a.0.run).join("lookups/dns")),
+            "{got:?}"
+        );
+        let body = std::fs::read_to_string(a.0.web.join(&got.path)).unwrap();
+        assert!(body.starts_with("{\n  \"query\": {"), "{body}");
+        let v: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(v["reply"]["Status"], 0);
+        assert_eq!(v["source"], "Cloudflare DoH");
+        assert_eq!(v["status"], 200);
+        let line = std::fs::read_to_string(a.0.run.join("index.jsonl")).unwrap();
+        assert!(line.contains(r#""type":"lookup""#), "{line}");
+        assert!(line.contains(r#""query":"dns example.com""#), "{line}");
+        let url = u("https://cloudflare-dns.com/dns-query?name=example.com&type=A");
+        assert!(line.contains(url.as_str()), "{line}");
+        assert!(a.cached(&url).is_none());
+    }
+
+    #[tokio::test]
+    async fn two_identical_lookups_write_two_files() {
+        let d = tempdir();
+        let a = open(&d);
+        let x = a.put(lookup()).await.unwrap();
+        let y = a.put(lookup()).await.unwrap();
+        assert_ne!(x.path, y.path);
+        assert!(a.0.web.join(&x.path).is_file() && a.0.web.join(&y.path).is_file());
     }
 
     #[tokio::test]

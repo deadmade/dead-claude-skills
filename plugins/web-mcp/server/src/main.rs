@@ -6,6 +6,7 @@ mod extract;
 mod fetch;
 mod images;
 mod limits;
+mod lookup;
 mod papers;
 mod passages;
 mod rank;

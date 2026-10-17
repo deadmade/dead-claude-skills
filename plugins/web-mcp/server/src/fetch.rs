@@ -657,7 +657,7 @@ fn slash(p: &Path) -> String {
 }
 
 /// Cuts markdown over `limit` chars at the last paragraph break before `limit - 1000`, then adds `note`.
-fn truncate(md: &str, limit: usize, note: &str) -> String {
+pub(crate) fn truncate(md: &str, limit: usize, note: &str) -> String {
     if md.chars().count() <= limit {
         return md.to_owned();
     }
@@ -794,6 +794,10 @@ pub(crate) mod tests {
                     crossref: Url::parse("https://api.crossref.org/works").unwrap(),
                 },
                 papers_deadline: std::time::Duration::from_secs(8),
+                lookup_urls: crate::config::LookupUrls {
+                    doh: Url::parse("https://cloudflare-dns.com/dns-query").unwrap(),
+                },
+                lookup_deadline: None,
                 project,
                 searxng: Url::parse("http://127.0.0.1:8888").unwrap(),
                 agent_browser: "agent-browser".into(),
