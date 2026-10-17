@@ -797,6 +797,7 @@ pub(crate) mod tests {
                 lookup_urls: crate::config::LookupUrls {
                     doh: Url::parse("https://cloudflare-dns.com/dns-query").unwrap(),
                     rdap_bootstrap: Url::parse("https://data.iana.org/rdap/").unwrap(),
+                    crtsh: Url::parse("https://crt.sh/").unwrap(),
                 },
                 lookup_deadline: None,
                 project,

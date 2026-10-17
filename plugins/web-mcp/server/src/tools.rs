@@ -54,7 +54,7 @@ pub struct FetchArgs {
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "schemars")]
 pub struct LookupArgs {
-    /// What to look up, and from where. dns: Cloudflare DNS over HTTPS. whois: RDAP
+    /// What to look up, and from where. dns: Cloudflare DNS over HTTPS. whois: RDAP. certs: crt.sh
     pub kind: lookup::Kind,
     /// A domain name; whois also an IP or AS number.
     pub target: String,

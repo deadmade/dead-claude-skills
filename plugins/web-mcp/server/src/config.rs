@@ -15,6 +15,7 @@ pub struct LookupUrls {
     pub doh: Url,
     /// The directory holding IANA's RDAP bootstrap files.
     pub rdap_bootstrap: Url,
+    pub crtsh: Url,
 }
 
 pub struct Config {
@@ -31,7 +32,7 @@ pub struct Config {
 
 impl Config {
     /// Reads `CLAUDE_PROJECT_DIR`, `WEB_MCP_SEARXNG_URL`, `WEB_MCP_AGENT_BROWSER` and
-    /// `WEB_MCP_{ARXIV,OPENALEX,CROSSREF,DOH,RDAP}_URL`, each with its default, `WEB_MCP_PAPERS_MS` (8 s; shorter for
+    /// `WEB_MCP_{ARXIV,OPENALEX,CROSSREF,DOH,RDAP,CRTSH}_URL`, each with its default, `WEB_MCP_PAPERS_MS` (8 s; shorter for
     /// tests) and `WEB_MCP_LOOKUP_MS` (unset: each lookup source's own deadline).
     ///
     /// # Errors
@@ -48,6 +49,7 @@ impl Config {
             lookup_urls: LookupUrls {
                 doh: url("WEB_MCP_DOH_URL", "https://cloudflare-dns.com/dns-query")?,
                 rdap_bootstrap: url("WEB_MCP_RDAP_URL", "https://data.iana.org/rdap/")?,
+                crtsh: url("WEB_MCP_CRTSH_URL", "https://crt.sh/")?,
             },
             lookup_deadline: var("WEB_MCP_LOOKUP_MS")
                 .and_then(|v| v.parse().ok())

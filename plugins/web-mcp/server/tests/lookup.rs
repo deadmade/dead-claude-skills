@@ -340,3 +340,84 @@ fn whois_timeout_with_only_bootstrap_is_an_error() {
     assert!(t.contains("Source: IANA RDAP bootstrap"), "{t}");
     assert!(t.contains("Failed: RDAP"), "{t}");
 }
+
+fn certs_start(fx: &Fixture, ms: Option<&str>) -> Mcp {
+    let mut envs = vec![("WEB_MCP_CRTSH_URL", fx.url("/"))];
+    if let Some(ms) = ms {
+        envs.push(("WEB_MCP_LOOKUP_MS", ms.to_owned()));
+    }
+    Mcp::start_with(tempdir(), &envs)
+}
+
+fn certs(mcp: &mut Mcp, target: &str) -> Value {
+    mcp.call("lookup", json!({"kind": "certs", "target": target}))
+}
+
+const CERTS_PATH: &str = "/?q=%25.example.com&output=json&exclude=expired";
+
+#[cfg(debug_assertions)]
+#[test]
+fn certs_queries_wildcard_without_expired() {
+    let fx = Fixture::start(PUBLIC);
+    let rows = json!([{
+        "name_value": "a.example.com\nwww.example.com",
+        "issuer_name": "C=US, O=Let's Encrypt, CN=R11",
+        "not_before": "2026-01-01T00:00:00",
+        "not_after": "2026-04-01T00:00:00"
+    }]);
+    fx.route(
+        CERTS_PATH,
+        vec![Resp::new(200, "application/json", rows.to_string())],
+    );
+    let mut mcp = certs_start(&fx, None);
+    let r = certs(&mut mcp, "Example.com");
+    assert!(!is_error(&r), "{r}");
+    let t = text(&r);
+    assert!(t.contains("1 certificates, 2 names"), "{t}");
+    assert!(
+        t.contains("www.example.com · C=US, O=Let's Encrypt, CN=R11 · 2026-01-01T00:00:00 → 2026-04-01T00:00:00"),
+        "{t}"
+    );
+    assert_eq!(fx.hits(CERTS_PATH), 1);
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn certs_empty_is_none_found() {
+    let fx = Fixture::start(PUBLIC);
+    fx.route(CERTS_PATH, vec![Resp::new(200, "application/json", "[]")]);
+    let mut mcp = certs_start(&fx, None);
+    let r = certs(&mut mcp, "example.com");
+    assert!(!is_error(&r), "{r}");
+    assert!(text(&r).contains("No certificates found"), "{r}");
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn certs_502_twice_is_a_named_failure() {
+    let fx = Fixture::start(PUBLIC);
+    fx.route(CERTS_PATH, vec![Resp::new(502, "text/html", "bad gateway")]);
+    let mut mcp = certs_start(&fx, None);
+    let r = certs(&mut mcp, "example.com");
+    assert!(is_error(&r), "{r}");
+    assert!(text(&r).contains("crt.sh: HTTP 502"), "{r}");
+    assert_eq!(fx.hits(CERTS_PATH), 2);
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn certs_deadline_is_per_attempt() {
+    let fx = Fixture::start(PUBLIC);
+    let slow = std::time::Duration::from_millis(200);
+    fx.route(
+        CERTS_PATH,
+        vec![
+            Resp::new(502, "text/html", "bad gateway").delay(slow),
+            Resp::new(200, "application/json", "[]").delay(slow),
+        ],
+    );
+    let mut mcp = certs_start(&fx, Some("300"));
+    let r = certs(&mut mcp, "example.com");
+    assert!(!is_error(&r), "{r}");
+    assert_eq!(fx.hits(CERTS_PATH), 2);
+}

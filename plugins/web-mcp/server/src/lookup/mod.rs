@@ -1,5 +1,6 @@
 //! The `lookup` tool: one record about a target from public sources, archived as each source sent it.
 
+mod certs;
 mod dns;
 mod rdap;
 
@@ -28,6 +29,7 @@ const CUT_NOTE: &str =
 pub enum Kind {
     Dns,
     Whois,
+    Certs,
 }
 
 impl Kind {
@@ -35,6 +37,7 @@ impl Kind {
         match self {
             Kind::Dns => "dns",
             Kind::Whois => "whois",
+            Kind::Certs => "certs",
         }
     }
 }
@@ -152,6 +155,13 @@ pub async fn run(ctx: &Arc<Ctx>, a: LookupArgs) -> CallToolResult {
             Ok(t) => {
                 let o = rdap::run(ctx, &t).await;
                 render(ctx, kind, &t, o).await
+            }
+            Err(e) => CallToolResult::error(vec![ContentBlock::text(e)]),
+        },
+        Kind::Certs => match dns::name(&a.target) {
+            Ok(name) => {
+                let o = certs::run(ctx, &name).await;
+                render(ctx, kind, &name, o).await
             }
             Err(e) => CallToolResult::error(vec![ContentBlock::text(e)]),
         },
