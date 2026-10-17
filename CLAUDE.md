@@ -22,7 +22,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   `$CLAUDE_PROJECT_DIR/.web/` before Claude sees it. Ranking is BM25 only: the H4 experiment (`examples/h4.rs`, `h4`
   feature) showed embeddings don't help, so none ship. `browser` drives the npm CLI `agent-browser`, pinned in
   `installer/agent-browser.json` (bumped by `sync-agent-browser.yml`). Test-only hooks: `WEB_MCP_TEST_PUBLIC_IP`
-  (debug builds only) treats one IP as public; `WEB_MCP_FALLBACK_MS` shortens the fetch browser fallback's deadline.
+  (debug builds or the `test-hooks` feature) treats a comma-separated list of IPs as public; `WEB_MCP_FALLBACK_MS` shortens the fetch browser fallback's deadline.
 - `plugins/languages/`: a grouping folder (`GROUPS` in `scripts/plugin-dirs.mjs`); each folder under it is a plugin.
   `rust-skills` and `csharp-skills` are vendored (`sync-rust.mjs`, `sync-csharp.mjs`). `paths:` frontmatter doesn't
   gate plugin skills in Claude Code (checked on 2.1.272 and 2.1.296), so csharp-skills exposes six router skills over an

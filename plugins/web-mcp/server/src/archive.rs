@@ -408,11 +408,18 @@ pub fn is_private(url: &Url) -> bool {
     }
 }
 
+/// Whether `ip` is in the comma-separated `WEB_MCP_TEST_PUBLIC_IP` list.
+#[cfg(any(debug_assertions, feature = "test-hooks"))]
+fn listed_public(list: Option<&str>, ip: IpAddr) -> bool {
+    list.is_some_and(|l| l.split(',').any(|v| v.trim() == ip.to_string()))
+}
+
 #[must_use]
 pub fn is_private_ip(ip: IpAddr) -> bool {
-    // Integration tests serve "public" pages from loopback; release builds never read this.
-    #[cfg(debug_assertions)]
-    if std::env::var("WEB_MCP_TEST_PUBLIC_IP").is_ok_and(|v| v == ip.to_string()) {
+    // Tests and the H5 driver serve "public" pages from loopback; only debug builds or the `test-hooks`
+    // feature read this, a normal release never does.
+    #[cfg(any(debug_assertions, feature = "test-hooks"))]
+    if listed_public(std::env::var("WEB_MCP_TEST_PUBLIC_IP").ok().as_deref(), ip) {
         return false;
     }
     match ip {
@@ -439,6 +446,14 @@ pub fn is_private_ip(ip: IpAddr) -> bool {
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    #[test]
+    fn test_public_ip_list() {
+        let list = Some("127.0.0.2, 127.0.0.3");
+        assert!(listed_public(list, "127.0.0.3".parse().unwrap()));
+        assert!(!listed_public(list, "127.0.0.4".parse().unwrap()));
+        assert!(!listed_public(None, "127.0.0.2".parse().unwrap()));
+    }
 
     fn u(s: &str) -> Url {
         Url::parse(s).unwrap()

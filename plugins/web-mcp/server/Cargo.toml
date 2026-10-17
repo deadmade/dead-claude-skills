@@ -58,6 +58,8 @@ path = "tests/bin/fake_agent_browser.rs"
 # H4 experiment only (examples/h4.rs); the server never links embeddings.
 [features]
 h4 = ["dep:model2vec-rs"]
+# Lets a release build read WEB_MCP_TEST_PUBLIC_IP (the H5 concurrency driver); never shipped.
+test-hooks = []
 
 [[example]]
 name = "h4"
