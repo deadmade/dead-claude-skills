@@ -9,8 +9,7 @@ A vendored plugin that carries a hand-chosen subset of one upstream's skills (`t
 _Avoid_: bundle, collection
 
 **Language plugin**:
-A vendored plugin that carries all of one language ecosystem's upstream skills. These live under
-`plugins/languages/`.
+A vendored plugin that carries all of one language ecosystem's upstream skills.
 _Avoid_: language pack, LSP plugin
 
 **Router skill**:
@@ -26,11 +25,20 @@ _Avoid_: sub-skill
 The default plugin `dead-skills`, whose dependencies are the plugins every machine gets.
 _Avoid_: default set
 
+**Default plugin**:
+The bundle, or a plugin it depends on. Every machine gets these.
+_Avoid_: core plugin
+
+**Shared plugin**:
+A plugin that flows depends on and the bundle doesn't: a building block the conductors run.
+_Avoid_: included plugin, building block
+
 **Opt-in**:
-A plugin the installer offers but doesn't install unless picked.
+A plugin the installer offers but doesn't install unless picked. Flows and some shared plugins are opt-ins too; the
+plain opt-ins are the ones nothing else depends on.
 
 **Database plugin**:
-A plugin for one database engine, living under `plugins/database/`. It can combine vendored skills with an MCP
+A plugin for one database engine. It can combine vendored skills with an MCP
 server.
 _Avoid_: DB pack, language plugin
 
