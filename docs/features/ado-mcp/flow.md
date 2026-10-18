@@ -68,7 +68,8 @@ MCP server.
   options inside it are still the crate's model (so `bypassPolicy` is never sent). Options: A, keep the hand-written
   PATCH; B, drop `draft` from `pr_update` and complete via the crate (loses `lastMergeSourceCommit`, which the server
   uses to refuse completing a PR that moved). Recommended A.
-  - Decision: pending.
+  - Decision: 2026-10-18, B ("b"). Held until the Task 9 review says whether another crate call carries both fields,
+    and flagged to the user: the server may require `lastMergeSourceCommit` to complete a PR at all.
 
 ## Skipped
 
