@@ -1,6 +1,6 @@
 # ado-mcp: spec
 
-Status: approved at Gate 1 on 2026-10-18; revised for D1 (flow.md), waiting for Gate 1 again.
+Status: approved at Gate 1 on 2026-10-18; revised for D1 (flow.md) and approved again on 2026-10-18.
 
 - Written from the chat and the decisions in [flow.md](flow.md) (Options).
 - The builder check is done and its two questions were answered on 2026-10-18.

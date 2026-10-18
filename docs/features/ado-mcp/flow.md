@@ -21,6 +21,7 @@ MCP server.
 
 - Gate 1, spec approved: 2026-10-18 ("approved"). ADR 0002 offered, not taken up.
 - Gate 2, plan approved: 2026-10-18 ("approved, subagent-driven"), plan revision 2, execution: subagent-driven
+- Gates 1 and 2 again for D1: 2026-10-18 ("I approve"), spec revised, plan revision 3
 
 ## Deviations
 
@@ -45,7 +46,7 @@ MCP server.
     - Tasks 3, 4 and 6 (done) are partly reworked.
   - Kept: the remote and collection check before any request, the PAT only to `ADO_ORG_URL`, one-line errors,
     output shaping, the write prompts, the cache, the installer and plugin work.
-  - Decision: pending (spec and plan revision 3 waiting for Gate 1 and Gate 2).
+  - Decision: 2026-10-18, spec and plan revision 3 approved ("I approve").
 
 ## Skipped
 
