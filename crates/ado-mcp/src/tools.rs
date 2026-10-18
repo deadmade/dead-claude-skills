@@ -212,6 +212,8 @@ impl Server {
     }
 }
 
+// The macro generates async fns without .await; the lint is new in clippy 1.99.
+#[allow(unknown_lints, clippy::unused_async_trait_impl)]
 #[tool_handler(router = self.router)]
 impl ServerHandler for Server {
     // By hand: `tool_handler`'s `instructions` takes only a literal.
