@@ -226,4 +226,4 @@ Should-fix:
 
 Consider: 14 small items (listed in the chat).
 
-Decisions: pending.
+Decisions (2026-10-18, "yes, accept all"): every recommendation accepted, including the pr_view merge-ref spec amendment (Gate 1 reopened for that line and approved with it). Plan revised to revision 2; its shape changed only by merging the plugin into the installer task and dropping the library, both from the review itself, so no second round.

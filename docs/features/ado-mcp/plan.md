@@ -3,15 +3,21 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or
 > superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+Revision 2: plan review round 1 applied (2026-10-18). The findings and decisions are in [flow.md](flow.md).
+
 **Goal:** A Rust stdio MCP server `ado-mcp` that gives Claude PR, work-item and pipeline tools for a self-hosted Azure
 DevOps Server 2022.2. It replaces the npm server in the `mcp-azure` plugin, and the installer installs and configures
 the plugin.
 
-**Architecture:** One crate, `crates/ado-mcp`, a library plus a thin `main.rs` so integration tests can call the
-library directly. An `Api` client wraps one `reqwest::Client` with PAT auth, the `api-version` and error mapping. `Ctx`
-resolves project, repo and branch from the git remote (via `/vsts/info`) and caches ids in memory. Each tool area
-(`pr`, `wi`, `pipeline`) holds async functions that return plain text, and `tools.rs` exposes them through `rmcp`.
-Write tools are marked `anthropic/requiresUserInteraction`.
+**Architecture:** One binary crate, `crates/ado-mcp`, shaped like web-mcp: no library, so items are `pub(crate)`.
+- `Api` wraps one `reqwest::Client` with PAT auth, timeouts and error mapping. It sends the PAT only to URLs under
+  `ADO_ORG_URL`.
+- `Ctx` resolves project, repo and branch from the git remote (checked against `ADO_ORG_URL` before any request,
+  then `/vsts/info`), and caches ids in memory.
+- Tool areas (`pr`, `wi`, `pipeline`) return plain text, and `tools.rs` exposes them through `rmcp`. Write tools are
+  marked `anthropic/requiresUserInteraction`.
+- Pure logic is unit-tested inline. Tool behaviour is tested over stdio against a fake HTTP server, copied from
+  web-mcp's `tests/common/mod.rs`.
 
 **Tech Stack:** Rust 2024; `rmcp =3.5.1` (server, transport-io, macros); `reqwest =0.13.5` (`rustls-no-provider`,
 `json`) with `rustls 0.23` ring; tokio; serde/serde_json; `url`; base64. Installer: Node standard library only.
@@ -21,21 +27,34 @@ Grounding. Terms: [GLOSSARY.md](../../../GLOSSARY.md).
 
 ## Global Constraints
 
-- Edition 2024, `rust-version = "1.97"`, `license = "MIT"`, `publish = false`, its own `Cargo.lock`, no workspace.
+- Edition 2024, `rust-version = "1.97"`, `license = "MIT"`, `publish = false`, its own `Cargo.lock`, no workspace,
+  no `[lib]`.
 - `[lints.clippy] pedantic = { level = "warn", priority = -1 }`. `[profile.release]` is `lto = "thin"`,
   `codegen-units = 1`, `strip = true`.
 - `version` equals `package.json`'s (currently `0.4.0`); never bumped by hand.
 - `--version` prints `ado-mcp <version>`.
 - Pins: `rmcp = "=3.5.1"`, `reqwest = "=0.13.5"`. rustls with ring, installed at startup like
   `crates/web-mcp/src/main.rs:43`.
-- API version `7.1`. Policy evaluations use `7.1-preview.1`, work-item comments `7.1-preview.4`.
-- One server and one PAT: `ADO_ORG_URL` (the collection URL), `ADO_PAT`, `ADO_DEFAULT_PROJECT`, `ADO_PROJECT_DIR`.
-- The PAT never appears in a tool result, an error, a log, or a process argument.
+- API versions, as `&str` constants in `api.rs`:
+
+  | Constant | Value | Used for |
+  | --- | --- | --- |
+  | `V71` | `"7.1"` | everything else |
+  | `V71_P1` | `"7.1-preview.1"` | policy evaluations, `connectionData` |
+  | `V71_P4` | `"7.1-preview.4"` | work-item comments |
+
+- One server, one collection, one PAT: `ADO_ORG_URL` (the collection URL, stored with a trailing `/` so
+  `Url::join` keeps the collection), `ADO_PAT`, `ADO_DEFAULT_PROJECT`, `ADO_PROJECT_DIR`.
+- The PAT never appears in a tool result, an error, a log, the installer's summary, or a process argument.
+- The PAT is only sent to URLs under `ADO_ORG_URL`.
+- Every request carries `X-TFS-FedAuthRedirect: Suppress`, with a 10 s connect timeout and a 60 s total timeout.
 - Output: plain text, one line per item, id first. No URLs, `_links`, GUIDs (unless needed to act), colours or
-  emoji. Dates `YYYY-MM-DD`. Lists default to 20. Every cut says how to get more.
+  emoji. Dates `YYYY-MM-DD`. Lists default to 20, fetched as `limit + 1` to know whether more exist. Every cut says
+  how to get more.
 - Reads have `readOnlyHint = true`. Writes have `_meta["anthropic/requiresUserInteraction"] = true`.
 - Builds only for x86_64-pc-windows-msvc and x86_64-unknown-linux-musl.
-- No new npm dependencies; installer logic goes in `core.mjs`/`ui.mjs` with tests, not in `install.mjs`.
+- No new npm dependencies; installer decisions go in `core.mjs` (and `ui.mjs`) with tests, and `install.mjs` only
+  does the I/O.
 - Commit messages are one sentence with no co-author lines (the user's rule).
 
 ## Review Focus
@@ -43,21 +62,22 @@ Grounding. Terms: [GLOSSARY.md](../../../GLOSSARY.md).
 1. **Project names with spaces and non-ASCII characters** (`My Project`, `Übergabe`).
    - The remote has them percent-encoded. They must be decoded exactly once, and API paths must use ids from
      `/vsts/info`.
-   - Test: `remote::tests::decodes_spaces_once` (Task 2) and `ctx_uses_ids_not_names` (Task 4).
+   - Tests: `remote::tests::decodes_spaces_once` (Task 2) and `ctx_uses_ids_not_names` (Task 4).
 2. **A PAT that expires mid-session.**
-   - The next call must return the 401 line naming `/plugin configure mcp-azure`. It must not retry, crash, or echo
-     the header.
-   - Test: `api::maps_401_without_secret` (Task 3).
+   - The next call must return the 401 line naming `/plugin configure mcp-azure`. It must not retry, crash, echo the
+     header, or show a sign-in HTML page.
+   - Tests: `maps_401_without_secret` and `html_203_is_one_line` (Task 3).
 3. **A PR or work item description that is huge or HTML.**
-   - Output stays bounded (cut at 4000 characters, with the call that shows the rest), and work-item HTML becomes
-     readable text.
-   - Test: `out::clip_names_the_rest` and `out::html_to_text_keeps_lists` (Task 5).
-4. **Several tool calls at once against one process.**
-   - They must not serialise behind a lock held across a request; the cache's lock is never held across `.await`.
-   - Test: `ctx::concurrent_resolve_hits_vsts_info_once_or_twice` (Task 4).
-5. **A log with Windows line endings and a step that has no log** (skipped or cancelled).
-   - `\r\n` is cleaned. A step without a log says `no log (skipped)` rather than erroring.
-   - Test: `pipeline::log_crlf_and_missing_log` (Task 8).
+   - Output stays bounded (cut at 4000 characters, with the call that shows the rest), and work-item HTML, comments
+     included, becomes readable text.
+   - Tests: `out::clip_names_the_rest` and `out::html_to_text_keeps_lists` (Task 5), and `view_lines` (Task 7).
+4. **A remote that points somewhere else** (a fork on another server, or another collection on the same host).
+   - No request may carry the PAT there.
+   - Tests: `remote::tests::other_host_refused` (Task 2) and `other_server_sends_nothing` (Task 4).
+5. **A log with Windows line endings, a step with no log, and a job that failed without a failed step**
+   (timeout, lost agent).
+   - `\r\n` is cleaned, a missing log is named, and a failed job without a failed step shows the job's issues.
+   - Tests: `log_crlf_and_missing_log` and `job_failed_without_step` (Task 8).
 
 ---
 
@@ -66,195 +86,207 @@ Grounding. Terms: [GLOSSARY.md](../../../GLOSSARY.md).
 ```
 crates/ado-mcp/
   Cargo.toml, Cargo.lock
-  src/main.rs        --version, ring provider, Config::from_env, serve stdio
-  src/lib.rs         pub mod declarations only
-  src/config.rs      Config from env
-  src/remote.rs      git remote URL → Remote; git helpers (remote_url, current_branch)
-  src/api.rs         Api: auth, api-version, get/post/patch/put, errors, continuation, Retry-After
-  src/ctx.rs         Ctx { api, cfg, cache }: Scope resolution, me(), pipeline id lookup
-  src/out.rs         text helpers: List, date, clip, html_to_text, person
-  src/pr.rs          pr_* functions (reads and writes)
-  src/wi.rs          wi_* functions
-  src/pipeline.rs    pipeline_* and repo_list, log cleaning
-  src/tools.rs       rmcp Server: arg structs, #[tool] wrappers, _meta, instructions
-  tests/common/mod.rs   std-only fake HTTP server (pattern: crates/web-mcp/tests/common/mod.rs)
+  src/main.rs        mod decls, --version, ring provider, Config::from_env, serve stdio
+  src/config.rs      Config from env (no Debug derive)
+  src/remote.rs      git remote → https URL under ADO_ORG_URL; git helpers
+  src/api.rs         Api: auth, versions, get/send, timeouts, errors, Retry-After
+  src/ctx.rs         Ctx { api, cfg, cache }: Scope, me(), user(), pipeline_id()
+  src/out.rs         text helpers
+  src/pr.rs  src/wi.rs  src/pipeline.rs   tool functions
+  src/tools.rs       rmcp Server: arg structs, #[tool] wrappers, _meta, get_info
+  tests/common/mod.rs   copy of crates/web-mcp/tests/common/mod.rs, plus a request log with bodies; Mcp client
   tests/fixtures/*.json responses shaped from the 7.1 Server docs
-  tests/{api,ctx,pr,wi,pipeline,mcp}.rs
-.github/workflows/ado-mcp.yml, build-ado-mcp.yml; release.yml (modified)
+  tests/{mcp,api,ctx,pr,wi,pipeline}.rs   stdio tests against the fake server
+.github/workflows/ado-mcp.yml, build-ado-mcp.yml; release.yml
 plugins/opt-in/mcp/mcp-azure/{.claude-plugin/plugin.json,.mcp.json,README.md}
-installer/{core.mjs,ui.mjs,install.mjs,core.test.mjs,view.test.mjs}
+installer/{core.mjs,ui.mjs,view.mjs,install.mjs,core.test.mjs,ui.test.mjs,view.test.mjs}
 scripts/{check-repo.mjs,release.mjs}; flake.nix; .claude-plugin/marketplace.json
 THIRD_PARTY.md; README.md; CLAUDE.md; docs/features/ado-mcp/smoke.md
 ```
 
+**Test harness (all stdio tests):**
+
+- `tests/common/mod.rs` is web-mcp's file copied as is, minus the parts web-mcp alone needs (`PUBLIC`, agent-browser
+  helpers).
+- It gains `pub struct Req { pub method: String, pub path: String /* with query */, pub headers: Vec<(String,
+  String)>, pub body: Vec<u8> }` and `Fixture::requests() -> Vec<Req>`. The body is read by `Content-Length`.
+- Routes match on path, with the query when given (as in web-mcp).
+- `pub fn ado(fx: &Fixture, extra_env: &[(&str, &str)]) -> Mcp` spawns `CARGO_BIN_EXE_ado-mcp` with
+  `ADO_ORG_URL={fx base}/tfs/Coll/` and `ADO_PAT=test-pat`, sets `ADO_PROJECT_DIR` to a temp dir, then initializes.
+- `Mcp::call(tool, args) -> (bool /* isError */, String /* text */)`.
+
 ---
 
-### Task 1: Crate skeleton, MCP server shell, version sync and CI
+### Task 1: Crate skeleton, MCP shell, version sync and CI
 
 **Files:**
 
-- Create: `crates/ado-mcp/Cargo.toml`, `src/{main,lib,config,tools}.rs`, `tests/mcp.rs`
-- Create: `.github/workflows/ado-mcp.yml` (copy of `web-mcp.yml` with `web-mcp` → `ado-mcp`, paths
-  `crates/ado-mcp/**`, `plugins/opt-in/mcp/mcp-azure/**`)
-- Modify: `scripts/check-repo.mjs:73-76` (`CRATES` entry `ado-mcp`); `scripts/release.mjs:43-46`
-  (`['crates/ado-mcp','ado-mcp']`) and its header comment
+- Create: `crates/ado-mcp/Cargo.toml`, `src/{main,config,tools}.rs`, `tests/common/mod.rs`, `tests/mcp.rs`.
+- Create: `.github/workflows/ado-mcp.yml`, a copy of `web-mcp.yml` with `web-mcp` → `ado-mcp` and paths
+  `crates/ado-mcp/**`, `plugins/opt-in/mcp/mcp-azure/**`.
+- Modify: `scripts/check-repo.mjs:73-76` (`CRATES` entry `ado-mcp`) and `scripts/release.mjs:43-46`
+  (`['crates/ado-mcp','ado-mcp']`, plus its header comment).
 
 **Interfaces:**
 
-- Produces: `pub struct Config { pub org_url: url::Url, pub pat: String, pub default_project: Option<String>,
-  pub project_dir: PathBuf }`
-- Produces: `Config::from_env() -> anyhow::Result<Config>`. It reads `ADO_ORG_URL` (required; a trailing `/` is
-  stripped), `ADO_PAT` (required), `ADO_DEFAULT_PROJECT` (empty means `None`) and `ADO_PROJECT_DIR` (default: cwd).
-  A missing value errors with `ADO_ORG_URL is not set: configure it with /plugin configure mcp-azure`. `Debug` is
-  implemented by hand and prints `pat: "***"`.
-- Produces: `tools::Server::new(ctx: Arc<Ctx>)`. `Ctx` arrives in Task 4; until then `Server` holds
-  `Arc<Config>`, and Task 4 swaps it.
-- Produces: `pub const WRITES: &[&str]` in `tools.rs`. It lists the 12 write tool names from spec goal 2, and
-  `Server::new` sets `requiresUserInteraction` on each name it finds in the router (pattern:
-  `crates/web-mcp/src/tools.rs:315-320`).
-- Produces: `INSTRUCTIONS: &str`, which `ServerHandler::get_info` returns. It is under 4096 characters and covers the
-  4 points of spec goal 3.
+- Produces: `pub(crate) struct Config { pub org_url: Url /* ends with / */, pub pat: String, pub default_project:
+  Option<String>, pub project_dir: PathBuf }`. It doesn't derive `Debug`.
+- Produces: `Config::from_env() -> anyhow::Result<Config>`.
+  - It reads `ADO_ORG_URL` (required; a trailing `/` is added), `ADO_PAT` (required), `ADO_DEFAULT_PROJECT` (empty
+    means `None`) and `ADO_PROJECT_DIR` (default: cwd).
+  - A missing value errors with `{VAR} is not set: configure it with /plugin configure mcp-azure`.
+- Produces: `tools::Server::new(ctx: Arc<Ctx>)`. Until Task 4 the server holds `Arc<Config>`.
+- Produces: `pub(crate) const WRITES: [&str; 12]`, the write tool names of spec goal 2. `Server::new` sets
+  `requiresUserInteraction` on each one present in the router (pattern: `crates/web-mcp/src/tools.rs:315-320`).
+- Produces: `get_info` written by hand (`tool_handler`'s `instructions` takes only a literal). It returns
+  `ServerInfo` with tools enabled in the capabilities and `instructions: INSTRUCTIONS`, a const under 4096 characters
+  covering the 4 points of spec goal 3.
 
-- [ ] **Step 1: Write the failing tests** in `tests/mcp.rs`. Spawn `CARGO_BIN_EXE_ado-mcp` with `ADO_ORG_URL` and
-      `ADO_PAT` set (pattern: `crates/web-mcp/tests/mcp.rs:7-30`).
-  - `version_flag`: `--version` stdout equals `format!("ado-mcp {}\n", env!("CARGO_PKG_VERSION"))`.
-  - `initialize_has_instructions`: `result.instructions` contains `git diff` and `branch`, and its length is
-    under 4096.
-  - `missing_url_is_one_line`: without `ADO_ORG_URL`, the process exits non-zero, stderr contains
-    `/plugin configure mcp-azure`, and stderr does not contain the `ADO_PAT` value.
-- [ ] **Step 2:** `cargo test --test mcp` in `crates/ado-mcp`. Expected: compile failure (no crate).
-- [ ] **Step 3: Implement** the Cargo.toml from the Global Constraints, `main.rs` (structure of
-      `crates/web-mcp/src/main.rs:34-58`) and `config.rs`, plus `tools.rs` with an empty `#[tool_router]` and
-      `get_info` returning `INSTRUCTIONS`.
-- [ ] **Step 4:** `cargo test && cargo clippy --all-targets -- -D warnings`: PASS. Then `npm test` at the repo
-      root: PASS (check-repo sees the crate at the shared version).
-- [ ] **Step 5: Commit**: `git commit -m "Add the ado-mcp crate skeleton with version sync and CI."`
+- [ ] **Step 1: Failing tests** in `tests/mcp.rs`:
+  - `version_flag`: stdout equals `format!("ado-mcp {}\n", env!("CARGO_PKG_VERSION"))`.
+  - `initialize_has_instructions`: `result.instructions` contains `git diff` and `branch`, its length is under
+    4096, and `result.capabilities.tools` is present.
+  - `missing_url_is_one_line`: without `ADO_ORG_URL`, the exit is non-zero, stderr contains
+    `/plugin configure mcp-azure`, and stderr doesn't contain `test-pat`.
+- [ ] **Step 2:** `cargo test --test mcp` in `crates/ado-mcp`: fails (no crate).
+- [ ] **Step 3: Implement.** `main.rs` follows `crates/web-mcp/src/main.rs:34-58`.
+- [ ] **Step 4:** `cargo test && cargo clippy --all-targets -- -D warnings`: PASS. Then `npm test` at the root: PASS.
+- [ ] **Step 5: Commit**: `"Add the ado-mcp crate skeleton with version sync and CI."`
 
-### Task 2: Remote parsing and git helpers
+### Task 2: Remote mapping and git helpers
 
-**Files:** Create `src/remote.rs` (unit tests inline, `#[cfg(test)] mod tests`).
+**Files:** Create `src/remote.rs` (unit tests inline).
 
 **Interfaces:**
 
-- Produces: `pub struct Remote { pub https_url: String, pub host: String }`. `https_url` is the remote as an HTTPS
-  URL, the one `/vsts/info` is appended to.
-- Produces: `pub fn parse_remote(url: &str) -> Option<Remote>`. It accepts:
-  - `https://host[:port]/<path…>/_git/<repo>`, user info stripped
-  - `ssh://[user@]host[:port]/<path…>/_git/<repo>`, mapped to `https://host/<path…>/_git/<repo>` with the ssh
-    port dropped (Task 4 replaces the host with the configured `ADO_ORG_URL`'s scheme, host and port)
-  - scp-style `user@host:<path…>/_git/<repo>`
-  - it returns `None` when there is no `/_git/` segment
-- Produces: `pub fn decode_path(s: &str) -> String`, which percent-decodes once.
-- Produces: `pub fn remote_url(dir: &Path) -> Option<String>` (`git -C dir remote get-url origin`, then the first of
-  `git remote`) and `pub fn current_branch(dir: &Path) -> Option<String>` (`git -C dir rev-parse --abbrev-ref HEAD`,
-  `None` for `HEAD`). Both use `std::process::Command`.
+- Produces: `pub(crate) fn https_remote(remote: &str, org_url: &Url) -> Result<String, String>`. It returns the
+  remote as an HTTPS URL under `org_url`, the one `/vsts/info` is appended to, or a one-line error.
+  - It accepts `https://[user@]host[:port]/<path>`, `ssh://[user@]host[:port]/<path>` and scp-style
+    `user@host:<path>`. The path must contain `/_git/`; otherwise
+    `not an Azure DevOps remote: pass project and repo`.
+  - The host (case-insensitive) must equal `org_url`'s host; otherwise
+    `this repo is on {host}, but mcp-azure is set up for {org host}`. The ssh port is ignored.
+  - `org_url`'s last path segment is the collection. It must match one segment of the remote path
+    (case-insensitive, after `decode_path`); otherwise
+    `this repo is not in collection {collection} that mcp-azure is set up for`.
+  - Result: `org_url` joined with the remote path segments after the collection. This handles SSH paths with and
+    without `tfs/`, and an HTTPS virtual directory.
+- Produces: `pub(crate) fn decode_path(s: &str) -> String`, which percent-decodes once.
+- Produces: `pub(crate) fn origin_url(dir: &Path) -> Option<String>` (`git -C dir remote get-url origin`) and
+  `pub(crate) fn current_branch(dir: &Path) -> Option<String>` (`git -C dir rev-parse --abbrev-ref HEAD`, `None` for
+  `HEAD`).
 
-- [ ] **Step 1: Failing tests:**
-  - `https_with_tfs_path`: `https://srv/tfs/Coll/Proj/_git/Repo` → `https_url` the same, `host` `srv`.
+- [ ] **Step 1: Failing tests** (`org_url` is `https://srv/tfs/Coll/`):
+  - `https_same`: `https://srv/tfs/Coll/Proj/_git/Repo` → the same URL.
   - `strips_userinfo`: `https://me@srv/tfs/Coll/Proj/_git/Repo` → no `me@`.
-  - `ssh_url`: `ssh://srv:22/tfs/Coll/Proj/_git/Repo` → `https://srv/tfs/Coll/Proj/_git/Repo`.
-  - `scp_style`: `git@srv:tfs/Coll/Proj/_git/Repo` → `https://srv/tfs/Coll/Proj/_git/Repo`.
+  - `ssh_with_tfs`: `ssh://srv:22/tfs/Coll/Proj/_git/Repo` → `https://srv/tfs/Coll/Proj/_git/Repo`.
+  - `ssh_without_tfs`: `ssh://srv:22/Coll/Proj/_git/Repo` → `https://srv/tfs/Coll/Proj/_git/Repo`.
+  - `scp_style`: `git@srv:Coll/Proj/_git/Repo` → `https://srv/tfs/Coll/Proj/_git/Repo`.
+  - `other_host_refused`: `https://evil/tfs/Coll/P/_git/R` → `Err` naming `evil` and `srv`.
+  - `other_collection_refused`: `https://srv/tfs/CollB/P/_git/R` → `Err` naming `Coll`.
   - `decodes_spaces_once`: `decode_path("My%20Project%2520x")` == `"My Project%20x"`.
-  - `not_azure`: `https://github.com/a/b.git` → `None`.
+  - `not_azure`: `https://srv/a/b.git` → `Err` containing `pass project and repo`.
   - `branch_of_temp_repo`: `git init -b feat/x` in a temp dir, then `current_branch` == `Some("feat/x")`.
-- [ ] **Step 2:** `cargo test remote`: FAIL.
-- [ ] **Step 3: Implement.**
-- [ ] **Step 4:** `cargo test remote`: PASS.
-- [ ] **Step 5: Commit**: `"Parse Azure DevOps git remotes and read the current branch."`
+- [ ] **Step 2:** `cargo test remote`: FAIL. **Step 3:** Implement. **Step 4:** PASS.
+- [ ] **Step 5: Commit**: `"Map Azure DevOps git remotes onto the configured collection."`
 
-### Task 3: API client, errors, paging, fake server
+### Task 3: API client and errors
 
-**Files:** Create `src/api.rs`, `tests/common/mod.rs`, `tests/api.rs`.
+**Files:** Create `src/api.rs`, `tests/api.rs`, and a temporary diagnostic tool `ping` in `tools.rs`
+(`GET _apis/projects?$top=1`, printing the count). Task 11 removes `ping`.
 
 **Interfaces:**
 
-- Produces: `pub struct Api { http: reqwest::Client, base: Url, auth: HeaderValue }`, built with
-  `Api::new(cfg: &Config) -> anyhow::Result<Api>`.
+- Produces: `pub(crate) struct Api`, via `Api::new(cfg: &Config) -> anyhow::Result<Api>`.
   - `auth` is `Basic base64(":" + pat)` with `set_sensitive(true)`.
-  - `user_agent` is `ado-mcp/<version>`.
-- Produces: `pub enum Ver { V71, Preview(u8) }`, rendered as `7.1` or `7.1-preview.N`.
-- Produces request methods. Each `path` is relative to the collection; an absolute URL (`/vsts/info`) is used as is.
-  - `get<T: DeserializeOwned>(&self, path: &str, query: &[(&str, String)], v: Ver) -> Result<T, ApiError>`
-  - `get_text(&self, path, query, v) -> Result<String, ApiError>`, for logs
-  - `send<T>(&self, method: Method, path, query, v, body: &serde_json::Value, json_patch: bool) -> Result<T, ApiError>`.
-    With `json_patch`, the content type is `application/json-patch+json`.
-  - `get_paged<T>(&self, path, query, v, limit: usize) -> Result<(Vec<T>, bool), ApiError>`. It follows
-    `x-ms-continuationtoken` (header) as `continuationToken=` until `limit`; the bool means more exist. Response
-    bodies are `{ "value": [...] }`.
-- Produces: `pub struct ApiError(pub String)`, implementing `Display`. The `area` is the path segment after
-  `_apis/`. The messages, exact:
-  - 401: `Azure DevOps rejected the PAT (expired or wrong); set a new one with /plugin configure mcp-azure`
-  - 403: `the PAT may not do this: it needs the {scope} scope`, where `git`/`policy` → `Code`, `wit` →
-    `Work Items`, `build`/`pipelines` → `Build`, and anything else → `a broader`
-  - 404: `not found: {what}`, where `what` is the caller's label (`with_what(label)`)
-  - 409, 412, 400: `the server refused it: {message}`, where `message` comes from the response's JSON `message`
-  - 429: one wait of `Retry-After` seconds, capped at 30, then the same request again; a second 429 gives
-    `the server is throttling requests; try again in a minute`
-  - TLS/connect: `can't reach {host}: {cause}`. Certificate errors add
+  - `user_agent` is `ado-mcp/<version>`, `connect_timeout` 10 s, `timeout` 60 s.
+  - Default header `X-TFS-FedAuthRedirect: Suppress`.
+- Produces request methods. `path` is joined onto `org_url`; an absolute URL is allowed only when it starts with
+  `org_url`, and otherwise the call returns `Err` before anything is sent.
+  - `get<T: DeserializeOwned>(&self, path: &str, query: &[(&str, String)], ver: &str) -> Result<T, ApiError>`
+  - `get_text(&self, path, query, ver) -> Result<String, ApiError>`
+  - `send<T>(&self, method: Method, path, query, ver, body: &serde_json::Value, json_patch: bool) -> Result<T, ApiError>`
+- Produces: `pub(crate) struct ApiError { pub status: Option<u16>, pub tf: Option<String>, pub msg: String }`.
+  `Display` shows `msg`, and `tf` holds a `TFnnnnnn` code parsed from the JSON message. `with_what(label)` sets the
+  404 text. The messages, exact:
+  - 401, or 203 with an HTML body: `Azure DevOps rejected the PAT (expired or wrong); set a new one with /plugin configure mcp-azure`
+  - 403: `the PAT may not do this: it needs the {scope} scope`. The area is the segment after `_apis/`: `git` or
+    `policy` → `Code`; `wit` → `Work Items`; `build` or `pipelines` → `Build`; `projects`, `identities` or
+    `connectionData` → `Project and Team (Read)`; anything else → `a broader`.
+  - 404: `not found: {what}`.
+  - 400, 409, 412: `the server refused it: {message}`.
+  - 429: one wait of `Retry-After` seconds (capped at 30) and one resend; a second 429 gives
+    `the server is throttling requests; try again in a minute`.
+  - 5xx: `the server failed ({status}); try again`.
+  - A body that isn't JSON where JSON was expected: `unexpected answer from the server ({status}, {content-type})`.
+  - Timeout: `the server didn't answer in 60 s`.
+  - Connect/TLS: `can't reach {host}: {cause}`. A rustls certificate error found in the `source()` chain adds
     ` (the certificate isn't trusted; ado-mcp uses the Windows certificate store)`.
-  - The PAT and the `Authorization` header never appear in any message.
-- Produces in `tests/common/mod.rs`: a fake server with the same shape as web-mcp's (`Resp`, a `serve()` returning
-  a base URL, scripted routes keyed by path and query, hit counts, a log of the request headers).
+  - No message contains the PAT or the `Authorization` value.
 
-- [ ] **Step 1: Failing tests** (`tests/api.rs`, against the fake server):
-  - `sends_basic_auth_and_version`: the header equals `Basic ` + base64(`:pat`), and the query has
-    `api-version=7.1`.
-  - `preview_version`: `Ver::Preview(4)` gives `api-version=7.1-preview.4`.
-  - `maps_401_without_secret`: the message equals the 401 line and doesn't contain the PAT.
-  - `maps_403_scope`: a 403 on `_apis/wit/...` → contains `Work Items scope`.
-  - `retry_after_once`: 429 with `Retry-After: 1`, then 200 → `Ok`, with 2 hits.
-  - `pages_until_limit`: two pages of 3 linked by `x-ms-continuationtoken`, limit 4 → 4 items, `true`.
-  - `json_patch_content_type`: `send(.., json_patch: true)` → the server saw `application/json-patch+json`.
-- [ ] **Step 2:** `cargo test --test api`: FAIL.
-- [ ] **Step 3: Implement.** Classify certificate errors by walking `std::error::Error::source()` for a rustls
-      error.
-- [ ] **Step 4:** PASS.
-- [ ] **Step 5: Commit**: `"Add the Azure DevOps REST client with PAT auth, paging and one-line errors."`
+- [ ] **Step 1: Failing tests** (`tests/api.rs`, through `ping`):
+  - `sends_auth_version_and_suppress`: the logged request has `Authorization: Basic ` + base64(`:test-pat`), the
+    query has `api-version=7.1`, and the header `X-TFS-FedAuthRedirect: Suppress` is present.
+  - `maps_401_without_secret`: the text equals the 401 line, with `isError` true and no `test-pat`.
+  - `html_203_is_one_line`: 203 with `text/html` → the 401 line.
+  - `maps_403_scope`: a 403 → contains `scope`.
+  - `retry_after_once`: 429 with `Retry-After: 1`, then 200 → OK, with 2 requests logged.
+  - `server_error_line`: 503 → `the server failed (503); try again`.
+  - `timeout_line`: a route delayed past the deadline (set the timeout from `ADO_TIMEOUT_MS`, read only in debug
+    builds, like web-mcp's test hooks) → `didn't answer`.
+- [ ] **Step 2–4:** FAIL → implement → PASS.
+- [ ] **Step 5: Commit**: `"Add the Azure DevOps REST client with PAT auth, timeouts and one-line errors."`
 
-### Task 4: Context: scope resolution and cache
+### Task 4: Context: scope, me, users, pipelines
 
-**Files:** Create `src/ctx.rs`, `tests/ctx.rs`, `tests/fixtures/vsts-info.json`, `connection-data.json`,
-`pipelines.json`. Modify `src/tools.rs` and `src/main.rs` so `Server` holds `Arc<Ctx>`.
+**Files:** Create `src/ctx.rs`, `tests/ctx.rs`, and fixtures `vsts-info.json`, `connection-data.json`,
+`definitions.json`, `identities.json`. Modify `tools.rs` and `main.rs` so `Server` holds `Arc<Ctx>`. Replace `ping`'s
+body with a `scope()` echo for the tests.
 
 **Interfaces:**
 
-- Consumes: `Config`, `Api` and `remote::*`.
-- Produces: `pub struct Ctx { pub api: Api, pub cfg: Config, cache: Mutex<Cache> }`, via `Ctx::new(cfg) ->
-  anyhow::Result<Ctx>`. The cache holds `vsts_info: HashMap<String, Scope>`, `me: Option<Me>` and
-  `pipelines: HashMap<(String, String), u32>`. It uses `std::sync::Mutex`, never held across `.await`.
-- Produces: `#[derive(Clone)] pub struct Scope { pub project_id: String, pub project: String, pub repo_id:
+- Produces: `pub(crate) struct Ctx { pub api: Api, pub cfg: Config, cache: std::sync::Mutex<Cache> }`.
+  - The lock is never held across `.await`. Concurrent misses may each fetch; the last write wins.
+- Produces: `#[derive(Clone)] pub(crate) struct Scope { pub project_id: String, pub project: String, pub repo_id:
   Option<String>, pub repo: Option<String>, pub branch: Option<String> }`.
-- Produces: `pub async fn scope(&self, project: Option<&str>, repo: Option<&str>, branch: Option<&str>) ->
+- Produces: `async fn scope(&self, project: Option<&str>, repo: Option<&str>, branch: Option<&str>) ->
   Result<Scope, ApiError>`.
-  - An explicit `project` and `repo` win: get `_apis/projects/{project}` and
-    `{project}/_apis/git/repositories/{repo}` for their ids, and cache them by name.
-  - Otherwise, from `remote_url(project_dir)`, call `GET {https_url}/vsts/info` with the header
-    `X-TFS-FedAuthRedirect: Suppress` and the configured host. The fields are `repository.id`, `repository.name`,
-    `repository.project.{id,name}` and `serverUrl`. If `serverUrl`'s host isn't `ADO_ORG_URL`'s, the error is
-    `this repo is on {remote host}, but mcp-azure is set up for {configured host}`.
-  - Otherwise `default_project`, with no repo.
+  - An explicit `project` (and `repo`) wins: get `{project}/_apis/git/repositories/{repo}`, which carries
+    `project.id`, and cache it. With no repo, get `_apis/projects/{project}`.
+  - Otherwise `origin_url(project_dir)` → `https_remote` (an `Err` becomes the tool error, and nothing is sent) →
+    `GET {https}/vsts/info`. It reads `repository.{id,name}` and `repository.project.{id,name}`, cached by remote.
+  - Otherwise `default_project`.
   - Otherwise `no project: pass project, or open Claude Code in a clone of an Azure DevOps repo`.
   - `branch`: the argument, else `current_branch(project_dir)`.
-- Produces: `pub async fn me(&self) -> Result<Me, ApiError>`, with `Me { id: String, name: String }` from
-  `_apis/connectionData` (`authenticatedUser.id`, `.providerDisplayName`), cached.
-- Produces: `pub async fn pipeline_id(&self, scope: &Scope, name_or_id: &str) -> Result<u32, ApiError>`. A number
-  passes through; otherwise it reads `{project}/_apis/pipelines` (cached) and matches the name case-insensitively.
-  An unknown name is a 404 that lists the first 10 names.
-- Produces: on a 404 for a cached id, the entry is dropped and the call retried once:
-  `pub(crate) fn forget(&self, key)`.
+  - A 404 on a request built from a cached id drops that entry, re-resolves and retries once:
+    `pub(crate) async fn retry_stale<F, T>(&self, key: &str, f: F)`.
+- Produces: `async fn me(&self) -> Result<Me, ApiError>`, with `Me { id: String, name: String }` from
+  `_apis/connectionData` at `V71_P1` (`authenticatedUser.id`, `.providerDisplayName`), cached.
+- Produces: `async fn user(&self, text: &str) -> Result<Me, ApiError>`. `me` → `me()`; otherwise
+  `_apis/identities?searchFilter=General&filterValue={text}`.
+  - No match: `no user matches "{text}"`.
+  - Several: `"{text}" matches: {name1}, {name2}, …`, the first 5.
+- Produces: `async fn pipeline_id(&self, scope: &Scope, name_or_id: &str) -> Result<u32, ApiError>`.
+  - A number passes through.
+  - Otherwise `{project}/_apis/build/definitions?name={name}`, cached per name; a miss isn't cached.
+  - Several results (same name in different folders): `pipeline "{name}" is ambiguous: {path}\{name}, …`.
+  - None: `not found: pipeline "{name}"`.
 
 - [ ] **Step 1: Failing tests:**
-  - `resolves_from_remote`: a temp git repo whose remote points at the fake server's `/tfs/Coll/My%20Proj/_git/R`
-    gives the ids from the fixture.
-  - `ctx_uses_ids_not_names`: the request after `scope()` uses the id, not `My Proj`.
-  - `other_server_errors`: the fixture's `serverUrl` host differs → the message names both hosts.
+  - `resolves_from_remote`: a temp git repo with origin `{base}/tfs/Coll/My%20Proj/_git/R` gives the fixture ids.
+  - `ctx_uses_ids_not_names`: the request after resolving uses the project id, not `My Proj`.
+  - `other_server_sends_nothing`: origin `https://evil.invalid/tfs/Coll/P/_git/R` → the error names `evil.invalid`,
+    and the request log is empty.
   - `explicit_args_win`.
   - `default_project_outside_clone`.
-  - `me_cached`: two calls, 1 hit.
-  - `pipeline_name_lookup`: `"CI"` → 7, `"ci"` → 7, `"nope"` → `not found` listing `CI`.
-  - `concurrent_resolve_hits_vsts_info_once_or_twice`: 8 `scope()` calls in `join_all` → ≤ 2 hits, all `Ok`.
-- [ ] **Step 2:** FAIL. **Step 3:** Implement. **Step 4:** PASS.
-- [ ] **Step 5: Commit**: `"Resolve project, repo and branch from the git remote with an in-memory id cache."`
+  - `me_cached_and_preview`: two `me` uses → 1 request, with `api-version=7.1-preview.1`.
+  - `user_ambiguous`.
+  - `pipeline_by_name`, `pipeline_ambiguous` and `pipeline_unknown`.
+  - `stale_id_retried_once`: a cached repo id that 404s → re-resolved, with exactly one retry.
+  - `concurrent_scopes_all_ok`: 8 parallel tool calls → all succeed; a 9th call afterwards adds no `/vsts/info`
+    request.
+- [ ] **Step 2–4:** FAIL → implement → PASS.
+- [ ] **Step 5: Commit**: `"Resolve project, repo, users and pipelines with an in-memory cache."`
 
 ### Task 5: Output helpers
 
@@ -262,23 +294,23 @@ THIRD_PARTY.md; README.md; CLAUDE.md; docs/features/ado-mcp/smoke.md
 
 **Interfaces:**
 
-- Produces: `pub fn date(iso: &str) -> String`, the first 10 characters (`2026-10-14`) or `?`.
-- Produces: `pub fn clip(text: &str, max: usize, rest: &str) -> String`. When over `max` characters (char-safe), it
-  returns the first `max` and then `\n… {n} more characters: {rest}`.
-- Produces: `pub const DESC_MAX: usize = 4000`.
-- Produces: `pub fn more(shown: usize, more: bool, call: &str) -> Option<String>`. With `more`, it returns
-  `… more: {call}`; `call` is e.g. `pr_list limit=100`.
-- Produces: `pub fn html_to_text(html: &str) -> String`.
-  - `<br>`, `</p>` and `</div>` become newlines, and `<li>` becomes `- `.
+- Produces: `date(iso: &str) -> String`, the first 10 characters or `?`.
+- Produces: `clip(text: &str, max: usize, rest: &str) -> String`. Char-safe; beyond `max` it appends
+  `\n… {n} more characters: {rest}`. `DESC_MAX = 4000`.
+- Produces: `cut<T>(items: Vec<T>, limit: usize) -> (Vec<T>, bool)`, keeping `limit`, with the bool true when more
+  were fetched.
+- Produces: `more(call: &str) -> String`, i.e. `… more: {call}`.
+- Produces: `html_to_text(html: &str) -> String`.
+  - `<br>`, `</p>`, `</div>` and `</li>` become newlines, and `<li>` becomes `- `.
   - Other tags are dropped, and `&amp; &lt; &gt; &quot; &#39; &nbsp;` are decoded.
-  - Runs of blank lines collapse to one, and lines are trimmed.
-  - A hand-written scanner, no new dependency.
-- Produces: `pub fn ref_name(r: &str) -> &str`, which strips `refs/heads/`.
+  - Blank runs collapse to one, and lines are trimmed. A hand-written scanner.
+- Produces: `ref_name(r: &str) -> &str`, which strips `refs/heads/`.
 
 - [ ] **Step 1: Failing tests:**
   - `clip_names_the_rest`: 5000 × `a` with max 4000 → it ends with `… 1000 more characters: wi_view id=1 full=true`.
-  - `clip_is_char_safe`: 4001 × `ü` doesn't panic.
+  - `clip_is_char_safe`: 4001 × `ü`.
   - `html_to_text_keeps_lists`: `<p>Do</p><ul><li>a &amp; b</li><li>c</li></ul>` → `"Do\n- a & b\n- c"`.
+  - `cut_reports_more`: 21 items with limit 20 → 20, `true`.
   - `ref_name_strips_heads`.
   - `date_short`.
 - [ ] **Step 2–4:** FAIL → implement → PASS.
@@ -287,218 +319,221 @@ THIRD_PARTY.md; README.md; CLAUDE.md; docs/features/ado-mcp/smoke.md
 ### Task 6: Pull request reads
 
 **Files:** Create `src/pr.rs`, `tests/pr.rs`, and fixtures `pr-list.json`, `pr.json`, `pr-threads.json`,
-`policy-evaluations.json`, `pr-workitems.json`, `wi-batch.json`, `builds-one.json`, `iterations.json`,
-`iteration-changes.json`. Modify `src/tools.rs` to add 4 tools.
+`policy-evaluations.json`, `pr-workitems.json`, `wi-batch.json`, `builds-one.json`, `builds-empty.json`,
+`iterations.json`, `iteration-changes-p1.json`, `iteration-changes-p2.json`. Modify `tools.rs` to add 4 read tools.
 
-**Interfaces:**
+**Interfaces** (every function is `-> Result<String, ApiError>`, and every args struct has optional `project`,
+`repo` and `branch`):
 
-- Consumes: `Ctx::scope`, `Ctx::me`, `Api::get`/`get_paged`, and `out::*`.
-- Produces (all `-> Result<String, ApiError>`):
-  - `pr_list(ctx, &PrListArgs)`. `PrListArgs { project, repo, status: Option<String> /* active|completed|abandoned|all, default active */, creator: Option<String>, reviewer: Option<String>, source: Option<String>, target: Option<String>, limit: Option<usize> }`.
-    - `"me"` in creator or reviewer resolves through `Ctx::me`.
-    - Endpoint: `{project_id}/_apis/git/repositories/{repo_id}/pullrequests`, with `searchCriteria.*` and `$top`.
-    - One line per PR:
-      `!{id}  {status}{ draft}  {source} → {target}  "{title}"  {author}  {approvals} approvals{, rejected}`
-  - `pr_view(ctx, &PrViewArgs)`. `PrViewArgs { project, repo, branch, id: Option<u32>, full: Option<bool> }`.
-    - With no id, it takes the active PR whose `sourceRefName` is `refs/heads/{scope.branch}`. None found:
-      `no active PR for branch {b}`.
-    - It fetches concurrently (`tokio::join!`) the PR, the policy evaluations, the PR's work items, and the latest
-      run (builds `branchName=refs/pull/{id}/merge`, `$top=1`).
-    - The policy `artifactId` is `vstfs:///CodeReview/CodeReviewId/{project_id}/{id}`.
-    - Output sections, in order:
-      - header line
-      - `reviewers:` with one line each: `{name}: approved|approved with suggestions|waiting|rejected|no vote`
-        (10/5/-5/-10/0), plus `(required)`
-      - `checks:` with one line each: `{policy display name}: {status}`
-      - `work items:` with lines `#{id} {type} {state} "{title}"`
-      - `latest run:` with `#{id} {pipeline} {result or status} {date}`
-      - the description, through `clip(DESC_MAX, "pr_view id={id} full=true")` unless `full`
-  - `pr_threads(ctx, &PrThreadsArgs)`. `PrThreadsArgs { project, repo, branch, id: Option<u32>, all: Option<bool> }`.
-    - Shows active and pending threads unless `all`.
-    - `pub fn is_system(t: &Thread) -> bool` is true when every comment's `commentType` is `system` or missing, or
-      `properties` has `CodeReviewThreadType`.
-    - Deleted comments and empty threads are dropped.
-    - Thread line: `#{thread id} {status}  {path}:{line}`, or without a location when there is no `threadContext`.
-      The line comes from `rightFileStart.line`, else `leftFileStart.line`.
-    - Comment lines: `   {author}: {content}`, each comment clipped at 2000.
-    - Footer when some are hidden: `{n} resolved threads hidden: pr_threads all=true`.
-  - `pr_files(ctx, &PrFilesArgs)` (the same scope and id args). It reads the last iteration's changes; the lines are
-    `{changeType}  {path}`. It ends with `diff: git diff {target}...{source}` using the ref names.
-- Produces: `PrRef` resolution shared by the writes in Task 9:
-  `pub(crate) async fn resolve_pr(ctx, scope, id: Option<u32>) -> Result<Pr, ApiError>`.
+- `pr_list(ctx, &PrListArgs { status, creator, reviewer, source, target, limit })`.
+  - `status` is active, completed, abandoned or all; default active.
+  - `creator` and `reviewer` resolve through `Ctx::user`.
+  - `…/git/repositories/{repo_id}/pullrequests` with `searchCriteria.*` and `$top=limit+1`.
+  - Line: `!{id}  {status}{ draft}  {source} → {target}  "{title}"  {author}  {n} approvals{, rejected}`.
+  - When more exist, `more("pr_list limit={2×limit}")`.
+- `pr_view(ctx, &PrViewArgs { id: Option<u32>, full })`.
+  - With no id, the active PR with `sourceRefName = refs/heads/{branch}`. None found:
+    `no active PR for branch {b}`.
+  - Then `tokio::join!` over:
+    - policy evaluations at `V71_P1`, with `artifactId=vstfs:///CodeReview/CodeReviewId/{project_id}/{id}`
+    - the PR's work items, then a batch get of their titles
+    - the latest run: builds with `branchName=refs/pull/{id}/merge`, `queryOrder=queueTimeDescending`, `$top=1`;
+      if empty, the same with `refs/heads/{source}`
+  - Sections, in order:
+    - header line
+    - `reviewers:` with `{name}: approved|approved with suggestions|waiting|rejected|no vote` (10/5/-5/-10/0), plus
+      ` (required)`
+    - `checks:` with `{policy display name}: {status}`
+    - `work items:` with `#{id} {type} {state} "{title}"`
+    - `latest run:` with `#{id} {pipeline} {result or status} {date}`, or `none`
+    - the description, clipped at `DESC_MAX` with `pr_view id={id} full=true`
+- `pr_threads(ctx, &PrThreadsArgs { id, all, limit })`.
+  - `fn is_system(t: &Thread) -> bool` is true when every comment's `commentType` is `system` or missing, or the
+    thread's `properties` has `CodeReviewThreadType`.
+  - Deleted comments and empty threads are dropped. Without `all`, only active and pending threads are shown.
+  - Thread line: `#{tid} {status}  {path}:{line}`. The line comes from `rightFileStart.line`, else
+    `leftFileStart.line`, and the location is omitted without a `threadContext`.
+  - Comment line: `   {author}: {content}`, each clipped at 2000.
+  - At most `limit` threads (default 20), with `more("pr_threads id={id} limit={2×limit}")`.
+  - Footer: `{n} resolved threads hidden: pr_threads id={id} all=true`.
+  - `pub(crate) async fn resolve_pr(ctx, scope, id: Option<u32>) -> Result<Pr, ApiError>` is shared with Task 9.
+- `pr_files(ctx, &PrFilesArgs { id })`.
+  - The last iteration's changes with `$top=2000`, following the body's `nextSkip` until done or 2000 files.
+  - Lines: `{changeType}  {path}`; past 2000, `more("git diff {target}...{source} --stat")`.
+  - Last line: `diff: git diff {target}...{source}`.
 
 - [ ] **Step 1: Failing tests:**
-  - `list_one_line_each`: the fixture with 2 PRs → 2 lines starting `!412 ` and `!409 `, no `http`.
-  - `list_more_line`: the fixture has `x-ms-continuationtoken`, limit 1 → it ends with `… more: pr_list limit=`.
-  - `view_by_branch`: the scope branch `feature/login-retry` matches the fixture PR 412.
-  - `view_sections`: contains `reviewers:`, `J. Doe: approved (required)`, `checks:`, `#77 Bug Active`,
-    `latest run: #991`.
-  - `view_concurrent`: the four fixture routes each delay 300 ms, and the call finishes in under 900 ms.
-  - `threads_hide_system_and_resolved`: the fixture has 1 system, 1 VoteUpdate, 1 fixed and 2 active threads → 2
-    threads shown, plus `1 resolved threads hidden`.
+  - `list_one_line_each`: lines start `!412 ` and `!409 `, and nothing contains `http`.
+  - `list_more_line`: the fixture has 3 PRs, limit 2 → 2 lines plus `… more: pr_list limit=4`; the request had
+    `$top=3`.
+  - `list_reviewer_by_name`: `reviewer=jane` → `searchCriteria.reviewerId={fixture id}`.
+  - `view_by_branch`: branch `feature/login-retry` → PR 412.
+  - `view_sections`: contains `J. Doe: approved (required)`, `checks:`, `#77 Bug Active` and `latest run: #991`.
+  - `view_run_falls_back_to_source`: the merge-ref query is empty → the second query is
+    `refs/heads/feature/login-retry`.
+  - `view_concurrent`: the 3 joined routes each delay 300 ms → the call takes under 800 ms.
+  - `threads_hide_system_and_resolved`: system 1, VoteUpdate 1, fixed 1, active 2 → 2 shown and
+    `1 resolved threads hidden`.
   - `thread_location`: `#7 active  src/auth.rs:88`.
-  - `files_with_diff_hint`: it ends with `diff: git diff main...feature/login-retry`.
-- [ ] **Step 2–4:** FAIL → implement → PASS. Register `pr_list`, `pr_view`, `pr_threads` and `pr_files` in
-      `tools.rs` with `annotations(read_only_hint = true)` and short descriptions; argument structs derive
-      `Deserialize, JsonSchema`, `#[schemars(crate = "schemars")]`.
+  - `files_follow_next_skip`: two pages → all files, and it ends with `diff: git diff main...feature/login-retry`.
+- [ ] **Step 2–4:** FAIL → implement → PASS. Register the 4 tools with `annotations(read_only_hint = true)`; the
+      argument structs derive `Deserialize, JsonSchema` with `#[schemars(crate = "schemars")]`.
 - [ ] **Step 5: Commit**: `"Add the pull request read tools."`
 
 ### Task 7: Work item reads
 
 **Files:** Create `src/wi.rs`, `tests/wi.rs`, and fixtures `wi.json`, `wi-comments.json`, `wiql.json`. Modify
-`src/tools.rs`.
+`tools.rs`.
 
 **Interfaces:**
 
-- Produces `wi_view(ctx, &WiViewArgs { project, id: u32, full: Option<bool> })`.
-  - `_apis/wit/workitems/{id}?$expand=relations`, plus comments
-    `{project}/_apis/wit/workItems/{id}/comments?$top=5&order=desc` at `Ver::Preview(4)`, concurrently.
-  - Lines, in order:
+- `wi_view(ctx, &WiViewArgs { project, id: u32, full })`.
+  - `_apis/wit/workitems/{id}?$expand=relations` and comments
+    `{project}/_apis/wit/workItems/{id}/comments?$top=5&order=desc` at `V71_P4`, concurrently.
+  - Lines:
     - `#{id} {type} {state}  "{title}"`
     - `assigned: {name or nobody}  area: {area}  iteration: {iteration}`
-    - `parent: #{id}` and `children: #a, #b`, from the `System.LinkTypes.Hierarchy-Reverse`/`-Forward` relations
+    - `parent: #{id}` and `children: #a, #b`, from the Hierarchy-Reverse/-Forward relations
     - `PRs: !{id}…`, from `ArtifactLink` relations whose url contains `PullRequestId`
-    - the description, then `acceptance criteria:` (`Microsoft.VSTS.Common.AcceptanceCriteria`), both via
-      `html_to_text` and clipped
-    - `comments:` with `{date} {author}: {text}`
-- Produces `wi_query(ctx, &WiQueryArgs { project, wiql: Option<String>, assigned: Option<String>, state:
-  Option<String>, r#type: Option<String>, title: Option<String>, limit: Option<usize> })`.
-  - Without `wiql`, it builds `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = @project` plus one
-    `AND` per filter (`assigned=me` → `[System.AssignedTo] = @Me`; `title` → `CONTAINS`). Values are escaped by
-    doubling `'`.
-  - It runs `POST {project}/_apis/wit/wiql?$top={limit+1}`, then batch-gets ≤ 200 ids with
+    - the description and `acceptance criteria:`, both through `html_to_text`, then `clip`
+    - `comments:` with `{date} {author}: {html_to_text(text)}`, plus `… {totalCount-5} older comments` when there
+      are more
+- `wi_query(ctx, &WiQueryArgs { project, wiql, assigned, state, r#type, title, limit })`.
+  - Without `wiql`, it builds `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = @project` plus `AND`
+    filters: `assigned` is `me` → `[System.AssignedTo] = @Me`, otherwise the name; `title` → `CONTAINS`. `'` is
+    doubled.
+  - `POST {project}/_apis/wit/wiql?$top={limit+1}`.
+  - The batch get comes in chunks of 200 ids with `errorPolicy=omit` and
     `fields=System.Id,System.WorkItemType,System.State,System.Title,System.AssignedTo`.
-  - The lines are `#{id} {type} {state}  "{title}"  {assignee}`.
+  - Line: `#{id} {type} {state}  "{title}"  {assignee}`, plus `more("wi_query … limit={2×limit}")`.
 
 - [ ] **Step 1: Failing tests:**
-  - `view_lines`: contains `#123 Bug Active`, `parent: #100`, `PRs: !412`, and the HTML description as text.
+  - `view_lines`: contains `#123 Bug Active`, `parent: #100` and `PRs: !412`, the description as text, and a comment
+    without tags.
   - `query_filters_build_wiql`: the request body contains `[System.AssignedTo] = @Me` and `'O''Brien'`.
   - `query_raw_wiql_passthrough`.
-  - `query_more_line`: 21 ids at limit 20 → `… more: wi_query limit=`.
+  - `query_more_line`.
 - [ ] **Step 2–4:** FAIL → implement → PASS (register as read tools).
 - [ ] **Step 5: Commit**: `"Add the work item read tools."`
 
 ### Task 8: Pipeline reads and repo_list
 
-**Files:** Create `src/pipeline.rs`, `tests/pipeline.rs`, and fixtures `builds.json`, `timeline.json`, `log.txt`
-(CRLF, ANSI, `##[group]`, `##[error]`), `repos.json`. Modify `src/tools.rs`.
+**Files:** Create `src/pipeline.rs`, `tests/pipeline.rs`, and fixtures `builds.json`, `timeline.json` (Stage →
+Phase → Job → Task, with one Task `skipped` and no log, and one Job `failed` with no failed Task but `issues`),
+`logs.json` (with `lineCount`), `log.txt` (CRLF, ANSI, `##[group]`, `##[error]`) and `repos.json`. Modify `tools.rs`.
 
 **Interfaces:**
 
-- Produces `pipeline_runs(ctx, &RunsArgs { project, pipeline: Option<String>, branch: Option<String>, pr:
-  Option<u32>, result: Option<String>, limit: Option<usize> })`.
-  - `{project}/_apis/build/builds` with `definitions` (via `Ctx::pipeline_id`), `branchName` (`refs/heads/…`, or
-    `refs/pull/{pr}/merge`), `resultFilter`, `queryOrder=queueTimeDescending` and `$top`.
-  - Lines: `#{id} {pipeline}  {branch}  {result or status}  {date}  {duration}`.
-- Produces `pipeline_view(ctx, &RunArgs { project, run: u32 })`, from the timeline.
-  - Records nest Stage → Job → Task by `parentId` and are ordered by `order`.
-  - Stage and job lines: `{indent}{name}: {result} {duration}`.
-  - Then `issues:` with `{type} {message}`, from records' `issues`.
-- Produces `pipeline_log(ctx, &LogArgs { project, run: u32, step: Option<String>, full: Option<bool>, start:
-  Option<u32>, end: Option<u32> })`.
-  - Default: each Task record with `result == failed`. `step` matches a record name case-insensitively.
-  - The log comes from `{project}/_apis/build/builds/{run}/logs/{log.id}` via `get_text`, with
-    `startLine`/`endLine` when `full`.
-  - `pub fn clean_log(raw: &str) -> Vec<(bool, String)>` returns `(is_error, line)` pairs. It strips the leading
-    ISO timestamp (`^\d{4}-\d\d-\d\dT[\d:.]+Z `), ANSI CSI sequences and `\r`. It drops `##[group]`,
-    `##[endgroup]`, `##[section]` and `##[command]` prefixes (keeping a command line's text), and turns
-    `##[error]x` into `(true, "ERROR x")` and `##[warning]x` into `(false, "WARNING x")`.
-  - `pub fn excerpt(lines: &[(bool, String)]) -> String` takes the error lines with ±5 context, merges overlaps,
-    and puts `…` between gaps, then `--- last 50 lines ---` and the tail.
-  - A step with no `log`: `{step}: no log ({result})`.
-  - `full` returns at most 2000 lines from `start` (default 1). When more exist it ends with
-    `… more: pipeline_log run={run} step="{step}" full=true start={next}`.
-- Produces `repo_list(ctx, &ProjectArgs { project })`, with lines `{name}  default: {branch}`.
+- `pipeline_runs(ctx, &RunsArgs { project, pipeline, branch, pr: Option<u32>, result, limit })`.
+  - `{project}/_apis/build/builds` with `definitions` (from `pipeline_id`), `branchName` (`refs/heads/…` or
+    `refs/pull/{pr}/merge`), `resultFilter`, `queryOrder=queueTimeDescending` and `$top=limit+1`.
+  - Line: `#{id} {pipeline}  {branch}  {result or status}  {date}  {duration}`.
+- `pipeline_view(ctx, &RunArgs { project, run: u32 })`.
+  - From the timeline: children by `parentId`, ordered by `order`. Phase records aren't printed: their Jobs show at
+    the Stage's child level.
+  - Lines: `{name}: {result} {duration}` for each Stage, and indented for each Job.
+  - Then `issues:` with `{type} {message}`.
+- `pipeline_log(ctx, &LogArgs { project, run: u32, step, full, start })`.
+  - Targets: `step` matches a Task name (case-insensitive). Otherwise the Tasks with `result == failed`. Otherwise
+    the failed Jobs, which print `{job}: failed with no failed step` and their issues.
+  - The log comes from `{project}/_apis/build/builds/{run}/logs/{log.id}` via `get_text`.
+  - `fn clean_log(raw: &str) -> Vec<(bool, String)>`:
+    - strips a leading ISO timestamp, ANSI CSI and `\r`
+    - drops the `##[group]`, `##[endgroup]`, `##[section]` and `##[command]` prefixes
+    - `##[error]x` → `(true, "ERROR x")` and `##[warning]x` → `(false, "WARNING x")`
+  - `fn excerpt(lines) -> String`: the error lines with ±5 context, merged, with `…` between gaps, then
+    `--- last 50 lines ---` and the tail.
+  - A Task with no `log`: `{step}: no log ({result})`.
+  - `full`: `startLine=start` (default 1) and `endLine=start+1999`. When `logs.json`'s `lineCount` for that log is
+    past `endLine`, it appends `more("pipeline_log run={run} step=\"{step}\" full=true start={endLine+1}")`.
+- `repo_list(ctx, &ProjectArgs { project })`, with lines `{name}  default: {ref_name(defaultBranch)}`.
 
 - [ ] **Step 1: Failing tests:**
-  - `clean_strips_noise`: no timestamp, no `\x1b`, no `##[group]`; it contains `(true, "ERROR boom")`.
-  - `excerpt_context_and_tail`: an error at line 100 of 300 → lines 95–105, then `--- last 50 lines ---`.
-  - `log_crlf_and_missing_log`: the CRLF fixture is clean, and a skipped step gives `Publish: no log (skipped)`.
-  - `log_full_paged`: 2500 lines with `full` → 2000 lines and `start=2001`.
-  - `view_tree`: contains `Build: failed` and `  Test: failed`, and `issues:` contains the fixture's error.
-  - `runs_by_pr_uses_merge_ref`: the query has `branchName=refs/pull/412/merge`.
+  - `clean_strips_noise`: no timestamp, no `\x1b`, no `##[group]`; it contains `ERROR boom`.
+  - `excerpt_context_and_tail`.
+  - `log_crlf_and_missing_log`: a clean CRLF log, and `Publish: no log (skipped)`.
+  - `job_failed_without_step`: `Deploy: failed with no failed step`, plus the job's issue text.
+  - `log_full_paged`: `lineCount` 2500 → `start=2001`.
+  - `view_tree_skips_phase`: `Build: failed` and `  Test: failed`, with no Phase name printed.
+  - `runs_by_pr_uses_merge_ref`.
+  - `repo_list_lines`.
 - [ ] **Step 2–4:** FAIL → implement → PASS (register 4 read tools).
 - [ ] **Step 5: Commit**: `"Add the pipeline read tools and repo_list."`
 
 ### Task 9: Pull request writes
 
-**Files:** Modify `src/pr.rs`, `tests/pr.rs` and `src/tools.rs`. Add fixtures `identities.json` and `repo.json`.
+**Files:** Modify `src/pr.rs`, `tests/pr.rs` and `tools.rs`. Add fixtures `repo.json`, `pr-409.json` (TF401179) and
+`pr-complete.json` (`status: active`, `mergeStatus: queued`).
 
-**Interfaces:**
+**Interfaces** (each returns one line naming what changed and the id):
 
-- Consumes: `resolve_pr`, `Ctx::me` and `Api::send`.
-- Produces (each returns one line naming what changed and the id):
-  - `pr_create(ctx, &PrCreateArgs { project, repo, branch, title: String, description: Option<String>, target:
-    Option<String>, draft: Option<bool>, reviewers: Option<Vec<String>>, work_items: Option<Vec<u32>> })`.
-    - The source is `branch` or the scope branch. The target defaults to the repository's `defaultBranch`
-      (`{project}/_apis/git/repositories/{repo_id}`).
-    - Reviewers resolve through `_apis/identities?searchFilter=General&filterValue={text}`. No match →
-      `no user matches "{text}"`; several → `"{text}" matches: a, b, c`.
-    - A 409 whose message names an existing PR → `the server refused it: …` (the message carries the PR id).
-    - Output: `created !{id} {source} → {target}{ (draft)}`.
-  - `pr_update(ctx, &PrUpdateArgs { …scope, id: Option<u32>, title, description, draft: Option<bool>, status:
-    Option<String> /* abandoned|active */ })`. PATCHes only the fields given. → `updated !{id}: {fields}`.
-  - `pr_comment(ctx, &PrCommentArgs { …scope, id, text: String, file: Option<String>, line: Option<u32> })`.
-    - `file` and `line` must come together; otherwise `file and line go together`. A `line` of 0 →
-      `line starts at 1`.
-    - It POSTs a thread with `status: active`, `comments[0].commentType: text`, and `threadContext` whose
-      `rightFileStart` and `rightFileEnd` are `{line, offset: 1}`. The path gets a leading `/`.
-    - → `commented on !{id} as thread #{t}`.
-  - `pr_reply(ctx, &PrReplyArgs { …scope, id, thread: u32, text })`, with `parentCommentId: 1`. →
-    `replied on !{id} thread #{t}`.
-  - `pr_thread_status(ctx, &PrThreadStatusArgs { …scope, id, thread, status: String /* active|fixed|wontFix|closed|byDesign|pending */ })`.
-    → `thread #{t} on !{id} is now {status}`.
-  - `pr_vote(ctx, &PrVoteArgs { …scope, id, vote: String /* approve|approve-with-suggestions|wait|reject|reset */ })`.
-    It PUTs `…/pullrequests/{id}/reviewers/{me.id}` with `{vote: 10|5|-5|-10|0}`. → `voted {vote} on !{id}`.
-  - `pr_complete(ctx, &PrCompleteArgs { …scope, id, strategy: Option<String> /* squash|noFastForward|rebase|rebaseMerge, default squash */, delete_source: Option<bool> /* default true */, transition_work_items: Option<bool> /* default true */, auto: Option<bool> })`.
-    - With `auto`, it PATCHes `autoCompleteSetBy: {id: me}` and `completionOptions`.
-    - Otherwise it PATCHes `status: completed`, `lastMergeSourceCommit` (from the PR) and `completionOptions`.
-    - The body never has `bypassPolicy`; the test asserts its absence.
-    - → `completed !{id} ({strategy})`, or `auto-complete set on !{id}`.
+- `pr_create(ctx, &PrCreateArgs { title, description, target, draft, reviewers: Option<Vec<String>>, work_items:
+  Option<Vec<u32>> })`.
+  - The source is `branch` or the scope branch. The target defaults to the repo's `defaultBranch`.
+  - Reviewers go through `Ctx::user`.
+  - A TF401179 error looks up the active PR for that source and target, and returns
+    `!{id} already exists for {source} → {target}` as a tool error.
+  - → `created !{id} {source} → {target}{ (draft)}`.
+- `pr_update(ctx, &PrUpdateArgs { id, title, description, draft, status })`. `status` is abandoned or active, and
+  only the given fields are PATCHed. → `updated !{id}: {fields}`.
+- `pr_comment(ctx, &PrCommentArgs { id, text, file, line })`.
+  - `file` and `line` must come together; otherwise `file and line go together`. `line` 0 → `line starts at 1`.
+  - The thread has `status: active`, comment type `text`, and `threadContext` with `filePath: "/{file}"` and
+    `rightFileStart`/`rightFileEnd` `{line, offset: 1}`.
+  - → `commented on !{id} as thread #{t}`.
+- `pr_reply(ctx, &PrReplyArgs { id, thread: u32, text })`, with `parentCommentId: 1`. →
+  `replied on !{id} thread #{t}`.
+- `pr_thread_status(ctx, &PrThreadStatusArgs { id, thread, status })`. `status` is active, fixed, wontFix, closed,
+  byDesign or pending. → `thread #{t} on !{id} is now {status}`.
+- `pr_vote(ctx, &PrVoteArgs { id, vote })`. `vote` is approve, approve-with-suggestions, wait, reject or reset. It
+  PUTs `…/reviewers/{me.id}` with 10, 5, -5, -10 or 0. → `voted {vote} on !{id}`.
+- `pr_complete(ctx, &PrCompleteArgs { id, strategy, delete_source, transition_work_items, auto })`.
+  - `strategy` is squash, noFastForward, rebase or rebaseMerge; default squash _(my call)_. `delete_source` and
+    `transition_work_items` default to true.
+  - With `auto`, it PATCHes `autoCompleteSetBy: {id: me}` and `completionOptions` → `auto-complete set on !{id}`.
+  - Otherwise it PATCHes `status: completed`, `lastMergeSourceCommit` and `completionOptions`. The output comes from
+    the response: `completed !{id} ({strategy})` when `status == completed`, otherwise
+    `completion queued for !{id} ({strategy}, merge {mergeStatus})`.
+  - No body ever has `bypassPolicy`.
 
 - [ ] **Step 1: Failing tests:**
-  - `create_defaults_and_reviewers`: the body has `refs/heads/feature/x` → `refs/heads/main` and the reviewer id
-    from the fixture.
-  - `create_ambiguous_reviewer`.
-  - `comment_anchor`: the body has `"/src/auth.rs"` and `rightFileStart` `{"line":88,"offset":1}`.
+  - `create_defaults_and_reviewers`.
+  - `create_conflict_names_pr`: TF401179 → `!412 already exists for feature/x → main`.
+  - `comment_anchor`: the body has `"/src/auth.rs"` and `{"line":88,"offset":1}`.
   - `comment_line_needs_file`.
   - `vote_values`: `reject` → `-10` at `/reviewers/{me}`.
-  - `complete_never_bypasses`: the body has no `bypassPolicy` and has `"deleteSourceBranch":true`.
+  - `complete_queued`: `completion queued for !412 (squash, merge queued)`.
+  - `complete_never_bypasses`: no request body anywhere contains `bypassPolicy`, and the body has
+    `"deleteSourceBranch":true`.
   - `update_only_given_fields`.
-- [ ] **Step 2–4:** FAIL → implement → PASS. Register the 7 tools without `read_only_hint`. `WRITES` already lists
-      them.
+- [ ] **Step 2–4:** FAIL → implement → PASS (register the 7 tools without `read_only_hint`).
 - [ ] **Step 5: Commit**: `"Add the pull request write tools."`
 
 ### Task 10: Work item and pipeline writes
 
-**Files:** Modify `src/wi.rs`, `src/pipeline.rs`, `tests/wi.rs`, `tests/pipeline.rs` and `src/tools.rs`.
+**Files:** Modify `src/wi.rs`, `src/pipeline.rs`, `tests/wi.rs`, `tests/pipeline.rs` and `tools.rs`.
 
 **Interfaces:**
 
-- Produces `wi_create(ctx, &WiCreateArgs { project, r#type: String, title: String, description: Option<String>,
-  assigned: Option<String>, parent: Option<u32> })`.
-  - It POSTs JSON Patch to `{project}/_apis/wit/workitems/${type}`, with `add` ops on `/fields/System.Title`,
+- `wi_create(ctx, &WiCreateArgs { project, r#type, title, description, assigned, parent })`.
+  - JSON Patch POST to `{project}/_apis/wit/workitems/${type}`, with `add` ops on `/fields/System.Title`,
     `/fields/System.Description` and `/fields/System.AssignedTo`.
-  - A parent becomes a `/relations/-` op with `rel: System.LinkTypes.Hierarchy-Reverse` and `url:
-    {org_url}/_apis/wit/workItems/{parent}`.
+  - The parent is a `/relations/-` op with `rel: System.LinkTypes.Hierarchy-Reverse` and url
+    `{org_url}_apis/wit/workItems/{parent}`.
   - → `created #{id} {type} "{title}"`.
-- Produces `wi_update(ctx, &WiUpdateArgs { project, id: u32, state, assigned, title, fields:
-  Option<BTreeMap<String, serde_json::Value>> })`.
-  - It PATCHes `_apis/wit/workitems/{id}` with `add` ops; the `fields` keys go to `/fields/{key}` verbatim.
-  - → `updated #{id}: {field names}`.
-- Produces `wi_comment(ctx, &WiCommentArgs { project, id, text })`, a POST at `Ver::Preview(4)`. →
-  `commented on #{id}`.
-- Produces `pipeline_run(ctx, &PipelineRunArgs { project, pipeline: String, branch: Option<String>, parameters:
-  Option<BTreeMap<String, String>> })`.
-  - It POSTs to `{project}/_apis/pipelines/{id}/runs` with
-    `resources.repositories.self.refName = refs/heads/{branch or scope branch}` and `templateParameters`.
+- `wi_update(ctx, &WiUpdateArgs { project, id, state, assigned, title, fields: Option<BTreeMap<String,
+  serde_json::Value>> })`. `fields` keys go to `/fields/{key}` verbatim. → `updated #{id}: {field names}`.
+- `wi_comment(ctx, &WiCommentArgs { project, id, text })`, at `V71_P4`. → `commented on #{id}`.
+- `pipeline_run(ctx, &PipelineRunArgs { project, pipeline, branch, parameters: Option<BTreeMap<String, String>> })`.
+  - POST `{project}/_apis/pipelines/{id}/runs` with `resources.repositories.self.refName` and
+    `templateParameters`.
   - → `queued run #{id} of {pipeline} on {branch}`.
-- Produces `pipeline_cancel(ctx, &RunArgs)`, which PATCHes `{project}/_apis/build/builds/{run}` with
-  `{status: "cancelling"}`. → `cancelling run #{run}`.
+- `pipeline_cancel(ctx, &RunArgs)`, a PATCH of `{project}/_apis/build/builds/{run}` with
+  `{"status":"cancelling"}`. → `cancelling run #{run}`.
 
 - [ ] **Step 1: Failing tests:**
   - `create_json_patch`: content type `application/json-patch+json`, with ops for title and parent.
-  - `update_custom_field`: `Microsoft.VSTS.Common.Priority` → `/fields/Microsoft.VSTS.Common.Priority`.
+  - `update_custom_field`.
   - `comment_preview_version`.
   - `run_ref_and_params`.
   - `cancel_body`.
@@ -507,139 +542,159 @@ THIRD_PARTY.md; README.md; CLAUDE.md; docs/features/ado-mcp/smoke.md
 
 ### Task 11: The tool surface end to end
 
-**Files:** Modify `tests/mcp.rs`.
+**Files:** Modify `tests/mcp.rs` and `tools.rs` (remove `ping`).
 
 - [ ] **Step 1: Test `tools_and_marks`.**
-  - `tools/list` names, sorted, equal the 22 tools of spec goal 2.
-  - Each read has `annotations.readOnlyHint == true` and no `requiresUserInteraction`.
-  - Each name in `WRITES` has `_meta["anthropic/requiresUserInteraction"] == true` and no `readOnlyHint`.
+  - The sorted `tools/list` names equal the 22 tools of spec goal 2.
+  - The reads have `readOnlyHint == true` and no `requiresUserInteraction`.
+  - Each `WRITES` name has `_meta["anthropic/requiresUserInteraction"] == true` and no `readOnlyHint`.
   - Every description is under 400 characters.
-- [ ] **Step 2: Test `call_errors_are_tool_errors`.**
-  - Spawn with `ADO_ORG_URL` at the fake server returning 401, and call `pr_list` with `project=P`, `repo=R`.
-  - The result has `isError: true`, the text equals the 401 line, and the PAT isn't in stdout.
+- [ ] **Step 2: Test `errors_are_tool_errors_without_pat`.** Every tool called against a fake server that answers
+      401 gives `isError` and the 401 line, and the full stdout never contains `test-pat`.
 - [ ] **Step 3:** Run; fix the gaps it finds; PASS.
 - [ ] **Step 4: Commit**: `"Pin the ado-mcp tool list, permission marks and error results."`
 
-### Task 12: Release build, Nix
+### Task 12: Release build and Nix
 
 **Files:**
 
-- Create: `.github/workflows/build-ado-mcp.yml`, a copy of `build-web-mcp.yml` with every `web-mcp` → `ado-mcp`
-  (lines 1, 7, 26, 39, 46, 50, 53, 55, 64).
-- Modify: `.github/workflows/release.yml`. Add an `ado-mcp:` job like `:74-75`, add it to `publish.needs` at `:78`,
-  and update the comments at `:4` and `:87` and the notes at `:101-102` (`ado-mcp-*: the binary behind the
-  mcp-azure plugin, for Windows and Linux x64`).
-- Modify: `flake.nix`. Add an `adoMcp` `importTOML` and an `ado-mcp` `buildRustPackage` block like `:98-109`, and
-  `nativeCheckInputs = [pkgs.git]` (Task 2's test runs git).
+- Create: `.github/workflows/build-ado-mcp.yml`, a copy of `build-web-mcp.yml` with every `web-mcp` → `ado-mcp`.
+- Modify: `.github/workflows/release.yml`:
+  - an `ado-mcp:` job like `:74-75`, and in `publish.needs` at `:78`
+  - the comments at `:4` and `:87`
+  - the notes at `:101-102`: `ado-mcp-*: the binary behind the mcp-azure plugin, for Windows and Linux x64; the
+    installer downloads yours`
+- Modify: `flake.nix`: an `adoMcp` `importTOML` and an `ado-mcp` `buildRustPackage` like `:98-109`, with
+  `nativeCheckInputs = [pkgs.git]` and `checkType = "debug"` (for the `ADO_TIMEOUT_MS` hook).
 
-- [ ] **Step 1:** `nix build .#ado-mcp`, if nix is available: builds and tests pass. Otherwise
-      `cargo build --release --locked` in `crates/ado-mcp`, and `./target/release/ado-mcp --version`.
+- [ ] **Step 1:** `nix build .#ado-mcp` where nix is available. Otherwise
+      `cargo build --release --locked && ./target/release/ado-mcp --version`.
 - [ ] **Step 2:** `npm test`: PASS.
 - [ ] **Step 3: Commit**: `"Build and release ado-mcp with the other binaries."`
 
-### Task 13: The mcp-azure plugin and docs
+### Task 13: mcp-azure plugin and installer
+
+**Files:** Modify `plugins/opt-in/mcp/mcp-azure/.claude-plugin/plugin.json`, `.mcp.json`, `installer/core.mjs`,
+`ui.mjs`, `view.mjs`, `install.mjs`, `core.test.mjs`, `ui.test.mjs` and `view.test.mjs`.
+
+**Plugin:**
+
+- `plugin.json`:
+  - Drop `ado_api_version`.
+  - Add `binPath` (`type string`, title `ado-mcp binary`, description
+    `Path to the ado-mcp binary. Default: ado-mcp on PATH.`, default `ado-mcp`).
+  - `description`: `Azure DevOps Server tools for Claude: pull requests, work items and YAML pipelines, through the
+    ado-mcp binary (self-hosted, PAT auth). Writes always ask first.`
+  - `ado_pat` description: `PAT with Code (Read & Write), Work Items (Read & Write), Build (Read & Execute), Project
+    and Team (Read).`
+- `.mcp.json`: `{"mcpServers":{"ado":{"command":"${user_config.binPath}","env":{"ADO_ORG_URL":
+  "${user_config.ado_org_url}","ADO_PAT":"${user_config.ado_pat}","ADO_DEFAULT_PROJECT":
+  "${user_config.ado_default_project}","ADO_PROJECT_DIR":"${CLAUDE_PROJECT_DIR}"}}}}`.
+
+**Installer interfaces (`core.mjs`):**
+
+- `BIN_PLUGINS['mcp-azure'] = { name: 'ado-mcp', key: 'binPath' }`.
+- `export const SELF_CONFIGURED = ['mcp-azure']`. These are left out of `tokenPlugins` when building the plan and
+  `data.tokens`, so `planPlugins` and `view.mjs:306` stay unchanged.
+- `export function configPrompts(userConfig, binKey, configuredKeys)`. It returns
+  `[{ key, title, description, secret, required, saved }]` in manifest order, minus `binKey`. `saved` is
+  `configuredKeys.includes(key)`.
+- `export function configValues(prompts, answers)`. It returns `{ values, missing }`: the non-empty trimmed
+  answers, with an empty answer to a `saved` prompt left out (it keeps its value); `missing` is the required,
+  unsaved keys with empty answers.
+- `export function selfConfigure({ installed, configuredKeys, requiredKeys })`. It returns `'prompt'` when the
+  plugin isn't installed or a required key isn't configured, otherwise `'skip'`.
+- `export const configureArgs = (id) => ['plugin', 'configure', id, '--values-stdin']`.
+
+**`ui.mjs`:** `export async function secret(message, io = STD)`. It calls `line()` with an output wrapper that writes
+the prompt and drops everything else, so the typed text is never echoed.
+
+**`install.mjs`, I/O only:**
+
+- For each selected `SELF_CONFIGURED` id: when installed, read `claude plugin configure {id} --json` (`configured`).
+  - If `selfConfigure(...)` gives `'prompt'`, ask each `configPrompts` entry with `line()` or `secret()`. A saved
+    entry shows `(saved, Enter keeps)`.
+  - If `missing` isn't empty and the plugin isn't installed: skip it and print `HANDOFF[name]` after the summary.
+- Install when needed (the existing install loop).
+- Then `applyBin(name, id, values)`, whenever the plugin is selected (installed or not), like
+  `install.mjs:696-697`. `applyBin` gains `extra = {}`:
+  - it sends `{...extra, [key]: bin}` in one `claude(JSON.stringify(...), ...configureArgs(id))`
+  - on `skip` (on PATH) with a non-empty `extra`, it sends `extra` alone
+  - its failure line for this call never includes `r.err`:
+    `{plugin}: could not save its settings; run /plugin configure {id} in Claude Code`
+- `install.mjs:370`: the crate folder becomes `crates/${name}`.
+- `option()` (`:569-572`): for `SELF_CONFIGURED`, the note is `asks for the token`.
+- `HANDOFF['mcp-azure']` (`:454-458`): the API-version line is dropped and the scopes updated.
+
+- [ ] **Step 1: Failing tests:**
+  - `core.test.mjs`:
+    - `configPrompts` keys equal `['ado_org_url','ado_pat','ado_default_project']`; only `ado_pat` is secret; `saved`
+      follows `configuredKeys`.
+    - `configValues`: an empty unsaved PAT → `missing` is `['ado_pat']`; an empty saved PAT → left out of `values`
+      and not missing.
+    - `selfConfigure`: not installed → `prompt`; installed with all required keys configured → `skip`; installed
+      with `ado_pat` unconfigured → `prompt`.
+    - `configureArgs('mcp-azure@x')` contains no value from the answers.
+    - The `BIN_PLUGINS` test map (`:388-392`) gains `'mcp-azure': 'plugins/opt-in/mcp/mcp-azure'`, and the
+      `binAsset` loop covers `ado-mcp`.
+  - `ui.test.mjs`: `secret()` with a fake io fed `hunter2\r` resolves to `hunter2`, and the captured output contains
+    the prompt but not `hunter2`.
+  - `view.test.mjs`: with mcp-azure selected and not in `tokens`, the review line has no `finish in Claude Code`.
+- [ ] **Step 2:** `node --test installer/`: FAIL.
+- [ ] **Step 3: Implement.**
+- [ ] **Step 4:** `npm test`: PASS. If `claude` is on PATH, `claude plugin validate plugins/opt-in/mcp/mcp-azure`
+      passes.
+- [ ] **Step 5: Commit**: `"Let the installer install and configure mcp-azure with the ado-mcp binary."`
+
+### Task 14: Docs
 
 **Files:**
 
-- Modify: `plugins/opt-in/mcp/mcp-azure/.claude-plugin/plugin.json`.
-  - Drop `ado_api_version`. Add `binPath`, with the same shape as web-mcp's: `type string`, `title` "ado-mcp
-    binary", `description` "Path to the ado-mcp binary. Default: ado-mcp on PATH.", `default` "ado-mcp".
-  - New `description`: "Azure DevOps Server tools for Claude: pull requests, work items and YAML pipelines, through
-    the ado-mcp binary (self-hosted, PAT auth). Writes always ask first."
-  - `ado_pat`'s description lists the scopes: "PAT with Code (Read & Write), Work Items (Read & Write), Build (Read &
-    Execute)."
-- Modify: `plugins/opt-in/mcp/mcp-azure/.mcp.json`. It becomes `{"mcpServers":{"ado":{"command":
-  "${user_config.binPath}","env":{"ADO_ORG_URL":"${user_config.ado_org_url}","ADO_PAT":"${user_config.ado_pat}",
-  "ADO_DEFAULT_PROJECT":"${user_config.ado_default_project}","ADO_PROJECT_DIR":"${CLAUDE_PROJECT_DIR}"}}}}`. Match
-  web-mcp's `.mcp.json` shape: wrapped in `mcpServers`, as in `plugins/shared/web-mcp/.mcp.json`.
 - Create: `plugins/opt-in/mcp/mcp-azure/README.md`:
   - what it does
-  - install (the installer, or by hand with `/plugin install` and the `binPath`)
+  - install (the installer, or by hand: `/plugin install` plus the `binPath`)
   - the PAT scopes
   - the 10 read tool names `mcp__plugin_mcp-azure_ado__…`, to allow with "don't ask again"
-  - that writes always prompt (Claude Code ≥ 2.1.214)
-  - limits (one server, API 7.1, YAML pipelines only)
-- Modify: `.claude-plugin/marketplace.json:56`, with the same description as plugin.json plus " Opt-in.".
-- Modify: `THIRD_PARTY.md:22-26`. Drop the tiberriver256 line and mcp-azure from the heading.
-- Modify: `README.md:13-16` (the tools sentence) and its mcp-azure mention.
-- Modify: `CLAUDE.md`:
-  - `:22` "the two Rust crates" → three, naming `ado-mcp` (mcp-azure's server)
-  - `:39`: mcp-azure is no longer "configs only"
-  - the release (`:100`), checks (`:108-109`, adding `cargo test` and `clippy` in `crates/ado-mcp`) and CI
-    (`:121-122`, `ado-mcp.yml`/`build-ado-mcp.yml`) lists
-  - a layout bullet for `crates/ado-mcp`
-- Modify: `installer/install.mjs:449-458` (`HANDOFF['mcp-azure']`): drop the API-version line and update the scopes.
+  - writes always prompt (Claude Code ≥ 2.1.214)
+  - limits: one server and collection, API 7.1, YAML pipelines only, Windows and Linux x64 only
+  - **Upgrading from the npm server:**
+    - re-run the installer, or set `binPath`
+    - old `mcp__plugin_mcp-azure_azure-devops-server__*` allow rules no longer match
+    - the `ado_api_version` setting is gone
+- Modify:
+  - `.claude-plugin/marketplace.json:56`: the plugin.json description plus ` Opt-in.`
+  - `THIRD_PARTY.md:22-26`: drop the tiberriver256 line and mcp-azure from the heading
+  - `README.md:13-16` and its mcp-azure mention
+  - `CLAUDE.md`:
+    - `:22` → three Rust crates, naming `ado-mcp` (mcp-azure's server)
+    - `:39`: mcp-azure is no longer "configs only"
+    - a layout bullet for `crates/ado-mcp`, including the `ADO_TIMEOUT_MS` test hook
+    - the release (`:100`), checks (`:108-109`) and CI (`:121-122`) lists
+- Modify: `release.yml`'s notes line, which mentions re-running the installer after updating mcp-azure.
 
-- [ ] **Step 1:** `npm test` (check-repo, plugin validate when `claude` is on PATH): PASS.
-- [ ] **Step 2:** If `claude` is available, `claude plugin validate plugins/opt-in/mcp/mcp-azure`: passed.
-- [ ] **Step 3: Commit**: `"Point mcp-azure at ado-mcp and update the docs."`
-
-### Task 14: Installer: install, download and configure mcp-azure
-
-**Files:** Modify `installer/core.mjs`, `installer/ui.mjs`, `installer/install.mjs`, `installer/core.test.mjs` and
-`installer/view.test.mjs` if their texts change.
-
-**Interfaces:**
-
-- Produces in `core.mjs`:
-  - `BIN_PLUGINS['mcp-azure'] = { name: 'ado-mcp', key: 'binPath' }`.
-  - `export const SELF_CONFIGURED = ['mcp-azure']`: token plugins the installer configures itself.
-  - `export function configPrompts(userConfig, binKey)`. It returns `[{ key, title, description, secret, required }]`
-    in manifest order, minus `binKey`; `secret` comes from `sensitive`.
-  - `export function configValues(prompts, answers, bin)`. It returns `{ values, missing }`: `values` holds the
-    non-empty trimmed answers plus `{binPath: bin}`, and `missing` is the required keys left empty.
-  - `planPlugins(selected, installedIds, tokenPlugins, configured = [])`. A token plugin in `configured` moves from
-    `handoff` to `install`.
-- Produces in `ui.mjs`: `export async function secret(message, io = STD)`. Raw-mode input echoes `*`, handles
-  backspace, returns on enter and gives `null` on ctrl-c (the pattern of `confirm`). The typed text is never written
-  to output.
-- Changes `install.mjs`:
-  - After the pages and before the install loop, for each `SELF_CONFIGURED` id in `plan.handoff`: prompt with
-    `line()` or `secret()` per `configPrompts(manifest userConfig, 'binPath')`.
-  - If `missing` is empty, add the id to `configured` and recompute the plan.
-  - After installs: `applyBin('mcp-azure', id)` downloads the binary.
-  - Then `claude(JSON.stringify(values), 'plugin', 'configure', id, '--values-stdin')`. The values travel on stdin,
-    never in args.
-  - On failure: push to `failures` the handoff instruction (`run /plugin configure {id} in Claude Code`) without the
-    values.
-  - `install.mjs:370` uses the binary name for the crate folder: `crates/${name}`.
-  - `option()` (`:569-572`): for `SELF_CONFIGURED`, the note is `asks for the token` instead of
-    `token entered in Claude Code`.
-
-- [ ] **Step 1: Failing tests** in `core.test.mjs`:
-  - `configPrompts(mcpAzureUserConfig, 'binPath')` keys equal `['ado_org_url','ado_pat','ado_default_project']`, and
-    only `ado_pat` is secret.
-  - `configValues` with an empty PAT → `missing` equals `['ado_pat']`. With all answers →
-    `values.binPath === bin`, and `ado_default_project` is left out when empty.
-  - `planPlugins([a], [], [a], [a])` → `install` has `a`, `handoff` is empty.
-  - The existing `BIN_PLUGINS` test map (`core.test.mjs:388-392`) gains
-    `'mcp-azure': 'plugins/opt-in/mcp/mcp-azure'`, and its `binAsset` loop covers `ado-mcp`.
-  - `install.mjs` source never passes `ado_pat` or `values` as an argument:
-    `assert.doesNotMatch(src, /'--config'/)`.
-- [ ] **Step 2:** `node --test installer/`: FAIL.
-- [ ] **Step 3: Implement.**
-- [ ] **Step 4:** `npm test`: PASS. View tests updated if the note text is asserted.
-- [ ] **Step 5: Commit**: `"Let the installer install and configure mcp-azure with the ado-mcp binary."`
+- [ ] **Step 1:** `npm test`: PASS.
+- [ ] **Step 2: Commit**: `"Document mcp-azure's new server and the upgrade from the npm one."`
 
 ### Task 15: Smoke checklist
 
-**Files:** Create `docs/features/ado-mcp/smoke.md`.
+**Files:** Create `docs/features/ado-mcp/smoke.md`. Each step ends with "paste back: …", which is only outputs and
+error lines, never raw JSON.
 
-Steps, each with "paste back: …" (only outputs and error lines, never raw JSON):
-
-1. **Install.** Run the installer, tick mcp-azure, enter the URL, PAT and project. Paste back the summary lines for
-   mcp-azure.
-2. **Connection.** In a clone, ask Claude for `repo_list`. Paste back the output or the error line. This covers TLS
-   through ESET, the PAT, and API 7.1; an error here means 7.0 is needed.
+1. **Install.** Run the installer, tick mcp-azure, and enter the URL, PAT and project.
+   - Paste back the mcp-azure summary lines.
+   - If the old npm version was installed, also paste back whether Claude Code warned about the removed
+     `ado_api_version` setting.
+2. **Connection.** In a clone, `repo_list`. This covers TLS through ESET, the PAT and API 7.1; a version error means
+   7.0 is needed.
 3. **Remote resolution.** `pr_list` with no arguments in the clone, then in a worktree with `branch`.
-4. **Each read tool** on a real PR, work item and failed run: `pr_view`, `pr_threads`, `pr_files`, `wi_view`,
-   `wi_query assigned=me`, `pipeline_runs`, `pipeline_view`, `pipeline_log`. Paste back anything noisy or wrong.
-5. **Writes on scratch items only.** On a scratch branch and PR, and a scratch work item, run each write tool once
-   and confirm that the prompt appeared every time, including in auto mode. Clean up with
-   `pr_update status=abandoned`.
-6. **Minimal PAT.** Make a PAT with only the README's scopes and repeat steps 2 and 5. Paste back any 403 line.
+4. **Reads** on a real PR, work item and failed run: `pr_view`, `pr_threads`, `pr_files`, `wi_view`,
+   `wi_query assigned=me`, `pipeline_runs`, `pipeline_view` and `pipeline_log`. Paste back anything noisy or wrong.
+5. **Writes**, on scratch items only. Run each write tool once on a scratch branch, PR and work item.
+   - Confirm that the prompt appeared every time, including in auto mode.
+   - Clean up with `pr_update status=abandoned`.
+6. **Minimal PAT.** Use only the README's scopes and repeat steps 2 and 5. Paste back any 403 line.
 
-- [ ] **Step 1:** Write the file. Link it from flow.md Artifacts.
+- [ ] **Step 1:** Write the file and link it from flow.md Artifacts.
 - [ ] **Step 2: Commit**: `"Add the ado-mcp smoke checklist for the user's server."`
 
 ---
@@ -647,21 +702,21 @@ Steps, each with "paste back: …" (only outputs and error lines, never raw JSON
 ## Self-review notes
 
 - **Spec coverage:**
-  - Goals 1–2 → Tasks 1, 6–10; goal 3 → Task 1; goal 4 → Task 5 and each tool task; goal 5 → Tasks 2 and 4;
-    goal 6 → Tasks 3, 4 and 6 (`view_concurrent`).
-  - Goal 7 → Task 3; goal 8 → Task 3 (`Ver`); goal 9 → Tasks 13 and 14; goal 10 → every task, CI in Task 1;
-    goal 11 → Task 15.
-  - The non-goals add nothing.
-- **Tool count:** reads 10 (`pr_list`, `pr_view`, `pr_threads`, `pr_files`, `wi_view`, `wi_query`,
-  `pipeline_runs`, `pipeline_view`, `pipeline_log`, `repo_list`) and writes 12 (`pr_create`, `pr_update`,
-  `pr_comment`, `pr_reply`, `pr_thread_status`, `pr_vote`, `pr_complete`, `wi_create`, `wi_update`, `wi_comment`,
-  `pipeline_run`, `pipeline_cancel`), so 22. Task 1's `WRITES` has 12 names and Task 11 asserts 22.
-- **Type consistency:**
-  - `Scope`, `Me`, `ApiError`, `Ver` and `resolve_pr` are defined in Tasks 3, 4 and 6, and used under the same names
-    in 6–10.
-  - The argument structs share the optional `project`, `repo` and `branch` (spec goal 5), written as `…scope` in
-    Task 9.
-- **Spec deviations: none.** The plan adds two things the spec leaves to the builder:
-  - the description cap of 400 characters per tool
-  - `squash` as `pr_complete`'s default strategy _(my call: the most common choice; the tool argument overrides
-    it)_
+  - Goals 1–2 → Tasks 1, 6–10; goal 3 → Task 1; goal 4 → Task 5 and each tool task.
+  - Goal 5 → Tasks 2 and 4; goal 6 → Tasks 4 and 6 (`view_concurrent`); goal 7 → Task 3; goal 8 → Task 3.
+  - Goal 9 → Tasks 13 and 14; goal 10 → every task, CI in Task 1; goal 11 → Task 15.
+- **Tool count:**
+  - Reads (10): `pr_list`, `pr_view`, `pr_threads`, `pr_files`, `wi_view`, `wi_query`, `pipeline_runs`,
+    `pipeline_view`, `pipeline_log`, `repo_list`.
+  - Writes (12): `pr_create`, `pr_update`, `pr_comment`, `pr_reply`, `pr_thread_status`, `pr_vote`, `pr_complete`,
+    `wi_create`, `wi_update`, `wi_comment`, `pipeline_run`, `pipeline_cancel`.
+  - 22 in all.
+- **Type consistency:** `Scope`, `Me`, `ApiError`, `resolve_pr`, `Ctx::user` and `configureArgs` are defined once
+  and used under those names.
+- **Spec amendment:** `pr_view`'s latest run (the merge ref, then the source branch) and the SSH and host rules,
+  accepted 2026-10-18 at plan review round 1. My calls: the 400-character description cap and `squash` as the
+  default merge strategy.
+- **Verified against Claude Code 2.1.302** (flow.md, Plan review round 1):
+  - a headless `plugin install` leaves the settings unset
+  - `configure --values-stdin` merges with the saved settings
+  - `configure --json` lists the configured keys

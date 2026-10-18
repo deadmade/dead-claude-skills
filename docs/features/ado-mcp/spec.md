@@ -44,7 +44,8 @@ downloaded when it runs. The user doesn't need a terminal tool: "goal is for cla
      - with no id, the PR for the current branch
      - title, status, draft, source → target, author, description
      - reviewers with their votes, policy evaluations (what blocks completion), linked work items, and the latest
-       pipeline run of the source branch
+       pipeline run of the PR (its merge ref `refs/pull/{id}/merge`, else the source branch; amended at plan review
+       round 1, 2026-10-18)
    - `pr_threads`:
      - the PR's comment threads, without system threads (`commentType: system`, or a `CodeReviewThreadType`
        property) or deleted comments
@@ -112,7 +113,10 @@ downloaded when it runs. The user doesn't need a terminal tool: "goal is for cla
      shelling out handles worktrees and git config for free)_.
    - It resolves the remote once with `GET {remote}/vsts/info`, which returns the collection URL, project id and
      repo id, as `az` does.
-   - Both HTTPS and SSH remotes work: `ssh://host:22/coll/proj/_git/repo` maps to the configured HTTPS server.
+   - Both HTTPS and SSH remotes work. An SSH remote (`ssh://host:22/[tfs/]Coll/Proj/_git/Repo`) is mapped to HTTPS
+     at its collection segment: `ADO_ORG_URL` plus the rest of the path after the collection.
+   - Before any request, the remote's host and collection must match `ADO_ORG_URL`'s, so the PAT only goes to the
+     configured server (plan review round 1).
    - Every tool takes optional `project` and `repo` arguments that override the remote. Outside a clone,
      `ado_default_project` applies.
    - Every tool that infers the current branch also takes an optional `branch`. In a worktree the project folder's
