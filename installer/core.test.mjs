@@ -56,6 +56,8 @@ import {
   configValues,
   selfConfigure,
   configureArgs,
+  configureSupported,
+  afterPrompts,
 } from './core.mjs';
 
 const json = (p) => JSON.parse(readFileSync(new URL(`../${p}`, import.meta.url), 'utf8'));
@@ -162,10 +164,33 @@ test('configValues trims answers, keeps saved values on empty and names what is 
 
 test('selfConfigure prompts until every required key is saved', () => {
   const requiredKeys = ['ado_org_url', 'ado_pat'];
+  const old = { configuredKeys: [], requiredKeys, supported: false };
+  assert.equal(selfConfigure({ ...old, installed: false }), 'handoff');
+  assert.equal(selfConfigure({ ...old, installed: true }), 'skip');
   assert.equal(selfConfigure({ installed: false, configuredKeys: [], requiredKeys }), 'prompt');
   assert.equal(selfConfigure({ installed: false, configuredKeys: requiredKeys, requiredKeys }), 'prompt');
   assert.equal(selfConfigure({ installed: true, configuredKeys: requiredKeys, requiredKeys }), 'skip');
   assert.equal(selfConfigure({ installed: true, configuredKeys: ['ado_org_url'], requiredKeys }), 'prompt');
+});
+
+test('configure needs Claude Code 2.1.285 or newer', () => {
+  assert.equal(configureSupported('2.1.302 (Claude Code)'), true);
+  assert.equal(configureSupported('2.1.285'), true);
+  assert.equal(configureSupported('3.0.0 (Claude Code)'), true);
+  assert.equal(configureSupported('2.1.284 (Claude Code)'), false);
+  assert.equal(configureSupported('1.9.999'), false);
+  assert.equal(configureSupported(''), false);
+  assert.equal(configureSupported(undefined), false);
+});
+
+test('afterPrompts hands off a new plugin without its token and names unset keys of an installed one', () => {
+  const id = `mcp-azure@${M}`;
+  assert.deepEqual(afterPrompts({ name: 'mcp-azure', id, installed: false, missing: ['ado_pat'] }), { handoff: true });
+  assert.deepEqual(afterPrompts({ name: 'mcp-azure', id, installed: true, missing: ['ado_pat'] }), {
+    unset: `mcp-azure: ado_pat not set; run /plugin configure ${id} in Claude Code`,
+  });
+  assert.deepEqual(afterPrompts({ name: 'mcp-azure', id, installed: false, missing: [] }), {});
+  assert.deepEqual(afterPrompts({ name: 'mcp-azure', id, installed: true, missing: [] }), {});
 });
 
 test('configureArgs reads the values from stdin, never from its arguments', () => {
@@ -350,6 +375,11 @@ test('reset keeps only our settings plus the dcg hook while dcg stays on', () =>
     permissions: { allow: ['Bash(ls)'] },
     hooks: { PreToolUse: [other, dcgEntry], Stop: [other] },
     enabledPlugins: { [`dead-skills@${M}`]: true, [`code-review@${O}`]: true, 'x@other': true },
+    pluginConfigs: {
+      [`web-mcp@${M}`]: { options: { binPath: '/home/me/.claude/bin/web-mcp' } },
+      [`code-review@${O}`]: { options: { a: '1' } },
+      'x@other': { options: { b: '2' } },
+    },
     extraKnownMarketplaces: {
       [O]: { source: { source: 'github', repo: 'anthropics/claude-plugins-official' } },
       other: {},
@@ -363,6 +393,11 @@ test('reset keeps only our settings plus the dcg hook while dcg stays on', () =>
   assert.equal(out.enabledPlugins[`code-review@${O}`], true);
   assert.deepEqual(Object.keys(out.extraKnownMarketplaces), [M, O]);
   assert.equal(out.enabledPlugins['x@other'], undefined);
+  assert.deepEqual(out.pluginConfigs, {
+    [`web-mcp@${M}`]: { options: { binPath: '/home/me/.claude/bin/web-mcp' } },
+    [`code-review@${O}`]: { options: { a: '1' } },
+  });
+  assert.equal(resetSettings({}, { dcg: false }).pluginConfigs, undefined);
   assert.ok(isStripped(out));
   assert.equal(resetSettings(before, { dcg: false }).hooks, undefined);
   assert.deepEqual(resetSettings(out, { statusLine: true, sandbox: false, dcg: true }), out);

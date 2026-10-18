@@ -32,6 +32,8 @@ import {
   configPrompts,
   configValues,
   configureArgs,
+  configureSupported,
+  afterPrompts,
   cswapCurrent,
   cswapDownload,
   dcgCommand,
@@ -693,13 +695,14 @@ const wantedIds = withDependencies(
   (id) => deps[id],
   opts,
 );
-// Self-configured plugins ask for their settings now; a new one left without a required value (an empty token) is
-// not installed and gets the handoff note instead.
+// Self-configured plugins ask for their settings now; a new one left without a required value (an empty token), or
+// on a Claude Code without `configure`, is not installed and gets the handoff note instead.
 const selfValues = {};
 const selfHandoff = [];
+const supported = wantedIds.some(selfConfigured) && configureSupported((await claude(undefined, '--version')).out);
 for (const id of wantedIds.filter(selfConfigured)) {
   const installed = installedIds.includes(id);
-  const shown = installed ? await claude(undefined, 'plugin', 'configure', id, '--json') : undefined;
+  const shown = installed && supported ? await claude(undefined, 'plugin', 'configure', id, '--json') : undefined;
   let configuredKeys = [];
   try {
     if (shown?.ok) configuredKeys = JSON.parse(shown.out).configured ?? [];
@@ -708,7 +711,9 @@ for (const id of wantedIds.filter(selfConfigured)) {
   }
   const userConfig = tryJson(join(PKG, manifestPath(manifest, id)))?.userConfig ?? {};
   const requiredKeys = Object.keys(userConfig).filter((k) => userConfig[k].required === true);
-  if (selfConfigure({ installed, configuredKeys, requiredKeys }) === 'skip') continue;
+  const step = selfConfigure({ installed, configuredKeys, requiredKeys, supported });
+  if (step === 'handoff') selfHandoff.push(id);
+  if (step !== 'prompt') continue;
   log('info', `${nameOf(id)} settings:`);
   const prompts = configPrompts(userConfig, BIN_PLUGINS[nameOf(id)].key, configuredKeys);
   const answers = {};
@@ -718,8 +723,10 @@ for (const id of wantedIds.filter(selfConfigured)) {
     answers[p.key] = must(await (p.secret ? secret(message) : line(message)));
   }
   const { values, missing } = configValues(prompts, answers);
-  if (missing.length && !installed) selfHandoff.push(id);
+  const after = afterPrompts({ name: nameOf(id), id, installed, missing });
+  if (after.handoff) selfHandoff.push(id);
   else selfValues[id] = values;
+  if (after.unset) failures.push(after.unset);
 }
 const selected = wantedIds.filter((id) => !selfHandoff.includes(id));
 const plan = planPlugins(

@@ -105,6 +105,15 @@ test('line returns the typed text, ctrl-c is null', async () => {
   assert.equal(io.input.isRaw, false);
 });
 
+test('line stops at the first Enter, so text pasted after it is not echoed', async () => {
+  const io = tty();
+  const done = line('Collection URL:', io);
+  io.input.write('url\rsecret\r');
+  assert.equal(await done, 'url');
+  assert.ok(!io.written().includes('secret'));
+  assert.equal(io.input.isRaw, false);
+});
+
 test('secret returns the typed text and never echoes it', async () => {
   const io = tty();
   const done = secret('Azure DevOps personal access token:', io);

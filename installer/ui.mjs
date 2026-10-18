@@ -1,6 +1,5 @@
 // The installer's terminal I/O on Node's stdlib: interactive screens, a yes/no, a typed line and plain output.
 import { createInterface } from 'node:readline';
-import { createInterface as createLineInterface } from 'node:readline/promises';
 import { Writable } from 'node:stream';
 import { frame, paint, wrap } from './view.mjs';
 
@@ -105,21 +104,23 @@ export async function confirm(message, initial = true, io = STD) {
   return s.result === 'quit' ? null : s.yes;
 }
 
-// A typed answer in line mode; null on ctrl-c.
-export async function line(message, { input, output } = STD) {
-  const rl = createLineInterface({ input, output, terminal: true });
-  const ac = new AbortController();
-  rl.on('SIGINT', () => ac.abort());
-  try {
-    return await rl.question(`${message} `, { signal: ac.signal });
-  } catch {
-    output.write('\n');
-    return null;
-  } finally {
-    rl.close();
-    input.setRawMode?.(false);
-    input.pause();
-  }
+// A typed answer in line mode; null on ctrl-c. The callback API answers synchronously, so closing there stops readline
+// before it echoes (and swallows) anything pasted after the first Enter.
+export function line(message, { input, output } = STD) {
+  return new Promise((resolve) => {
+    const rl = createInterface({ input, output, terminal: true });
+    const end = (answer) => {
+      rl.close();
+      input.setRawMode?.(false);
+      input.pause();
+      resolve(answer);
+    };
+    rl.on('SIGINT', () => {
+      output.write('\n');
+      end(null);
+    });
+    rl.question(`${message} `, end);
+  });
 }
 
 // A typed answer that is never shown: the prompt is written here and everything line() draws (echo, redraws) is dropped.

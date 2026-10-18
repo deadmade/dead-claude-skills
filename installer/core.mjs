@@ -226,13 +226,17 @@ export function stripDefaults(settings) {
   return out;
 }
 
-// Clean slate: only our settings survive, plus the official marketplace's entry and enabledPlugins entries from ours
-// and it (claude plugin install writes them; strip already uninstalled the official plugins we don't use)
+// Clean slate: only our settings survive, plus the official marketplace's entry and enabledPlugins and pluginConfigs
+// entries from ours and it (claude plugin install writes them; strip already uninstalled the official plugins we don't use)
 // and dcg's hook while dcg stays on (its installer only reruns on a toggle change, so dropping it would disable dcg).
 export function resetSettings(settings, { dcg, ...toggles }) {
   const out = stripDefaults(mergeSettings({}, toggles));
   for (const [id, v] of Object.entries(settings.enabledPlugins ?? {})) {
     if ([MARKETPLACE, OFFICIAL].includes(marketOf(id))) out.enabledPlugins[id] = v;
+  }
+  // The plugins' options, binPath included (their secrets live in .credentials.json, which clean never touches).
+  for (const [id, v] of Object.entries(settings.pluginConfigs ?? {})) {
+    if ([MARKETPLACE, OFFICIAL].includes(marketOf(id))) (out.pluginConfigs ??= {})[id] = v;
   }
   const official = settings.extraKnownMarketplaces?.[OFFICIAL];
   if (official) out.extraKnownMarketplaces[OFFICIAL] = official;
@@ -379,8 +383,26 @@ export function configValues(prompts, answers) {
   return { values, missing };
 }
 
-export const selfConfigure = ({ installed, configuredKeys, requiredKeys }) =>
-  installed && requiredKeys.every((k) => configuredKeys.includes(k)) ? 'skip' : 'prompt';
+// supported: configureSupported(). Without `configure`, a new plugin gets the handoff note and an installed one is left
+// as it is.
+export function selfConfigure({ installed, configuredKeys, requiredKeys, supported = true }) {
+  if (!supported) return installed ? 'skip' : 'handoff';
+  return installed && requiredKeys.every((k) => configuredKeys.includes(k)) ? 'skip' : 'prompt';
+}
+
+// After the prompts: a new plugin still without a required value is handed off (nothing installed); an installed one
+// keeps what was given, and the summary names its unset keys, never values.
+export function afterPrompts({ name, id, installed, missing }) {
+  if (!missing.length) return {};
+  if (!installed) return { handoff: true };
+  return { unset: `${name}: ${missing.join(', ')} not set; run /plugin configure ${id} in Claude Code` };
+}
+
+// `claude plugin configure --values-stdin` came in Claude Code 2.1.285. out: what `claude --version` printed.
+export function configureSupported(out) {
+  const v = /(\d+\.\d+\.\d+)/.exec(out ?? '')?.[1];
+  return v !== undefined && !newer('2.1.285', v);
+}
 
 // The values go over stdin as JSON, never as arguments: the token must not show up in a process list.
 export const configureArgs = (id) => ['plugin', 'configure', id, '--values-stdin'];
