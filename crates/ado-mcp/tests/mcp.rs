@@ -61,6 +61,11 @@ fn writes_need_user_interaction() {
         "pr_thread_status",
         "pr_vote",
         "pr_complete",
+        "wi_create",
+        "wi_update",
+        "wi_comment",
+        "pipeline_run",
+        "pipeline_cancel",
     ] {
         assert!(writes.contains(&w), "{w} in {writes:?}");
     }

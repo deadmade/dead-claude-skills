@@ -371,3 +371,137 @@ fn view_comments_in_the_items_project() {
     assert_eq!(requests(&fx, COMMENTS).len(), 1);
     assert_eq!(requests(&fx, other).len(), 1);
 }
+
+const CONN: &str = "/tfs/Coll/_apis/connectionData";
+const STORY: &str =
+    "/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/wit/workitems/$User%20Story";
+const IN_PROJ: &str = "/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/wit/workitems/123";
+
+fn op(path: &str, value: &Value) -> Value {
+    json!({"op": "add", "path": path, "value": value})
+}
+
+#[test]
+fn create_json_patch() {
+    let fx = Fixture::start();
+    fx.route(STORY, vec![fixture("wi.json")]);
+    fx.route(CONN, vec![fixture("connection-data.json")]);
+    let text = ok(
+        &mut env(&fx),
+        "wi_create",
+        json!({"type": "User Story", "title": "Add retry", "description": "<p>Retry once.</p>",
+            "assigned": "me", "parent": 100}),
+    );
+    assert_eq!(text, "created #123 User Story \"Add retry\"");
+    let reqs = requests(&fx, STORY);
+    assert_eq!(reqs.len(), 1);
+    assert_eq!(reqs[0].method, "POST");
+    assert_eq!(
+        reqs[0].header("content-type"),
+        Some("application/json-patch+json")
+    );
+    let parent = json!({"rel": "System.LinkTypes.Hierarchy-Reverse",
+        "url": fx.url("/tfs/Coll/_apis/wit/workItems/100")});
+    assert_eq!(
+        bodies(&fx, STORY)[0],
+        json!([
+            op("/fields/System.Title", &json!("Add retry")),
+            op("/fields/System.Description", &json!("<p>Retry once.</p>")),
+            op("/fields/System.AssignedTo", &json!("Alice Example")),
+            op("/relations/-", &parent),
+        ])
+    );
+}
+
+#[test]
+fn update_custom_field() {
+    let fx = Fixture::start();
+    fx.route(IN_PROJ, vec![fixture("wi.json")]);
+    let text = ok(
+        &mut env(&fx),
+        "wi_update",
+        json!({"id": 123, "state": "Resolved",
+            "fields": {"Microsoft.VSTS.Common.Priority": 1, "Custom.Team_Name": "Web \"/fields/x\""}}),
+    );
+    assert_eq!(
+        text,
+        "updated #123: Custom.Team_Name, Microsoft.VSTS.Common.Priority, System.State"
+    );
+    let reqs = requests(&fx, IN_PROJ);
+    assert_eq!(reqs[0].method, "PATCH");
+    assert_eq!(
+        reqs[0].header("content-type"),
+        Some("application/json-patch+json")
+    );
+    assert_eq!(
+        bodies(&fx, IN_PROJ)[0],
+        json!([
+            op("/fields/Custom.Team_Name", &json!("Web \"/fields/x\"")),
+            op("/fields/Microsoft.VSTS.Common.Priority", &json!(1)),
+            op("/fields/System.State", &json!("Resolved")),
+        ])
+    );
+}
+
+#[test]
+fn update_refuses_bad_field_names() {
+    let fx = Fixture::start();
+    let mut mcp = env(&fx);
+    for key in ["System.Title/-", "a b", "", "x~1", "Custom.Foo\"}"] {
+        let (err, text) = mcp.call(
+            "wi_update",
+            json!({"id": 123, "title": "t", "fields": {key: "v"}}),
+        );
+        assert!(err, "{key}: {text}");
+        assert_eq!(text, format!("bad field name: {key}"));
+    }
+    let (err, text) = mcp.call("wi_update", json!({"id": 123}));
+    assert!(err, "{text}");
+    assert_eq!(
+        text,
+        "nothing to update: give state, assigned, title or fields"
+    );
+    assert!(requests(&fx, IN_PROJ).is_empty());
+}
+
+#[test]
+fn comment_preview_version() {
+    let fx = Fixture::start();
+    fx.route(
+        COMMENTS,
+        vec![Resp::json(
+            &json!({"id": 9, "text": "Fixed in !412.", "url": "http://x"}),
+        )],
+    );
+    let text = ok(
+        &mut env(&fx),
+        "wi_comment",
+        json!({"id": 123, "text": "Fixed in !412."}),
+    );
+    assert_eq!(text, "commented on #123");
+    let reqs = requests(&fx, COMMENTS);
+    assert_eq!(reqs.len(), 1);
+    assert_eq!(reqs[0].method, "POST");
+    assert_eq!(queries(&fx, COMMENTS)[0], "api-version=7.1-preview");
+    assert_eq!(bodies(&fx, COMMENTS)[0], json!({"text": "Fixed in !412."}));
+}
+
+#[test]
+fn wi_write_sent_once_on_404() {
+    let fx = Fixture::start();
+    fx.route(IN_PROJ, vec![Resp::new(404, "text/plain", "gone")]);
+    fx.route(COMMENTS, vec![Resp::new(404, "text/plain", "gone")]);
+    fx.route(STORY, vec![Resp::new(404, "text/plain", "gone")]);
+    let mut mcp = env(&fx);
+    for (tool, args) in [
+        ("wi_update", json!({"id": 123, "title": "t"})),
+        ("wi_comment", json!({"id": 123, "text": "x"})),
+        ("wi_create", json!({"type": "User Story", "title": "t"})),
+    ] {
+        let (err, text) = mcp.call(tool, args);
+        assert!(err, "{tool}: {text}");
+    }
+    for path in [IN_PROJ, COMMENTS, STORY] {
+        assert_eq!(requests(&fx, path).len(), 1, "{path}");
+    }
+}

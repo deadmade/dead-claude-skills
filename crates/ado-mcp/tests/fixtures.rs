@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use azure_devops_rust_api::{build, git, ims, policy, wit};
+use azure_devops_rust_api::{build, git, ims, pipelines, policy, wit};
 use serde::de::DeserializeOwned;
 
 fn fits<T: DeserializeOwned>(body: &[u8]) -> Result<(), String> {
@@ -36,6 +36,7 @@ const TABLE: &[(&str, Check)] = &[
         fits::<git::models::GitPullRequestIterationList>,
     ),
     ("logs.json", fits::<build::models::BuildLogList>),
+    ("pipeline-run.json", fits::<pipelines::models::Run>),
     (
         "policy-evaluations.json",
         fits::<policy::models::PolicyEvaluationRecordList>,

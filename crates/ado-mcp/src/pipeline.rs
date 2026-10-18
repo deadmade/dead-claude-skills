@@ -1,15 +1,20 @@
-//! The pipeline read tools: `pipeline_runs`, `pipeline_view` and `pipeline_log`; and `repo_list`.
+//! The pipeline tools: the reads `pipeline_runs`, `pipeline_view` and `pipeline_log`, the writes `pipeline_run` and
+//! `pipeline_cancel`; and `repo_list`.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Write as _;
 
 use azure_devops_rust_api::build::models::{
     BuildQueryOrder, BuildResult, Issue, Timeline, TimelineRecord, timeline_record,
 };
+use azure_devops_rust_api::pipelines::models::{RunPipelineParameters, RunResourcesParameters};
+use reqwest::Method;
 use rmcp::schemars::{self, JsonSchema};
 use serde::Deserialize;
+use serde::de::IgnoredAny;
+use serde_json::json;
 
-use crate::api::ApiError;
+use crate::api::{ApiError, V71_PREVIEW};
 use crate::ctx::{Ctx, given, seg};
 use crate::out::{cut, more, ref_name};
 use crate::pr::full_ref;
@@ -60,6 +65,19 @@ pub(crate) struct LogArgs {
     pub full: Option<bool>,
     /// With full: the first line to show. Default 1.
     pub start: Option<u32>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[schemars(crate = "schemars")]
+pub(crate) struct PipelineRunArgs {
+    /// Project name or id. Default: the clone's project.
+    pub project: Option<String>,
+    /// Pipeline name or id.
+    pub pipeline: String,
+    /// The branch to run. Default: the clone's current branch.
+    pub branch: Option<String>,
+    /// Template parameters, name → value.
+    pub parameters: Option<BTreeMap<String, String>>,
 }
 
 /// Lines of context around an error line, and the length of the tail.
@@ -798,6 +816,74 @@ pub(crate) async fn pipeline_log(ctx: &Ctx, a: &LogArgs) -> Result<String, ApiEr
         out.add(note, format!("{job} (pipeline_view run={run})"), "");
     }
     Ok(out.finish())
+}
+
+/// # Errors
+/// When there is no branch, or the scope, the pipeline or the server fails.
+pub(crate) async fn pipeline_run(ctx: &Ctx, a: &PipelineRunArgs) -> Result<String, ApiError> {
+    let (p, b) = (a.project.as_deref(), a.branch.as_deref());
+    let first = ctx.scope(p, None, b).await?;
+    // Only the lookups retry; the run itself is sent once.
+    let (s, def) = ctx
+        .retry_stale(&first.key, || async {
+            let s = ctx.scope(p, None, b).await?;
+            let def = ctx.pipeline_id(&s, &a.pipeline).await?;
+            Ok((s, def))
+        })
+        .await?;
+    let branch = full_ref(
+        s.branch
+            .as_deref()
+            .ok_or_else(|| ApiError::local("no branch: pass branch"))?,
+    );
+    let body = RunPipelineParameters {
+        resources: Some(RunResourcesParameters {
+            repositories: Some(json!({"self": {"refName": branch}})),
+            ..RunResourcesParameters::default()
+        }),
+        template_parameters: a.parameters.as_ref().map(|m| json!(m)),
+        ..RunPipelineParameters::default()
+    };
+    let (api, proj) = (&ctx.api, seg(&s.project_id));
+    let run = api
+        .az(|| {
+            api.pipelines
+                .runs_client()
+                .run_pipeline(&api.org, body.clone(), &proj, def)
+                .into_future()
+        })
+        .await
+        .map_err(|e| e.with_what(&format!("pipeline {}", a.pipeline.trim())))?;
+    Ok(format!(
+        "queued run #{} of {} on {}",
+        run.run_reference.id,
+        run.pipeline.pipeline_base.name,
+        ref_name(&branch)
+    ))
+}
+
+/// # Errors
+/// When the scope, the run or the server fails.
+pub(crate) async fn pipeline_cancel(ctx: &Ctx, a: &RunArgs) -> Result<String, ApiError> {
+    let run = a.run;
+    let id = run_id(run)?;
+    let proj = seg(&ctx
+        .scope(a.project.as_deref(), None, None)
+        .await?
+        .project_id);
+    // By hand: the crate's `update_build` takes a whole `Build`, whose required fields would go out with the status.
+    ctx.api
+        .send::<IgnoredAny>(
+            Method::PATCH,
+            &format!("{proj}/_apis/build/builds/{id}"),
+            &[],
+            V71_PREVIEW,
+            &json!({"status": "cancelling"}),
+            false,
+        )
+        .await
+        .map_err(|e| e.with_what(&format!("run #{run}")))?;
+    Ok(format!("cancelling run #{run}"))
 }
 
 /// # Errors

@@ -13,12 +13,12 @@ use serde::Deserialize;
 use crate::api::ApiError;
 use crate::config::Config;
 use crate::ctx::{Ctx, seg};
-use crate::pipeline::{self, LogArgs, ProjectArgs, RunArgs, RunsArgs};
+use crate::pipeline::{self, LogArgs, PipelineRunArgs, ProjectArgs, RunArgs, RunsArgs};
 use crate::pr::{
     self, PrCommentArgs, PrCompleteArgs, PrCreateArgs, PrFilesArgs, PrListArgs, PrReplyArgs,
     PrThreadStatusArgs, PrThreadsArgs, PrUpdateArgs, PrViewArgs, PrVoteArgs,
 };
-use crate::wi::{self, WiQueryArgs, WiViewArgs};
+use crate::wi::{self, WiCommentArgs, WiCreateArgs, WiQueryArgs, WiUpdateArgs, WiViewArgs};
 
 /// The tools that change something on the server. Claude Code prompts on every call to these.
 pub(crate) const WRITES: [&str; 12] = [
@@ -235,6 +235,37 @@ impl Server {
     )]
     async fn wi_query(&self, Parameters(a): Parameters<WiQueryArgs>) -> CallToolResult {
         reply(wi::wi_query(&self.ctx, &a).await)
+    }
+
+    #[tool(
+        description = "Create a work item of a type (Bug, Task, User Story, …) with a title, and optionally a description (HTML), an assignee (`me` or a name) and a parent work item."
+    )]
+    async fn wi_create(&self, Parameters(a): Parameters<WiCreateArgs>) -> CallToolResult {
+        reply(wi::wi_create(&self.ctx, &a).await)
+    }
+
+    #[tool(
+        description = "Change a work item's state, assignee (`me` or a name), title, or any other field by reference name (fields: {\"Microsoft.VSTS.Common.Priority\": 1}). Only the given fields change."
+    )]
+    async fn wi_update(&self, Parameters(a): Parameters<WiUpdateArgs>) -> CallToolResult {
+        reply(wi::wi_update(&self.ctx, &a).await)
+    }
+
+    #[tool(description = "Add a comment (HTML) to a work item.")]
+    async fn wi_comment(&self, Parameters(a): Parameters<WiCommentArgs>) -> CallToolResult {
+        reply(wi::wi_comment(&self.ctx, &a).await)
+    }
+
+    #[tool(
+        description = "Queue a run of a pipeline (name or id) on a branch (default: the current branch), with optional template parameters."
+    )]
+    async fn pipeline_run(&self, Parameters(a): Parameters<PipelineRunArgs>) -> CallToolResult {
+        reply(pipeline::pipeline_run(&self.ctx, &a).await)
+    }
+
+    #[tool(description = "Cancel a pipeline run (the run id from pipeline_runs).")]
+    async fn pipeline_cancel(&self, Parameters(a): Parameters<RunArgs>) -> CallToolResult {
+        reply(pipeline::pipeline_cancel(&self.ctx, &a).await)
     }
 
     #[tool(
