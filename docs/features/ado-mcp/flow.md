@@ -170,6 +170,22 @@ Settled in the chat before this flow started (the user's words in quotes):
     `anthropic/requiresUserInteraction` mark.
   - Picked: "writes only". Write tools carry the mark; reads are allowed on first use (A).
 - **Linux CA**: "no wsl at work", so there is no CA setting.
+- **Grill round 1** (2026-10-18), all recommendations accepted:
+  - Q1: API 7.1 fixed, option removed
+  - Q2: optional `branch` arg for worktrees
+  - Q4: no bypass-policy
+  - Q5: `wi_update` takes any field
+  - Q6: server instructions
+  - Q7: only outputs are pasted back, not raw JSON
+  - Q8: log limits
+  - Q9: one server
+- **Grill Q3 → Q10:** the user asked whether the installer can install mcp-azure too. Yes, with
+  `claude plugin configure --values-stdin`, the PAT over stdin. Accepted.
+- **Grill Q11, integration tests.**
+  - Options offered: A, the fake server only; B, A plus a live suite the user runs; C, B plus CI against dev.azure.com.
+  - Recommended B. The user picked **A**.
+  - There is no official Azure DevOps Server container (sources in the chat: Microsoft Learn, Docker agents and the
+    unattended install).
 - **Reusing azdocli** (the user asked, 2026-10-18): it is only a reference. Its code sits on the SDK the user ruled
   out, so nothing copies over as is. A function ported close to verbatim keeps its MIT notice and gets a
   THIRD_PARTY.md line _(my call)_.

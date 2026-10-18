@@ -160,7 +160,17 @@ downloaded when it runs. The user doesn't need a terminal tool: "goal is for cla
      Read & Execute) and how to set it up. The marketplace and plugin descriptions say what it is now.
    - Installer: `BIN_PLUGINS` maps `mcp-azure` → binary `ado-mcp`. The plugin and binary names now differ, so
      `install.mjs:370` uses the binary's crate folder.
-   - Installing mcp-azure: open, see grill round 2.
+   - **The installer installs and configures mcp-azure itself** (grill Q10). It no longer hands it off.
+     - When mcp-azure is ticked, it asks for the collection URL, the PAT (hidden input) and an optional default
+       project. Enter keeps a value that is already saved.
+     - Then it installs the plugin, downloads `ado-mcp`, and saves everything, `binPath` included, in one
+       `claude plugin configure mcp-azure@<marketplace> --values-stdin` call (Claude Code ≥ 2.1.285).
+     - The PAT travels over stdin only, never as an argument (no `--config key=value`).
+     - An empty PAT, or a Claude Code too old for `configure`, falls back to today's handoff note, minus its
+       API-version line.
+     - The decisions (which prompts, the values object, the fallback) live in `core.mjs` with tests; the prompting
+       lives in `install.mjs`.
+     - `mcp-github` keeps the handoff.
    - THIRD_PARTY.md drops `@tiberriver256/mcp-server-azure-devops`. CLAUDE.md and README.md say what mcp-azure is
      now (CLAUDE.md:22 "the two Rust crates" becomes three).
 
@@ -171,7 +181,9 @@ downloaded when it runs. The user doesn't need a terminal tool: "goal is for cla
     - Unit tests for error mapping.
     - Request-level tests against a local fake server that replays JSON fixtures shaped from the 7.1 Server docs.
     - `cargo test` and `cargo clippy --all-targets -- -D warnings` in CI on Linux and Windows, like web-mcp.
-    - Live integration tests: open, see grill round 2.
+    - No live or container integration tests (grill Q11). There is no official Azure DevOps Server container, and
+      building one means Windows Server, SQL Server and an install of about an hour. The real-server check is the
+      smoke checklist (goal 11).
 
 11. **A smoke checklist for the user's server** (`docs/features/ado-mcp/smoke.md`). Short steps the user runs at
     work, each with what to paste back:
@@ -195,6 +207,7 @@ downloaded when it runs. The user doesn't need a terminal tool: "goal is for cla
 - A custom CA setting for Linux/WSL. The user never runs Claude Code under WSL or Linux at work (2026-10-18), and on
   Linux at home the system bundle covers public certificates.
 - Several servers or PATs (grill Q9).
+- Automated tests against a live server, either a self-built container or a dev.azure.com org (grill Q11).
 
 ## Anti-goals
 
