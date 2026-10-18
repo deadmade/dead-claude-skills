@@ -103,5 +103,5 @@ jobs:
 
           tui-review-*: the binary behind tui-review, for each platform; the installer downloads yours.
           web-mcp-*: the binary behind the web-mcp plugin, for Windows and Linux x64; the installer downloads yours.
-          ado-mcp-*: the binary behind the mcp-azure plugin, for Windows and Linux x64; the installer downloads yours.
+          ado-mcp-*: the binary behind the mcp-azure plugin, for Windows and Linux x64; the installer downloads yours. After updating mcp-azure from 0.4.0 or earlier (the npm server), re-run the installer so it downloads ado-mcp and sets binPath.
           cswap.exe is claude-swap $cswap (https://github.com/realiti4/claude-swap, MIT) compiled with Nuitka for Windows."
