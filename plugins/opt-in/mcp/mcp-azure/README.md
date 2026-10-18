@@ -23,7 +23,7 @@ Reads, each named `mcp__plugin_mcp-azure_ado__<tool>`:
 - `wi_query`: work items by assignee (`me` or a name), state, type or title text, or a raw WIQL query.
 - `pipeline_runs`: recent runs, newest first, by pipeline, branch, PR or result.
 - `pipeline_view`: a run's stages and jobs with result and duration, and its errors and warnings.
-- `pipeline_log`: a run's cleaned logs: each failed step's error lines with context and its last 50 lines; `step`
+- `pipeline_log`: a run's cleaned logs: each failed step's error lines with context and its last 50 lines, read from at most its last 20,000 lines; `step`
   picks one, `full` pages through a whole log (at most 2000 lines or 40,000 characters per call).
 - `repo_list`: the project's repos with their default branch.
 

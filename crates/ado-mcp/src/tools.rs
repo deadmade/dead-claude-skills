@@ -233,7 +233,7 @@ impl Server {
     }
 
     #[tool(
-        description = "Read a pipeline run's logs, cleaned: by default each failed step's error lines with 5 lines of context and its last 50 lines (and a failed job's issues when no step failed). step picks a step; full pages through the whole log, 2000 lines per call.",
+        description = "Read a pipeline run's logs, cleaned: by default each failed step's error lines with 5 lines of context and its last 50 lines, from at most its last 20,000 lines (and a failed job's issues when no step failed). step picks a step; full pages through the whole log, 2000 lines per call.",
         annotations(read_only_hint = true)
     )]
     async fn pipeline_log(&self, Parameters(a): Parameters<LogArgs>) -> CallToolResult {
