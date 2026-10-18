@@ -59,6 +59,17 @@ Shipping a third binary follows web-mcp's path:
     tui-review from mod options. A CLI that Claude calls through Bash has neither.
   - No plugin ships a `bin/` folder. The only Bash pre-approval precedent is skill `allowed-tools`
     (`Bash(cargo:*)` in rust-skills).
+- **Claude Code facts** (from the code.claude.com docs, read 2026-10-18):
+  - A plugin's `bin/` folder is on the Bash tool's PATH (plugins/components, "Executables"). A binary in
+    `~/.claude/bin` is outside the plugin, so that doesn't help.
+  - `${user_config.KEY}` is substituted in MCP server config and in skill bodies (manifest-reference, "Reference a
+    saved value").
+  - Plugins can't ship permission allow rules: plugin `settings.json` keeps only `agent` and `subagentStatusLine`
+    (plugins/components, "Default settings").
+  - Skill `allowed-tools` lasts one turn (skills, "Pre-approve tools for a skill").
+  - Bash rules match the literal command text, so `Bash(ado …)` doesn't match `C:\…\ado.exe …`
+    (permissions, "What a Bash rule doesn't match").
+  - Native Windows has no Bash sandbox (sandboxing, intro). MCP servers run outside the sandbox anyway.
 - **Open: Bash sandbox.** `core.mjs:38` turns on `autoAllowBashIfSandboxed` when the sandbox toggle is on. Sandboxed
   Bash may block the work server's host unless it is added to `sandbox.network`.
 
