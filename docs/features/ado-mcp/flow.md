@@ -62,6 +62,13 @@ MCP server.
   but the server sends plain text, so `pipeline_log` reads the raw body of the same crate call (guard and error lines
   unchanged). Options: A, the raw read; B, none that works without patching the crate. Recommended A.
   - Decision: 2026-10-18, A ("yes, keep the raw log read").
+- **D4, 2026-10-18: the pull request PATCH is hand-written** (Task 9). The crate's `GitPullRequestUpdateOptions` has
+  no `isDraft` and no `lastMergeSourceCommit`, which `pr_update draft=` and `pr_complete` need. So `pr_update` and
+  `pr_complete` send their PATCH through our `Api::send` at the crate's path and `7.1-preview`; the completion
+  options inside it are still the crate's model (so `bypassPolicy` is never sent). Options: A, keep the hand-written
+  PATCH; B, drop `draft` from `pr_update` and complete via the crate (loses `lastMergeSourceCommit`, which the server
+  uses to refuse completing a PR that moved). Recommended A.
+  - Decision: pending.
 
 ## Skipped
 
