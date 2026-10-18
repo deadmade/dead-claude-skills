@@ -191,3 +191,39 @@ Settled in the chat before this flow started (the user's words in quotes):
   THIRD_PARTY.md line _(my call)_.
 - TLS: the work browser shows the server's certificate as issued by ESET, i.e. ESET's HTTPS scanning re-signs traffic
   with a root it installed in the Windows store. So `ado` must trust the OS certificate store, not a bundled root list.
+
+### Plan review round 1 (2026-10-18)
+
+Three reviewers ran: correctness, fit and simpler. All findings traced to a source; none were dropped. Two unknowns
+were checked against the real CLI (Claude Code 2.1.302, in a throwaway `CLAUDE_CONFIG_DIR`):
+
+- `claude plugin install` with closed stdin installs a plugin whose required and sensitive options are unset. It
+  exits 0 with "3 userConfig options not yet set".
+- `configure --values-stdin` merges: sending `{binPath}` after `{url, pat}` leaves all three configured.
+- `configure --json` lists the `configured` option names, so "Enter keeps" can be shown per option.
+
+Blocking:
+
+- B1: pipeline_view must walk Stage → Phase → Job → Task.
+- B2: the concurrency test asserts dedup the spec doesn't ask for.
+- B3: existing mcp-azure installs never get the binary or a configure step.
+
+Should-fix:
+
+- S1: the PAT could go to the remote's host before the host check.
+- S2: a different collection on the same host is not caught.
+- S3: paging (`$top=limit+1`; pr_files `nextSkip`).
+- S4: the fake server must log request bodies.
+- S5: one merged configure through `applyBin`.
+- S6: `connectionData` is preview-only.
+- S7: `pr_complete` is asynchronous.
+- S8: TF401179 has no PR id.
+- S9: no timeouts.
+- S10: installer UI, decisions, `secret()` and PAT hygiene.
+- S11: SSH mapping by the collection segment.
+- S12: binary-only like web-mcp.
+- S13: task order.
+
+Consider: 14 small items (listed in the chat).
+
+Decisions: pending.
