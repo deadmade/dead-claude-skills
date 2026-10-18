@@ -21,6 +21,15 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   plugin `name`); renaming a plugin does.
 - `crates/`: the two Rust crates, `tui-review` (the tui-review plugin's binary, formerly `brv`) and `web-mcp` (web-mcp's server). Each keeps its own
   `Cargo.lock`; nothing in the plugins reaches into them at runtime.
+- `crates/ado-mcp/`: the mcp-azure server. Its library (`lib.rs`) also backs `timetrack` (`src/bin/timetrack/`), a
+  personal TUI (Windows) that times work items: `ADO_ORG_URL`/`ADO_PAT` from the environment, `ado_mcp::mine` lists the
+  open items assigned to me across the collection. It also clocks the workday in and out; `TIMETRACK_TARGET` (`h:mm`,
+  default 8:00) is the weekday target for the overtime balance, which counts only days with a shift. The log lives in
+  `%APPDATA%\timetrack` (`TIMETRACK_DIR` overrides): `log.jsonl`/`running.json` for tickets, `shifts.jsonl`/`shift.json`
+  for the clock. `claude.rs` reads Claude Code's session logs (`projects/**/*.jsonl` under `CLAUDE_CONFIG_DIR` or
+  `~/.claude`, an undocumented format, so unknown lines are skipped) for a lane under the timeline and Claude time per
+  ticket: a branch naming a known ticket id, else the ticket timed then. Not released or installed;
+  `cargo install --path crates/ado-mcp --bin timetrack`.
 - `plugins/default/`: the dead-skills bundle. Its `dependencies` are the core plugins; itself it carries the global rules
   (`rules.md`, a SessionStart hook), Context7 (`.mcp.json`), Night City and the notifications. night-city, mcp-basic and notify were plugins of
   their own until 0.3.0; the installer retires them, and `mergeSettings` moves a picked theme to its new id

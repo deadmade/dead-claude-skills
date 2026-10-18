@@ -37,7 +37,7 @@ const USER_AGENT_VALUE: &str = concat!("ado-mcp/", env!("CARGO_PKG_VERSION"));
 
 /// What went wrong, already worded for the model. Never holds the PAT or the `Authorization` value.
 #[derive(Debug, Clone)]
-pub(crate) struct ApiError {
+pub struct ApiError {
     pub status: Option<u16>,
     /// A `TFnnnnnn` code from the server's message.
     pub tf: Option<String>,
@@ -195,7 +195,7 @@ async fn wait(retry_after: Option<&str>) {
 }
 
 /// One client per area of the crate, all sending through our client. Cheap to clone.
-pub(crate) struct Api {
+pub struct Api {
     client: Client,
     org_url: Url,
     /// The collection's name: the crate's `organization` in every call.

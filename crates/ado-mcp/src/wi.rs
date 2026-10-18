@@ -9,10 +9,10 @@ use azure_devops_rust_api::wit::models::{
     work_item_batch_get_request::ErrorPolicy, work_item_query_result::QueryResultType,
 };
 use rmcp::schemars::{self, JsonSchema};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::api::ApiError;
+use crate::api::{Api, ApiError};
 use crate::ctx::{Ctx, given, seg};
 use crate::out::{DESC_MAX, clip, cut, html_to_text, more};
 use crate::pr::unexpected;
@@ -312,6 +312,41 @@ struct Batch {
     value: Vec<Option<WorkItem>>,
 }
 
+/// The work items `ids` names, in that order; the ones the server doesn't know are left out. `proj` is a path
+/// segment, empty for the whole collection.
+async fn batch(
+    api: &Api,
+    proj: &str,
+    ids: &[i32],
+    fields: &[&str],
+) -> Result<Vec<WorkItem>, ApiError> {
+    let mut items = Vec::new();
+    for chunk in ids.chunks(200) {
+        let req = WorkItemBatchGetRequest {
+            ids: chunk.to_vec(),
+            fields: fields.iter().map(|f| (*f).to_owned()).collect(),
+            error_policy: Some(ErrorPolicy::Omit),
+            ..WorkItemBatchGetRequest::default()
+        };
+        let raw = api
+            .az(|| {
+                api.wit
+                    .work_items_client()
+                    .get_work_items_batch(&api.org, req.clone(), proj)
+                    .send()
+            })
+            .await?
+            .into_raw_response()
+            .into_body();
+        let batch: Batch = serde_json::from_slice(&raw).map_err(|e| unexpected(&e))?;
+        items.extend(batch.value.into_iter().flatten());
+    }
+    // The batch needn't answer in the order asked; the query's order is the one that counts.
+    let rank: HashMap<i32, usize> = ids.iter().enumerate().map(|(i, id)| (*id, i)).collect();
+    items.sort_by_key(|w| rank.get(&w.id).copied());
+    Ok(items)
+}
+
 /// # Errors
 /// When the scope, the query or the server fails.
 pub(crate) async fn wi_query(ctx: &Ctx, a: &WiQueryArgs) -> Result<String, ApiError> {
@@ -349,38 +384,14 @@ pub(crate) async fn wi_query(ctx: &Ctx, a: &WiQueryArgs) -> Result<String, ApiEr
     }
     let ids: Vec<i32> = found.work_items.iter().filter_map(|r| r.id).collect();
     let (ids, has_more) = cut(ids, limit);
-    let mut items = Vec::new();
-    for chunk in ids.chunks(200) {
-        let req = WorkItemBatchGetRequest {
-            ids: chunk.to_vec(),
-            fields: [
-                "System.Id",
-                "System.WorkItemType",
-                "System.State",
-                "System.Title",
-                "System.AssignedTo",
-            ]
-            .map(String::from)
-            .into(),
-            error_policy: Some(ErrorPolicy::Omit),
-            ..WorkItemBatchGetRequest::default()
-        };
-        let raw = api
-            .az(|| {
-                api.wit
-                    .work_items_client()
-                    .get_work_items_batch(&api.org, req.clone(), &proj)
-                    .send()
-            })
-            .await?
-            .into_raw_response()
-            .into_body();
-        let batch: Batch = serde_json::from_slice(&raw).map_err(|e| unexpected(&e))?;
-        items.extend(batch.value.into_iter().flatten());
-    }
-    // The batch needn't answer in the order asked; the query's order is the one that counts.
-    let rank: HashMap<i32, usize> = ids.iter().enumerate().map(|(i, id)| (*id, i)).collect();
-    items.sort_by_key(|w| rank.get(&w.id).copied());
+    let fields = [
+        "System.Id",
+        "System.WorkItemType",
+        "System.State",
+        "System.Title",
+        "System.AssignedTo",
+    ];
+    let items = batch(api, &proj, &ids, &fields).await?;
     let mut lines: Vec<String> = items
         .iter()
         .map(|w| format!("{}  {}", head(w), assignee(w)))
@@ -393,6 +404,68 @@ pub(crate) async fn wi_query(ctx: &Ctx, a: &WiQueryArgs) -> Result<String, ApiEr
     } else {
         lines.join("\n")
     })
+}
+
+/// A work item as timetrack lists and logs it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Ticket {
+    pub id: i32,
+    pub project: String,
+    pub kind: String,
+    pub state: String,
+    pub title: String,
+}
+
+const TICKET_FIELDS: [&str; 5] = [
+    "System.Id",
+    "System.TeamProject",
+    "System.WorkItemType",
+    "System.State",
+    "System.Title",
+];
+
+/// Collection-wide, so every project the user works in lands in one list.
+const MINE: &str = "SELECT [System.Id] FROM WorkItems WHERE [System.AssignedTo] = @Me \
+AND [System.State] NOT IN ('Closed', 'Done', 'Removed') ORDER BY [System.ChangedDate] DESC";
+
+/// The open work items assigned to the PAT's user across the collection, last changed first (at most 200).
+///
+/// # Errors
+/// When the query or the server fails.
+pub async fn mine(api: &Api) -> Result<Vec<Ticket>, ApiError> {
+    let body = Wiql {
+        query: Some(MINE.into()),
+    };
+    // No project and no team: the guard cuts the `///` this leaves.
+    let found = api
+        .az(|| {
+            api.wit
+                .wiql_client()
+                .query_by_wiql(&api.org, body.clone(), "", "")
+                .top(200)
+                .into_future()
+        })
+        .await?;
+    let ids: Vec<i32> = found.work_items.iter().filter_map(|r| r.id).collect();
+    tickets(api, &ids).await
+}
+
+/// The work items `ids` names, from any project; unknown ids are left out.
+///
+/// # Errors
+/// When the server fails.
+pub async fn tickets(api: &Api, ids: &[i32]) -> Result<Vec<Ticket>, ApiError> {
+    let items = batch(api, "", ids, &TICKET_FIELDS).await?;
+    Ok(items
+        .iter()
+        .map(|w| Ticket {
+            id: w.id,
+            project: field(w, "System.TeamProject").to_owned(),
+            kind: field(w, "System.WorkItemType").to_owned(),
+            state: field(w, "System.State").to_owned(),
+            title: field(w, "System.Title").to_owned(),
+        })
+        .collect())
 }
 
 fn wi_id(id: u32) -> Result<i32, ApiError> {

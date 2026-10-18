@@ -372,6 +372,50 @@ fn view_comments_in_the_items_project() {
     assert_eq!(requests(&fx, other).len(), 1);
 }
 
+/// timetrack's list: one collection-wide query and batch, whatever the projects.
+#[tokio::test]
+async fn mine_spans_the_collection() {
+    let fx = Fixture::start();
+    fx.route("/tfs/Coll/_apis/wit/wiql", vec![fixture("wiql.json")]);
+    let mut items = three();
+    items["value"][0]["fields"]["System.TeamProject"] = json!("My Proj");
+    items["value"][1]["fields"]["System.TeamProject"] = json!("Other Proj");
+    // Out of the query's order, and without 125.
+    let swapped = json!({"count": 2, "value": [items["value"][1], items["value"][0]]});
+    fx.route(
+        "/tfs/Coll/_apis/wit/workitemsbatch",
+        vec![Resp::json(&swapped)],
+    );
+    let cfg = ado_mcp::Config {
+        org_url: fx.url("/tfs/Coll/").parse().unwrap(),
+        pat: "test-pat".into(),
+        default_project: None,
+        project_dir: common::tempdir(),
+    };
+    let got = ado_mcp::mine(&ado_mcp::Api::new(&cfg).unwrap())
+        .await
+        .unwrap();
+    let got: Vec<(i32, &str, &str)> = got
+        .iter()
+        .map(|t| (t.id, t.project.as_str(), t.title.as_str()))
+        .collect();
+    assert_eq!(
+        got,
+        [
+            (123, "My Proj", "Login fails behind the proxy"),
+            (124, "Other Proj", "Add a proxy test")
+        ]
+    );
+    let wiql = bodies(&fx, "/tfs/Coll/_apis/wit/wiql")[0]["query"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(wiql.contains("[System.AssignedTo] = @Me"), "{wiql}");
+    assert!(!wiql.contains("@project"), "{wiql}");
+    let batch = &bodies(&fx, "/tfs/Coll/_apis/wit/workitemsbatch")[0];
+    assert_eq!(batch["ids"], json!([123, 124, 125]));
+}
+
 const CONN: &str = "/tfs/Coll/_apis/connectionData";
 const STORY: &str =
     "/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/wit/workitems/$User%20Story";

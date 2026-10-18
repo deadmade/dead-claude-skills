@@ -3,7 +3,7 @@ name = "ado-mcp"
 version = "0.4.0"
 edition = "2024"
 rust-version = "1.97"
-description = "Stdio MCP server for the mcp-azure plugin: Azure DevOps Server pull request, work item and pipeline tools."
+description = "Stdio MCP server for the mcp-azure plugin: Azure DevOps Server pull request, work item and pipeline tools. Also builds timetrack, a TUI that times work items."
 license = "MIT"
 publish = false
 
@@ -21,6 +21,9 @@ azure_devops_rust_api = { version = "=0.39.1", default-features = false, feature
 azure_core = "=1.1.0"
 # Already in the tree through azure_core; implementing its `Policy` needs the macro.
 async-trait = "0.1"
+# timetrack only.
+ratatui = "0.30"
+jiff = { version = "0.2", features = ["serde"] }
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
