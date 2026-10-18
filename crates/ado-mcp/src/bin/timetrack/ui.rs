@@ -1,6 +1,7 @@
 //! Drawing, in Night City's palette (plugins/default/themes/night-city.json): a big clock on the running ticket, a
-//! timeline of today, the ticket list, and Today, Week and Help as overlays.
+//! timeline of today with Claude's lane under it, the ticket list, and Today, Week and Help as overlays.
 
+use ado_mcp::Ticket;
 use jiff::Timestamp;
 use jiff::civil::Date;
 use jiff::tz::TimeZone;
@@ -10,6 +11,7 @@ use ratatui::style::{Color, Style, Stylize as _};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Clear, Paragraph, Row, Table, TableState};
 
+use crate::claude::{busy, per_ticket};
 use crate::log::{day, hm, monday, signed, target_on, totals};
 use crate::{App, Overlay};
 
@@ -54,11 +56,20 @@ struct Ctx {
     to: Timestamp,
     /// Ticket id to colour, for the tickets timed today.
     colors: Vec<(i32, Color)>,
+    /// Claude's time today per ticket; `None` for none.
+    claude: Vec<(Option<i32>, i64)>,
 }
 
 impl Ctx {
     fn color(&self, id: i32) -> Option<Color> {
         self.colors.iter().find(|(i, _)| *i == id).map(|(_, c)| *c)
+    }
+
+    fn claude_on(&self, id: Option<i32>) -> i64 {
+        self.claude
+            .iter()
+            .find(|(t, _)| *t == id)
+            .map_or(0, |(_, s)| *s)
     }
 
     fn local(&self, t: Timestamp) -> String {
@@ -93,6 +104,7 @@ pub fn draw(f: &mut Frame, app: &App) {
         from,
         to,
         colors,
+        claude: per_ticket(&app.claude, &app.log, &app.known(), from, to, now),
     };
 
     let area = f.area().inner(Margin::new(2, 1));
@@ -104,6 +116,7 @@ pub fn draw(f: &mut Frame, app: &App) {
         caption,
         _,
         bar,
+        lane,
         ticks,
         _,
         find_line,
@@ -118,6 +131,7 @@ pub fn draw(f: &mut Frame, app: &App) {
         Constraint::Length(1),
         Constraint::Length(1),
         Constraint::Length(1),
+        Constraint::Length(1),
         Constraint::Length(u16::from(find)),
         Constraint::Min(0),
         Constraint::Length(1),
@@ -126,7 +140,7 @@ pub fn draw(f: &mut Frame, app: &App) {
 
     header(f, app, &cx, head);
     big_clock(f, app, &cx, clock, caption);
-    timeline(f, app, &cx, bar, ticks);
+    timeline(f, app, &cx, [bar, lane, ticks]);
     if find {
         let mut l = vec![
             Span::from("/ ").fg(PINK),
@@ -272,13 +286,13 @@ fn slice(app: &App, cx: &Ctx, at: Timestamp) -> Span<'static> {
 }
 
 /// Today from 08:00 (or earlier) to 18:00 (or later): tickets in their colour, clocked-in time on no ticket shaded,
-/// breaks and the rest a thin line, now a pink bar.
+/// breaks and the rest a thin line, now a pink bar. Under it a violet line while Claude was working.
 #[allow(
     clippy::cast_precision_loss,
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss
 )]
-fn timeline(f: &mut Frame, app: &App, cx: &Ctx, bar: Rect, ticks: Rect) {
+fn timeline(f: &mut Frame, app: &App, cx: &Ctx, [bar, lane, ticks]: [Rect; 3]) {
     let width = i64::from(bar.width);
     if width < 10 {
         return;
@@ -308,6 +322,21 @@ fn timeline(f: &mut Frame, app: &App, cx: &Ctx, bar: Rect, ticks: Rect) {
         })
         .collect();
     f.render_widget(Line::from(spans), bar);
+    let claude: Vec<_> = app
+        .claude
+        .iter()
+        .filter(|s| s.end > cx.from && s.start < cx.to)
+        .collect();
+    let lane_line: String = (0..width)
+        .map(|i| {
+            let mid = cx.from.as_second() + lo + ((i as f64 + 0.5) * step) as i64;
+            let on = claude
+                .iter()
+                .any(|s| s.start.as_second() <= mid && mid < s.end.as_second());
+            if on { '━' } else { ' ' }
+        })
+        .collect();
+    f.render_widget(Line::from(lane_line).fg(VIOLET), lane);
 
     let per_hour = width * 3600 / (hi - lo).max(1);
     let every = match per_hour {
@@ -354,6 +383,9 @@ fn tickets(f: &mut Frame, app: &App, cx: &Ctx, area: Rect) {
             Line::from(t.title.as_str()).fg(TEXT),
             Line::from(t.project.as_str()).fg(DIM).right_aligned(),
             Line::from(spent).fg(DIM).right_aligned(),
+            Line::from(claude_time(cx.claude_on(Some(t.id))))
+                .fg(VIOLET)
+                .right_aligned(),
         ])
     });
     let widths = [
@@ -361,6 +393,7 @@ fn tickets(f: &mut Frame, app: &App, cx: &Ctx, area: Rect) {
         Constraint::Min(10),
         Constraint::Length(14),
         Constraint::Length(6),
+        Constraint::Length(7),
     ];
     let table = Table::new(rows, widths)
         .column_spacing(2)
@@ -368,6 +401,15 @@ fn tickets(f: &mut Frame, app: &App, cx: &Ctx, area: Rect) {
         .highlight_symbol(Line::from("▸ ").fg(PINK));
     let mut state = TableState::default().with_selected(Some(app.selected));
     f.render_stateful_widget(table, area, &mut state);
+}
+
+/// `✻ h:mm`, or nothing for no time.
+fn claude_time(secs: i64) -> String {
+    if secs == 0 {
+        String::new()
+    } else {
+        format!("✻ {}", hm(secs))
+    }
 }
 
 fn footer(f: &mut Frame, app: &App, area: Rect) {
@@ -436,17 +478,27 @@ fn today_overlay(f: &mut Frame, app: &App, cx: &Ctx) {
         .filter(|e| e.end.unwrap_or(cx.now) > cx.from && e.start < cx.to)
         .collect();
     entries.sort_by_key(|e| e.start);
+    // Your tickets, then the ones only Claude worked on, then Claude's time on no ticket.
+    let mut ids: Vec<Option<i32>> = sums.iter().map(|(t, _)| Some(t.id)).collect();
+    for (id, _) in &cx.claude {
+        if !ids.contains(id) && id.is_some() {
+            ids.push(*id);
+        }
+    }
+    if cx.claude_on(None) > 0 {
+        ids.push(None);
+    }
     let inner = panel(
         f,
-        96,
-        len(sums.len() + entries.len()).saturating_add(10),
+        104,
+        len(ids.len() + entries.len()).saturating_add(10),
         "today",
         "t or esc closes",
     );
     let [summary, _, per, _, shifts, _, list] = Layout::vertical([
         Constraint::Length(1),
         Constraint::Length(1),
-        Constraint::Length(len(sums.len())),
+        Constraint::Length(len(ids.len())),
         Constraint::Length(1),
         Constraint::Length(1),
         Constraint::Length(1),
@@ -462,6 +514,7 @@ fn today_overlay(f: &mut Frame, app: &App, cx: &Ctx) {
         stat("    worked ", hm(d.worked), TEXT),
         stat("    break ", hm(d.breaks), TEXT),
         stat("    booked ", hm(d.booked), TEXT),
+        stat("    claude ", hm(busy(&app.claude, cx.from, cx.to)), VIOLET),
         stat(
             "    unbooked ",
             hm(unbooked),
@@ -473,22 +526,7 @@ fn today_overlay(f: &mut Frame, app: &App, cx: &Ctx) {
     .collect();
     f.render_widget(Line::from(line), summary);
 
-    let rows = sums.iter().map(|(t, s)| {
-        let c = cx.color(t.id).unwrap_or(DIM);
-        Row::new([
-            Line::from("■").fg(c),
-            Line::from(format!("#{}", t.id)).fg(c),
-            Line::from(t.title.as_str()).fg(TEXT),
-            Line::from(hm(*s)).fg(TEXT).bold().right_aligned(),
-        ])
-    });
-    let widths = [
-        Constraint::Length(1),
-        Constraint::Length(6),
-        Constraint::Min(10),
-        Constraint::Length(6),
-    ];
-    f.render_widget(Table::new(rows, widths).column_spacing(2), per);
+    today_tickets(f, app, cx, &sums, &ids, per);
 
     let mut today_shifts: Vec<_> = app
         .log
@@ -520,6 +558,66 @@ fn today_overlay(f: &mut Frame, app: &App, cx: &Ctx) {
         Constraint::Min(10),
     ];
     f.render_widget(Table::new(rows, widths).column_spacing(2), list);
+}
+
+/// Today's tickets: your time and Claude's per ticket.
+fn today_tickets(
+    f: &mut Frame,
+    app: &App,
+    cx: &Ctx,
+    sums: &[(&Ticket, i64)],
+    ids: &[Option<i32>],
+    per: Rect,
+) {
+    let title = |id: i32| {
+        app.tickets
+            .iter()
+            .chain(app.log.all().map(|e| &e.ticket))
+            .find(|t| t.id == id)
+            .map_or(String::new(), |t| t.title.clone())
+    };
+    let rows = ids.iter().map(|id| {
+        let mine = sums
+            .iter()
+            .find(|(t, _)| Some(t.id) == *id)
+            .map_or(0, |(_, s)| *s);
+        let (mark, name, text) = match id {
+            Some(id) => {
+                let c = cx.color(*id).unwrap_or(DIM);
+                (
+                    Line::from("■").fg(c),
+                    Line::from(format!("#{id}")).fg(c),
+                    Line::from(title(*id)).fg(TEXT),
+                )
+            }
+            None => (
+                Line::from("✻").fg(VIOLET),
+                Line::from(""),
+                Line::from("Claude on no ticket").fg(DIM),
+            ),
+        };
+        Row::new([
+            mark,
+            name,
+            text,
+            if mine == 0 {
+                Line::from("")
+            } else {
+                Line::from(hm(mine)).fg(TEXT).bold().right_aligned()
+            },
+            Line::from(claude_time(cx.claude_on(*id)))
+                .fg(VIOLET)
+                .right_aligned(),
+        ])
+    });
+    let widths = [
+        Constraint::Length(1),
+        Constraint::Length(6),
+        Constraint::Min(10),
+        Constraint::Length(6),
+        Constraint::Length(7),
+    ];
+    f.render_widget(Table::new(rows, widths).column_spacing(2), per);
 }
 
 fn right(l: impl Into<Line<'static>>) -> Line<'static> {
@@ -555,7 +653,7 @@ fn week_overlay(f: &mut Frame, app: &App, cx: &Ctx) {
     let inner = panel(
         f,
         112,
-        len(all.len()).saturating_add(13),
+        len(all.len()).saturating_add(14),
         &format!("week of {mon}"),
         "←/→ weeks · w or esc closes",
     );
@@ -605,6 +703,13 @@ fn week_overlay(f: &mut Frame, app: &App, cx: &Ctx) {
     ));
     rows.push(sum_row("worked", stats.iter().map(|s| s.worked).collect()));
     rows.push(sum_row("break", stats.iter().map(|s| s.breaks).collect()));
+    rows.push(sum_row(
+        "claude",
+        bounds
+            .iter()
+            .map(|(a, b)| busy(&app.claude, *a, *b))
+            .collect(),
+    ));
     // Only days with time on the clock owe the target, so a day off costs nothing.
     let diffs: Vec<Option<i64>> = stats
         .iter()
@@ -620,26 +725,30 @@ fn week_overlay(f: &mut Frame, app: &App, cx: &Ctx) {
         plus_minus(diffs.iter().flatten().sum()).bold(),
     ));
 
+    let head = week_head(&days, cx.today);
+    let mut widths = vec![Constraint::Min(16)];
+    widths.extend([Constraint::Length(6); 8]);
+    f.render_widget(
+        Table::new(rows, widths).header(head).column_spacing(2),
+        grid,
+    );
+
+    f.render_widget(balance_line(app, cx), foot);
+}
+
+/// The week's header row: the days, today in pink.
+fn week_head(days: &[Date], today: Date) -> Row<'static> {
     let mut head = vec![Line::from("")];
     head.extend(days.iter().map(|d| {
         let l = right(d.strftime("%a %d").to_string());
-        if *d == cx.today {
+        if *d == today {
             l.fg(PINK).bold()
         } else {
             l.fg(CYAN)
         }
     }));
     head.push(right("total").fg(CYAN));
-    let mut widths = vec![Constraint::Min(16)];
-    widths.extend([Constraint::Length(6); 8]);
-    f.render_widget(
-        Table::new(rows, widths)
-            .header(Row::new(head).bottom_margin(1))
-            .column_spacing(2),
-        grid,
-    );
-
-    f.render_widget(balance_line(app, cx), foot);
+    Row::new(head).bottom_margin(1)
 }
 
 /// The overtime balance so far.
@@ -669,6 +778,10 @@ fn help_overlay(f: &mut Frame) {
         ("w", "week: per day, worked vs target, balance"),
         ("← →", "earlier / later week"),
         ("r", "reload work items"),
+        (
+            "✻",
+            "Claude: the violet line under the timeline, time per ticket",
+        ),
         ("q", "quit; ticket and clock keep running"),
     ];
     let inner = panel(

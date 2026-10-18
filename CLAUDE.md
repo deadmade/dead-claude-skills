@@ -26,7 +26,10 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   open items assigned to me across the collection. It also clocks the workday in and out; `TIMETRACK_TARGET` (`h:mm`,
   default 8:00) is the weekday target for the overtime balance, which counts only days with a shift. The log lives in
   `%APPDATA%\timetrack` (`TIMETRACK_DIR` overrides): `log.jsonl`/`running.json` for tickets, `shifts.jsonl`/`shift.json`
-  for the clock. Not released or installed; `cargo install --path crates/ado-mcp --bin timetrack`.
+  for the clock. `claude.rs` reads Claude Code's session logs (`projects/**/*.jsonl` under `CLAUDE_CONFIG_DIR` or
+  `~/.claude`, an undocumented format, so unknown lines are skipped) for a lane under the timeline and Claude time per
+  ticket: a branch naming a known ticket id, else the ticket timed then. Not released or installed;
+  `cargo install --path crates/ado-mcp --bin timetrack`.
 - `plugins/default/`: the dead-skills bundle. Its `dependencies` are the core plugins; itself it carries the global rules
   (`rules.md`, a SessionStart hook), Context7 (`.mcp.json`), Night City and the notifications. night-city, mcp-basic and notify were plugins of
   their own until 0.3.0; the installer retires them, and `mergeSettings` moves a picked theme to its new id

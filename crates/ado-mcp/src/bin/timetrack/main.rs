@@ -1,8 +1,9 @@
 //! timetrack: a TUI that times Azure DevOps work items and your workday, and keeps the log in `%APPDATA%\timetrack`
 //! (or `TIMETRACK_DIR`). The collection and PAT come from `ADO_ORG_URL` and `ADO_PAT`, as for the MCP server; without
 //! them the timer still works on tickets already in the log. `TIMETRACK_TARGET` (`h:mm`, default `8:00`) is the daily
-//! target the overtime balance counts against.
+//! target the overtime balance counts against. Claude Code's session logs add when Claude was working (`claude.rs`).
 
+mod claude;
 mod log;
 mod ui;
 
@@ -12,7 +13,7 @@ use std::time::{Duration, Instant};
 
 use ado_mcp::{Api, Config, Ticket};
 use anyhow::{Context as _, Result, bail};
-use jiff::Timestamp;
+use jiff::{SignedDuration, Timestamp};
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -45,6 +46,9 @@ pub struct App {
     status: String,
     status_at: Instant,
     pub loading: bool,
+    /// When Claude was working, refreshed in the background.
+    pub claude: Vec<claude::Segment>,
+    claude_rx: mpsc::Receiver<Vec<claude::Segment>>,
 }
 
 impl App {
@@ -60,6 +64,16 @@ impl App {
                     || t.project.to_lowercase().contains(&f)
                     || t.id.to_string().contains(&f)
             })
+            .collect()
+    }
+
+    /// Every ticket id timetrack knows: the list and the log.
+    #[must_use]
+    pub fn known(&self) -> Vec<i32> {
+        self.tickets
+            .iter()
+            .map(|t| t.id)
+            .chain(self.log.all().map(|e| e.ticket.id))
             .collect()
     }
 
@@ -265,6 +279,23 @@ fn main() -> Result<()> {
         }
     }
     let (tx, rx) = mpsc::channel();
+    let (claude_tx, claude_rx) = mpsc::channel();
+    if let Some(dir) = claude::root() {
+        std::thread::spawn(move || {
+            let mut cache = claude::Cache::new();
+            loop {
+                // The week overlay goes back further, but five weeks of logs is what's worth reading every minute.
+                let since = Timestamp::now() - SignedDuration::from_hours(35 * 24);
+                if claude_tx
+                    .send(claude::scan(&dir, since, &mut cache))
+                    .is_err()
+                {
+                    return;
+                }
+                std::thread::sleep(Duration::from_mins(1));
+            }
+        });
+    }
     let mut app = App {
         log,
         api,
@@ -280,6 +311,8 @@ fn main() -> Result<()> {
         status,
         status_at: Instant::now(),
         loading: false,
+        claude: Vec::new(),
+        claude_rx,
     };
     if app.log.bad > 0 {
         let bad = app.log.bad;
@@ -291,6 +324,9 @@ fn main() -> Result<()> {
             term.draw(|f| ui::draw(f, &app))?;
             while let Ok(done) = app.rx.try_recv() {
                 app.received(done);
+            }
+            while let Ok(segs) = app.claude_rx.try_recv() {
+                app.claude = segs;
             }
             // A short poll keeps the running clock ticking.
             if event::poll(Duration::from_millis(250))?
