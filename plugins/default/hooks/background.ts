@@ -17,8 +17,7 @@ exit 1`;
 
 // Windows: no /dev/pts. The engine starts the child hidden (windowsHide), which gives it a new console of its own, so
 // it swaps that for its parent's (Claude's) before opening CONOUT$, and lets go again so its own exit leaves Claude's
-// console alone. CONOUT$ is opened through CreateFileW because .NET's FileStream won't open device names. One line per
-// statement: `-Command -` runs stdin line by line.
+// console alone. CONOUT$ is opened through CreateFileW because .NET's FileStream won't open device names.
 export const PS = `$sig = '[DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Unicode)] public static extern IntPtr CreateFileW(string n, uint a, uint s, IntPtr p, uint c, uint f, IntPtr t); [DllImport("kernel32.dll")] public static extern bool FreeConsole(); [DllImport("kernel32.dll")] public static extern bool AttachConsole(int p);'
 $k = Add-Type -MemberDefinition $sig -Name K -Namespace NightBg -PassThru
 $null = $k::FreeConsole()
@@ -28,6 +27,9 @@ if ($h -eq [IntPtr](-1)) { $null = $k::FreeConsole(); exit 1 }
 $fs = New-Object IO.FileStream((New-Object Microsoft.Win32.SafeHandles.SafeFileHandle($h, $true)), [IO.FileAccess]::Write)
 $b = [Text.Encoding]::ASCII.GetBytes([string][char]27 + $env:NIGHT_CITY_OSC + [char]7)
 $fs.Write($b, 0, $b.Length); $fs.Close(); $null = $k::FreeConsole()`;
+// Passed as -EncodedCommand (base64 of UTF-16LE; PS is ASCII), not on stdin: once FreeConsole drops the console,
+// PowerShell stops reading stdin and exits 0 without running the lines after it.
+export const PS_ENCODED = btoa([...PS].map((c) => c + '\0').join(''));
 
 // Absolute paths: a bare name is looked up in the session's working directory first on Windows, so a project could
 // plant its own `sh.exe` or `powershell.exe`.
@@ -45,8 +47,7 @@ export async function paint($: $, osc: string): Promise<boolean> {
     if ((await $.process.run([SH_PATH, '-c', SH, 'sh', osc])).exitCode === 0) return true;
   } catch {}
   try {
-    const r = await $.process.run([PS_PATH, '-NoProfile', '-NonInteractive', '-Command', '-'], {
-      stdin: PS,
+    const r = await $.process.run([PS_PATH, '-NoProfile', '-NonInteractive', '-EncodedCommand', PS_ENCODED], {
       env: { NIGHT_CITY_OSC: osc },
     });
     if (r.exitCode === 0) return true;
