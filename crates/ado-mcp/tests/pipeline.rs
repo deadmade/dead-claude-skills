@@ -108,6 +108,16 @@ fn job_failed_without_step() {
 fn log_full_paged() {
     let fx = Fixture::start();
     run_routes(&fx);
+    // A whole page of 2000 lines, the last an error; `logs.json` says the log has 2500.
+    let page = (1..2000)
+        .map(|i| format!("line {i}"))
+        .collect::<Vec<_>>()
+        .join("\r\n")
+        + "\r\n";
+    fx.route(
+        &format!("{LOGS}/4"),
+        vec![Resp::new(200, "text/plain", page + "##[error]boom\r\n")],
+    );
     let text = ok(
         &mut env(&fx),
         "pipeline_log",
@@ -185,4 +195,42 @@ fn repo_list_lines() {
         text,
         "Empty  default: none\nR  default: main\nTools  default: develop"
     );
+}
+
+#[test]
+fn log_full_one_step_and_unknown_count() {
+    let fx = Fixture::start();
+    run_routes(&fx);
+    let mut timeline: Value = serde_json::from_slice(&fixture("timeline.json").body).unwrap();
+    for r in timeline["records"].as_array_mut().unwrap() {
+        if r["name"] == "Checkout" {
+            r["result"] = json!("failed");
+        }
+    }
+    fx.route(TIMELINE, vec![Resp::json(&timeline)]);
+    fx.route(
+        &format!("{LOGS}/3"),
+        vec![Resp::new(200, "text/plain", "cloning\r\n")],
+    );
+    fx.route(LOGS, vec![Resp::new(500, "text/plain", "down")]);
+    let text = ok(
+        &mut env(&fx),
+        "pipeline_log",
+        json!({"run": 77, "full": true}),
+    );
+    let lines: Vec<&str> = text.lines().collect();
+    assert_eq!(
+        lines[0],
+        "showing Checkout only; also failed: Run tests; pass step to page through one"
+    );
+    assert_eq!(lines[2], "Checkout: failed");
+    assert_eq!(lines[3], "cloning");
+    assert!(
+        lines[4].starts_with("… line count unavailable (")
+            && lines[4].ends_with(
+                "); if the log goes on: pipeline_log run=77 step=\"Checkout\" full=true start=2"
+            ),
+        "{text}"
+    );
+    assert_eq!(queries(&fx, &format!("{LOGS}/4")).len(), 0, "{text}");
 }

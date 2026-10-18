@@ -1,5 +1,6 @@
 //! The pipeline read tools: `pipeline_runs`, `pipeline_view` and `pipeline_log`; and `repo_list`.
 
+use std::collections::HashMap;
 use std::fmt::Write as _;
 
 use azure_devops_rust_api::build::models::{
@@ -69,6 +70,12 @@ const PAGE: u32 = 2000;
 /// A log line is cut here: one minified file on a line would fill the reply.
 const LINE_MAX: usize = 1000;
 const ISSUES_MAX: usize = 20;
+/// Step names an error lists.
+const NAMES_MAX: usize = 20;
+/// Lines of error context an excerpt shows before it points at the full log.
+const EXCERPT_MAX: usize = 300;
+/// Characters per `full` page (Ruling R8): 2000 long lines would fill the reply.
+const PAGE_CHARS: usize = 40_000;
 
 /// `4m 55s`; empty while it hasn't finished.
 fn took(secs: Option<i64>) -> String {
@@ -246,57 +253,77 @@ fn failed(r: &TimelineRecord) -> bool {
     r.result == Some(timeline_record::Result::Failed)
 }
 
-/// `{type} {message}`, on one line.
+/// `{type} {message}`, on one line, without terminal control sequences.
 fn issue(i: &Issue) -> String {
     let kind = i
         .type_
         .as_ref()
         .map(ToString::to_string)
         .unwrap_or_default();
-    let msg: Vec<&str> = i
-        .message
-        .as_deref()
-        .unwrap_or_default()
-        .split_whitespace()
-        .collect();
-    format!("{kind} {}", msg.join(" "))
+    let msg = strip_ansi(i.message.as_deref().unwrap_or_default());
+    let words: Vec<&str> = msg.split_whitespace().collect();
+    format!("{kind} {}", words.join(" "))
 }
 
+/// The first 20 issues as indented lines, then how many were left out.
+fn issue_lines(issues: &[String], rest: &str) -> Vec<String> {
+    let mut lines: Vec<String> = issues
+        .iter()
+        .take(ISSUES_MAX)
+        .map(|i| format!("  {i}"))
+        .collect();
+    if issues.len() > ISSUES_MAX {
+        lines.push(format!(
+            "  … {} more issues{rest}",
+            issues.len() - ISSUES_MAX
+        ));
+    }
+    lines
+}
+
+/// `a, b, c`, the first 20, then `… and N more`.
+fn name_list(names: &[&str]) -> String {
+    let mut s = names
+        .iter()
+        .take(NAMES_MAX)
+        .copied()
+        .collect::<Vec<_>>()
+        .join(", ");
+    if names.len() > NAMES_MAX {
+        let _ = write!(s, " … and {} more", names.len() - NAMES_MAX);
+    }
+    s
+}
+
+type Children<'a> = HashMap<Option<&'a str>, Vec<&'a TimelineRecord>>;
+
 /// Stage and Job lines under `parent`, by `order`; a Phase's Jobs show at the Phase's own level.
-fn tree(
-    recs: &[TimelineRecord],
-    parent: Option<&str>,
-    depth: usize,
-    hops: u8,
-    out: &mut Vec<String>,
-) {
-    // The records come from the server: a parent loop must not recurse forever.
+fn tree(kids: &Children, parent: Option<&str>, depth: usize, hops: u8, out: &mut Vec<String>) {
+    // The records come from the server: a parent loop (duplicate ids) must not recurse forever.
     if hops > 4 {
         return;
     }
-    let mut children: Vec<&TimelineRecord> = recs
-        .iter()
-        .filter(|r| r.parent_id.as_deref() == parent)
-        .collect();
-    children.sort_by_key(|r| r.order);
-    for r in children {
-        match kind(r) {
-            "Phase" => tree(recs, r.id.as_deref(), depth, hops + 1, out),
-            "Stage" | "Job" => {
-                let secs = r
-                    .start_time
-                    .zip(r.finish_time)
-                    .map(|(s, f)| (f - s).whole_seconds());
-                let line = format!(
-                    "{}{}: {} {}",
-                    "  ".repeat(depth),
-                    name(r),
-                    state(r),
-                    took(secs)
-                );
-                out.push(line.trim_end().to_owned());
-                tree(recs, r.id.as_deref(), depth + 1, hops + 1, out);
-            }
+    for r in kids.get(&parent).into_iter().flatten() {
+        let k = kind(r);
+        if matches!(k, "Stage" | "Job") {
+            let secs = r
+                .start_time
+                .zip(r.finish_time)
+                .map(|(s, f)| (f - s).whole_seconds());
+            let line = format!(
+                "{}{}: {} {}",
+                "  ".repeat(depth),
+                name(r),
+                state(r),
+                took(secs)
+            );
+            out.push(line.trim_end().to_owned());
+        }
+        // A Job's children are Tasks, which aren't shown; a record without an id has none.
+        let Some(id) = r.id.as_deref() else { continue };
+        match k {
+            "Phase" => tree(kids, Some(id), depth, hops + 1, out),
+            "Stage" => tree(kids, Some(id), depth + 1, hops + 1, out),
             _ => {}
         }
     }
@@ -306,8 +333,15 @@ fn tree(
 /// When the scope, the run or the server fails.
 pub(crate) async fn pipeline_view(ctx: &Ctx, a: &RunArgs) -> Result<String, ApiError> {
     let (_, t) = timeline(ctx, a.project.as_deref(), a.run).await?;
+    let mut kids: Children = HashMap::new();
+    for r in &t.records {
+        kids.entry(r.parent_id.as_deref()).or_default().push(r);
+    }
+    for v in kids.values_mut() {
+        v.sort_by_key(|r| r.order);
+    }
     let mut lines = Vec::new();
-    tree(&t.records, None, 0, 0, &mut lines);
+    tree(&kids, None, 0, 0, &mut lines);
     if lines.is_empty() {
         lines.push(format!("run #{} has no stages or jobs yet", a.run));
     }
@@ -319,35 +353,56 @@ pub(crate) async fn pipeline_view(ctx: &Ctx, a: &RunArgs) -> Result<String, ApiE
         .collect();
     if !issues.is_empty() {
         lines.push("issues:".into());
-        lines.extend(issues.iter().take(ISSUES_MAX).map(|i| format!("  {i}")));
-        if issues.len() > ISSUES_MAX {
-            lines.push(format!(
-                "  … {} more issues: pipeline_log run={}",
-                issues.len() - ISSUES_MAX,
-                a.run
-            ));
-        }
+        lines.extend(issue_lines(
+            &issues,
+            &format!(": pipeline_log run={}", a.run),
+        ));
     }
     Ok(lines.join("\n"))
 }
 
-/// Strips ANSI CSI sequences (and any other escape with the character after it) and `\r`.
+/// Skips the rest of an OSC string: up to BEL, ST or `ESC \`.
+fn skip_osc(chars: &mut std::str::Chars) {
+    while let Some(c) = chars.next() {
+        match c {
+            '\x07' | '\u{9c}' => return,
+            '\x1b' => {
+                chars.next();
+                return;
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Skips the rest of a CSI sequence: parameter and intermediate bytes, then a final byte in `@`..=`~`.
+fn skip_csi(chars: &mut std::str::Chars) {
+    for c in chars.by_ref() {
+        if ('@'..='~').contains(&c) {
+            return;
+        }
+    }
+}
+
+/// The text without terminal control: CSI and OSC sequences (7- and 8-bit), any other escape with the character
+/// after it, and every other control character but `\t` (`\n` becomes a space).
 fn strip_ansi(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut chars = s.chars();
     while let Some(c) = chars.next() {
         match c {
-            '\r' => {}
-            '\x1b' => {
-                // `ESC [`, parameter and intermediate bytes, then a final byte in `@`..=`~`.
-                if chars.next() == Some('[') {
-                    for c in chars.by_ref() {
-                        if ('@'..='~').contains(&c) {
-                            break;
-                        }
-                    }
-                }
-            }
+            '\x1b' => match chars.next() {
+                Some('[') => skip_csi(&mut chars),
+                // An OSC 8 hyperlink would leak its URL.
+                Some(']') => skip_osc(&mut chars),
+                _ => {}
+            },
+            '\u{9b}' => skip_csi(&mut chars),
+            '\u{9d}' => skip_osc(&mut chars),
+            '\t' => out.push(c),
+            // Only issue messages hold line breaks; log lines are split already.
+            '\n' => out.push(' '),
+            c if c.is_control() => {}
             c => out.push(c),
         }
     }
@@ -366,17 +421,16 @@ fn strip_time(l: &str) -> &str {
     if stamp { rest } else { l }
 }
 
-/// A log as `(is_error, text)` lines: no timestamps, ANSI codes, `\r` or `##[group]`-style markers; errors and
-/// warnings marked. One pass over the input.
+/// A log as `(is_error, text)` lines, one per line of `raw` (so a page's line numbers hold): no timestamps, terminal
+/// control or `##[group]`-style markers; errors and warnings marked. One pass over the input.
 pub(crate) fn clean_log(raw: &str) -> Vec<(bool, String)> {
+    // shortcut: a lone `\r` (CR-only progress output) is dropped, not split into lines; split on it if such logs
+    // read as run-together lines.
     raw.lines()
-        .filter_map(|l| {
+        .map(|l| {
             let l = strip_ansi(l);
             let l = strip_time(&l);
-            if l.starts_with("##[endgroup]") {
-                return None;
-            }
-            let l = ["##[group]", "##[section]", "##[command]"]
+            let l = ["##[group]", "##[endgroup]", "##[section]", "##[command]"]
                 .iter()
                 .find_map(|p| l.strip_prefix(p))
                 .unwrap_or(l);
@@ -391,28 +445,39 @@ pub(crate) fn clean_log(raw: &str) -> Vec<(bool, String)> {
                 text.truncate(at);
                 text.push('…');
             }
-            Some((err, text))
+            (err, text)
         })
         .collect()
 }
 
-/// The error lines with their context (merged, `…` between the pieces), then the last 50 lines.
-pub(crate) fn excerpt(lines: &[(bool, String)]) -> String {
+/// The error lines with their context (merged, `…` between the pieces, at most 300 lines, then how many error lines
+/// were left out and `rest`, the call that shows them), then the last 50 lines.
+pub(crate) fn excerpt(lines: &[(bool, String)], rest: &str) -> String {
     let tail = lines.len().saturating_sub(TAIL);
     let mut out: Vec<&str> = Vec::new();
     // The first line before the tail not printed yet.
     let mut next = 0;
+    let mut shown = 0;
     for (i, _) in lines[..tail].iter().enumerate().filter(|(_, (e, _))| *e) {
         let from = i.saturating_sub(CONTEXT).max(next);
         let to = (i + CONTEXT + 1).min(tail);
         if from >= to {
             continue;
         }
+        if shown + (to - from) > EXCERPT_MAX {
+            break;
+        }
         if from > next && !out.is_empty() {
             out.push("…");
         }
         out.extend(lines[from..to].iter().map(|(_, l)| l.as_str()));
+        shown += to - from;
         next = to;
+    }
+    let left = lines[next..tail].iter().filter(|(e, _)| *e).count();
+    let note = more(&format!("{left} more error lines: {rest}"));
+    if left > 0 {
+        out.push(&note);
     }
     out.push("--- last 50 lines ---");
     out.extend(lines[tail..].iter().map(|(_, l)| l.as_str()));
@@ -434,7 +499,7 @@ fn targets<'a>(
             let names: Vec<&str> = tasks().map(name).collect();
             return Err(ApiError::local(format!(
                 "no step \"{step}\" in run #{run}; its steps: {}",
-                names.join(", ")
+                name_list(&names)
             )));
         }
         return Ok((hits, Vec::new()));
@@ -447,14 +512,51 @@ fn targets<'a>(
             .iter()
             .any(|t| t.parent_id.is_some() && t.parent_id == job.id)
         {
-            let mut s = format!("{}: failed with no failed step", name(job));
-            for i in &job.issues {
-                let _ = write!(s, "\n  {}", issue(i));
-            }
-            notes.push(s);
+            let issues: Vec<String> = job.issues.iter().map(issue).collect();
+            let mut lines = vec![format!("{}: failed with no failed step", name(job))];
+            lines.extend(issue_lines(&issues, &format!(": pipeline_view run={run}")));
+            notes.push(lines.join("\n"));
         }
     }
     Ok((hits, notes))
+}
+
+/// The `pipeline_log` call for `step` from line `start` on.
+fn page_call(run: u32, step: &str, start: u64) -> String {
+    format!("pipeline_log run={run} step=\"{step}\" full=true start={start}")
+}
+
+/// One `full` page from line `start`: at most 2000 lines and 40,000 characters (the server may ignore the range
+/// it was asked for), then the call for the next page when the log goes on.
+fn page(
+    lines: &[(bool, String)],
+    start: u32,
+    total: Result<Option<i64>, &ApiError>,
+    next: impl Fn(u64) -> String,
+) -> String {
+    let mut out = Vec::new();
+    let mut chars = 0;
+    for (_, l) in lines.iter().take(PAGE as usize) {
+        let n = l.chars().count() + 1;
+        if !out.is_empty() && chars + n > PAGE_CHARS {
+            break;
+        }
+        chars += n;
+        out.push(l.as_str());
+    }
+    let after = u64::from(start) + out.len() as u64;
+    let cut_here = out.len() < lines.len();
+    let note = match total {
+        _ if cut_here => Some(more(&next(after))),
+        Ok(Some(n)) if u64::try_from(n).unwrap_or(0) >= after => Some(more(&next(after))),
+        Ok(_) => None,
+        Err(e) => Some(format!(
+            "… line count unavailable ({e}); if the log goes on: {}",
+            next(after)
+        )),
+    };
+    out.extend(note.as_deref());
+    out.join("\n")
 }
 
 /// # Errors
@@ -463,7 +565,7 @@ pub(crate) async fn pipeline_log(ctx: &Ctx, a: &LogArgs) -> Result<String, ApiEr
     let run = a.run;
     let (proj, t) = timeline(ctx, a.project.as_deref(), run).await?;
     let id = run_id(run)?;
-    let (targets, notes) = targets(&t.records, given(a.step.as_deref()), run)?;
+    let (mut targets, notes) = targets(&t.records, given(a.step.as_deref()), run)?;
     if targets.is_empty() && notes.is_empty() {
         return Ok(format!(
             "run #{run} has no failed step; pass step to read one"
@@ -473,20 +575,29 @@ pub(crate) async fn pipeline_log(ctx: &Ctx, a: &LogArgs) -> Result<String, ApiEr
     let full = a.full == Some(true);
     let start = a.start.unwrap_or(1).max(1);
     let end = start.saturating_add(PAGE - 1);
-    let counts = if full {
-        let logs = api
-            .az(|| {
-                api.build
-                    .builds_client()
-                    .get_build_logs(&api.org, &proj, id)
-                    .into_future()
-            })
-            .await?;
-        logs.value
-    } else {
-        Vec::new()
-    };
     let mut out = Vec::new();
+    // A full page is one step's: the others are named so the agent can pass their step.
+    if full && targets.len() > 1 {
+        let others: Vec<&str> = targets[1..].iter().map(|r| name(r)).collect();
+        out.push(format!(
+            "showing {} only; also failed: {}; pass step to page through one",
+            name(targets[0]),
+            name_list(&others)
+        ));
+        targets.truncate(1);
+    }
+    let counts = if full {
+        api.az(|| {
+            api.build
+                .builds_client()
+                .get_build_logs(&api.org, &proj, id)
+                .into_future()
+        })
+        .await
+        .map(|l| l.value)
+    } else {
+        Ok(Vec::new())
+    };
     for r in targets {
         let Some(log) = &r.log else {
             out.push(format!("{}: no log ({})", name(r), state(r)));
@@ -507,33 +618,26 @@ pub(crate) async fn pipeline_log(ctx: &Ctx, a: &LogArgs) -> Result<String, ApiEr
             .await
             .map(|r| r.into_raw_response().into_body());
         let mut text = format!("{}: {}", name(r), state(r));
-        match raw {
+        let lines = match raw {
             Err(e) => {
                 let _ = write!(text, "\nlog unavailable ({e})");
+                out.push(text);
+                continue;
             }
-            Ok(body) => {
-                let lines = clean_log(&String::from_utf8_lossy(&body));
-                if full {
-                    for (_, l) in &lines {
-                        let _ = write!(text, "\n{l}");
-                    }
-                    let total = counts
-                        .iter()
-                        .find(|c| c.build_log_reference.id == log.id)
-                        .and_then(|c| c.line_count);
-                    if total.is_some_and(|n| n > i64::from(end)) {
-                        let call = format!(
-                            "pipeline_log run={run} step=\"{}\" full=true start={}",
-                            name(r),
-                            u64::from(end) + 1
-                        );
-                        let _ = write!(text, "\n{}", more(&call));
-                    }
-                } else {
-                    let _ = write!(text, "\n{}", excerpt(&lines));
-                }
-            }
-        }
+            Ok(body) => clean_log(&String::from_utf8_lossy(&body)),
+        };
+        let step = name(r);
+        let body = if full {
+            let total = counts.as_ref().map(|c| {
+                c.iter()
+                    .find(|c| c.build_log_reference.id == log.id)
+                    .and_then(|c| c.line_count)
+            });
+            page(&lines, start, total, |n| page_call(run, step, n))
+        } else {
+            excerpt(&lines, &page_call(run, step, 1))
+        };
+        let _ = write!(text, "\n{body}");
         out.push(text);
     }
     out.extend(notes);
@@ -587,7 +691,13 @@ mod tests {
                    ##[warning]careful\n\
                    ##[command]cargo test\n\
                    2026-03-05T10:00:24.0000000Z\n\
-                   not 2026-03-05T10:00:20Z a stamp";
+                   not 2026-03-05T10:00:20Z a stamp\n\
+                   \x1b]8;;https://x.example/\x07link\x1b]8;;\x07 here\n\
+                   \x1b]0;my title\x1b\\after\n\
+                   \u{9b}31mc1\u{9b}0m\n\
+                   bell\x07 nul\0 tab\tok\n\
+                   open \x1b]8;;https://y.example/ never closed\n\
+                   trailing esc\x1b";
         let lines = clean_log(raw);
         let all: Vec<&str> = lines.iter().map(|(_, l)| l.as_str()).collect();
         assert_eq!(
@@ -595,17 +705,34 @@ mod tests {
             [
                 "Run cargo",
                 "red done",
+                "",
                 "ERROR boom",
                 "WARNING careful",
                 "cargo test",
                 "",
-                "not 2026-03-05T10:00:20Z a stamp"
+                "not 2026-03-05T10:00:20Z a stamp",
+                "link here",
+                "after",
+                "c1",
+                "bell nul tab\tok",
+                "open ",
+                "trailing esc",
             ]
         );
-        let errors: Vec<bool> = lines.iter().map(|(e, _)| *e).collect();
-        assert_eq!(errors, [false, false, true, false, false, false, false]);
+        let errors: Vec<usize> = (0..lines.len()).filter(|i| lines[*i].0).collect();
+        assert_eq!(errors, [3]);
         let joined = all.join("\n");
-        for noise in ["\x1b", "\r", "##[group]", "2026-03-05T10:00:21"] {
+        for noise in [
+            "\x1b",
+            "\r",
+            "\x07",
+            "\0",
+            "\u{9b}",
+            "##[",
+            "https",
+            "title",
+            "2026-03-05T10:00:21",
+        ] {
             assert!(!joined.contains(noise), "{noise:?}");
         }
         let long = clean_log(&"é".repeat(LINE_MAX + 5));
@@ -627,9 +754,107 @@ mod tests {
         want.extend(range(143..150));
         want.push("--- last 50 lines ---".into());
         want.extend(range(150..200));
-        assert_eq!(excerpt(&lines), want.join("\n"));
+        assert_eq!(excerpt(&lines, "x"), want.join("\n"));
         let short = vec![(true, "ERROR x".to_owned())];
-        assert_eq!(excerpt(&short), "--- last 50 lines ---\nERROR x");
+        assert_eq!(excerpt(&short, "x"), "--- last 50 lines ---\nERROR x");
+    }
+
+    #[test]
+    fn excerpt_caps_errors() {
+        let lines: Vec<(bool, String)> = (0..5000).map(|i| (true, format!("ERROR {i}"))).collect();
+        let out = excerpt(&lines, "pipeline_log run=7 step=\"T\" full=true start=1");
+        let out: Vec<&str> = out.lines().collect();
+        assert_eq!(out.len(), EXCERPT_MAX + 2 + TAIL, "{out:?}");
+        assert_eq!(out[EXCERPT_MAX - 1], "ERROR 299");
+        assert_eq!(
+            out[EXCERPT_MAX],
+            "… more: 4650 more error lines: pipeline_log run=7 step=\"T\" full=true start=1"
+        );
+        assert_eq!(out[EXCERPT_MAX + 1], "--- last 50 lines ---");
+    }
+
+    fn plain(n: usize, width: usize) -> Vec<(bool, String)> {
+        (0..n).map(|i| (false, format!("{i:0width$}"))).collect()
+    }
+
+    #[test]
+    fn page_cuts_at_lines_or_chars() {
+        let next = |n| format!("next {n}");
+        // The server ignored the range and sent 2500 short lines: 2000 shown.
+        let out = page(&plain(2500, 4), 1, Ok(None), next);
+        assert_eq!(out.lines().count(), PAGE as usize + 1);
+        assert!(out.ends_with("\n… more: next 2001"), "{out}");
+        // Ruling R8: 100-character lines stop at 40,000 characters (396 lines of 101 with the newline).
+        let out = page(&plain(2000, 100), 501, Ok(Some(2500)), next);
+        assert_eq!(out.lines().count(), 397);
+        assert!(out.ends_with("\n… more: next 897"), "{out}");
+        assert!(out.chars().count() < PAGE_CHARS + 100);
+        // All shown: more only when the line count says the log goes on.
+        assert_eq!(
+            page(&plain(10, 4), 1, Ok(Some(10)), next).lines().count(),
+            10
+        );
+        assert!(page(&plain(10, 4), 1, Ok(Some(11)), next).ends_with("… more: next 11"));
+        let e = ApiError::local("boom");
+        assert!(
+            page(&plain(10, 4), 1, Err(&e), next)
+                .ends_with("\n… line count unavailable (boom); if the log goes on: next 11")
+        );
+    }
+
+    fn records(json: serde_json::Value) -> Vec<TimelineRecord> {
+        serde_json::from_value(json).unwrap()
+    }
+
+    #[test]
+    fn tree_survives_bad_records() {
+        let recs = records(serde_json::json!([
+            {"id": "s", "type": "Stage", "name": "S", "order": 1},
+            // Same id as its parent: a loop.
+            {"id": "s", "parentId": "s", "type": "Phase", "name": "P", "order": 1},
+            {"parentId": "s", "type": "Job", "name": "J", "order": 2},
+            {"type": "Stage", "name": "No id", "order": 2},
+        ]));
+        let mut kids: Children = HashMap::new();
+        for r in &recs {
+            kids.entry(r.parent_id.as_deref()).or_default().push(r);
+        }
+        let mut out = Vec::new();
+        tree(&kids, None, 0, 0, &mut out);
+        assert!(out.len() < 20, "{out:?}");
+        assert_eq!(out[0], "S:");
+        assert!(out.contains(&"No id:".to_owned()), "{out:?}");
+        assert!(!out.iter().any(|l| l.contains('P')), "{out:?}");
+    }
+
+    #[test]
+    fn job_note_caps_issues_and_strips() {
+        let issues: Vec<serde_json::Value> = (0..25)
+            .map(|i| serde_json::json!({"type": "error", "message": format!("e{i}\x1b[31m\r\nx")}))
+            .collect();
+        let recs = records(serde_json::json!([
+            {"id": "j", "type": "Job", "name": "Deploy", "result": "failed", "issues": issues},
+        ]));
+        let (hits, notes) = targets(&recs, None, 7).unwrap();
+        assert_eq!(hits.len(), 0);
+        let lines: Vec<&str> = notes[0].lines().collect();
+        assert_eq!(lines.len(), 1 + ISSUES_MAX + 1);
+        assert_eq!(lines[1], "  error e0 x");
+        assert_eq!(lines[21], "  … 5 more issues: pipeline_view run=7");
+    }
+
+    #[test]
+    fn unknown_step_names_capped() {
+        let tasks: Vec<serde_json::Value> = (0..25)
+            .map(|i| serde_json::json!({"type": "Task", "name": format!("t{i}")}))
+            .collect();
+        let e = targets(&records(serde_json::Value::Array(tasks)), Some("x"), 7).unwrap_err();
+        assert!(
+            e.msg
+                .starts_with("no step \"x\" in run #7; its steps: t0, t1,"),
+            "{e}"
+        );
+        assert!(e.msg.ends_with(", t19 … and 5 more"), "{e}");
     }
 
     #[test]
