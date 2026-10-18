@@ -95,7 +95,13 @@ pub fn draw(f: &mut Frame, app: &App) {
     } else {
         app.status.as_str()
     };
-    let [l, r] = Layout::horizontal([Constraint::Min(0), Constraint::Length(48)]).areas(foot);
+    // The status gets what it needs, up to half the line; the help takes the rest.
+    let width = u16::try_from(status.chars().count() + 1).unwrap_or(u16::MAX);
+    let [l, r] = Layout::horizontal([
+        Constraint::Min(0),
+        Constraint::Length(width.min(foot.width / 2)),
+    ])
+    .areas(foot);
     f.render_widget(Paragraph::new(help).style(Style::new().fg(DIM)), l);
     f.render_widget(
         Paragraph::new(status)
