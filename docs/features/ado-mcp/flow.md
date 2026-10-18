@@ -61,7 +61,7 @@ MCP server.
 - **D3, 2026-10-18: build logs read raw** (Task 8). The crate's `get_build_log` reads the answer as a JSON string,
   but the server sends plain text, so `pipeline_log` reads the raw body of the same crate call (guard and error lines
   unchanged). Options: A, the raw read; B, none that works without patching the crate. Recommended A.
-  - Decision: pending.
+  - Decision: 2026-10-18, A ("yes, keep the raw log read").
 
 ## Skipped
 
