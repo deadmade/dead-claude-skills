@@ -15,8 +15,6 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
     let cfg = config::Config::from_env()?;
-    // ring, not aws-lc-rs: no cmake or C toolchain needed to build.
-    let _ = rustls::crypto::ring::default_provider().install_default();
     tools::Server::new(cfg)?
         .serve(stdio())
         .await?

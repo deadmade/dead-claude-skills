@@ -4,6 +4,7 @@
 pub const DESC_MAX: usize = 4000;
 
 /// The `YYYY-MM-DD` of an ISO timestamp, or `?` when there is none.
+#[allow(dead_code)] // wi_view uses it from Task 7
 pub fn date(iso: &str) -> String {
     if iso.is_empty() {
         "?".into()

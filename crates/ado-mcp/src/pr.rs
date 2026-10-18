@@ -2,14 +2,19 @@
 
 use std::fmt::Write as _;
 
-use reqwest::Method;
+use azure_devops_rust_api::build::models::BuildQueryOrder;
+use azure_devops_rust_api::git::models::{
+    CommentThread, GitPullRequest, GitPullRequestCommentThreadList, GitPullRequestList,
+    IdentityRef, PullRequestStatus, comment::CommentType,
+};
+use azure_devops_rust_api::wit::models::WorkItemBatchGetRequest;
 use rmcp::schemars::{self, JsonSchema};
 use serde::Deserialize;
-use serde_json::{Map, Value, json};
+use serde_json::{Map, Value};
 
-use crate::api::{ApiError, V71, V71_P1};
+use crate::api::{ApiError, V71_PREVIEW};
 use crate::ctx::{Ctx, Scope, given, seg};
-use crate::out::{DESC_MAX, clip, cut, date, more, ref_name};
+use crate::out::{DESC_MAX, clip, cut, more, ref_name};
 
 /// Where a tool works; all three default to the clone the server runs in.
 #[derive(Deserialize, JsonSchema)]
@@ -75,50 +80,6 @@ pub(crate) struct PrFilesArgs {
     pub id: Option<u32>,
 }
 
-#[derive(Deserialize)]
-struct List<T> {
-    value: Vec<T>,
-}
-
-#[derive(Deserialize, Default)]
-struct Person {
-    #[serde(rename = "displayName", default)]
-    name: String,
-}
-
-#[derive(Deserialize)]
-struct Reviewer {
-    #[serde(rename = "displayName", default)]
-    name: String,
-    #[serde(default)]
-    vote: i32,
-    #[serde(rename = "isRequired", default)]
-    required: bool,
-}
-
-#[derive(Deserialize)]
-pub(crate) struct Pr {
-    #[serde(rename = "pullRequestId")]
-    pub id: u32,
-    #[serde(default)]
-    pub status: String,
-    #[serde(rename = "isDraft", default)]
-    pub draft: bool,
-    #[serde(default)]
-    pub title: String,
-    #[serde(rename = "createdBy", default)]
-    author: Person,
-    /// With `refs/heads/`.
-    #[serde(rename = "sourceRefName", default)]
-    pub source: String,
-    /// With `refs/heads/`.
-    #[serde(rename = "targetRefName", default)]
-    pub target: String,
-    pub description: Option<String>,
-    #[serde(default)]
-    reviewers: Vec<Reviewer>,
-}
-
 impl Where {
     /// The scope, which must name a repo.
     async fn scope(&self, ctx: &Ctx) -> Result<Scope, ApiError> {
@@ -128,23 +89,22 @@ impl Where {
             self.branch.as_deref(),
         );
         let s = ctx.scope(p, r, b).await?;
-        prs_path(&s)?;
+        repo_id(&s)?;
         Ok(s)
     }
 }
 
-/// `{project}/_apis/git/repositories/{repo}/pullrequests`, by id.
-fn prs_path(s: &Scope) -> Result<String, ApiError> {
-    let repo = s.repo_id.as_deref().ok_or_else(|| {
+/// The scope's repo id and project id, as path segments.
+fn ids(s: &Scope) -> Result<(String, String), ApiError> {
+    Ok((seg(repo_id(s)?), seg(&s.project_id)))
+}
+
+fn repo_id(s: &Scope) -> Result<&str, ApiError> {
+    s.repo_id.as_deref().ok_or_else(|| {
         ApiError::local(
             "no repo: pass repo, or open Claude Code in a clone of an Azure DevOps repo",
         )
-    })?;
-    Ok(format!(
-        "{}/_apis/git/repositories/{}/pullrequests",
-        seg(&s.project_id),
-        seg(repo)
-    ))
+    })
 }
 
 /// `refs/heads/{branch}`, unless it already is a ref.
@@ -156,23 +116,31 @@ fn full_ref(branch: &str) -> String {
     }
 }
 
+fn name(i: &IdentityRef) -> &str {
+    i.graph_subject_base
+        .display_name
+        .as_deref()
+        .unwrap_or_default()
+}
+
 /// `!{id}  {status}  {source} → {target}  "{title}"  {author}  {n} approvals`
-fn line(pr: &Pr) -> String {
-    let approvals = pr.reviewers.iter().filter(|r| r.vote >= 5).count();
-    let rejected = if pr.reviewers.iter().any(|r| r.vote == -10) {
+fn line(pr: &GitPullRequest) -> String {
+    let votes = || pr.reviewers.iter().map(|r| r.vote.unwrap_or_default());
+    let approvals = votes().filter(|v| *v >= 5).count();
+    let rejected = if votes().any(|v| v == -10) {
         ", rejected"
     } else {
         ""
     };
     format!(
         "!{}  {}{}  {} → {}  \"{}\"  {}  {approvals} approvals{rejected}",
-        pr.id,
+        pr.pull_request_id,
         pr.status,
-        if pr.draft { " draft" } else { "" },
-        ref_name(&pr.source),
-        ref_name(&pr.target),
-        pr.title,
-        pr.author.name
+        if pr.is_draft { " draft" } else { "" },
+        ref_name(&pr.source_ref_name),
+        ref_name(&pr.target_ref_name),
+        pr.title.as_deref().unwrap_or_default(),
+        name(&pr.created_by)
     )
 }
 
@@ -180,33 +148,75 @@ fn line(pr: &Pr) -> String {
 /// When the scope, a user or the server fails.
 pub(crate) async fn pr_list(ctx: &Ctx, a: &PrListArgs) -> Result<String, ApiError> {
     let limit = a.limit.unwrap_or(20).max(1);
-    let status = given(a.status.as_deref()).unwrap_or("active");
-    if !["active", "completed", "abandoned", "all"].contains(&status) {
-        return Err(ApiError::local(
-            "status is active, completed, abandoned or all",
-        ));
-    }
-    let mut q = vec![
-        ("searchCriteria.status", status.to_owned()),
-        ("$top", (limit + 1).to_string()),
-    ];
-    if let Some(u) = given(a.creator.as_deref()) {
-        q.push(("searchCriteria.creatorId", ctx.user(u).await?.id));
-    }
-    if let Some(u) = given(a.reviewer.as_deref()) {
-        q.push(("searchCriteria.reviewerId", ctx.user(u).await?.id));
-    }
-    if let Some(b) = given(a.source.as_deref()) {
-        q.push(("searchCriteria.sourceRefName", full_ref(b)));
-    }
-    if let Some(b) = given(a.target.as_deref()) {
-        q.push(("searchCriteria.targetRefName", full_ref(b)));
-    }
+    let status = match given(a.status.as_deref()).unwrap_or("active") {
+        "active" => Some(PullRequestStatus::Active),
+        "completed" => Some(PullRequestStatus::Completed),
+        "abandoned" => Some(PullRequestStatus::Abandoned),
+        "all" => None,
+        _ => {
+            return Err(ApiError::local(
+                "status is active, completed, abandoned or all",
+            ));
+        }
+    };
+    let top = i32::try_from(limit.saturating_add(1)).unwrap_or(i32::MAX);
+    let creator = match given(a.creator.as_deref()) {
+        Some(u) => Some(ctx.user(u).await?.id),
+        None => None,
+    };
+    let reviewer = match given(a.reviewer.as_deref()) {
+        Some(u) => Some(ctx.user(u).await?.id),
+        None => None,
+    };
+    let source = given(a.source.as_deref()).map(full_ref);
+    let target = given(a.target.as_deref()).map(full_ref);
     let first = a.at.scope(ctx).await?;
-    let prs: List<Pr> = ctx
+    let prs = ctx
         .retry_stale(&first.key, || async {
             let s = a.at.scope(ctx).await?;
-            ctx.api.get(&prs_path(&s)?, &q, V71).await
+            let (api, (repo, proj)) = (&ctx.api, ids(&s)?);
+            let Some(status) = &status else {
+                // By hand: the crate's `PullRequestStatus` has no `all`.
+                let filters = [
+                    ("searchCriteria.creatorId", &creator),
+                    ("searchCriteria.reviewerId", &reviewer),
+                    ("searchCriteria.sourceRefName", &source),
+                    ("searchCriteria.targetRefName", &target),
+                ];
+                let mut q = vec![
+                    ("searchCriteria.status", "all".to_owned()),
+                    ("$top", top.to_string()),
+                ];
+                q.extend(
+                    filters
+                        .iter()
+                        .filter_map(|(k, v)| Some((*k, (*v).clone()?))),
+                );
+                let path = format!("{proj}/_apis/git/repositories/{repo}/pullrequests");
+                return api.get::<GitPullRequestList>(&path, &q, V71_PREVIEW).await;
+            };
+            api.az(|| {
+                let mut b = api
+                    .git
+                    .pull_requests_client()
+                    .get_pull_requests(&api.org, &repo, &proj)
+                    .search_criteria_status(status.clone())
+                    .top(top);
+                if let Some(v) = &creator {
+                    b = b.search_criteria_creator_id(v);
+                }
+                if let Some(v) = &reviewer {
+                    b = b.search_criteria_reviewer_id(v);
+                }
+                if let Some(v) = &source {
+                    b = b.search_criteria_source_ref_name(v);
+                }
+                if let Some(v) = &target {
+                    b = b.search_criteria_target_ref_name(v);
+                }
+                b.into_future()
+            })
+            .await
         })
         .await?;
     let (prs, has_more) = cut(prs.value, limit);
@@ -225,89 +235,87 @@ pub(crate) async fn pr_list(ctx: &Ctx, a: &PrListArgs) -> Result<String, ApiErro
 ///
 /// # Errors
 /// When there is no such PR, no branch to look for, or the server fails.
-pub(crate) async fn resolve_pr(ctx: &Ctx, scope: &Scope, id: Option<u32>) -> Result<Pr, ApiError> {
-    let base = prs_path(scope)?;
+pub(crate) async fn resolve_pr(
+    ctx: &Ctx,
+    scope: &Scope,
+    id: Option<u32>,
+) -> Result<GitPullRequest, ApiError> {
+    let (api, (repo, proj)) = (&ctx.api, ids(scope)?);
+    let prs = api.git.pull_requests_client();
     if let Some(id) = id {
+        let not_found = |e: ApiError| e.with_what(&format!("PR !{id}"));
+        let n = i32::try_from(id).map_err(|_| ApiError::local(format!("not found: PR !{id}")))?;
         // A 404 here means the PR doesn't exist, so no `retry_stale`.
-        return ctx
-            .api
-            .get(&format!("{base}/{id}"), &[], V71)
+        return api
+            .az(|| {
+                prs.get_pull_request(&api.org, &repo, n, &proj)
+                    .into_future()
+            })
             .await
-            .map_err(|e| e.with_what(&format!("PR !{id}")));
+            .map_err(not_found);
     }
     let branch = scope
         .branch
         .as_deref()
         .ok_or_else(|| ApiError::local("no branch: pass id or branch"))?;
-    let q = [
-        ("searchCriteria.sourceRefName", full_ref(branch)),
-        ("searchCriteria.status", "active".to_owned()),
-        ("$top", "1".to_owned()),
-    ];
-    let mut found = ctx.api.get::<List<Pr>>(&base, &q, V71).await?.value;
+    let mut found = api
+        .az(|| {
+            prs.get_pull_requests(&api.org, &repo, &proj)
+                .search_criteria_source_ref_name(full_ref(branch))
+                .search_criteria_status(PullRequestStatus::Active)
+                .top(1)
+                .into_future()
+        })
+        .await?
+        .value;
     if found.is_empty() {
         return Err(ApiError::local(format!("no active PR for branch {branch}")));
     }
     Ok(found.remove(0))
 }
 
-#[derive(Deserialize)]
-struct Eval {
-    #[serde(default)]
-    status: String,
-    configuration: Option<EvalConfig>,
-}
-
-#[derive(Deserialize)]
-struct EvalConfig {
-    #[serde(rename = "type")]
-    kind: Option<EvalType>,
-}
-
-#[derive(Deserialize)]
-struct EvalType {
-    #[serde(rename = "displayName", default)]
-    name: String,
-}
-
-async fn checks(ctx: &Ctx, s: &Scope, id: u32) -> Result<Vec<String>, ApiError> {
-    let q = [(
-        "artifactId",
-        format!("vstfs:///CodeReview/CodeReviewId/{}/{id}", s.project_id),
-    )];
-    let path = format!("{}/_apis/policy/evaluations", seg(&s.project_id));
-    let evals: List<Eval> = ctx.api.get(&path, &q, V71_P1).await?;
+async fn checks(ctx: &Ctx, s: &Scope, id: i32) -> Result<Vec<String>, ApiError> {
+    let (api, proj) = (&ctx.api, seg(&s.project_id));
+    let artifact = format!("vstfs:///CodeReview/CodeReviewId/{}/{id}", s.project_id);
+    let evals = api
+        .az(|| {
+            api.policy
+                .evaluations_client()
+                .list(&api.org, &proj, &artifact)
+                .into_future()
+        })
+        .await?;
     Ok(evals
         .value
         .iter()
         .map(|e| {
-            let name = e.configuration.as_ref().and_then(|c| c.kind.as_ref());
+            let kind = e.configuration.as_ref().and_then(|c| {
+                c.versioned_policy_configuration_ref
+                    .policy_configuration_ref
+                    .type_
+                    .as_ref()
+            });
+            let status = e.status.as_ref().map(ToString::to_string);
             format!(
                 "{}: {}",
-                name.map_or("policy", |t| t.name.as_str()),
-                e.status
+                kind.map_or("policy", |t| t.display_name.as_str()),
+                status.unwrap_or_default()
             )
         })
         .collect())
 }
 
-#[derive(Deserialize)]
-struct WiRef {
-    id: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct Wi {
-    id: u32,
-    fields: Map<String, Value>,
-}
-
-async fn work_items(ctx: &Ctx, s: &Scope, id: u32) -> Result<Vec<String>, ApiError> {
-    let refs: List<WiRef> = ctx
-        .api
-        .get(&format!("{}/{id}/workitems", prs_path(s)?), &[], V71)
+async fn work_items(ctx: &Ctx, s: &Scope, id: i32) -> Result<Vec<String>, ApiError> {
+    let (api, (repo, proj)) = (&ctx.api, ids(s)?);
+    let refs = api
+        .az(|| {
+            api.git
+                .pull_request_work_items_client()
+                .list(&api.org, &repo, id, &proj)
+                .into_future()
+        })
         .await?;
-    let ids: Vec<u32> = refs
+    let ids: Vec<i32> = refs
         .value
         .iter()
         .filter_map(|r| r.id.as_deref()?.parse().ok())
@@ -315,26 +323,23 @@ async fn work_items(ctx: &Ctx, s: &Scope, id: u32) -> Result<Vec<String>, ApiErr
     if ids.is_empty() {
         return Ok(vec![]);
     }
-    let body = json!({"ids": ids,
-        "fields": ["System.Title", "System.WorkItemType", "System.State"]});
-    let items: List<Wi> = ctx
-        .api
-        .send(
-            Method::POST,
-            "_apis/wit/workitemsbatch",
-            &[],
-            V71,
-            &body,
-            false,
-        )
-        .await?;
-    let field = |w: &Wi, k: &str| {
-        w.fields
-            .get(k)
-            .and_then(Value::as_str)
-            .unwrap_or("?")
-            .to_owned()
+    let body = WorkItemBatchGetRequest {
+        ids,
+        fields: ["System.Title", "System.WorkItemType", "System.State"]
+            .map(String::from)
+            .into(),
+        ..WorkItemBatchGetRequest::default()
     };
+    // No project: linked items can sit in another one. The guard cuts the `//` this leaves.
+    let items = api
+        .az(|| {
+            api.wit
+                .work_items_client()
+                .get_work_items_batch(&api.org, body.clone(), "")
+                .into_future()
+        })
+        .await?;
+    let field = |f: &Value, k: &str| f.get(k).and_then(Value::as_str).unwrap_or("?").to_owned();
     Ok(items
         .value
         .iter()
@@ -342,64 +347,55 @@ async fn work_items(ctx: &Ctx, s: &Scope, id: u32) -> Result<Vec<String>, ApiErr
             format!(
                 "#{} {} {} \"{}\"",
                 w.id,
-                field(w, "System.WorkItemType"),
-                field(w, "System.State"),
-                field(w, "System.Title")
+                field(&w.fields, "System.WorkItemType"),
+                field(&w.fields, "System.State"),
+                field(&w.fields, "System.Title")
             )
         })
         .collect())
 }
 
-#[derive(Deserialize)]
-struct Build {
-    id: u32,
-    result: Option<String>,
-    #[serde(default)]
-    status: String,
-    #[serde(rename = "queueTime", default)]
-    queued: String,
-    definition: BuildDef,
-}
-
-#[derive(Deserialize)]
-struct BuildDef {
-    #[serde(default)]
-    name: String,
-}
-
 /// The newest build of the PR's merge ref, else of its source branch.
-async fn latest_run(ctx: &Ctx, s: &Scope, pr: &Pr) -> Result<String, ApiError> {
-    let path = format!("{}/_apis/build/builds", seg(&s.project_id));
-    for branch in [format!("refs/pull/{}/merge", pr.id), pr.source.clone()] {
-        let mut q = vec![
-            ("branchName", branch),
-            ("queryOrder", "queueTimeDescending".to_owned()),
-            ("$top", "1".to_owned()),
-        ];
-        if let Some(repo) = &s.repo_id {
-            q.push(("repositoryId", repo.clone()));
-            q.push(("repositoryType", "TfsGit".to_owned()));
-        }
-        if let Some(b) = ctx
-            .api
-            .get::<List<Build>>(&path, &q, V71)
-            .await?
-            .value
-            .first()
-        {
-            let state = b.result.as_deref().unwrap_or(&b.status);
+async fn latest_run(ctx: &Ctx, s: &Scope, pr: &GitPullRequest) -> Result<String, ApiError> {
+    let (api, proj) = (&ctx.api, seg(&s.project_id));
+    let merge = format!("refs/pull/{}/merge", pr.pull_request_id);
+    for branch in [&merge, &pr.source_ref_name] {
+        let builds = api
+            .az(|| {
+                let mut b = api
+                    .build
+                    .builds_client()
+                    .list(&api.org, &proj)
+                    .branch_name(branch)
+                    .query_order(BuildQueryOrder::QueueTimeDescending)
+                    .top(1);
+                if let Some(repo) = &s.repo_id {
+                    b = b.repository_id(repo).repository_type("TfsGit");
+                }
+                b.into_future()
+            })
+            .await?;
+        if let Some(b) = builds.value.first() {
+            let state = b
+                .result
+                .as_ref()
+                .map(ToString::to_string)
+                .or_else(|| b.status.as_ref().map(ToString::to_string))
+                .unwrap_or_default();
+            let queued = b
+                .queue_time
+                .map_or_else(|| "?".into(), |t| t.date().to_string());
             return Ok(format!(
-                "#{} {} {state} {}",
+                "#{} {} {state} {queued}",
                 b.id,
-                b.definition.name,
-                date(&b.queued)
+                b.definition.name.as_deref().unwrap_or_default()
             ));
         }
     }
     Ok("none".into())
 }
 
-fn vote(v: i32) -> &'static str {
+fn vote(v: i64) -> &'static str {
     match v {
         10 => "approved",
         5 => "approved with suggestions",
@@ -420,7 +416,11 @@ fn section(out: &mut String, title: &str, lines: &[String]) {
 }
 
 /// The scope and the PR, looked up once more when a cached repo id turns out stale.
-async fn find_pr(ctx: &Ctx, at: &Where, id: Option<u32>) -> Result<(Scope, Pr), ApiError> {
+async fn find_pr(
+    ctx: &Ctx,
+    at: &Where,
+    id: Option<u32>,
+) -> Result<(Scope, GitPullRequest), ApiError> {
     let first = at.scope(ctx).await?;
     ctx.retry_stale(&first.key, || async {
         let s = at.scope(ctx).await?;
@@ -434,9 +434,10 @@ async fn find_pr(ctx: &Ctx, at: &Where, id: Option<u32>) -> Result<(Scope, Pr), 
 /// When the scope, the PR or the server fails.
 pub(crate) async fn pr_view(ctx: &Ctx, a: &PrViewArgs) -> Result<String, ApiError> {
     let (s, pr) = find_pr(ctx, &a.at, a.id).await?;
+    let id = pr.pull_request_id;
     let (checks, items, run) = tokio::join!(
-        checks(ctx, &s, pr.id),
-        work_items(ctx, &s, pr.id),
+        checks(ctx, &s, id),
+        work_items(ctx, &s, id),
         latest_run(ctx, &s, &pr)
     );
     let mut out = line(&pr);
@@ -444,8 +445,13 @@ pub(crate) async fn pr_view(ctx: &Ctx, a: &PrViewArgs) -> Result<String, ApiErro
         .reviewers
         .iter()
         .map(|r| {
-            let req = if r.required { " (required)" } else { "" };
-            format!("{}: {}{req}", r.name, vote(r.vote))
+            let req = if r.is_required == Some(true) {
+                " (required)"
+            } else {
+                ""
+            };
+            let v = vote(r.vote.unwrap_or_default());
+            format!("{}: {v}{req}", name(&r.identity_ref))
         })
         .collect();
     section(&mut out, "reviewers:", &reviewers);
@@ -470,64 +476,38 @@ pub(crate) async fn pr_view(ctx: &Ctx, a: &PrViewArgs) -> Result<String, ApiErro
         let desc = if a.full == Some(true) {
             desc.to_owned()
         } else {
-            clip(desc, DESC_MAX, &format!("pr_view id={} full=true", pr.id))
+            clip(desc, DESC_MAX, &format!("pr_view id={id} full=true"))
         };
         let _ = write!(out, "\n\n{desc}");
     }
     Ok(out)
 }
 
+/// What the thread model can't hold: its `properties` (a `PropertiesCollection`) drops the property names.
 #[derive(Deserialize)]
-pub(crate) struct Thread {
-    id: u32,
-    status: Option<String>,
-    #[serde(rename = "isDeleted", default)]
-    deleted: bool,
-    #[serde(rename = "threadContext")]
-    context: Option<ThreadContext>,
-    #[serde(default)]
-    comments: Vec<Comment>,
+struct Props {
     properties: Option<Map<String, Value>>,
 }
 
 #[derive(Deserialize)]
-struct ThreadContext {
-    #[serde(rename = "filePath")]
-    path: Option<String>,
-    #[serde(rename = "rightFileStart")]
-    right: Option<Pos>,
-    #[serde(rename = "leftFileStart")]
-    left: Option<Pos>,
-}
-
-#[derive(Deserialize)]
-struct Pos {
-    line: Option<u32>,
-}
-
-#[derive(Deserialize)]
-struct Comment {
-    content: Option<String>,
-    #[serde(rename = "commentType")]
-    kind: Option<String>,
-    #[serde(rename = "isDeleted", default)]
-    deleted: bool,
-    #[serde(default)]
-    author: Person,
+struct List<T> {
+    value: Vec<T>,
 }
 
 /// Threads the server writes itself (votes, policy and push updates) rather than a person.
-fn is_system(t: &Thread) -> bool {
-    t.properties
+fn is_system(t: &CommentThread, p: &Props) -> bool {
+    p.properties
         .as_ref()
         .is_some_and(|p| p.contains_key("CodeReviewThreadType"))
         || t.comments
             .iter()
-            .all(|c| matches!(c.kind.as_deref(), None | Some("system")))
+            .all(|c| matches!(c.comment_type, None | Some(CommentType::System)))
 }
 
-fn status(t: &Thread) -> &str {
-    t.status.as_deref().unwrap_or("unknown")
+fn status(t: &CommentThread) -> String {
+    t.status
+        .as_ref()
+        .map_or_else(|| "unknown".into(), ToString::to_string)
 }
 
 /// `/src/a.rs` as `src/a.rs`.
@@ -535,17 +515,17 @@ fn rel(path: &str) -> &str {
     path.trim_start_matches('/')
 }
 
-fn thread_text(t: &Thread) -> String {
-    let mut out = format!("#{} {}", t.id, status(t));
-    if let Some(ThreadContext {
-        path: Some(path),
-        right,
-        left,
-    }) = &t.context
+fn thread_text(t: &CommentThread) -> String {
+    let mut out = format!("#{} {}", t.id.unwrap_or_default(), status(t));
+    if let Some(ctx) = &t.thread_context
+        && let Some(path) = &ctx.file_path
     {
-        let line = right.as_ref().or(left.as_ref()).and_then(|p| p.line);
+        let pos = ctx
+            .right_file_start
+            .as_ref()
+            .or(ctx.left_file_start.as_ref());
         let _ = write!(out, "  {}", rel(path));
-        if let Some(n) = line {
+        if let Some(n) = pos.and_then(|p| p.line) {
             let _ = write!(out, ":{n}");
         }
     }
@@ -558,28 +538,52 @@ fn thread_text(t: &Thread) -> String {
         let _ = write!(
             out,
             "\n   {}: {}",
-            c.author.name,
+            c.author.as_ref().map_or("", name),
             text.replace('\n', "\n      ")
         );
     }
     out
 }
 
+fn unexpected(e: &serde_json::Error) -> ApiError {
+    ApiError::local(format!("unexpected answer from the server: {e}"))
+}
+
 /// # Errors
 /// When the scope, the PR or the server fails.
 pub(crate) async fn pr_threads(ctx: &Ctx, a: &PrThreadsArgs) -> Result<String, ApiError> {
     let (s, pr) = find_pr(ctx, &a.at, a.id).await?;
+    let (api, (repo, proj)) = (&ctx.api, ids(&s)?);
+    let id = pr.pull_request_id;
     let all = a.all == Some(true);
     let limit = a.limit.unwrap_or(20).max(1);
-    let path = format!("{}/{}/threads", prs_path(&s)?, pr.id);
-    let mut threads = ctx.api.get::<List<Thread>>(&path, &[], V71).await?.value;
-    threads.retain_mut(|t| {
-        t.comments.retain(|c| !c.deleted);
-        !t.deleted && !t.comments.is_empty() && !is_system(t)
-    });
+    let body = api
+        .az(|| {
+            api.git
+                .pull_request_threads_client()
+                .list(&api.org, &repo, id, &proj)
+                .send()
+        })
+        .await?
+        .into_raw_response()
+        .into_body();
+    let list: GitPullRequestCommentThreadList =
+        serde_json::from_slice(&body).map_err(|e| unexpected(&e))?;
+    let props: List<Props> = serde_json::from_slice(&body).map_err(|e| unexpected(&e))?;
+    let mut threads: Vec<CommentThread> = list
+        .value
+        .into_iter()
+        .zip(&props.value)
+        .filter_map(|(t, p)| {
+            let mut t = t.comment_thread;
+            t.comments.retain(|c| c.is_deleted != Some(true));
+            let keep = t.is_deleted != Some(true) && !t.comments.is_empty() && !is_system(&t, p);
+            keep.then_some(t)
+        })
+        .collect();
     let before = threads.len();
     if !all {
-        threads.retain(|t| matches!(status(t), "active" | "pending" | "unknown"));
+        threads.retain(|t| matches!(status(t).as_str(), "active" | "pending" | "unknown"));
     }
     let hidden = before - threads.len();
     let (threads, has_more) = cut(threads, limit);
@@ -587,15 +591,13 @@ pub(crate) async fn pr_threads(ctx: &Ctx, a: &PrThreadsArgs) -> Result<String, A
     if has_more {
         let all_arg = if all { " all=true" } else { "" };
         lines.push(more(&format!(
-            "pr_threads id={}{all_arg} limit={}",
-            pr.id,
+            "pr_threads id={id}{all_arg} limit={}",
             limit * 2
         )));
     }
     if hidden > 0 {
         lines.push(format!(
-            "{hidden} resolved threads hidden: pr_threads id={} all=true",
-            pr.id
+            "{hidden} resolved threads hidden: pr_threads id={id} all=true"
         ));
     }
     Ok(if lines.is_empty() {
@@ -603,32 +605,6 @@ pub(crate) async fn pr_threads(ctx: &Ctx, a: &PrThreadsArgs) -> Result<String, A
     } else {
         lines.join("\n")
     })
-}
-
-#[derive(Deserialize)]
-struct Iteration {
-    id: Option<u32>,
-}
-
-#[derive(Deserialize)]
-struct Changes {
-    #[serde(rename = "changeEntries", default)]
-    entries: Vec<Change>,
-    #[serde(rename = "nextSkip")]
-    next_skip: Option<u32>,
-}
-
-#[derive(Deserialize)]
-struct Change {
-    #[serde(rename = "changeType", default)]
-    kind: String,
-    item: Option<ChangeItem>,
-}
-
-#[derive(Deserialize)]
-struct ChangeItem {
-    #[serde(default)]
-    path: String,
 }
 
 /// Whether `name` is safe to paste into a shell command.
@@ -640,47 +616,57 @@ fn plain_ref(name: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || "._/-".contains(c))
 }
 
-const MAX_FILES: usize = 2000;
+const MAX_FILES: u16 = 2000;
 
 /// # Errors
 /// When the scope, the PR or the server fails.
 pub(crate) async fn pr_files(ctx: &Ctx, a: &PrFilesArgs) -> Result<String, ApiError> {
     let (s, pr) = find_pr(ctx, &a.at, a.id).await?;
-    let base = format!("{}/{}/iterations", prs_path(&s)?, pr.id);
-    let last = ctx
-        .api
-        .get::<List<Iteration>>(&base, &[], V71)
+    let (api, (repo, proj)) = (&ctx.api, ids(&s)?);
+    let id = pr.pull_request_id;
+    let last = api
+        .az(|| {
+            api.git
+                .pull_request_iterations_client()
+                .list(&api.org, &repo, id, &proj)
+                .into_future()
+        })
         .await?
         .value
         .iter()
         .filter_map(|i| i.id)
         .max()
-        .ok_or_else(|| ApiError::local(format!("PR !{} has no iterations", pr.id)))?;
-    let path = format!("{base}/{last}/changes");
+        .ok_or_else(|| ApiError::local(format!("PR !{id} has no iterations")))?;
+    let changes = api.git.pull_request_iteration_changes_client();
     let mut files = Vec::new();
     let mut skip = 0;
     loop {
-        let q = [("$top", MAX_FILES.to_string()), ("$skip", skip.to_string())];
-        let page: Changes = ctx.api.get(&path, &q, V71).await?;
-        let empty = page.entries.is_empty();
-        files.extend(page.entries);
+        let page = api
+            .az(|| {
+                changes
+                    .get(&api.org, &repo, id, last, &proj)
+                    .top(i32::from(MAX_FILES))
+                    .skip(skip)
+                    .into_future()
+            })
+            .await?;
+        let empty = page.change_entries.is_empty();
+        files.extend(page.change_entries);
         skip = page.next_skip.unwrap_or(0);
         // An empty page with a `nextSkip` would repeat forever.
-        if skip == 0 || empty || files.len() >= MAX_FILES {
+        if skip == 0 || empty || files.len() >= usize::from(MAX_FILES) {
             break;
         }
     }
-    let has_more = files.len() > MAX_FILES || skip > 0;
-    files.truncate(MAX_FILES);
-    let (source, target) = (ref_name(&pr.source), ref_name(&pr.target));
+    let has_more = files.len() > usize::from(MAX_FILES) || skip > 0;
+    files.truncate(usize::from(MAX_FILES));
+    let (source, target) = (ref_name(&pr.source_ref_name), ref_name(&pr.target_ref_name));
     let mut lines: Vec<String> = files
         .iter()
         .map(|f| {
-            format!(
-                "{}  {}",
-                f.kind,
-                rel(f.item.as_ref().map_or("", |i| &i.path))
-            )
+            let change = &f.git_change.change;
+            let path = change.item.as_ref().and_then(|i| i.get("path")?.as_str());
+            format!("{}  {}", change.change_type, rel(path.unwrap_or_default()))
         })
         .collect();
     // The names come from the server and a branch name may hold shell syntax: only plain ones go in a command.
@@ -698,10 +684,14 @@ pub(crate) async fn pr_files(ctx: &Ctx, a: &PrFilesArgs) -> Result<String, ApiEr
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
 
-    fn thread(json: &Value) -> Thread {
-        serde_json::from_value(json.clone()).unwrap()
+    fn system(json: &Value) -> bool {
+        let t: CommentThread = serde_json::from_value(json.clone()).unwrap();
+        let p: Props = serde_json::from_value(json.clone()).unwrap();
+        is_system(&t, &p)
     }
 
     #[test]
@@ -715,12 +705,12 @@ mod tests {
     #[test]
     fn system_threads() {
         let sys = json!({"id": 1, "comments": [{"commentType": "system"}, {}]});
-        assert!(is_system(&thread(&sys)));
+        assert!(system(&sys));
         let vote = json!({"id": 2, "properties": {"CodeReviewThreadType": {}},
             "comments": [{"commentType": "text"}]});
-        assert!(is_system(&thread(&vote)));
+        assert!(system(&vote));
         let human =
             json!({"id": 3, "comments": [{"commentType": "system"}, {"commentType": "text"}]});
-        assert!(!is_system(&thread(&human)));
+        assert!(!system(&human));
     }
 }

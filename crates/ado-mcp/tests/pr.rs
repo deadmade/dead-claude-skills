@@ -14,6 +14,8 @@ const WI_BATCH: &str = "/tfs/Coll/_apis/wit/workitemsbatch";
 const POLICY: &str = "/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/policy/evaluations";
 const BUILDS: &str = "/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/build/builds";
 const PRS: &str = "/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/pullrequests";
+/// The crate spells the PR's own sub-resources `pullRequests`.
+const PR412: &str = "/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/pullRequests/412";
 
 /// A server inside a clone of the collection's own repo; the PR routes come from the test.
 fn env(fx: &Fixture) -> Mcp {
@@ -27,7 +29,7 @@ fn view_routes(fx: &Fixture) {
     fx.route(&format!("{PRS}/412"), vec![fixture("pr.json")]);
     fx.route(POLICY, vec![fixture("policy-evaluations.json")]);
     fx.route(
-        &format!("{PRS}/412/workitems"),
+        &format!("{PR412}/workitems"),
         vec![fixture("pr-workitems.json")],
     );
     fx.route(WI_BATCH, vec![fixture("wi-batch.json")]);
@@ -204,7 +206,7 @@ fn view_sections() {
         )),
         "{q}"
     );
-    assert!(q.contains("api-version=7.1-preview.1"), "{q}");
+    assert!(q.split('&').any(|p| p == "api-version=7.1-preview"), "{q}");
     let batch = fx
         .requests()
         .into_iter()
@@ -272,7 +274,7 @@ fn view_concurrent() {
     let slow = Duration::from_millis(300);
     fx.route(POLICY, vec![fixture("policy-evaluations.json").delay(slow)]);
     fx.route(
-        &format!("{PRS}/412/workitems"),
+        &format!("{PR412}/workitems"),
         vec![fixture("pr-workitems.json").delay(slow)],
     );
     fx.route(BUILDS, vec![fixture("builds-one.json").delay(slow)]);
@@ -288,7 +290,7 @@ fn threads_hide_system_and_resolved() {
     let fx = Fixture::start();
     fx.route(&format!("{PRS}/412"), vec![fixture("pr.json")]);
     fx.route(
-        &format!("{PRS}/412/threads"),
+        &format!("{PR412}/threads"),
         vec![fixture("pr-threads.json")],
     );
     let mut mcp = env(&fx);
@@ -330,7 +332,7 @@ fn thread_location() {
     let left = ctx["rightFileStart"].take();
     ctx["leftFileStart"] = left;
     ctx.as_object_mut().unwrap().remove("rightFileStart");
-    fx.route(&format!("{PRS}/412/threads"), vec![Resp::json(&threads)]);
+    fx.route(&format!("{PR412}/threads"), vec![Resp::json(&threads)]);
     let text = ok(&mut env(&fx), "pr_threads", json!({"id": 412, "limit": 1}));
     assert!(text.starts_with("#7 active  src/auth.rs:88\n"), "{text}");
     assert!(text.contains("… more: pr_threads id=412 limit=2"), "{text}");
@@ -341,10 +343,10 @@ fn files_follow_next_skip() {
     let fx = Fixture::start();
     fx.route(&format!("{PRS}/412"), vec![fixture("pr.json")]);
     fx.route(
-        &format!("{PRS}/412/iterations"),
+        &format!("{PR412}/iterations"),
         vec![fixture("iterations.json")],
     );
-    let changes = format!("{PRS}/412/iterations/2/changes");
+    let changes = format!("{PR412}/iterations/2/changes");
     fx.route(
         &changes,
         vec![
@@ -379,7 +381,7 @@ fn view_tolerates_entries_without_configuration_or_id() {
         .push(json!({"status": "broken", "configuration": {"id": 9}}));
     fx.route(POLICY, vec![Resp::json(&evals)]);
     fx.route(
-        &format!("{PRS}/412/workitems"),
+        &format!("{PR412}/workitems"),
         vec![Resp::json(&json!({"value": [{"url": "x"}, {"id": "77"}]}))],
     );
     let text = ok(&mut env(&fx), "pr_view", json!({"id": 412}));
@@ -420,11 +422,11 @@ fn files_keep_odd_ref_names_out_of_commands() {
     pr["sourceRefName"] = json!("refs/heads/x;rm -rf ~");
     fx.route(&format!("{PRS}/412"), vec![Resp::json(&pr)]);
     fx.route(
-        &format!("{PRS}/412/iterations"),
+        &format!("{PR412}/iterations"),
         vec![Resp::json(&json!({"value": [{}, {"id": 1}]}))],
     );
     fx.route(
-        &format!("{PRS}/412/iterations/1/changes"),
+        &format!("{PR412}/iterations/1/changes"),
         vec![fixture("iteration-changes-p2.json")],
     );
     let text = ok(&mut env(&fx), "pr_files", json!({"id": 412}));
@@ -440,10 +442,10 @@ fn files_stop_on_an_empty_page() {
     let fx = Fixture::start();
     fx.route(&format!("{PRS}/412"), vec![fixture("pr.json")]);
     fx.route(
-        &format!("{PRS}/412/iterations"),
+        &format!("{PR412}/iterations"),
         vec![fixture("iterations.json")],
     );
-    let changes = format!("{PRS}/412/iterations/2/changes");
+    let changes = format!("{PR412}/iterations/2/changes");
     // The last answer repeats for every further request.
     fx.route(
         &changes,

@@ -1,12 +1,23 @@
-//! The Azure DevOps REST client: PAT auth, api-versions, timeouts, and errors that fit on one line.
+//! The Azure DevOps client: the crate's clients behind our own reqwest client, PAT auth, timeouts, and errors that
+//! fit on one line. `/vsts/info` and `connectionData`, which the crate doesn't cover, are sent by hand.
 // The tools that use the rest of this come with later tasks.
 #![allow(dead_code)]
 
 use std::error::Error as _;
 use std::fmt;
+use std::future::Future;
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
+use async_trait::async_trait;
+use azure_core::error::ErrorKind;
+use azure_core::http::headers::{
+    CONTENT_TYPE as AZ_CONTENT_TYPE, RETRY_AFTER as AZ_RETRY_AFTER, USER_AGENT,
+};
+use azure_core::http::policies::{Policy, PolicyResult};
+use azure_core::http::{Context, Request, RetryOptions, Transport};
+use azure_devops_rust_api::{Credential, build, git, ims, pipelines, policy, wit};
 use base64::Engine as _;
 use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderMap, HeaderValue, RETRY_AFTER};
 use reqwest::{Client, Method};
@@ -16,18 +27,18 @@ use url::Url;
 
 use crate::config::Config;
 
-/// Everything not named below.
-pub(crate) const V71: &str = "7.1";
-/// Policy evaluations and `connectionData`.
+/// `connectionData`.
 pub(crate) const V71_P1: &str = "7.1-preview.1";
-/// Work-item comments.
-pub(crate) const V71_P4: &str = "7.1-preview.4";
+/// What the crate sends, for the one call it can't express (`pr_list status=all`).
+pub(crate) const V71_PREVIEW: &str = "7.1-preview";
 
 const TIMEOUT: Duration = Duration::from_mins(1);
 const PAT_LINE: &str = "Azure DevOps rejected the PAT (expired or wrong); set a new one with /plugin configure mcp-azure";
+const OUTSIDE: &str = "refusing to send the PAT to a URL outside the configured collection";
+const USER_AGENT_VALUE: &str = concat!("ado-mcp/", env!("CARGO_PKG_VERSION"));
 
 /// What went wrong, already worded for the model. Never holds the PAT or the `Authorization` value.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct ApiError {
     pub status: Option<u16>,
     /// A `TFnnnnnn` code from the server's message.
@@ -60,12 +71,144 @@ impl ApiError {
         }
         self
     }
+
+    /// The line for a failed crate call.
+    pub(crate) fn from_az(e: &azure_core::Error) -> Self {
+        // The guard's own errors, and the network errors under the crate's wrapping.
+        let mut cur = e.source();
+        while let Some(s) = cur {
+            if let Some(a) = s.downcast_ref::<ApiError>() {
+                return a.clone();
+            }
+            if let Some(r) = s.downcast_ref::<reqwest::Error>() {
+                return net_err(r);
+            }
+            cur = s.source();
+        }
+        match e.kind() {
+            // The guard words every other status; this is a 429 that `Api::az` didn't wait out.
+            ErrorKind::HttpResponse {
+                status,
+                raw_response,
+                ..
+            } => {
+                let raw = raw_response.as_deref();
+                let ct = raw
+                    .and_then(|r| r.headers().get_optional_str(&AZ_CONTENT_TYPE))
+                    .unwrap_or("none");
+                let body = raw.map(|r| String::from_utf8_lossy(r.body()).into_owned());
+                status_error(u16::from(*status), ct, &body.unwrap_or_default(), "")
+            }
+            ErrorKind::DataConversion => {
+                Self::local(format!("unexpected answer from the server: {e}"))
+            }
+            _ => Self::local(e.to_string()),
+        }
+    }
 }
 
+/// Keeps the PAT on `ADO_ORG_URL` and words HTTP failures while the request URL is still at hand.
+#[derive(Debug)]
+struct Guard {
+    org: String,
+}
+
+/// `path` with every run of `/` cut to one.
+fn squeeze(path: &str) -> String {
+    let mut out = String::with_capacity(path.len());
+    for c in path.chars() {
+        if !(c == '/' && out.ends_with('/')) {
+            out.push(c);
+        }
+    }
+    out
+}
+
+#[async_trait]
+impl Policy for Guard {
+    async fn send(
+        &self,
+        ctx: &Context,
+        request: &mut Request,
+        next: &[Arc<dyn Policy>],
+    ) -> PolicyResult {
+        let url = request.url_mut();
+        // The crate joins `{endpoint}/{org}/{project}`: a collection at the server root, or no project, gives a `//`.
+        if url.path().contains("//") {
+            let path = squeeze(url.path());
+            url.set_path(&path);
+        }
+        let Some(rel) = url.as_str().strip_prefix(&self.org) else {
+            return Err(az_err(ApiError::local(OUTSIDE)));
+        };
+        let rel = rel.split('?').next().unwrap_or_default().to_owned();
+        request.insert_header(USER_AGENT, USER_AGENT_VALUE);
+        let resp = next[0].send(ctx, request, &next[1..]).await?;
+        let status = u16::from(resp.status());
+        let ct = resp
+            .headers()
+            .get_optional_str(&AZ_CONTENT_TYPE)
+            .unwrap_or("none")
+            .to_owned();
+        // A 429 goes on to `Api::az`, which waits for it once.
+        if status == 429 || ((200..300).contains(&status) && !ct.contains("html")) {
+            return Ok(resp);
+        }
+        let body = resp.deconstruct().2.collect().await?;
+        Err(az_err(status_error(
+            status,
+            &ct,
+            &String::from_utf8_lossy(&body),
+            &rel,
+        )))
+    }
+}
+
+fn az_err(e: ApiError) -> azure_core::Error {
+    azure_core::Error::new(ErrorKind::Other, e)
+}
+
+/// The request timeout; `ADO_TIMEOUT_MS` overrides it in debug builds (a test hook).
+fn timeout() -> Duration {
+    #[cfg(debug_assertions)]
+    if let Some(ms) = std::env::var("ADO_TIMEOUT_MS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+    {
+        return Duration::from_millis(ms);
+    }
+    TIMEOUT
+}
+
+fn throttled() -> ApiError {
+    ApiError {
+        status: Some(429),
+        tf: None,
+        msg: "the server is throttling requests; try again in a minute".into(),
+    }
+}
+
+/// Sleeps for a `Retry-After` in seconds (1 when missing, at most 30).
+async fn wait(retry_after: Option<&str>) {
+    let secs = retry_after
+        .and_then(|v| v.trim().parse::<u64>().ok())
+        .unwrap_or(1);
+    tokio::time::sleep(Duration::from_secs(secs.min(30))).await;
+}
+
+/// One client per area of the crate, all sending through our client. Cheap to clone.
 pub(crate) struct Api {
     client: Client,
-    org: Url,
-    timeout: Duration,
+    org_url: Url,
+    /// The collection's name: the crate's `organization` in every call.
+    pub org: String,
+    pub git: git::Client,
+    pub build: build::Client,
+    pub pipelines: pipelines::Client,
+    pub policy: policy::Client,
+    pub wit: wit::Client,
+    pub core: azure_devops_rust_api::core::Client,
+    pub ims: ims::Client,
 }
 
 impl Api {
@@ -81,32 +224,93 @@ impl Api {
             "X-TFS-FedAuthRedirect",
             HeaderValue::from_static("Suppress"),
         );
-        #[allow(unused_mut)]
-        let mut timeout = TIMEOUT;
-        // Test hook; a release build never reads it.
-        #[cfg(debug_assertions)]
-        if let Some(ms) = std::env::var("ADO_TIMEOUT_MS")
-            .ok()
-            .and_then(|v| v.parse().ok())
-        {
-            timeout = Duration::from_millis(ms);
-        }
         let client = Client::builder()
-            .user_agent(concat!("ado-mcp/", env!("CARGO_PKG_VERSION")))
+            .user_agent(USER_AGENT_VALUE)
             .default_headers(headers)
             .connect_timeout(Duration::from_secs(10))
-            .timeout(timeout)
+            .timeout(timeout())
             // A redirect would carry the PAT to wherever it points.
             .redirect(reqwest::redirect::Policy::none())
             .build()?;
+        // `https://server/tfs/Coll/` is the endpoint `https://server/tfs` and the organization `Coll`.
+        let org = cfg
+            .org_url
+            .path_segments()
+            .and_then(|mut s| s.rfind(|s| !s.is_empty()))
+            .unwrap_or_default()
+            .to_owned();
+        let mut base = cfg.org_url.clone();
+        if let Ok(mut s) = base.path_segments_mut() {
+            s.pop_if_empty().pop();
+        }
+        let cred = Credential::from_pat(cfg.pat.clone());
+        let transport = Transport::new(Arc::new(client.clone()));
+        let guard: Arc<dyn Policy> = Arc::new(Guard {
+            org: cfg.org_url.to_string(),
+        });
+        macro_rules! area {
+            ($area:path) => {{
+                use $area as a;
+                a::ClientBuilder::new(cred.clone())
+                    .endpoint(base.clone())
+                    .transport(transport.clone())
+                    // azure_core would resend writes on a 5xx or a dropped connection.
+                    .retry(RetryOptions::none())
+                    .per_try_policies(vec![Arc::clone(&guard)])
+                    .build()
+            }};
+        }
         Ok(Self {
+            git: area!(git),
+            build: area!(build),
+            pipelines: area!(pipelines),
+            policy: area!(policy),
+            wit: area!(wit),
+            core: area!(azure_devops_rust_api::core),
+            ims: area!(ims),
             client,
-            org: cfg.org_url.clone(),
-            timeout,
+            org_url: cfg.org_url.clone(),
+            org,
         })
     }
 
-    /// `path` is joined onto the collection URL; `query` and `api-version` follow.
+    /// Runs a crate call (`f` builds it afresh each time), once more after a 429.
+    ///
+    /// # Errors
+    /// See [`ApiError::from_az`].
+    pub async fn az<T, F, Fut>(&self, f: F) -> Result<T, ApiError>
+    where
+        F: Fn() -> Fut,
+        Fut: Future<Output = azure_core::Result<T>>,
+    {
+        let mut throttled_once = false;
+        loop {
+            let e = match f().await {
+                Ok(v) => return Ok(v),
+                Err(e) => e,
+            };
+            if let ErrorKind::HttpResponse {
+                status,
+                raw_response,
+                ..
+            } = e.kind()
+                && u16::from(*status) == 429
+            {
+                if throttled_once {
+                    return Err(throttled());
+                }
+                throttled_once = true;
+                let ra = raw_response
+                    .as_deref()
+                    .and_then(|r| r.headers().get_optional_str(&AZ_RETRY_AFTER));
+                wait(ra).await;
+                continue;
+            }
+            return Err(ApiError::from_az(&e));
+        }
+    }
+
+    /// `path` is joined onto the collection URL; `query` and `api-version` (unless `ver` is empty) follow.
     ///
     /// # Errors
     /// For anything the server answers with, see [`ApiError`]; also when the answer isn't JSON.
@@ -165,17 +369,22 @@ impl Api {
     fn url(&self, path: &str, query: &[(&str, String)], ver: &str) -> Result<Url, ApiError> {
         // `join` also takes an absolute URL, and `/x` or `../x` climb out of the collection: check the result.
         let mut url = self
-            .org
+            .org_url
             .join(path)
             .map_err(|_| ApiError::local(format!("not a usable path: {path}")))?;
-        if !url.as_str().starts_with(self.org.as_str()) {
-            return Err(ApiError::local(
-                "refusing to send the PAT to a URL outside the configured collection",
-            ));
+        if !url.as_str().starts_with(self.org_url.as_str()) {
+            return Err(ApiError::local(OUTSIDE));
         }
-        url.query_pairs_mut()
-            .extend_pairs(query.iter().map(|(k, v)| (*k, v.as_str())))
-            .append_pair("api-version", ver);
+        let ver = (!ver.is_empty()).then_some(("api-version", ver));
+        let pairs: Vec<(&str, &str)> = query
+            .iter()
+            .map(|(k, v)| (*k, v.as_str()))
+            .chain(ver)
+            .collect();
+        // An empty `query_pairs_mut` would still leave a `?`.
+        if !pairs.is_empty() {
+            url.query_pairs_mut().extend_pairs(pairs);
+        }
         Ok(url)
     }
 
@@ -190,7 +399,7 @@ impl Api {
         accept: &str,
     ) -> Result<(u16, String, String), ApiError> {
         let url = self.url(path, query, ver)?;
-        let mut throttled = false;
+        let mut throttled_once = false;
         loop {
             let mut req = self
                 .client
@@ -204,24 +413,19 @@ impl Api {
                 };
                 req = req.header(CONTENT_TYPE, ct).body(json.to_string());
             }
-            let resp = req.send().await.map_err(|e| self.net_err(&e, &url))?;
+            let resp = req.send().await.map_err(|e| net_err(&e))?;
             let status = resp.status().as_u16();
             if status == 429 {
-                if throttled {
-                    return Err(ApiError {
-                        status: Some(429),
-                        tf: None,
-                        msg: "the server is throttling requests; try again in a minute".into(),
-                    });
+                if throttled_once {
+                    return Err(throttled());
                 }
-                throttled = true;
-                let secs = resp
-                    .headers()
-                    .get(RETRY_AFTER)
-                    .and_then(|v| v.to_str().ok())
-                    .and_then(|v| v.trim().parse::<u64>().ok())
-                    .unwrap_or(1);
-                tokio::time::sleep(Duration::from_secs(secs.min(30))).await;
+                throttled_once = true;
+                wait(
+                    resp.headers()
+                        .get(RETRY_AFTER)
+                        .and_then(|v| v.to_str().ok()),
+                )
+                .await;
                 continue;
             }
             let ct = resp
@@ -230,7 +434,7 @@ impl Api {
                 .and_then(|v| v.to_str().ok())
                 .unwrap_or("none")
                 .to_owned();
-            let text = resp.text().await.map_err(|e| self.net_err(&e, &url))?;
+            let text = resp.text().await.map_err(|e| net_err(&e))?;
             return if (200..300).contains(&status) && !(status == 203 && ct.contains("html")) {
                 Ok((status, ct, text))
             } else {
@@ -238,32 +442,30 @@ impl Api {
             };
         }
     }
+}
 
-    fn net_err(&self, e: &reqwest::Error, url: &Url) -> ApiError {
-        // A connect timeout is both; it is the host that can't be reached, not a slow answer.
-        if e.is_timeout() && !e.is_connect() {
-            return ApiError::local(format!(
-                "the server didn't answer in {} s",
-                self.timeout.as_secs()
-            ));
-        }
-        let mut cause = e.to_string();
-        let mut cur = e.source();
-        while let Some(s) = cur {
-            cause = s.to_string();
-            cur = s.source();
-        }
-        let mut msg = format!(
-            "can't reach {}: {cause}",
-            url.host_str().unwrap_or("the server")
-        );
-        if is_cert_error(e) {
-            msg.push_str(
-                " (the certificate isn't trusted; ado-mcp uses the Windows certificate store)",
-            );
-        }
-        ApiError::local(msg)
+fn net_err(e: &reqwest::Error) -> ApiError {
+    // A connect timeout is both; it is the host that can't be reached, not a slow answer.
+    if e.is_timeout() && !e.is_connect() {
+        return ApiError::local(format!(
+            "the server didn't answer in {} s",
+            timeout().as_secs()
+        ));
     }
+    let mut cause = e.to_string();
+    let mut cur = e.source();
+    while let Some(s) = cur {
+        cause = s.to_string();
+        cur = s.source();
+    }
+    let host = e.url().and_then(Url::host_str).unwrap_or("the server");
+    let mut msg = format!("can't reach {host}: {cause}");
+    if is_cert_error(e) {
+        msg.push_str(
+            " (the certificate isn't trusted; ado-mcp uses the Windows certificate store)",
+        );
+    }
+    ApiError::local(msg)
 }
 
 /// Whether a rustls certificate error sits anywhere in `e`'s `source()` chain.
@@ -356,7 +558,6 @@ mod tests {
     use super::*;
 
     fn api() -> Api {
-        let _ = rustls::crypto::ring::default_provider().install_default();
         let cfg = Config {
             org_url: Url::parse("https://ado.example/tfs/Coll/").unwrap(),
             pat: "secret-pat".into(),
@@ -378,7 +579,7 @@ mod tests {
             "/tfs/Other/_apis/projects",
             "../x",
         ] {
-            let e = api.get_text(path, &[], V71).await.unwrap_err();
+            let e = api.get_text(path, &[], V71_P1).await.unwrap_err();
             assert!(
                 e.status.is_none() && e.msg.contains("outside the configured collection"),
                 "{path}: {e}"
@@ -390,12 +591,15 @@ mod tests {
     #[test]
     fn urls_under_the_collection_pass() {
         let u = api()
-            .url("My Project/_apis/git", &[("$top", "1".into())], V71)
+            .url("My Project/_apis/git", &[("$top", "1".into())], V71_P1)
             .unwrap();
         assert_eq!(
             u.as_str(),
-            "https://ado.example/tfs/Coll/My%20Project/_apis/git?%24top=1&api-version=7.1"
+            "https://ado.example/tfs/Coll/My%20Project/_apis/git?%24top=1&api-version=7.1-preview.1"
         );
+        // `/vsts/info` takes no version.
+        let u = api().url("R/vsts/info", &[], "").unwrap();
+        assert_eq!(u.as_str(), "https://ado.example/tfs/Coll/R/vsts/info");
         assert!(
             api()
                 .url("https://ado.example/tfs/Coll/x?a=b", &[], V71_P1)
@@ -434,7 +638,6 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[tokio::test]
     async fn connect_timeout_is_not_a_slow_answer() {
-        let api = api(); // installs the crypto provider
         // Fill a listener's accept queue, then the next connect hangs until its timeout.
         let l = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
         let addr = l.local_addr().unwrap();
@@ -453,7 +656,7 @@ mod tests {
             .await
             .unwrap_err();
         assert!(e.is_connect() && e.is_timeout(), "{e:?}");
-        let msg = api.net_err(&e, &url).msg;
+        let msg = net_err(&e).msg;
         assert!(msg.starts_with("can't reach 127.0.0.1: "), "{msg}");
     }
 
@@ -477,6 +680,43 @@ mod tests {
             find_tf("TF12 and TFabcdef and TF000123"),
             Some("TF000123".into())
         );
+    }
+
+    /// Fails the test if a request gets past the guard.
+    #[derive(Debug)]
+    struct Unreachable;
+
+    #[async_trait]
+    impl Policy for Unreachable {
+        async fn send(&self, _: &Context, r: &mut Request, _: &[Arc<dyn Policy>]) -> PolicyResult {
+            panic!("sent to {}", r.url());
+        }
+    }
+
+    #[tokio::test]
+    async fn guard_refuses_outside_org() {
+        let guard = Guard {
+            org: "https://ado.example/tfs/Coll/".into(),
+        };
+        let next: [Arc<dyn Policy>; 1] = [Arc::new(Unreachable)];
+        for url in [
+            "https://evil.example/tfs/Coll/_apis/projects",
+            "https://ado.example/tfs/Other/_apis/projects",
+            "https://ado.example@evil.example/tfs/Coll/x",
+        ] {
+            let mut req = Request::new(Url::parse(url).unwrap(), azure_core::http::Method::Get);
+            let e = guard
+                .send(&Context::new(), &mut req, &next)
+                .await
+                .unwrap_err();
+            assert_eq!(ApiError::from_az(&e).msg, OUTSIDE, "{url}");
+        }
+    }
+
+    #[test]
+    fn squeeze_cuts_double_slashes() {
+        assert_eq!(squeeze("//Coll//_apis/x"), "/Coll/_apis/x");
+        assert_eq!(squeeze("/tfs/Coll/P/_apis"), "/tfs/Coll/P/_apis");
     }
 
     #[test]

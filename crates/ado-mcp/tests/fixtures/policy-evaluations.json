@@ -9,10 +9,29 @@
         "isBlocking": true,
         "type": {
           "id": "fa4e907d-c16b-4a4c-9dfa-4906e5d171dd",
-          "displayName": "Minimum number of reviewers"
+          "displayName": "Minimum number of reviewers",
+          "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/policy/types/fa4e907d-c16b-4a4c-9dfa-4906e5d171dd"
         },
-        "url": "http://dev.example/tfs/Coll/policy/3"
-      }
+        "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/policy/configurations/3",
+        "revision": 1,
+        "isEnabled": true,
+        "isDeleted": false,
+        "createdDate": "2025-06-02T08:20:00Z",
+        "settings": {
+          "scope": [
+            {
+              "refName": "refs/heads/main",
+              "matchKind": "Exact",
+              "repositoryId": "3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01"
+            }
+          ],
+          "minimumApproverCount": 1,
+          "creatorVoteCounts": false
+        }
+      },
+      "artifactId": "vstfs:///CodeReview/CodeReviewId/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/412",
+      "startedDate": "2026-03-04T08:00:01.2Z",
+      "completedDate": "2026-03-04T08:00:02Z"
     },
     {
       "evaluationId": "c1f0a2b3-1111-4222-8333-444455556667",
@@ -22,9 +41,34 @@
         "isBlocking": true,
         "type": {
           "id": "0609b952-1397-4640-95ec-e00a01b2c241",
-          "displayName": "Build"
+          "displayName": "Build",
+          "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/policy/types/0609b952-1397-4640-95ec-e00a01b2c241"
         },
-        "url": "http://dev.example/tfs/Coll/policy/4"
+        "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/policy/configurations/4",
+        "revision": 1,
+        "isEnabled": true,
+        "isDeleted": false,
+        "createdDate": "2025-06-02T08:20:00Z",
+        "settings": {
+          "scope": [
+            {
+              "refName": "refs/heads/main",
+              "matchKind": "Exact",
+              "repositoryId": "3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01"
+            }
+          ],
+          "buildDefinitionId": 12,
+          "queueOnSourceUpdateOnly": true,
+          "validDuration": 720
+        }
+      },
+      "artifactId": "vstfs:///CodeReview/CodeReviewId/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/412",
+      "startedDate": "2026-03-04T08:00:01.2Z",
+      "context": {
+        "buildId": 991,
+        "buildDefinitionId": 12,
+        "buildDefinitionName": "CI",
+        "isExpired": false
       }
     }
   ]

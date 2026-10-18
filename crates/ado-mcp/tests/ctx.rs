@@ -21,7 +21,23 @@ fn in_clone(fx: &Fixture, dir: &Path) -> Mcp {
 
 fn scripted(fx: &Fixture) {
     fx.route(INFO, vec![fixture("vsts-info.json")]);
-    fx.route(CHECK, vec![fixture("vsts-info.json")]);
+    fx.route(CHECK, vec![fixture("repo.json")]);
+}
+
+/// A `GET _apis/projects/{name}` answer.
+fn project(id: &str, name: &str) -> Resp {
+    Resp::json(
+        &json!({"id": id, "name": name, "state": "wellFormed", "revision": 3,
+        "visibility": "private", "lastUpdateTime": "2025-11-04T10:12:33.47Z",
+        "url": format!("http://dev.example/tfs/Coll/_apis/projects/{id}")}),
+    )
+}
+
+/// A build definition reference in project `PROJ_ID`.
+fn def(id: u32, name: &str, path: &str) -> Value {
+    json!({"id": id, "name": name, "path": path, "type": "build", "queueStatus": "enabled",
+        "revision": 1, "url": format!("http://dev.example/tfs/Coll/_apis/build/Definitions/{id}"),
+        "project": {"id": PROJ_ID, "name": "My Proj", "state": "wellFormed", "visibility": "private"}})
 }
 
 fn paths(fx: &Fixture) -> Vec<String> {
@@ -82,8 +98,7 @@ fn explicit_args_win() {
     let clone = clone_of("https://evil.invalid/tfs/Coll/P/_git/R");
     fx.route(
         "/tfs/Coll/My%20Proj/_apis/git/repositories/R",
-        vec![Resp::json(&json!({"id": REPO_ID, "name": "R",
-            "project": {"id": PROJ_ID, "name": "My Proj"}}))],
+        vec![fixture("repo.json")],
     );
     let mut mcp = in_clone(&fx, &clone);
     let (err, text) = mcp.call(
@@ -98,7 +113,7 @@ fn explicit_args_win() {
     // No repo: the project alone, with the clone's branch.
     fx.route(
         "/tfs/Coll/_apis/projects/Other",
-        vec![Resp::json(&json!({"id": "p-other", "name": "Other"}))],
+        vec![project("p-other", "Other")],
     );
     let (err, text) = mcp.call("scope_echo", json!({"project": "Other"}));
     assert!(!err, "{text}");
@@ -115,7 +130,7 @@ fn default_project_outside_clone() {
     let fx = Fixture::start();
     fx.route(
         "/tfs/Coll/_apis/projects/Fallback",
-        vec![Resp::json(&json!({"id": "p-fb", "name": "Fallback"}))],
+        vec![project("p-fb", "Fallback")],
     );
     // The default temp dir is no git clone.
     let mut mcp = ado(&fx, &[("ADO_DEFAULT_PROJECT", "Fallback")]);
@@ -228,9 +243,9 @@ fn pipeline_ambiguous() {
     let fx = Fixture::start();
     fx.route(
         DEFS,
-        vec![Resp::json(&json!({"count": 2, "value": [
-            {"id": 1, "name": "Deploy", "path": "\\Prod"},
-            {"id": 2, "name": "Deploy", "path": "\\"}]}))],
+        vec![Resp::json(
+            &json!({"count": 2, "value": [def(1, "Deploy", "\\Prod"), def(2, "Deploy", "\\")]}),
+        )],
     );
     let (mut mcp, _) = pipeline_env(&fx);
     let (err, text) = mcp.call("scope_echo", json!({"pipeline": "Deploy"}));
@@ -271,7 +286,7 @@ fn stale_id_retried_once() {
         &format!("{base}/old-repo"),
         vec![Resp::new(404, "text/plain", "gone")],
     );
-    fx.route(&format!("{base}/new-repo"), vec![fixture("vsts-info.json")]);
+    fx.route(&format!("{base}/new-repo"), vec![fixture("repo.json")]);
     let mut mcp = in_clone(&fx, &clone_of(&own_remote(&fx)));
     let (err, text) = mcp.call("scope_echo", json!({"check": true}));
     assert!(!err, "{text}");
@@ -320,7 +335,7 @@ fn github_clone_uses_default_project() {
     let fx = Fixture::start();
     fx.route(
         "/tfs/Coll/_apis/projects/Fallback",
-        vec![Resp::json(&json!({"id": "p-fb", "name": "Fallback"}))],
+        vec![project("p-fb", "Fallback")],
     );
     let clone = clone_of("https://github.com/a/b.git");
     let mut mcp = ado(

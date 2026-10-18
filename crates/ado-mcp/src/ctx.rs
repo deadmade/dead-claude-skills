@@ -10,7 +10,7 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use serde::Deserialize;
 
-use crate::api::{Api, ApiError, V71, V71_P1};
+use crate::api::{Api, ApiError, V71_P1};
 use crate::config::Config;
 use crate::remote::{current_branch, https_remote, is_azure_remote, origin_url};
 
@@ -26,7 +26,7 @@ pub(crate) struct Scope {
     pub branch: Option<String>,
 }
 
-/// A user, as `connectionData` and the identities API both give one.
+/// A user, as `connectionData` gives one.
 #[derive(Clone, Deserialize)]
 pub(crate) struct Me {
     pub id: String,
@@ -59,30 +59,12 @@ struct Connection {
     user: Me,
 }
 
-#[derive(Deserialize)]
-struct Users {
-    value: Vec<Me>,
-}
-
-#[derive(Deserialize)]
-struct Def {
-    id: u32,
-    name: String,
-    #[serde(default)]
-    path: String,
-}
-
-#[derive(Deserialize)]
-struct Defs {
-    value: Vec<Def>,
-}
-
 #[derive(Default)]
 struct Cache {
     scopes: HashMap<String, Scope>,
     me: Option<Me>,
     /// `(project id, lower-case name)` to the definition id.
-    pipelines: HashMap<(String, String), u32>,
+    pipelines: HashMap<(String, String), i32>,
 }
 
 pub(crate) struct Ctx {
@@ -177,26 +159,35 @@ impl Ctx {
         }
         let key = format!("arg:{project}/{}", repo.unwrap_or_default());
         self.cached(key.clone(), async {
-            let p = seg(project);
-            let (proj, repo) = if let Some(r) = repo {
-                let found: Repo = self
-                    .api
-                    .get(&format!("{p}/_apis/git/repositories/{}", seg(r)), &[], V71)
+            let (api, p) = (&self.api, seg(project));
+            // The two answers carry different `TeamProjectReference` types.
+            let (project_id, project_name, repo) = if let Some(r) = repo {
+                let found = api
+                    .az(|| {
+                        api.git
+                            .repositories_client()
+                            .get_repository(&api.org, seg(r), &p)
+                            .into_future()
+                    })
                     .await
                     .map_err(|e| e.with_what(&format!("repo {r} in {project}")))?;
-                (found.project, Some((found.id, found.name)))
+                let p = found.project;
+                (p.id, p.name, Some((found.id, found.name)))
             } else {
-                let proj: Proj = self
-                    .api
-                    .get(&format!("_apis/projects/{p}"), &[], V71)
+                let found = api
+                    .az(|| api.core.projects_client().get(&api.org, &p).into_future())
                     .await
                     .map_err(|e| e.with_what(&format!("project {project}")))?;
-                (proj, None)
+                let p = found.team_project_reference;
+                (p.id, p.name, None)
             };
+            let project_id = project_id.ok_or_else(|| {
+                ApiError::local("unexpected answer from the server: missing field `id`")
+            })?;
             Ok(Scope {
                 key,
-                project_id: proj.id,
-                project: proj.name,
+                project_id,
+                project: project_name,
                 repo_id: repo.as_ref().map(|r| r.0.clone()),
                 repo: repo.map(|r| r.1),
                 branch: None,
@@ -216,7 +207,7 @@ impl Ctx {
                 .cached(key.clone(), async {
                     let info: VstsInfo = self
                         .api
-                        .get(&format!("{https}/vsts/info"), &[], V71)
+                        .get(&format!("{https}/vsts/info"), &[], "")
                         .await
                         .map_err(|e| e.with_what("this repo on the server"))?;
                     let r = info.repository;
@@ -283,15 +274,28 @@ impl Ctx {
         if text.eq_ignore_ascii_case("me") {
             return self.me().await;
         }
-        let q = [
-            ("searchFilter", "General".to_owned()),
-            ("filterValue", text.to_owned()),
-        ];
-        let mut found = self
-            .api
-            .get::<Users>("_apis/identities", &q, V71)
+        let api = &self.api;
+        let mut found: Vec<Me> = api
+            .az(|| {
+                api.ims
+                    .identities_client()
+                    .read_identities(&api.org)
+                    .search_filter("General")
+                    .filter_value(text)
+                    .into_future()
+            })
             .await?
-            .value;
+            .value
+            .into_iter()
+            // An identity without an id can't be used in a filter.
+            .filter_map(|i| {
+                let i = i.identity_base;
+                Some(Me {
+                    id: i.id?,
+                    name: i.provider_display_name.unwrap_or_default(),
+                })
+            })
+            .collect();
         match found.len() {
             0 => Err(ApiError::local(format!("no user matches \"{text}\""))),
             1 => Ok(found.remove(0)),
@@ -310,7 +314,7 @@ impl Ctx {
     ///
     /// # Errors
     /// When the name matches none or several (the folders are named), or the server refuses.
-    pub async fn pipeline_id(&self, scope: &Scope, name_or_id: &str) -> Result<u32, ApiError> {
+    pub async fn pipeline_id(&self, scope: &Scope, name_or_id: &str) -> Result<i32, ApiError> {
         let name = name_or_id.trim();
         if let Ok(id) = name.parse() {
             return Ok(id);
@@ -319,16 +323,26 @@ impl Ctx {
         if let Some(id) = self.cache().pipelines.get(&key) {
             return Ok(*id);
         }
-        let path = format!("{}/_apis/build/definitions", seg(&scope.project_id));
-        let list: Defs = self
-            .api
-            .get(&path, &[("name", name.to_owned())], V71)
+        let (api, p) = (&self.api, seg(&scope.project_id));
+        let list = api
+            .az(|| {
+                api.build
+                    .definitions_client()
+                    .list(&api.org, &p)
+                    .name(name)
+                    .into_future()
+            })
             .await?;
         // The name filter takes wildcards; only an exact name is the pipeline asked for.
-        let mut hits: Vec<Def> = list
+        let mut hits: Vec<_> = list
             .value
             .into_iter()
-            .filter(|d| d.name.eq_ignore_ascii_case(name))
+            .map(|d| d.definition_reference)
+            .filter(|d| {
+                d.name
+                    .as_deref()
+                    .is_some_and(|n| n.eq_ignore_ascii_case(name))
+            })
             .collect();
         match hits.len() {
             0 => Err(ApiError::local(format!("not found: pipeline \"{name}\""))),
@@ -340,7 +354,11 @@ impl Ctx {
             _ => {
                 let at: Vec<String> = hits
                     .iter()
-                    .map(|d| format!("{}\\{}", d.path.trim_end_matches('\\'), d.name))
+                    .map(|d| {
+                        let path = d.path.as_deref().unwrap_or_default();
+                        let n = d.name.as_deref().unwrap_or(name);
+                        format!("{}\\{n}", path.trim_end_matches('\\'))
+                    })
                     .collect();
                 Err(ApiError::local(format!(
                     "pipeline \"{name}\" is ambiguous: {}",

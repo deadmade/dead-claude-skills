@@ -10,7 +10,10 @@ const ROUTE: &str = "/tfs/Coll/_apis/projects";
 const PAT_LINE: &str = "Azure DevOps rejected the PAT (expired or wrong); set a new one with /plugin configure mcp-azure";
 
 fn projects() -> Resp {
-    Resp::json(&json!({"count": 1, "value": [{"name": "P"}]}))
+    Resp::json(
+        &json!({"count": 1, "value": [{"id": "p1", "name": "P", "state": "wellFormed",
+        "revision": 7, "visibility": "private", "lastUpdateTime": "2025-11-04T10:12:33.47Z"}]}),
+    )
 }
 
 /// Calls `ping` against `fx` and returns `(isError, text)`.
@@ -32,7 +35,13 @@ fn sends_auth_version_and_suppress() {
         r.header("authorization"),
         Some(format!("Basic {basic}").as_str())
     );
-    assert!(r.path.contains("api-version=7.1"), "{}", r.path);
+    assert!(
+        r.path
+            .split(['?', '&'])
+            .any(|p| p == "api-version=7.1-preview"),
+        "{}",
+        r.path
+    );
     assert!(r.path.contains("top=1"), "{}", r.path);
     assert_eq!(r.header("x-tfs-fedauthredirect"), Some("Suppress"));
     assert!(r.header("user-agent").unwrap().starts_with("ado-mcp/"));
@@ -187,4 +196,48 @@ fn unreachable_names_the_host() {
     assert!(err);
     assert!(text.starts_with("can't reach 127.0.0.1: "), "{text}");
     assert!(!text.contains("test-pat"));
+}
+
+#[test]
+fn root_hosted_collection() {
+    let fx = Fixture::start();
+    fx.route("/Coll/_apis/projects", vec![projects()]);
+    let org = fx.url("/Coll/");
+    let dir = common::tempdir();
+    let mut mcp = common::Mcp::start_with(
+        dir.clone(),
+        &[
+            ("ADO_ORG_URL", org.as_str()),
+            ("ADO_PAT", "test-pat"),
+            ("ADO_PROJECT_DIR", dir.to_str().unwrap()),
+        ],
+    );
+    let (err, text) = mcp.call("ping", json!({}));
+    assert!(!err, "{text}");
+    let path = &fx.requests()[0].path;
+    assert!(path.starts_with("/Coll/") && !path.contains("//"), "{path}");
+}
+
+#[test]
+fn missing_field_names_it() {
+    let fx = Fixture::start();
+    fx.route(
+        ROUTE,
+        vec![Resp::json(&json!({"count": 1, "value": [{"name": "P"}]}))],
+    );
+    let (err, text) = ping(&fx);
+    assert!(err, "{text}");
+    assert!(
+        text.starts_with("unexpected answer from the server") && text.contains("visibility"),
+        "{text}"
+    );
+}
+
+#[test]
+fn no_resend_on_503() {
+    let fx = Fixture::start();
+    fx.route(ROUTE, vec![Resp::new(503, "text/plain", "down")]);
+    let (err, _) = ping(&fx);
+    assert!(err);
+    assert_eq!(fx.requests().len(), 1);
 }

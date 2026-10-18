@@ -4,15 +4,15 @@ use std::sync::Arc;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::model::{CallToolResult, ContentBlock, Implementation, ServerCapabilities, ServerConfig};
 use rmcp::{ServerHandler, tool, tool_handler, tool_router};
-use serde_json::{Value, json};
+use serde_json::json;
 
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::schemars::{self, JsonSchema};
 use serde::Deserialize;
 
-use crate::api::{ApiError, V71};
+use crate::api::ApiError;
 use crate::config::Config;
-use crate::ctx::Ctx;
+use crate::ctx::{Ctx, seg};
 use crate::pr::{self, PrFilesArgs, PrListArgs, PrThreadsArgs, PrViewArgs};
 
 /// The tools that change something on the server. Claude Code prompts on every call to these.
@@ -100,15 +100,20 @@ impl Server {
         annotations(read_only_hint = true)
     )]
     async fn ping(&self) -> CallToolResult {
-        match self
-            .ctx
-            .api
-            .get::<Value>("_apis/projects", &[("$top", "1".into())], V71)
+        let api = &self.ctx.api;
+        match api
+            .az(|| {
+                api.core
+                    .projects_client()
+                    .list(&api.org)
+                    .top(1)
+                    .into_future()
+            })
             .await
         {
             Ok(v) => CallToolResult::success(vec![ContentBlock::text(format!(
                 "projects: {}",
-                v["count"]
+                v.count.unwrap_or_default()
             ))]),
             Err(e) => error(e.to_string()),
         }
@@ -155,7 +160,8 @@ impl Server {
         annotations(read_only_hint = true)
     )]
     async fn pr_files(&self, Parameters(a): Parameters<PrFilesArgs>) -> CallToolResult {
-        reply(pr::pr_files(&self.ctx, &a).await)
+        // The PR model is large; boxed, the tool's future stays small.
+        reply(Box::pin(pr::pr_files(&self.ctx, &a)).await)
     }
 }
 
@@ -173,8 +179,14 @@ impl Server {
             ctx.retry_stale(&first.key, || async {
                 let s = ctx.scope(p, r, b).await?;
                 if let Some(id) = &s.repo_id {
-                    let path = format!("{}/_apis/git/repositories/{id}", s.project_id);
-                    ctx.api.get::<Value>(&path, &[], V71).await?;
+                    let api = &ctx.api;
+                    api.az(|| {
+                        api.git
+                            .repositories_client()
+                            .get_repository(&api.org, seg(id), seg(&s.project_id))
+                            .into_future()
+                    })
+                    .await?;
                 }
                 Ok(s)
             })

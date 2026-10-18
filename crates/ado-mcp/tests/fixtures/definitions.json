@@ -6,7 +6,36 @@
       "name": "CI",
       "path": "\\Build",
       "type": "build",
-      "queueStatus": "enabled"
+      "queueStatus": "enabled",
+      "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/build/Definitions/12?revision=7",
+      "uri": "vstfs:///Build/Definition/12",
+      "revision": 7,
+      "createdDate": "2025-06-02T08:14:51.31Z",
+      "project": {
+        "id": "b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455",
+        "name": "My Proj",
+        "description": "Main product.",
+        "url": "http://dev.example/tfs/Coll/_apis/projects/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455",
+        "state": "wellFormed",
+        "revision": 41,
+        "visibility": "private",
+        "lastUpdateTime": "2025-11-04T10:12:33.47Z"
+      },
+      "authoredBy": {
+        "displayName": "Alice Example",
+        "id": "7c1e4d52-93ab-4f06-b1d8-5a2f6e0c9d13",
+        "uniqueName": "alice@example.com"
+      },
+      "queue": {
+        "id": 3,
+        "name": "Default",
+        "pool": {
+          "id": 1,
+          "name": "Default"
+        }
+      },
+      "quality": "definition",
+      "drafts": []
     }
   ]
 }
