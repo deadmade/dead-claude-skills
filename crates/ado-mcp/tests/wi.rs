@@ -416,7 +416,7 @@ fn create_json_patch() {
 #[test]
 fn update_custom_field() {
     let fx = Fixture::start();
-    fx.route(IN_PROJ, vec![fixture("wi.json")]);
+    fx.route(WI123, vec![fixture("wi.json")]);
     let text = ok(
         &mut env(&fx),
         "wi_update",
@@ -427,14 +427,17 @@ fn update_custom_field() {
         text,
         "updated #123: Custom.Team_Name, Microsoft.VSTS.Common.Priority, System.State"
     );
-    let reqs = requests(&fx, IN_PROJ);
+    // No project segment: the item may live in any project.
+    assert!(requests(&fx, IN_PROJ).is_empty());
+    let reqs = requests(&fx, WI123);
+    assert_eq!(reqs.len(), 1);
     assert_eq!(reqs[0].method, "PATCH");
     assert_eq!(
         reqs[0].header("content-type"),
         Some("application/json-patch+json")
     );
     assert_eq!(
-        bodies(&fx, IN_PROJ)[0],
+        bodies(&fx, WI123)[0],
         json!([
             op("/fields/Custom.Team_Name", &json!("Web \"/fields/x\"")),
             op("/fields/Microsoft.VSTS.Common.Priority", &json!(1)),
@@ -461,7 +464,22 @@ fn update_refuses_bad_field_names() {
         text,
         "nothing to update: give state, assigned, title or fields"
     );
-    assert!(requests(&fx, IN_PROJ).is_empty());
+    assert!(fx.requests().is_empty());
+}
+
+#[test]
+fn create_needs_type_and_title() {
+    let fx = Fixture::start();
+    let mut mcp = env(&fx);
+    for (args, want) in [
+        (json!({"type": " ", "title": "t"}), "no type: pass type"),
+        (json!({"type": "Bug", "title": ""}), "no title: pass title"),
+    ] {
+        let (err, text) = mcp.call("wi_create", args);
+        assert!(err, "{text}");
+        assert_eq!(text, want);
+    }
+    assert!(fx.requests().is_empty());
 }
 
 #[test]
@@ -489,19 +507,32 @@ fn comment_preview_version() {
 #[test]
 fn wi_write_sent_once_on_404() {
     let fx = Fixture::start();
-    fx.route(IN_PROJ, vec![Resp::new(404, "text/plain", "gone")]);
+    fx.route(WI123, vec![Resp::new(404, "text/plain", "gone")]);
     fx.route(COMMENTS, vec![Resp::new(404, "text/plain", "gone")]);
     fx.route(STORY, vec![Resp::new(404, "text/plain", "gone")]);
     let mut mcp = env(&fx);
-    for (tool, args) in [
-        ("wi_update", json!({"id": 123, "title": "t"})),
-        ("wi_comment", json!({"id": 123, "text": "x"})),
-        ("wi_create", json!({"type": "User Story", "title": "t"})),
+    for (tool, args, want) in [
+        (
+            "wi_update",
+            json!({"id": 123, "title": "t"}),
+            "not found: work item #123",
+        ),
+        (
+            "wi_comment",
+            json!({"id": 123, "text": "x"}),
+            "not found: work item #123 (if #123 is in another project, pass project)",
+        ),
+        (
+            "wi_create",
+            json!({"type": "User Story", "title": "t"}),
+            "not found: work item type User Story",
+        ),
     ] {
         let (err, text) = mcp.call(tool, args);
         assert!(err, "{tool}: {text}");
+        assert_eq!(text, want);
     }
-    for path in [IN_PROJ, COMMENTS, STORY] {
+    for path in [WI123, COMMENTS, STORY] {
         assert_eq!(requests(&fx, path).len(), 1, "{path}");
     }
 }

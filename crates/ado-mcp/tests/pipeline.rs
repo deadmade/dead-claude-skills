@@ -370,6 +370,8 @@ fn cancel_body() {
     let reqs = sent(&fx, &build);
     assert_eq!(reqs.len(), 1);
     assert_eq!(reqs[0].method, "PATCH");
+    assert_eq!(reqs[0].header("content-type"), Some("application/json"));
+    assert_eq!(queries(&fx, &build), ["api-version=7.1-preview"]);
     assert_eq!(body(&reqs[0]), json!({"status": "cancelling"}));
 }
 
@@ -380,12 +382,17 @@ fn pipeline_write_sent_once_on_404() {
     fx.route(&build, vec![Resp::new(404, "text/plain", "gone")]);
     fx.route(RUNS12, vec![Resp::new(404, "text/plain", "gone")]);
     let mut mcp = env(&fx);
-    for (tool, args) in [
-        ("pipeline_cancel", json!({"run": 77})),
-        ("pipeline_run", json!({"pipeline": "12", "branch": "main"})),
+    for (tool, args, want) in [
+        ("pipeline_cancel", json!({"run": 77}), "not found: run #77"),
+        (
+            "pipeline_run",
+            json!({"pipeline": "12", "branch": "main"}),
+            "not found: pipeline 12",
+        ),
     ] {
         let (err, text) = mcp.call(tool, args);
         assert!(err, "{tool}: {text}");
+        assert_eq!(text, want);
     }
     assert_eq!(sent(&fx, &build).len(), 1);
     assert_eq!(sent(&fx, RUNS12).len(), 1);

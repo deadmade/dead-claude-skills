@@ -66,9 +66,7 @@ pub(crate) struct WiCreateArgs {
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "schemars")]
 pub(crate) struct WiUpdateArgs {
-    /// Project name or id. Default: the clone's project.
-    pub project: Option<String>,
-    /// Work item id.
+    /// Work item id (unique in the collection, so no project).
     pub id: u32,
     /// New state, such as Active or Resolved.
     pub state: Option<String>,
@@ -401,11 +399,12 @@ fn wi_id(id: u32) -> Result<i32, ApiError> {
     i32::try_from(id).map_err(|_| ApiError::local(format!("not found: work item #{id}")))
 }
 
-/// A field reference name such as `System.Title` or `Custom.Team_Name`: nothing that could end the JSON Patch path.
+/// A field reference name such as `System.Title` or `Custom.Team_Name`: two or more `.`-separated words of ASCII
+/// letters, digits and `_`, so nothing can end the JSON Patch path.
 fn field_name(k: &str) -> bool {
-    !k.is_empty()
-        && k.bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b"._".contains(&b))
+    let mut parts = k.split('.');
+    let word = |p: &str| !p.is_empty() && p.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_');
+    parts.clone().count() >= 2 && parts.all(word)
 }
 
 fn add(path: String, value: Value) -> JsonPatchOperation {
@@ -428,6 +427,10 @@ async fn assignee_name(ctx: &Ctx, who: Option<&str>) -> Result<Option<Value>, Ap
 /// # Errors
 /// When the assignee, the scope or the server fails.
 pub(crate) async fn wi_create(ctx: &Ctx, a: &WiCreateArgs) -> Result<String, ApiError> {
+    let kind = given(Some(&a.r#type)).ok_or_else(|| ApiError::local("no type: pass type"))?;
+    if given(Some(&a.title)).is_none() {
+        return Err(ApiError::local("no title: pass title"));
+    }
     let mut ops = vec![add("/fields/System.Title".into(), json!(a.title))];
     if let Some(d) = &a.description {
         ops.push(add("/fields/System.Description".into(), json!(d)));
@@ -444,7 +447,6 @@ pub(crate) async fn wi_create(ctx: &Ctx, a: &WiCreateArgs) -> Result<String, Api
         .scope(a.project.as_deref(), None, None)
         .await?
         .project_id);
-    let kind = a.r#type.trim();
     let api = &ctx.api;
     let item = api
         .az(|| {
@@ -453,12 +455,13 @@ pub(crate) async fn wi_create(ctx: &Ctx, a: &WiCreateArgs) -> Result<String, Api
                 .create(&api.org, ops.clone(), &proj, seg(kind))
                 .into_future()
         })
-        .await?;
+        .await
+        .map_err(|e| e.with_what(&format!("work item type {kind}")))?;
     Ok(format!("created #{} {kind} \"{}\"", item.id, a.title))
 }
 
 /// # Errors
-/// When nothing or a bad field name is given, or the assignee, the scope, the work item or the server fails.
+/// When nothing or a bad field name is given, or the assignee, the work item or the server fails.
 pub(crate) async fn wi_update(ctx: &Ctx, a: &WiUpdateArgs) -> Result<String, ApiError> {
     let mut fields = a.fields.clone().unwrap_or_default();
     if let Some(k) = fields.keys().find(|k| !field_name(k)) {
@@ -484,15 +487,12 @@ pub(crate) async fn wi_update(ctx: &Ctx, a: &WiUpdateArgs) -> Result<String, Api
         .into_iter()
         .map(|(k, v)| add(format!("/fields/{k}"), v))
         .collect();
-    let proj = seg(&ctx
-        .scope(a.project.as_deref(), None, None)
-        .await?
-        .project_id);
     let api = &ctx.api;
+    // No project: an id is unique in the collection, so an item in any project updates. The guard cuts the `//`.
     api.az(|| {
         api.wit
             .work_items_client()
-            .update(&api.org, ops.clone(), num, &proj)
+            .update(&api.org, ops.clone(), num, "")
             .into_future()
     })
     .await
@@ -519,7 +519,13 @@ pub(crate) async fn wi_comment(ctx: &Ctx, a: &WiCommentArgs) -> Result<String, A
             .into_future()
     })
     .await
-    .map_err(|e| e.with_what(&format!("work item #{}", a.id)))?;
+    // The comments path needs the item's project; a retry elsewhere would send the write twice.
+    .map_err(|e| {
+        let id = a.id;
+        e.with_what(&format!(
+            "work item #{id} (if #{id} is in another project, pass project)"
+        ))
+    })?;
     Ok(format!("commented on #{}", a.id))
 }
 
@@ -536,7 +542,22 @@ mod tests {
         ] {
             assert!(field_name(good), "{good}");
         }
-        for bad in ["", "a/b", "a b", "x~1", "-", "a\"b", "Ünter"] {
+        for bad in [
+            "",
+            "a/b",
+            "a b",
+            "x~1",
+            "-",
+            "a\"b",
+            "Ünter",
+            ".",
+            "..",
+            ".Title",
+            "System..Title",
+            "_",
+            "System.",
+            "Title",
+        ] {
             assert!(!field_name(bad), "{bad}");
         }
     }
