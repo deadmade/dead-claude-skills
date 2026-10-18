@@ -116,6 +116,20 @@ pub(crate) fn https_remote(remote: &str, org_url: &Url) -> Result<String, String
     Ok(out.into())
 }
 
+/// Whether `remote` has the shape of an Azure DevOps one (https or ssh, with a `/_git/` segment); a GitHub clone
+/// doesn't, so it is not an error but simply not ours.
+pub(crate) fn is_azure_remote(remote: &str) -> bool {
+    let remote = remote.trim();
+    if remote.contains("://") {
+        Url::parse(remote)
+            .is_ok_and(|u| matches!(u.scheme(), "https" | "ssh") && u.path().contains("/_git/"))
+    } else {
+        remote
+            .split_once(':')
+            .is_some_and(|(_, p)| format!("/{p}").contains("/_git/"))
+    }
+}
+
 fn git(dir: &Path, args: &[&str]) -> Option<String> {
     let out = Command::new("git")
         .arg("-C")
@@ -144,6 +158,27 @@ mod tests {
         Url::parse("https://srv/tfs/Coll/").unwrap()
     }
     const SAME: &str = "https://srv/tfs/Coll/Proj/_git/Repo";
+
+    #[test]
+    fn azure_shape() {
+        for yes in [
+            SAME,
+            "ssh://h@srv:22/tfs/Coll/P/_git/R",
+            "git@srv:v3/Coll/P/_git/R",
+            "https://evil/tfs/Coll/P/_git/R",
+        ] {
+            assert!(is_azure_remote(yes), "{yes}");
+        }
+        for no in [
+            "https://github.com/a/b.git",
+            "git@github.com:a/b.git",
+            "file:///srv/_git/x",
+            "/local/path",
+            "",
+        ] {
+            assert!(!is_azure_remote(no), "{no}");
+        }
+    }
 
     #[test]
     fn https_same() {

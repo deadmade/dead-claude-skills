@@ -12,7 +12,7 @@ use serde::Deserialize;
 
 use crate::api::{Api, ApiError, V71, V71_P1};
 use crate::config::Config;
-use crate::remote::{current_branch, https_remote, origin_url};
+use crate::remote::{current_branch, https_remote, is_azure_remote, origin_url};
 
 /// Where a tool works. The ids are what API paths use: names can hold spaces and non-ASCII characters.
 #[derive(Clone)]
@@ -167,6 +167,14 @@ impl Ctx {
 
     /// A project by name or id, and optionally one of its repos.
     async fn named(&self, project: &str, repo: Option<&str>) -> Result<Scope, ApiError> {
+        // `.` and `..` would climb out of the segment they name.
+        if [Some(project), repo]
+            .into_iter()
+            .flatten()
+            .any(|s| matches!(s, "." | ".."))
+        {
+            return Err(ApiError::local("bad project or repo name"));
+        }
         let key = format!("arg:{project}/{}", repo.unwrap_or_default());
         self.cached(key.clone(), async {
             let p = seg(project);
@@ -199,7 +207,8 @@ impl Ctx {
 
     /// The clone's `origin`, else the default project.
     async fn ambient(&self) -> Result<Scope, ApiError> {
-        if let Some(remote) = origin_url(&self.cfg.project_dir) {
+        // A clone of something else (GitHub, say) falls through to the default project.
+        if let Some(remote) = origin_url(&self.cfg.project_dir).filter(|r| is_azure_remote(r)) {
             // Nothing is sent when the remote is another server or collection.
             let https = https_remote(&remote, &self.cfg.org_url).map_err(ApiError::local)?;
             let key = format!("remote:{https}");
@@ -268,6 +277,9 @@ impl Ctx {
     /// When nobody or several match (the first five are named), or the server refuses.
     pub async fn user(&self, text: &str) -> Result<Me, ApiError> {
         let text = text.trim();
+        if text.is_empty() {
+            return Err(ApiError::local("no user given"));
+        }
         if text.eq_ignore_ascii_case("me") {
             return self.me().await;
         }

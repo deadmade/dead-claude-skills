@@ -346,3 +346,49 @@ fn concurrent_scopes_all_ok() {
     assert!(!err, "{text}");
     assert_eq!(count(&fx, "vsts/info"), before);
 }
+
+#[test]
+fn github_clone_uses_default_project() {
+    let fx = Fixture::start();
+    fx.route(
+        "/tfs/Coll/_apis/projects/Fallback",
+        vec![Resp::json(&json!({"id": "p-fb", "name": "Fallback"}))],
+    );
+    let clone = clone_of("https://github.com/a/b.git");
+    let mut mcp = ado(
+        &fx,
+        &[
+            ("ADO_PROJECT_DIR", clone.to_str().unwrap()),
+            ("ADO_DEFAULT_PROJECT", "Fallback"),
+        ],
+    );
+    let (err, text) = mcp.call("scope_echo", json!({}));
+    assert!(!err, "{text}");
+    assert_eq!(text, "project: p-fb Fallback\nrepo: -\nbranch: main");
+    // Without a default project it still says what to do, and sends nothing.
+    let mut bare = in_clone(&fx, &clone);
+    let (err, text) = bare.call("scope_echo", json!({}));
+    assert!(err);
+    assert!(text.starts_with("no project: pass project"), "{text}");
+    assert_eq!(fx.requests().len(), 1);
+}
+
+#[test]
+fn bad_names_and_empty_user() {
+    let fx = Fixture::start();
+    let mut mcp = ado(&fx, &[]);
+    for args in [
+        json!({"project": ".."}),
+        json!({"project": "P", "repo": "."}),
+    ] {
+        assert_eq!(
+            mcp.call("scope_echo", args),
+            (true, "bad project or repo name".into())
+        );
+    }
+    assert_eq!(
+        mcp.call("scope_echo", json!({"user": "  "})),
+        (true, "no user given".into())
+    );
+    assert!(fx.requests().is_empty(), "{:?}", paths(&fx));
+}
