@@ -766,6 +766,8 @@ error lines, never raw JSON.
      slash), which only a real server can confirm.
    - `pipeline_log` on a real failed run: the crate sends no `Accept: text/plain`, so check the log comes back as
      text, not the JSON lines form. Also check whether a YAML run without stages prints a `__default` stage line.
+   - `pipeline_log … full=true` on a log over 2000 lines, then the `start=` call it offers: the second page must
+     start where the first stopped (a server that ignores `startLine` would repeat the opening lines).
    - `pr_files` on a PR with a renamed file and, if one exists, a file whose encoding changed: the crate's
      change-type enum knows only some flag combinations.
 5. **Writes**, on scratch items only. Run each write tool once on a scratch branch, PR and work item.
