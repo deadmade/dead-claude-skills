@@ -81,6 +81,7 @@
       pkgs = nixpkgs.legacyPackages.${system};
       manifest = (pkgs.lib.importTOML ./crates/tui-review/Cargo.toml).package;
       webMcp = (pkgs.lib.importTOML ./crates/web-mcp/Cargo.toml).package;
+      adoMcp = (pkgs.lib.importTOML ./crates/ado-mcp/Cargo.toml).package;
     in {
       tui-review = pkgs.rustPlatform.buildRustPackage {
         pname = manifest.name;
@@ -105,6 +106,21 @@
         meta = {
           inherit (webMcp) description;
           mainProgram = "web-mcp";
+        };
+      };
+      # ado-mcp, the mcp-azure plugin's MCP server: `nix build .#ado-mcp`.
+      ado-mcp = pkgs.rustPlatform.buildRustPackage {
+        pname = adoMcp.name;
+        inherit (adoMcp) version;
+        src = ./crates/ado-mcp;
+        cargoLock.lockFile = ./crates/ado-mcp/Cargo.lock;
+        # The tests read git remotes and build reqwest clients, whose platform verifier needs CA certificates (cacert's
+        # setup hook sets SSL_CERT_FILE in the sandbox); debug checks keep the ADO_TIMEOUT_MS hook, debug builds only.
+        nativeCheckInputs = [pkgs.git pkgs.cacert];
+        checkType = "debug";
+        meta = {
+          inherit (adoMcp) description;
+          mainProgram = "ado-mcp";
         };
       };
     });
