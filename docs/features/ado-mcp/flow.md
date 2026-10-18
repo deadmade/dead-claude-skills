@@ -15,7 +15,7 @@ MCP server.
 - Spec: [spec.md](spec.md) (draft, builder check done 2026-10-18)
 - Plan:
 - ADRs:
-- CONTEXT.md:
+- Glossary: [GLOSSARY.md](../../../GLOSSARY.md), section "Azure DevOps (mcp-azure)"
 
 ## Gates
 

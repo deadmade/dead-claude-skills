@@ -44,7 +44,7 @@ downloaded when it runs. The user doesn't need a terminal tool: "goal is for cla
      - with no id, the PR for the current branch
      - title, status, draft, source → target, author, description
      - reviewers with their votes, policy evaluations (what blocks completion), linked work items, and the latest
-       build of the source branch
+       pipeline run of the source branch
    - `pr_threads`:
      - the PR's comment threads, without system threads (`commentType: system`, or a `CodeReviewThreadType`
        property) or deleted comments
