@@ -1,6 +1,6 @@
 # ado-mcp: spec
 
-Status: draft, in the grill, before Gate 1.
+Status: approved at Gate 1 on 2026-10-18.
 
 - Written from the chat and the decisions in [flow.md](flow.md) (Options).
 - The builder check is done and its two questions were answered on 2026-10-18.

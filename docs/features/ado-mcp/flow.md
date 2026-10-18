@@ -1,5 +1,5 @@
 ---
-phase: grill
+phase: plan
 ---
 
 # ado MCP server: flow
@@ -19,7 +19,7 @@ MCP server.
 
 ## Gates
 
-- Gate 1, spec approved:
+- Gate 1, spec approved: 2026-10-18 ("approved"). ADR 0002 offered, not taken up.
 - Gate 2, plan approved:
 
 ## Skipped
