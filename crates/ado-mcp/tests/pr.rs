@@ -8,6 +8,10 @@ use serde_json::{Value, json};
 const PROJ: &str = "b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455";
 const REPO: &str = "3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01";
 const JANE: &str = "5e8f1a77-0c2b-4d39-8e6a-1b7c3d9f4a02";
+/// The PAT's user in `connection-data.json`.
+const ALICE: &str = "7c1e4d52-93ab-4f06-b1d8-5a2f6e0c9d13";
+const CONN: &str = "/tfs/Coll/_apis/connectionData";
+const REPO_URL: &str = "/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01";
 const INFO: &str = "/tfs/Coll/My%20Proj/_git/R/vsts/info";
 const IDENTITIES: &str = "/tfs/Coll/_apis/identities";
 const WI_BATCH: &str = "/tfs/Coll/_apis/wit/workitemsbatch";
@@ -49,6 +53,15 @@ fn queries(fx: &Fixture, path: &str) -> Vec<String> {
                 .replace("%2F", "/")
                 .replace("%3A", ":")
         })
+        .collect()
+}
+
+/// The JSON bodies of the `method` requests to `path` (without query).
+fn bodies(fx: &Fixture, method: &str, path: &str) -> Vec<Value> {
+    fx.requests()
+        .into_iter()
+        .filter(|r| r.method == method && r.path.split('?').next() == Some(path))
+        .map(|r| serde_json::from_slice(&r.body).unwrap())
         .collect()
 }
 
@@ -457,4 +470,296 @@ fn files_stop_on_an_empty_page() {
         "… more: git diff main...feature/login-retry --stat\ndiff: git diff main...feature/login-retry"
     );
     assert_eq!(queries(&fx, &changes).len(), 1);
+}
+
+#[test]
+fn create_defaults_and_reviewers() {
+    let fx = Fixture::start();
+    fx.route(REPO_URL, vec![fixture("repo.json")]);
+    fx.route(
+        IDENTITIES,
+        vec![Resp::json(
+            &json!({"value": [{"id": JANE, "providerDisplayName": "Jane Roe"}]}),
+        )],
+    );
+    fx.route(PRS, vec![fixture("pr.json")]);
+    let mut mcp = env(&fx);
+    let text = ok(
+        &mut mcp,
+        "pr_create",
+        json!({"title": "Retry login", "branch": "feature/login-retry",
+               "reviewers": ["jane"], "work_items": [77]}),
+    );
+    assert_eq!(text, "created !412 feature/login-retry → main");
+    let sent = bodies(&fx, "POST", PRS);
+    assert_eq!(
+        sent,
+        [
+            json!({"title": "Retry login", "sourceRefName": "refs/heads/feature/login-retry",
+                "targetRefName": "refs/heads/main", "reviewers": [{"id": JANE}],
+                "workItemRefs": [{"id": "77"}]})
+        ]
+    );
+    let mut draft: Value = serde_json::from_slice(&fixture("pr.json").body).unwrap();
+    draft["isDraft"] = json!(true);
+    fx.route(PRS, vec![Resp::json(&draft)]);
+    let text = ok(
+        &mut mcp,
+        "pr_create",
+        json!({"title": "T", "branch": "feature/x", "target": "dev", "draft": true}),
+    );
+    assert_eq!(text, "created !412 feature/x → dev (draft)");
+    let sent = &bodies(&fx, "POST", PRS)[1];
+    assert_eq!(sent["targetRefName"], "refs/heads/dev");
+    assert_eq!(sent["isDraft"], true);
+    // The explicit target needs no lookup of the default branch.
+    assert_eq!(queries(&fx, REPO_URL).len(), 1);
+}
+
+#[test]
+fn create_conflict_names_pr() {
+    let fx = Fixture::start();
+    let conflict = fixture("pr-409.json").body;
+    fx.route(
+        PRS,
+        vec![
+            Resp::new(409, "application/json", conflict),
+            fixture("pr-list.json"),
+        ],
+    );
+    let (err, text) = env(&fx).call(
+        "pr_create",
+        json!({"title": "T", "branch": "feature/x", "target": "main"}),
+    );
+    assert!(err, "{text}");
+    assert_eq!(text, "!412 already exists for feature/x → main");
+    assert_eq!(bodies(&fx, "POST", PRS).len(), 1);
+    let q = &queries(&fx, PRS)[1];
+    assert!(
+        q.contains("searchCriteria.sourceRefName=refs/heads/feature/x")
+            && q.contains("searchCriteria.targetRefName=refs/heads/main")
+            && q.contains("searchCriteria.status=active"),
+        "{q}"
+    );
+}
+
+#[test]
+fn comment_anchor() {
+    let fx = Fixture::start();
+    fx.route(&format!("{PRS}/412"), vec![fixture("pr.json")]);
+    let threads = format!("{PR412}/threads");
+    fx.route(&threads, vec![Resp::json(&json!({"id": 31}))]);
+    let text = ok(
+        &mut env(&fx),
+        "pr_comment",
+        json!({"id": 412, "text": "Why retry twice?", "file": "src/auth.rs", "line": 88}),
+    );
+    assert_eq!(text, "commented on !412 as thread #31");
+    let req = fx
+        .requests()
+        .into_iter()
+        .find(|r| r.method == "POST" && r.path.starts_with(&threads))
+        .unwrap();
+    let raw = String::from_utf8(req.body.clone()).unwrap();
+    assert!(raw.contains(r#""/src/auth.rs""#), "{raw}");
+    assert!(raw.contains(r#"{"line":88,"offset":1}"#), "{raw}");
+    let body: Value = serde_json::from_slice(&req.body).unwrap();
+    assert_eq!(body["status"], "active");
+    assert_eq!(
+        body["comments"],
+        json!([{"content": "Why retry twice?", "commentType": "text"}])
+    );
+    let at = &body["threadContext"];
+    assert_eq!(at["rightFileStart"], at["rightFileEnd"]);
+}
+
+#[test]
+fn comment_line_needs_file() {
+    let fx = Fixture::start();
+    let mut mcp = env(&fx);
+    for (args, want) in [
+        (
+            json!({"id": 412, "text": "x", "line": 5}),
+            "file and line go together",
+        ),
+        (
+            json!({"id": 412, "text": "x", "file": "a.rs"}),
+            "file and line go together",
+        ),
+        (
+            json!({"id": 412, "text": "x", "file": "a.rs", "line": 0}),
+            "line starts at 1",
+        ),
+    ] {
+        let (err, text) = mcp.call("pr_comment", args);
+        assert!(err, "{text}");
+        assert_eq!(text, want);
+    }
+    assert!(fx.requests().is_empty());
+}
+
+#[test]
+fn reply_and_thread_status() {
+    let fx = Fixture::start();
+    fx.route(&format!("{PRS}/412"), vec![fixture("pr.json")]);
+    let comments = format!("{PR412}/threads/7/comments");
+    fx.route(&comments, vec![Resp::json(&json!({"id": 3}))]);
+    let thread = format!("{PR412}/threads/7");
+    fx.route(
+        &thread,
+        vec![Resp::json(&json!({"id": 7, "status": "fixed"}))],
+    );
+    let mut mcp = env(&fx);
+    let text = ok(
+        &mut mcp,
+        "pr_reply",
+        json!({"id": 412, "thread": 7, "text": "Done."}),
+    );
+    assert_eq!(text, "replied on !412 thread #7");
+    assert_eq!(
+        bodies(&fx, "POST", &comments),
+        [json!({"content": "Done.", "parentCommentId": 1, "commentType": "text"})]
+    );
+    let text = ok(
+        &mut mcp,
+        "pr_thread_status",
+        json!({"id": 412, "thread": 7, "status": "wontFix"}),
+    );
+    assert_eq!(text, "thread #7 on !412 is now wontFix");
+    assert_eq!(
+        bodies(&fx, "PATCH", &thread),
+        [json!({"status": "wontFix"})]
+    );
+    let (err, text) = mcp.call(
+        "pr_thread_status",
+        json!({"id": 412, "thread": 7, "status": "unknown"}),
+    );
+    assert!(err);
+    assert_eq!(
+        text,
+        "status is active, fixed, wontFix, closed, byDesign or pending"
+    );
+}
+
+#[test]
+fn vote_values() {
+    let fx = Fixture::start();
+    fx.route(CONN, vec![fixture("connection-data.json")]);
+    fx.route(&format!("{PRS}/412"), vec![fixture("pr.json")]);
+    let me = format!("{PR412}/reviewers/{ALICE}");
+    fx.route(&me, vec![Resp::json(&json!({"id": ALICE, "vote": -10}))]);
+    let mut mcp = env(&fx);
+    let text = ok(&mut mcp, "pr_vote", json!({"id": 412, "vote": "reject"}));
+    assert_eq!(text, "voted reject on !412");
+    let sent = bodies(&fx, "PUT", &me);
+    assert_eq!(sent.len(), 1);
+    assert_eq!(sent[0]["vote"], -10);
+    let (err, text) = mcp.call("pr_vote", json!({"id": 412, "vote": "maybe"}));
+    assert!(err);
+    assert_eq!(
+        text,
+        "vote is approve, approve-with-suggestions, wait, reject or reset"
+    );
+}
+
+#[test]
+fn complete_queued() {
+    let fx = Fixture::start();
+    let pr = format!("{PRS}/412");
+    fx.route(&pr, vec![fixture("pr.json"), fixture("pr-complete.json")]);
+    let mut mcp = env(&fx);
+    let text = ok(&mut mcp, "pr_complete", json!({"id": 412}));
+    assert_eq!(text, "completion queued for !412 (squash, merge queued)");
+    let mut done: Value = serde_json::from_slice(&fixture("pr.json").body).unwrap();
+    done["status"] = json!("completed");
+    fx.route(&pr, vec![fixture("pr.json"), Resp::json(&done)]);
+    let text = ok(
+        &mut mcp,
+        "pr_complete",
+        json!({"id": 412, "strategy": "rebase"}),
+    );
+    assert_eq!(text, "completed !412 (rebase)");
+    assert_eq!(bodies(&fx, "PATCH", &pr).len(), 2);
+}
+
+#[test]
+fn complete_never_bypasses() {
+    let fx = Fixture::start();
+    fx.route(CONN, vec![fixture("connection-data.json")]);
+    let pr = format!("{PRS}/412");
+    fx.route(&pr, vec![fixture("pr.json"), fixture("pr-complete.json")]);
+    let mut mcp = env(&fx);
+    ok(&mut mcp, "pr_complete", json!({"id": 412}));
+    fx.route(&pr, vec![fixture("pr.json"), fixture("pr-complete.json")]);
+    let text = ok(
+        &mut mcp,
+        "pr_complete",
+        json!({"id": 412, "auto": true, "delete_source": false}),
+    );
+    assert_eq!(text, "auto-complete set on !412");
+    for r in fx.requests() {
+        let raw = String::from_utf8(r.body).unwrap();
+        assert!(!raw.contains("bypassPolicy"), "{raw}");
+    }
+    let sent = bodies(&fx, "PATCH", &pr);
+    assert_eq!(
+        sent[0],
+        json!({"status": "completed",
+               "lastMergeSourceCommit": {"commitId": "9b1f3c2a7d4e5f60718293a4b5c6d7e8f9a0b1c2"},
+               "completionOptions": {"mergeStrategy": "squash", "deleteSourceBranch": true,
+                                     "transitionWorkItems": true}})
+    );
+    assert!(
+        serde_json::to_string(&sent[0])
+            .unwrap()
+            .contains(r#""deleteSourceBranch":true"#)
+    );
+    assert_eq!(
+        sent[1],
+        json!({"autoCompleteSetBy": {"id": ALICE},
+               "completionOptions": {"mergeStrategy": "squash", "deleteSourceBranch": false,
+                                     "transitionWorkItems": true}})
+    );
+}
+
+#[test]
+fn update_only_given_fields() {
+    let fx = Fixture::start();
+    let pr = format!("{PRS}/412");
+    fx.route(&pr, vec![fixture("pr.json")]);
+    let mut mcp = env(&fx);
+    let text = ok(
+        &mut mcp,
+        "pr_update",
+        json!({"id": 412, "title": "New title", "draft": false}),
+    );
+    assert_eq!(text, "updated !412: title, draft");
+    let text = ok(
+        &mut mcp,
+        "pr_update",
+        json!({"id": 412, "status": "abandoned"}),
+    );
+    assert_eq!(text, "updated !412: status");
+    assert_eq!(
+        bodies(&fx, "PATCH", &pr),
+        [
+            json!({"title": "New title", "isDraft": false}),
+            json!({"status": "abandoned"})
+        ]
+    );
+    for (args, want) in [
+        (
+            json!({"id": 412, "status": "completed"}),
+            "status is abandoned or active",
+        ),
+        (
+            json!({"id": 412}),
+            "nothing to update: give title, description, draft or status",
+        ),
+    ] {
+        let (err, text) = mcp.call("pr_update", args);
+        assert!(err, "{text}");
+        assert_eq!(text, want);
+    }
+    assert_eq!(bodies(&fx, "PATCH", &pr).len(), 2);
 }

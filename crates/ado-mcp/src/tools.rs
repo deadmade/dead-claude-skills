@@ -14,7 +14,10 @@ use crate::api::ApiError;
 use crate::config::Config;
 use crate::ctx::{Ctx, seg};
 use crate::pipeline::{self, LogArgs, ProjectArgs, RunArgs, RunsArgs};
-use crate::pr::{self, PrFilesArgs, PrListArgs, PrThreadsArgs, PrViewArgs};
+use crate::pr::{
+    self, PrCommentArgs, PrCompleteArgs, PrCreateArgs, PrFilesArgs, PrListArgs, PrReplyArgs,
+    PrThreadStatusArgs, PrThreadsArgs, PrUpdateArgs, PrViewArgs, PrVoteArgs,
+};
 use crate::wi::{self, WiQueryArgs, WiViewArgs};
 
 /// The tools that change something on the server. Claude Code prompts on every call to these.
@@ -164,6 +167,58 @@ impl Server {
     async fn pr_files(&self, Parameters(a): Parameters<PrFilesArgs>) -> CallToolResult {
         // The PR model is large; boxed, the tool's future stays small.
         reply(Box::pin(pr::pr_files(&self.ctx, &a)).await)
+    }
+
+    #[tool(
+        description = "Create a pull request from branch (default: the current branch) into target (default: the repo's default branch), optionally as a draft, with reviewers and linked work items."
+    )]
+    async fn pr_create(&self, Parameters(a): Parameters<PrCreateArgs>) -> CallToolResult {
+        reply(pr::pr_create(&self.ctx, &a).await)
+    }
+
+    #[tool(
+        description = "Change a pull request's title or description, make it a draft or publish it (draft), or abandon or reactivate it (status). Only the given fields change. Without id, the active PR of the current branch."
+    )]
+    async fn pr_update(&self, Parameters(a): Parameters<PrUpdateArgs>) -> CallToolResult {
+        reply(pr::pr_update(&self.ctx, &a).await)
+    }
+
+    #[tool(
+        description = "Start a review thread on a pull request, optionally anchored to file and line (both or neither). Without id, the active PR of the current branch."
+    )]
+    async fn pr_comment(&self, Parameters(a): Parameters<PrCommentArgs>) -> CallToolResult {
+        reply(Box::pin(pr::pr_comment(&self.ctx, &a)).await)
+    }
+
+    #[tool(
+        description = "Reply on a pull request's review thread (the thread id from pr_threads). Without id, the active PR of the current branch."
+    )]
+    async fn pr_reply(&self, Parameters(a): Parameters<PrReplyArgs>) -> CallToolResult {
+        reply(pr::pr_reply(&self.ctx, &a).await)
+    }
+
+    #[tool(
+        description = "Set a pull request thread's status: active, fixed, wontFix, closed, byDesign or pending. Without id, the active PR of the current branch."
+    )]
+    async fn pr_thread_status(
+        &self,
+        Parameters(a): Parameters<PrThreadStatusArgs>,
+    ) -> CallToolResult {
+        reply(pr::pr_thread_status(&self.ctx, &a).await)
+    }
+
+    #[tool(
+        description = "Vote on a pull request as the PAT's user: approve, approve-with-suggestions, wait, reject or reset. Without id, the active PR of the current branch."
+    )]
+    async fn pr_vote(&self, Parameters(a): Parameters<PrVoteArgs>) -> CallToolResult {
+        reply(Box::pin(pr::pr_vote(&self.ctx, &a)).await)
+    }
+
+    #[tool(
+        description = "Complete (merge) a pull request with a merge strategy (default squash), deleting the source branch and transitioning work items unless told not to; with auto, set auto-complete instead. Branch policies always apply. Without id, the active PR of the current branch."
+    )]
+    async fn pr_complete(&self, Parameters(a): Parameters<PrCompleteArgs>) -> CallToolResult {
+        reply(Box::pin(pr::pr_complete(&self.ctx, &a)).await)
     }
 
     #[tool(

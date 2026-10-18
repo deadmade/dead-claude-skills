@@ -1,16 +1,21 @@
-//! The pull request read tools: `pr_list`, `pr_view`, `pr_threads` and `pr_files`.
+//! The pull request tools: the reads `pr_list`, `pr_view`, `pr_threads` and `pr_files`, and the writes `pr_create`,
+//! `pr_update`, `pr_comment`, `pr_reply`, `pr_thread_status`, `pr_vote` and `pr_complete`.
 
 use std::fmt::Write as _;
 
 use azure_devops_rust_api::build::models::BuildQueryOrder;
 use azure_devops_rust_api::git::models::{
-    CommentThread, GitPullRequest, GitPullRequestCommentThreadList, GitPullRequestList,
-    IdentityRef, PullRequestStatus, comment::CommentType,
+    Comment, CommentPosition, CommentThread, CommentThreadContext, GitPullRequest,
+    GitPullRequestCommentThread, GitPullRequestCommentThreadList, GitPullRequestCompletionOptions,
+    GitPullRequestCreateOptions, GitPullRequestList, IdentityId, IdentityRef, IdentityRefWithVote,
+    PullRequestStatus, ResourceRef, comment::CommentType, comment_thread, git_pull_request,
+    git_pull_request_completion_options::MergeStrategy,
 };
 use azure_devops_rust_api::wit::models::WorkItemBatchGetRequest;
+use reqwest::Method;
 use rmcp::schemars::{self, JsonSchema};
 use serde::Deserialize;
-use serde_json::{Map, Value};
+use serde_json::{Map, Value, json};
 
 use crate::api::{ApiError, V71_PREVIEW};
 use crate::ctx::{Ctx, Scope, given, seg};
@@ -680,6 +685,443 @@ pub(crate) async fn pr_files(ctx: &Ctx, a: &PrFilesArgs) -> Result<String, ApiEr
         "diff: run git diff between the target and source branches".into()
     });
     Ok(lines.join("\n"))
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[schemars(crate = "schemars")]
+pub(crate) struct PrCreateArgs {
+    /// Where, and `branch` is the source. Default: the clone's current branch.
+    #[serde(flatten)]
+    pub at: Where,
+    pub title: String,
+    pub description: Option<String>,
+    /// Target branch. Default: the repo's default branch.
+    pub target: Option<String>,
+    /// Create it as a draft.
+    pub draft: Option<bool>,
+    /// Reviewers: `me` or part of a name, each.
+    pub reviewers: Option<Vec<String>>,
+    /// Work item ids to link.
+    pub work_items: Option<Vec<u32>>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[schemars(crate = "schemars")]
+pub(crate) struct PrUpdateArgs {
+    #[serde(flatten)]
+    pub at: Where,
+    /// Pull request id. Default: the active PR of the branch.
+    pub id: Option<u32>,
+    pub title: Option<String>,
+    pub description: Option<String>,
+    /// true makes it a draft, false publishes it.
+    pub draft: Option<bool>,
+    /// abandoned or active (reactivates an abandoned PR).
+    pub status: Option<String>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[schemars(crate = "schemars")]
+pub(crate) struct PrCommentArgs {
+    #[serde(flatten)]
+    pub at: Where,
+    /// Pull request id. Default: the active PR of the branch.
+    pub id: Option<u32>,
+    pub text: String,
+    /// File to anchor the comment to, relative to the repo root; needs `line`.
+    pub file: Option<String>,
+    /// Line in the file's new version, from 1; needs `file`.
+    pub line: Option<u32>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[schemars(crate = "schemars")]
+pub(crate) struct PrReplyArgs {
+    #[serde(flatten)]
+    pub at: Where,
+    /// Pull request id. Default: the active PR of the branch.
+    pub id: Option<u32>,
+    /// Thread id, as `pr_threads` shows it (`#7`).
+    pub thread: u32,
+    pub text: String,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[schemars(crate = "schemars")]
+pub(crate) struct PrThreadStatusArgs {
+    #[serde(flatten)]
+    pub at: Where,
+    /// Pull request id. Default: the active PR of the branch.
+    pub id: Option<u32>,
+    /// Thread id, as `pr_threads` shows it (`#7`).
+    pub thread: u32,
+    /// active, fixed, wontFix, closed, byDesign or pending.
+    pub status: String,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[schemars(crate = "schemars")]
+pub(crate) struct PrVoteArgs {
+    #[serde(flatten)]
+    pub at: Where,
+    /// Pull request id. Default: the active PR of the branch.
+    pub id: Option<u32>,
+    /// approve, approve-with-suggestions, wait, reject or reset.
+    pub vote: String,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[schemars(crate = "schemars")]
+pub(crate) struct PrCompleteArgs {
+    #[serde(flatten)]
+    pub at: Where,
+    /// Pull request id. Default: the active PR of the branch.
+    pub id: Option<u32>,
+    /// squash (default), noFastForward, rebase or rebaseMerge.
+    pub strategy: Option<String>,
+    /// Delete the source branch after the merge. Default true.
+    pub delete_source: Option<bool>,
+    /// Move the linked work items on. Default true.
+    pub transition_work_items: Option<bool>,
+    /// Set auto-complete instead: it merges once the policies pass.
+    pub auto: Option<bool>,
+}
+
+/// # Errors
+/// When the scope, a reviewer or the server fails, or such a PR already exists.
+pub(crate) async fn pr_create(ctx: &Ctx, a: &PrCreateArgs) -> Result<String, ApiError> {
+    let mut reviewers = Vec::new();
+    for r in a.reviewers.iter().flatten() {
+        reviewers.push(IdentityId {
+            id: ctx.user(r).await?.id,
+        });
+    }
+    let first = a.at.scope(ctx).await?;
+    let (s, target) = ctx
+        .retry_stale(&first.key, || async {
+            let s = a.at.scope(ctx).await?;
+            if let Some(t) = given(a.target.as_deref()) {
+                return Ok((s, full_ref(t)));
+            }
+            let (api, (repo, proj)) = (&ctx.api, ids(&s)?);
+            let found = api
+                .az(|| {
+                    api.git
+                        .repositories_client()
+                        .get_repository(&api.org, &repo, &proj)
+                        .into_future()
+                })
+                .await?;
+            let t = found
+                .default_branch
+                .ok_or_else(|| ApiError::local("the repo has no default branch: pass target"))?;
+            Ok((s, t))
+        })
+        .await?;
+    let source = full_ref(
+        s.branch
+            .as_deref()
+            .ok_or_else(|| ApiError::local("no branch: pass branch"))?,
+    );
+    let (api, (repo, proj)) = (&ctx.api, ids(&s)?);
+    let body = GitPullRequestCreateOptions {
+        description: a.description.clone(),
+        is_draft: a.draft,
+        reviewers,
+        work_item_refs: a
+            .work_items
+            .iter()
+            .flatten()
+            .map(|id| ResourceRef {
+                id: Some(id.to_string()),
+                url: None,
+            })
+            .collect(),
+        ..GitPullRequestCreateOptions::new(source.clone(), target.clone(), a.title.clone())
+    };
+    let prs = api.git.pull_requests_client();
+    let arrow = format!("{} → {}", ref_name(&source), ref_name(&target));
+    let pr = match api
+        .az(|| {
+            prs.create(&api.org, &repo, &proj, body.clone())
+                .into_future()
+        })
+        .await
+    {
+        Ok(pr) => pr,
+        Err(e) if e.tf.as_deref() == Some("TF401179") => {
+            let found = api
+                .az(|| {
+                    prs.get_pull_requests(&api.org, &repo, &proj)
+                        .search_criteria_source_ref_name(&source)
+                        .search_criteria_target_ref_name(&target)
+                        .search_criteria_status(PullRequestStatus::Active)
+                        .top(1)
+                        .into_future()
+                })
+                .await;
+            // When the lookup fails, the server's own refusal still says what happened.
+            let id = found
+                .ok()
+                .and_then(|f| Some(f.value.first()?.pull_request_id));
+            return Err(id.map_or(e, |id| {
+                ApiError::local(format!("!{id} already exists for {arrow}"))
+            }));
+        }
+        Err(e) => return Err(e),
+    };
+    let draft = if pr.is_draft { " (draft)" } else { "" };
+    Ok(format!("created !{} {arrow}{draft}", pr.pull_request_id))
+}
+
+/// Sends a `PATCH` to the PR. By hand: the crate's `GitPullRequestUpdateOptions` has no `isDraft` or `lastMergeSourceCommit`.
+async fn patch_pr(ctx: &Ctx, s: &Scope, id: i32, body: &Value) -> Result<GitPullRequest, ApiError> {
+    let (repo, proj) = ids(s)?;
+    let path = format!("{proj}/_apis/git/repositories/{repo}/pullrequests/{id}");
+    ctx.api
+        .send(Method::PATCH, &path, &[], V71_PREVIEW, body, false)
+        .await
+}
+
+/// # Errors
+/// When nothing or a bad status is given, or the scope, the PR or the server fails.
+pub(crate) async fn pr_update(ctx: &Ctx, a: &PrUpdateArgs) -> Result<String, ApiError> {
+    let mut body = Map::new();
+    let mut fields = Vec::new();
+    let mut put = |field: &'static str, key: &str, v: Value| {
+        fields.push(field);
+        body.insert(key.into(), v);
+    };
+    if let Some(t) = &a.title {
+        put("title", "title", json!(t));
+    }
+    if let Some(d) = &a.description {
+        put("description", "description", json!(d));
+    }
+    if let Some(d) = a.draft {
+        put("draft", "isDraft", json!(d));
+    }
+    if let Some(st) = given(a.status.as_deref()) {
+        if !matches!(st, "abandoned" | "active") {
+            return Err(ApiError::local("status is abandoned or active"));
+        }
+        put("status", "status", json!(st));
+    }
+    if fields.is_empty() {
+        return Err(ApiError::local(
+            "nothing to update: give title, description, draft or status",
+        ));
+    }
+    let (s, pr) = find_pr(ctx, &a.at, a.id).await?;
+    let id = pr.pull_request_id;
+    patch_pr(ctx, &s, id, &Value::Object(body)).await?;
+    Ok(format!("updated !{id}: {}", fields.join(", ")))
+}
+
+fn thread_id(thread: u32) -> Result<i32, ApiError> {
+    i32::try_from(thread).map_err(|_| ApiError::local(format!("not found: thread #{thread}")))
+}
+
+fn text_comment(text: &str, parent: Option<i64>) -> Comment {
+    Comment {
+        content: Some(text.to_owned()),
+        comment_type: Some(CommentType::Text),
+        parent_comment_id: parent,
+        ..Comment::default()
+    }
+}
+
+/// # Errors
+/// When `file` and `line` don't come together, or the scope, the PR or the server fails.
+pub(crate) async fn pr_comment(ctx: &Ctx, a: &PrCommentArgs) -> Result<String, ApiError> {
+    let at = match (given(a.file.as_deref()), a.line) {
+        (None, None) => None,
+        (Some(_), Some(0)) => return Err(ApiError::local("line starts at 1")),
+        (Some(f), Some(n)) => {
+            let line = i32::try_from(n).map_err(|_| ApiError::local("line is too large"))?;
+            let pos = CommentPosition {
+                line: Some(line),
+                offset: Some(1),
+            };
+            Some(CommentThreadContext {
+                file_path: Some(format!("/{}", rel(f))),
+                right_file_start: Some(pos.clone()),
+                right_file_end: Some(pos),
+                ..CommentThreadContext::default()
+            })
+        }
+        _ => return Err(ApiError::local("file and line go together")),
+    };
+    let (s, pr) = find_pr(ctx, &a.at, a.id).await?;
+    let (api, (repo, proj)) = (&ctx.api, ids(&s)?);
+    let id = pr.pull_request_id;
+    let body = GitPullRequestCommentThread {
+        comment_thread: CommentThread {
+            comments: vec![text_comment(&a.text, None)],
+            status: Some(comment_thread::Status::Active),
+            thread_context: at,
+            ..CommentThread::default()
+        },
+        pull_request_thread_context: None,
+    };
+    let t = api
+        .az(|| {
+            api.git
+                .pull_request_threads_client()
+                .create(&api.org, body.clone(), &repo, id, &proj)
+                .into_future()
+        })
+        .await?;
+    Ok(format!(
+        "commented on !{id} as thread #{}",
+        t.comment_thread.id.unwrap_or_default()
+    ))
+}
+
+/// # Errors
+/// When the scope, the PR, the thread or the server fails.
+pub(crate) async fn pr_reply(ctx: &Ctx, a: &PrReplyArgs) -> Result<String, ApiError> {
+    let thread = thread_id(a.thread)?;
+    let (s, pr) = find_pr(ctx, &a.at, a.id).await?;
+    let (api, (repo, proj)) = (&ctx.api, ids(&s)?);
+    let id = pr.pull_request_id;
+    // A thread's first comment has id 1: a reply hangs under it.
+    let body = text_comment(&a.text, Some(1));
+    api.az(|| {
+        api.git
+            .pull_request_thread_comments_client()
+            .create(&api.org, body.clone(), &repo, id, thread, &proj)
+            .into_future()
+    })
+    .await
+    .map_err(|e| e.with_what(&format!("thread #{thread} on !{id}")))?;
+    Ok(format!("replied on !{id} thread #{thread}"))
+}
+
+/// # Errors
+/// When the status is unknown, or the scope, the PR, the thread or the server fails.
+pub(crate) async fn pr_thread_status(
+    ctx: &Ctx,
+    a: &PrThreadStatusArgs,
+) -> Result<String, ApiError> {
+    use comment_thread::Status;
+    let status = match a.status.trim() {
+        "active" => Status::Active,
+        "fixed" => Status::Fixed,
+        "wontFix" => Status::WontFix,
+        "closed" => Status::Closed,
+        "byDesign" => Status::ByDesign,
+        "pending" => Status::Pending,
+        _ => {
+            return Err(ApiError::local(
+                "status is active, fixed, wontFix, closed, byDesign or pending",
+            ));
+        }
+    };
+    let thread = thread_id(a.thread)?;
+    let (s, pr) = find_pr(ctx, &a.at, a.id).await?;
+    let (api, (repo, proj)) = (&ctx.api, ids(&s)?);
+    let id = pr.pull_request_id;
+    let body = GitPullRequestCommentThread {
+        comment_thread: CommentThread {
+            status: Some(status.clone()),
+            ..CommentThread::default()
+        },
+        pull_request_thread_context: None,
+    };
+    api.az(|| {
+        api.git
+            .pull_request_threads_client()
+            .update(&api.org, body.clone(), &repo, id, thread, &proj)
+            .into_future()
+    })
+    .await
+    .map_err(|e| e.with_what(&format!("thread #{thread} on !{id}")))?;
+    Ok(format!("thread #{thread} on !{id} is now {status}"))
+}
+
+/// # Errors
+/// When the vote is unknown, or the scope, the PR or the server fails.
+pub(crate) async fn pr_vote(ctx: &Ctx, a: &PrVoteArgs) -> Result<String, ApiError> {
+    let name = a.vote.trim();
+    let value = match name {
+        "approve" => 10,
+        "approve-with-suggestions" => 5,
+        "wait" => -5,
+        "reject" => -10,
+        "reset" => 0,
+        _ => {
+            return Err(ApiError::local(
+                "vote is approve, approve-with-suggestions, wait, reject or reset",
+            ));
+        }
+    };
+    let (s, pr) = find_pr(ctx, &a.at, a.id).await?;
+    let me = ctx.me().await?;
+    let (api, (repo, proj)) = (&ctx.api, ids(&s)?);
+    let id = pr.pull_request_id;
+    let body = IdentityRefWithVote {
+        vote: Some(value),
+        ..IdentityRefWithVote::new(IdentityRef::new(me.id.clone()))
+    };
+    api.az(|| {
+        api.git
+            .pull_request_reviewers_client()
+            .create_pull_request_reviewer(&api.org, body.clone(), &repo, id, seg(&me.id), &proj)
+            .into_future()
+    })
+    .await?;
+    Ok(format!("voted {name} on !{id}"))
+}
+
+/// # Errors
+/// When the strategy is unknown, the PR has no source commit yet, or the scope, the PR or the server fails.
+pub(crate) async fn pr_complete(ctx: &Ctx, a: &PrCompleteArgs) -> Result<String, ApiError> {
+    let strategy = match given(a.strategy.as_deref()).unwrap_or("squash") {
+        "squash" => MergeStrategy::Squash,
+        "noFastForward" => MergeStrategy::NoFastForward,
+        "rebase" => MergeStrategy::Rebase,
+        "rebaseMerge" => MergeStrategy::RebaseMerge,
+        _ => {
+            return Err(ApiError::local(
+                "strategy is squash, noFastForward, rebase or rebaseMerge",
+            ));
+        }
+    };
+    // `bypassPolicy` stays `None`, which the model leaves out: nothing here can merge past a policy.
+    let options = GitPullRequestCompletionOptions {
+        merge_strategy: Some(strategy.clone()),
+        delete_source_branch: Some(a.delete_source.unwrap_or(true)),
+        transition_work_items: Some(a.transition_work_items.unwrap_or(true)),
+        ..GitPullRequestCompletionOptions::default()
+    };
+    let (s, pr) = find_pr(ctx, &a.at, a.id).await?;
+    let id = pr.pull_request_id;
+    if a.auto == Some(true) {
+        let me = ctx.me().await?;
+        let body = json!({"autoCompleteSetBy": {"id": me.id}, "completionOptions": options});
+        patch_pr(ctx, &s, id, &body).await?;
+        return Ok(format!("auto-complete set on !{id}"));
+    }
+    let commit = pr
+        .last_merge_source_commit
+        .and_then(|c| c.commit_id)
+        .ok_or_else(|| ApiError::local(format!("PR !{id} has no source commit to merge yet")))?;
+    let body = json!({
+        "status": "completed",
+        "lastMergeSourceCommit": {"commitId": commit},
+        "completionOptions": options,
+    });
+    let done = patch_pr(ctx, &s, id, &body).await?;
+    Ok(if done.status == git_pull_request::Status::Completed {
+        format!("completed !{id} ({strategy})")
+    } else {
+        let merge = done
+            .merge_status
+            .as_ref()
+            .map_or_else(|| "unknown".into(), ToString::to_string);
+        format!("completion queued for !{id} ({strategy}, merge {merge})")
+    })
 }
 
 #[cfg(test)]

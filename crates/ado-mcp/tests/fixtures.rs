@@ -40,6 +40,7 @@ const TABLE: &[(&str, Check)] = &[
         "policy-evaluations.json",
         fits::<policy::models::PolicyEvaluationRecordList>,
     ),
+    ("pr-complete.json", fits::<git::models::GitPullRequest>),
     ("pr-list.json", fits::<git::models::GitPullRequestList>),
     (
         "pr-threads.json",
@@ -56,8 +57,13 @@ const TABLE: &[(&str, Check)] = &[
     ("wiql.json", fits::<wit::models::WorkItemQueryResult>),
 ];
 
-/// Answers with no crate model: the two hand-written calls, and a log, which is plain text.
-const HAND_WRITTEN: &[&str] = &["connection-data.json", "vsts-info.json", "log.txt"];
+/// Answers with no crate model: the two hand-written calls, an error body, and a log, which is plain text.
+const HAND_WRITTEN: &[&str] = &[
+    "connection-data.json",
+    "vsts-info.json",
+    "pr-409.json",
+    "log.txt",
+];
 
 #[test]
 fn fixtures_fit_models() {
