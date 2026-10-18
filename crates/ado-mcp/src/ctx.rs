@@ -93,7 +93,7 @@ pub(crate) struct Ctx {
 }
 
 /// A path segment, percent-encoded so a name can't add a `/`, `?` or `#` of its own.
-fn seg(s: &str) -> String {
+pub(crate) fn seg(s: &str) -> String {
     s.bytes().fold(String::new(), |mut out, b| {
         if b.is_ascii_alphanumeric() || b"-._~".contains(&b) {
             out.push(char::from(b));
@@ -105,7 +105,7 @@ fn seg(s: &str) -> String {
 }
 
 /// An argument the model left out may arrive as an empty string.
-fn given(s: Option<&str>) -> Option<&str> {
+pub(crate) fn given(s: Option<&str>) -> Option<&str> {
     s.map(str::trim).filter(|s| !s.is_empty())
 }
 

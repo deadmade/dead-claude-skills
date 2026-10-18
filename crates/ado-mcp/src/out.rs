@@ -1,5 +1,4 @@
 //! Plain-text output helpers: the shapes every tool's reply is built from. Pure, no I/O.
-#![allow(dead_code)] // called by the tools that come with Task 6
 
 /// How much of a work item description or comment a view shows before pointing at the full call.
 pub const DESC_MAX: usize = 4000;
@@ -36,6 +35,7 @@ pub fn more(call: &str) -> String {
     format!("… more: {call}")
 }
 
+#[allow(dead_code)] // wi_view uses it from Task 7
 /// Azure DevOps rich text as plain text: line breaks and list items kept, other tags dropped.
 pub fn html_to_text(html: &str) -> String {
     const ENTITIES: [(&str, char); 6] = [
@@ -96,6 +96,7 @@ pub fn html_to_text(html: &str) -> String {
     lines.join("\n").trim().to_string()
 }
 
+#[allow(dead_code)] // as html_to_text
 /// The index of the `>` that ends the tag `tag` opens with, skipping any inside quotes. `None` when it never closes.
 fn tag_end(tag: &str) -> Option<usize> {
     let mut quote = None;

@@ -214,6 +214,37 @@ pub fn tempdir() -> PathBuf {
     d
 }
 
+pub fn fixture(name: &str) -> Resp {
+    let p = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures")
+        .join(name);
+    Resp::new(200, "application/json", std::fs::read(p).unwrap())
+}
+
+pub fn git(dir: &Path, args: &[&str]) {
+    let ok = Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(args)
+        .status()
+        .unwrap();
+    assert!(ok.success(), "git {args:?}");
+}
+
+/// A git clone (no commits) of `remote`, on branch `main`.
+pub fn clone_of(remote: &str) -> PathBuf {
+    let dir = tempdir();
+    git(&dir, &["init", "-q", "-b", "main"]);
+    git(&dir, &["remote", "add", "origin", remote]);
+    dir
+}
+
+/// The collection's own remote on the fixture host. The fixture speaks http and `https_remote` only takes https or
+/// ssh, so the clone is an ssh one; the PAT still goes to `ADO_ORG_URL`'s scheme and port.
+pub fn own_remote(fx: &Fixture) -> String {
+    format!("ssh://git@{}/tfs/Coll/My%20Proj/_git/R", fx.addr.ip())
+}
+
 /// The ado-mcp binary over stdio, initialized.
 pub struct Mcp {
     pub project: PathBuf,

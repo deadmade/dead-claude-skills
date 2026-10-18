@@ -1,0 +1,26 @@
+{
+  "changeEntries": [
+    {
+      "changeTrackingId": 1,
+      "changeId": 1,
+      "item": {
+        "objectId": "abc123",
+        "path": "/src/auth.rs",
+        "url": "http://dev.example/x"
+      },
+      "changeType": "edit"
+    },
+    {
+      "changeTrackingId": 1,
+      "changeId": 1,
+      "item": {
+        "objectId": "abc123",
+        "path": "/src/retry.rs",
+        "url": "http://dev.example/x"
+      },
+      "changeType": "add"
+    }
+  ],
+  "nextSkip": 2,
+  "nextTop": 2
+}

@@ -1,0 +1,231 @@
+{
+  "count": 6,
+  "value": [
+    {
+      "id": 1,
+      "status": "closed",
+      "comments": [
+        {
+          "id": 1,
+          "content": "Policy status update",
+          "commentType": "system",
+          "isDeleted": false,
+          "author": {
+            "displayName": "J. Doe",
+            "id": "2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22",
+            "uniqueName": "j.@example.com",
+            "url": "http://dev.example/tfs/Coll/_apis/Identities/2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22",
+            "imageUrl": "http://dev.example/tfs/Coll/_api/_common/identityImage?id=2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22"
+          },
+          "publishedDate": "2026-03-03T10:00:00Z"
+        }
+      ],
+      "isDeleted": false,
+      "_links": {
+        "self": {
+          "href": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/pullRequests/412/threads/1"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "status": "active",
+      "comments": [
+        {
+          "id": 1,
+          "content": "Reviewer voted",
+          "commentType": "text",
+          "isDeleted": false,
+          "author": {
+            "displayName": "J. Doe",
+            "id": "2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22",
+            "uniqueName": "j.@example.com",
+            "url": "http://dev.example/tfs/Coll/_apis/Identities/2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22",
+            "imageUrl": "http://dev.example/tfs/Coll/_api/_common/identityImage?id=2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22"
+          },
+          "publishedDate": "2026-03-03T10:00:00Z"
+        }
+      ],
+      "isDeleted": false,
+      "_links": {
+        "self": {
+          "href": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/pullRequests/412/threads/2"
+        }
+      },
+      "properties": {
+        "CodeReviewThreadType": {
+          "$type": "System.String",
+          "$value": "VoteUpdate"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "status": "fixed",
+      "comments": [
+        {
+          "id": 1,
+          "content": "Typo here.",
+          "commentType": "text",
+          "isDeleted": false,
+          "author": {
+            "displayName": "J. Doe",
+            "id": "2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22",
+            "uniqueName": "j.@example.com",
+            "url": "http://dev.example/tfs/Coll/_apis/Identities/2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22",
+            "imageUrl": "http://dev.example/tfs/Coll/_api/_common/identityImage?id=2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22"
+          },
+          "publishedDate": "2026-03-03T10:00:00Z"
+        },
+        {
+          "id": 2,
+          "content": "Done.",
+          "commentType": "text",
+          "isDeleted": false,
+          "author": {
+            "displayName": "Alice Example",
+            "id": "2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22",
+            "uniqueName": "alice@example.com",
+            "url": "http://dev.example/tfs/Coll/_apis/Identities/2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22",
+            "imageUrl": "http://dev.example/tfs/Coll/_api/_common/identityImage?id=2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22"
+          },
+          "publishedDate": "2026-03-03T10:00:00Z"
+        }
+      ],
+      "isDeleted": false,
+      "_links": {
+        "self": {
+          "href": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/pullRequests/412/threads/5"
+        }
+      },
+      "threadContext": {
+        "filePath": "/src/lib.rs",
+        "rightFileStart": {
+          "line": 3,
+          "offset": 1
+        },
+        "rightFileEnd": {
+          "line": 3,
+          "offset": 9
+        }
+      }
+    },
+    {
+      "id": 7,
+      "status": "active",
+      "comments": [
+        {
+          "id": 1,
+          "content": "Why retry twice?",
+          "commentType": "text",
+          "isDeleted": false,
+          "author": {
+            "displayName": "J. Doe",
+            "id": "2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22",
+            "uniqueName": "j.@example.com",
+            "url": "http://dev.example/tfs/Coll/_apis/Identities/2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22",
+            "imageUrl": "http://dev.example/tfs/Coll/_api/_common/identityImage?id=2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22"
+          },
+          "publishedDate": "2026-03-03T10:00:00Z"
+        },
+        {
+          "id": 2,
+          "content": "Deleted reply",
+          "commentType": "text",
+          "isDeleted": true,
+          "author": {
+            "displayName": "J. Doe",
+            "id": "2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22",
+            "uniqueName": "j.@example.com",
+            "url": "http://dev.example/tfs/Coll/_apis/Identities/2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22",
+            "imageUrl": "http://dev.example/tfs/Coll/_api/_common/identityImage?id=2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22"
+          },
+          "publishedDate": "2026-03-03T10:00:00Z"
+        },
+        {
+          "id": 3,
+          "content": "Because of the flaky proxy.\nSee the ticket.",
+          "commentType": "text",
+          "isDeleted": false,
+          "author": {
+            "displayName": "Alice Example",
+            "id": "2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22",
+            "uniqueName": "alice@example.com",
+            "url": "http://dev.example/tfs/Coll/_apis/Identities/2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22",
+            "imageUrl": "http://dev.example/tfs/Coll/_api/_common/identityImage?id=2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22"
+          },
+          "publishedDate": "2026-03-03T10:00:00Z"
+        }
+      ],
+      "isDeleted": false,
+      "_links": {
+        "self": {
+          "href": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/pullRequests/412/threads/7"
+        }
+      },
+      "threadContext": {
+        "filePath": "/src/auth.rs",
+        "rightFileStart": {
+          "line": 88,
+          "offset": 1
+        },
+        "rightFileEnd": {
+          "line": 88,
+          "offset": 9
+        }
+      }
+    },
+    {
+      "id": 9,
+      "status": "active",
+      "comments": [
+        {
+          "id": 1,
+          "content": "General remark.",
+          "commentType": "text",
+          "isDeleted": false,
+          "author": {
+            "displayName": "J. Doe",
+            "id": "2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22",
+            "uniqueName": "j.@example.com",
+            "url": "http://dev.example/tfs/Coll/_apis/Identities/2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22",
+            "imageUrl": "http://dev.example/tfs/Coll/_api/_common/identityImage?id=2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22"
+          },
+          "publishedDate": "2026-03-03T10:00:00Z"
+        }
+      ],
+      "isDeleted": false,
+      "_links": {
+        "self": {
+          "href": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/pullRequests/412/threads/9"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "status": "active",
+      "comments": [
+        {
+          "id": 1,
+          "content": "Deleted only",
+          "commentType": "text",
+          "isDeleted": true,
+          "author": {
+            "displayName": "J. Doe",
+            "id": "2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22",
+            "uniqueName": "j.@example.com",
+            "url": "http://dev.example/tfs/Coll/_apis/Identities/2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22",
+            "imageUrl": "http://dev.example/tfs/Coll/_api/_common/identityImage?id=2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22"
+          },
+          "publishedDate": "2026-03-03T10:00:00Z"
+        }
+      ],
+      "isDeleted": false,
+      "_links": {
+        "self": {
+          "href": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/pullRequests/412/threads/11"
+        }
+      }
+    }
+  ]
+}

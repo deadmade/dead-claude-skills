@@ -1,10 +1,9 @@
 mod common;
 
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::Path;
 use std::time::Duration;
 
-use common::{Fixture, Mcp, Resp, ado, tempdir};
+use common::{Fixture, Mcp, Resp, ado, clone_of, fixture, own_remote};
 use serde_json::{Value, json};
 
 const PROJ_ID: &str = "b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455";
@@ -15,37 +14,6 @@ const CHECK: &str = "/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/re
 const CONN: &str = "/tfs/Coll/_apis/connectionData";
 const IDENTITIES: &str = "/tfs/Coll/_apis/identities";
 const DEFS: &str = "/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/build/definitions";
-
-fn fixture(name: &str) -> Resp {
-    let p = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures")
-        .join(name);
-    Resp::new(200, "application/json", std::fs::read(p).unwrap())
-}
-
-fn git(dir: &Path, args: &[&str]) {
-    let ok = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(args)
-        .status()
-        .unwrap();
-    assert!(ok.success(), "git {args:?}");
-}
-
-/// A git clone (no commits) of `remote`, on branch `main`.
-fn clone_of(remote: &str) -> PathBuf {
-    let dir = tempdir();
-    git(&dir, &["init", "-q", "-b", "main"]);
-    git(&dir, &["remote", "add", "origin", remote]);
-    dir
-}
-
-/// The collection's own remote on the fixture host. The fixture speaks http and `https_remote` only takes https or
-/// ssh, so the clone is an ssh one; the PAT still goes to `ADO_ORG_URL`'s scheme and port.
-fn own_remote(fx: &Fixture) -> String {
-    format!("ssh://git@{}/tfs/Coll/My%20Proj/_git/R", fx.addr.ip())
-}
 
 fn in_clone(fx: &Fixture, dir: &Path) -> Mcp {
     ado(fx, &[("ADO_PROJECT_DIR", dir.to_str().unwrap())])

@@ -10,9 +10,10 @@ use rmcp::handler::server::wrapper::Parameters;
 use rmcp::schemars::{self, JsonSchema};
 use serde::Deserialize;
 
-use crate::api::V71;
+use crate::api::{ApiError, V71};
 use crate::config::Config;
 use crate::ctx::Ctx;
+use crate::pr::{self, PrFilesArgs, PrListArgs, PrThreadsArgs, PrViewArgs};
 
 /// The tools that change something on the server. Claude Code prompts on every call to these.
 pub(crate) const WRITES: [&str; 12] = [
@@ -69,6 +70,13 @@ fn error(msg: impl Into<String>) -> CallToolResult {
     CallToolResult::error(vec![ContentBlock::text(msg)])
 }
 
+fn reply(r: Result<String, ApiError>) -> CallToolResult {
+    match r {
+        Ok(text) => CallToolResult::success(vec![ContentBlock::text(text)]),
+        Err(e) => error(e.to_string()),
+    }
+}
+
 // Temporary, for the context tests; Task 11 removes it.
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "schemars")]
@@ -116,6 +124,38 @@ impl Server {
             Ok(text) => CallToolResult::success(vec![ContentBlock::text(text)]),
             Err(e) => error(e.to_string()),
         }
+    }
+
+    #[tool(
+        description = "List pull requests, one line each (id, status, branches, title, author, approvals). Defaults to the active ones in this repo.",
+        annotations(read_only_hint = true)
+    )]
+    async fn pr_list(&self, Parameters(a): Parameters<PrListArgs>) -> CallToolResult {
+        reply(pr::pr_list(&self.ctx, &a).await)
+    }
+
+    #[tool(
+        description = "Show a pull request: reviewers and votes, policy checks, linked work items, latest pipeline run and the description. Without id, the active PR of the current branch.",
+        annotations(read_only_hint = true)
+    )]
+    async fn pr_view(&self, Parameters(a): Parameters<PrViewArgs>) -> CallToolResult {
+        reply(pr::pr_view(&self.ctx, &a).await)
+    }
+
+    #[tool(
+        description = "Show a pull request's review threads with file and line (system threads and, unless all, resolved ones are left out). Without id, the active PR of the current branch.",
+        annotations(read_only_hint = true)
+    )]
+    async fn pr_threads(&self, Parameters(a): Parameters<PrThreadsArgs>) -> CallToolResult {
+        reply(pr::pr_threads(&self.ctx, &a).await)
+    }
+
+    #[tool(
+        description = "List the files a pull request changes (latest iteration) and the git diff command that shows the patch. Without id, the active PR of the current branch.",
+        annotations(read_only_hint = true)
+    )]
+    async fn pr_files(&self, Parameters(a): Parameters<PrFilesArgs>) -> CallToolResult {
+        reply(pr::pr_files(&self.ctx, &a).await)
     }
 }
 

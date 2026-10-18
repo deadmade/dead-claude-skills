@@ -2,6 +2,7 @@ mod api;
 mod config;
 mod ctx;
 mod out;
+mod pr;
 mod remote;
 mod tools;
 

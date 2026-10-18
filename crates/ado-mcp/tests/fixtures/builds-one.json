@@ -1,0 +1,24 @@
+{
+  "count": 1,
+  "value": [
+    {
+      "id": 991,
+      "buildNumber": "20260304.2",
+      "status": "completed",
+      "result": "succeeded",
+      "queueTime": "2026-03-04T08:00:00.1Z",
+      "finishTime": "2026-03-04T08:05:00Z",
+      "definition": {
+        "id": 12,
+        "name": "CI",
+        "url": "http://dev.example/tfs/Coll/_apis/build/Definitions/12"
+      },
+      "_links": {
+        "self": {
+          "href": "http://dev.example/tfs/Coll/_apis/build/Builds/991"
+        }
+      },
+      "url": "http://dev.example/tfs/Coll/_apis/build/Builds/991"
+    }
+  ]
+}

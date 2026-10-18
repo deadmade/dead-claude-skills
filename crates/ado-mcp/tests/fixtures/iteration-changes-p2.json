@@ -1,0 +1,16 @@
+{
+  "changeEntries": [
+    {
+      "changeTrackingId": 1,
+      "changeId": 1,
+      "item": {
+        "objectId": "abc123",
+        "path": "/old.txt",
+        "url": "http://dev.example/x"
+      },
+      "changeType": "delete"
+    }
+  ],
+  "nextSkip": 0,
+  "nextTop": 0
+}
