@@ -14,6 +14,7 @@ MCP server.
 
 - Spec: [spec.md](spec.md) (draft, builder check done 2026-10-18)
 - Plan: [plan.md](plan.md) (2026-10-18)
+- Smoke checklist: [smoke.md](smoke.md) (2026-10-18)
 - ADRs:
 - Glossary: [GLOSSARY.md](../../../GLOSSARY.md), section "Azure DevOps (mcp-azure)"
 
