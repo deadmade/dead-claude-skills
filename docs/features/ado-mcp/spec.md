@@ -37,7 +37,8 @@ downloaded when it runs. The user doesn't need a terminal tool: "goal is for cla
      Microsoft's, not ours (flow.md, D1). The crate's clients point at the collection with `.endpoint()` and send
      through our own `reqwest` client (`.transport()`).
    - Hand-written requests remain only where the crate has no call: `/vsts/info`, `_apis/connectionData`, and
-     `pr_list status=all` (the crate's status enum has no `all`; flow.md, D2). A
+     `pr_list status=all` (the crate's status enum has no `all`; flow.md, D2), and `pipeline_cancel` (the crate's build
+     update sends a whole build; D5). A
      crate model that the user's server doesn't satisfy (a required field it leaves out) gets the same: the raw
      response through the crate's `.send()` and a small serde struct of ours, named in a comment.
 
@@ -71,7 +72,7 @@ downloaded when it runs. The user doesn't need a terminal tool: "goal is for cla
        removed; `##[error]` lines kept and marked
      - shows the error lines with ±5 lines of context, plus the step's last 50 lines
      - `step` picks another step
-     - `full: true` with `start`/`end` returns the raw lines, at most 2000 per call (grill Q8)
+     - `full: true` with `start` returns the cleaned lines, at most 2000 or 40,000 characters per call (grill Q8; R8)
    - `repo_list`: repos in the project.
 
    **Writes.** Each one carries `_meta["anthropic/requiresUserInteraction"]: true` in `tools/list` (the user's
@@ -162,7 +163,7 @@ downloaded when it runs. The user doesn't need a terminal tool: "goal is for cla
 
 8. **API version 7.1.** Azure DevOps Server 2022.1 and later accept it. Calls through the crate send its
    `7.1-preview` (the newest resource version up to 7.1). Of the hand-written calls, `connectionData` sends
-   `7.1-preview.1`, `pr_list status=all` sends `7.1-preview`, and `/vsts/info` takes no version.
+   `7.1-preview.1`, `pr_list status=all` and `pipeline_cancel` send `7.1-preview`, and `/vsts/info` takes no version.
    - The `ado_api_version` option is removed (grill Q1). An older server gets a clear error instead of half-working
      calls, and a stale value in someone's settings is ignored.
    - If the smoke test shows the user's server accepts only 7.0, the option comes back.

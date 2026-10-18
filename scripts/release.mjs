@@ -1,5 +1,5 @@
 // Cuts a release: one version for package.json, the marketplace, every local plugin and the Rust crates, committed and tagged
-// vX.Y.Z on main. Pushing the tag runs .github/workflows/release.yml, which builds cswap.exe and tui-review and publishes the
+// vX.Y.Z on main. Pushing the tag runs .github/workflows/release.yml, which builds cswap.exe, tui-review, web-mcp and ado-mcp and publishes the
 // GitHub release. Claude Code only offers plugin updates when this version changes.
 // Usage: npm run release -- patch|minor|major|X.Y.Z
 import { spawnSync } from 'node:child_process';
