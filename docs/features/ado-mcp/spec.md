@@ -1,6 +1,6 @@
 # ado-mcp: spec
 
-Status: approved at Gate 1 on 2026-10-18.
+Status: approved at Gate 1 on 2026-10-18; revised for D1 (flow.md), waiting for Gate 1 again.
 
 - Written from the chat and the decisions in [flow.md](flow.md) (Options).
 - The builder check is done and its two questions were answered on 2026-10-18.
@@ -32,8 +32,13 @@ downloaded when it runs. The user doesn't need a terminal tool: "goal is for cla
    - The plugin keeps its name and its userConfig keys, so existing configuration carries over.
    - It is built, released, downloaded and version-synced like web-mcp: Windows x64 and Linux x64 (musl) only. The
      touch points are listed in flow.md, Grounding.
-   - It calls the REST API with hand-written requests and small serde structs, for only the endpoints the tools
-     below use. No `azure_devops_rust_api`, no generated SDK.
+   - It calls the REST API through Microsoft's `azure_devops_rust_api` crate (pinned `=0.39.1`, only the `git`,
+     `build`, `pipelines`, `policy`, `wit`, `core` and `ims` features), so the request shapes and models are
+     Microsoft's, not ours (flow.md, D1). The crate's clients point at the collection with `.endpoint()` and send
+     through our own `reqwest` client (`.transport()`).
+   - Hand-written requests remain only where the crate has no call: `/vsts/info` and `_apis/connectionData`. A
+     crate model that the user's server doesn't satisfy (a required field it leaves out) gets the same: the raw
+     response through the crate's `.send()` and a small serde struct of ours, named in a comment.
 
 2. **The tools.** The names are the MCP tool names, seen by Claude as `mcp__plugin_mcp-azure_ado__<tool>`.
 
@@ -138,19 +143,23 @@ downloaded when it runs. The user doesn't need a terminal tool: "goal is for cla
    - `Authorization: Basic base64(":" + PAT)`. The PAT comes from the existing `ado_pat` userConfig through `env` in
      `.mcp.json`. It is marked `sensitive`, so Claude Code keeps it in the platform's secure credential store.
    - The server never prints or logs the PAT.
-   - TLS uses web-mcp's stack: reqwest `rustls-no-provider` with ring, and `rustls-platform-verifier`. That trusts
-     the Windows certificate store, which matters because ESET's HTTPS scanning re-signs traffic on the user's work
+   - TLS uses reqwest `=0.13.5` with rustls and `rustls-platform-verifier`, like web-mcp, but with aws-lc-rs as the
+     crypto provider, since the crate compiles it in anyway (ring is dropped). That trusts the Windows certificate
+     store, which matters because ESET's HTTPS scanning re-signs traffic on the user's work
      machine.
    - Errors map to one line each:
      - 401: the PAT was rejected (expired or wrong); fix it with `/plugin configure mcp-azure`
      - 403: names the PAT scope the area needs
      - 404: names what wasn't found
      - 409/412: a conflict; e.g. when a PR already exists for the branch, it names that PR
-     - 429: honours `Retry-After` once, then reports
+     - 429: honours `Retry-After` once, then reports. azure_core's own retry policy is off, so nothing else is
+       resent (a resent write could post twice).
+     - A response the crate's model can't read: `unexpected answer from the server: {serde error}`, which names the
+       missing field, so the smoke test shows which model to replace
      - TLS failure: says the certificate isn't trusted and that the server uses the Windows store
 
-8. **API version 7.1.** Azure DevOps Server 2022.1 and later accept it. Preview endpoints use their documented
-   `7.1-preview.N`: policy evaluations `-preview.1`, work-item comments `-preview.4`.
+8. **API version 7.1.** Azure DevOps Server 2022.1 and later accept it. Calls through the crate send its
+   `7.1-preview` (the newest resource version up to 7.1); our two hand-written calls send `7.1-preview.1`.
    - The `ado_api_version` option is removed (grill Q1). An older server gets a clear error instead of half-working
      calls, and a stale value in someone's settings is ignored.
    - If the smoke test shows the user's server accepts only 7.0, the option comes back.
@@ -184,6 +193,7 @@ downloaded when it runs. The user doesn't need a terminal tool: "goal is for cla
       replaced by ids from `/vsts/info`).
     - Unit tests for error mapping.
     - Request-level tests against a local fake server that replays JSON fixtures shaped from the 7.1 Server docs.
+      The fixtures must satisfy the crate's models, which makes the crate the contract check for them.
     - `cargo test` and `cargo clippy --all-targets -- -D warnings` in CI on Linux and Windows, like web-mcp.
     - No live or container integration tests (grill Q11). There is no official Azure DevOps Server container, and
       building one means Windows Server, SQL Server and an install of about an hour. The real-server check is the
@@ -225,7 +235,8 @@ downloaded when it runs. The user doesn't need a terminal tool: "goal is for cla
 - Rust edition 2024 and `rust-version = "1.97"`.
 - Its own `Cargo.lock`, clippy pedantic, and web-mcp's release profile.
 - `--version` prints `ado-mcp <version>`; the installer parses it.
-- Versions pinned as in web-mcp: `rmcp =3.5.1` and `reqwest =0.13.5`.
+- Versions pinned as in web-mcp: `rmcp =3.5.1` and `reqwest =0.13.5`; plus `azure_devops_rust_api =0.39.1` and
+  `azure_core =1.1.0`, whose reqwest must stay the one we pin.
 - One version for everything (CLAUDE.md, Versions): the crate goes into `scripts/check-repo.mjs` `CRATES` and into
   `scripts/release.mjs`.
 - No new npm dependencies in the installer.

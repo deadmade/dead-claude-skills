@@ -4,14 +4,16 @@
 > superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 Revision 2: plan review round 1 applied (2026-10-18). The findings and decisions are in [flow.md](flow.md).
+Revision 3: deviation D1 (flow.md), Microsoft's `azure_devops_rust_api` at runtime. Tasks 1–6 are done; Task 6a moves
+them onto the crate, and Tasks 7–10 call the crate (Task 6a, "From here on").
 
 **Goal:** A Rust stdio MCP server `ado-mcp` that gives Claude PR, work-item and pipeline tools for a self-hosted Azure
 DevOps Server 2022.2. It replaces the npm server in the `mcp-azure` plugin, and the installer installs and configures
 the plugin.
 
 **Architecture:** One binary crate, `crates/ado-mcp`, shaped like web-mcp: no library, so items are `pub(crate)`.
-- `Api` wraps one `reqwest::Client` with PAT auth, timeouts and error mapping. It sends the PAT only to URLs under
-  `ADO_ORG_URL`.
+- `Api` wraps one `reqwest::Client` with timeouts, no redirects and error mapping, and holds the
+  `azure_devops_rust_api` clients built on it (Task 6a). It sends the PAT only to URLs under `ADO_ORG_URL`.
 - `Ctx` resolves project, repo and branch from the git remote (checked against `ADO_ORG_URL` before any request,
   then `/vsts/info`), and caches ids in memory.
 - Tool areas (`pr`, `wi`, `pipeline`) return plain text, and `tools.rs` exposes them through `rmcp`. Write tools are
@@ -19,8 +21,9 @@ the plugin.
 - Pure logic is unit-tested inline. Tool behaviour is tested over stdio against a fake HTTP server, copied from
   web-mcp's `tests/common/mod.rs`.
 
-**Tech Stack:** Rust 2024; `rmcp =3.5.1` (server, transport-io, macros); `reqwest =0.13.5` (`rustls-no-provider`,
-`json`) with `rustls 0.23` ring; tokio; serde/serde_json; `url`; base64. Installer: Node standard library only.
+**Tech Stack:** Rust 2024; `rmcp =3.5.1` (server, transport-io, macros); `azure_devops_rust_api =0.39.1` and
+`azure_core =1.1.0`; `reqwest =0.13.5` (`rustls-no-provider`, `json`) with aws-lc-rs, the provider the crate compiles
+in; tokio; serde/serde_json; `url`; base64. Installer: Node standard library only.
 
 **Spec:** [docs/features/ado-mcp/spec.md](spec.md). Grounding (file:line touch points): [flow.md](flow.md),
 Grounding. Terms: [GLOSSARY.md](../../../GLOSSARY.md).
@@ -33,15 +36,12 @@ Grounding. Terms: [GLOSSARY.md](../../../GLOSSARY.md).
   `codegen-units = 1`, `strip = true`.
 - `version` equals `package.json`'s (currently `0.4.0`); never bumped by hand.
 - `--version` prints `ado-mcp <version>`.
-- Pins: `rmcp = "=3.5.1"`, `reqwest = "=0.13.5"`. rustls with ring, installed at startup like
-  `crates/web-mcp/src/main.rs:43`.
-- API versions, as `&str` constants in `api.rs`:
-
-  | Constant | Value | Used for |
-  | --- | --- | --- |
-  | `V71` | `"7.1"` | everything else |
-  | `V71_P1` | `"7.1-preview.1"` | policy evaluations, `connectionData` |
-  | `V71_P4` | `"7.1-preview.4"` | work-item comments |
+- Pins: `rmcp = "=3.5.1"`, `reqwest = "=0.13.5"`, `azure_devops_rust_api = "=0.39.1"`, `azure_core = "=1.1.0"`.
+  `cargo tree -d -i reqwest` shows one reqwest; a crate bump that brings a second one is not taken.
+- rustls uses aws-lc-rs (since Task 6a; ring until then). Nothing installs a provider: reqwest falls back to
+  aws-lc-rs itself.
+- API versions: calls through the crate send its `7.1-preview`. The hand-written calls keep constants in `api.rs`:
+  `V71_P1 = "7.1-preview.1"` for `connectionData`, none for `/vsts/info`. `V71` and `V71_P4` go in Task 6a.
 
 - One server, one collection, one PAT: `ADO_ORG_URL` (the collection URL, stored with a trailing `/` so
   `Url::join` keeps the collection), `ADO_PAT`, `ADO_DEFAULT_PROJECT`, `ADO_PROJECT_DIR`.
@@ -78,6 +78,13 @@ Grounding. Terms: [GLOSSARY.md](../../../GLOSSARY.md).
    (timeout, lost agent).
    - `\r\n` is cleaned, a missing log is named, and a failed job without a failed step shows the job's issues.
    - Tests: `log_crlf_and_missing_log` and `job_failed_without_step` (Task 8).
+
+6. **The crate meeting a self-hosted server** (Task 6a).
+   - A collection at the server root (`https://server/Coll/`, no `/tfs/`) must not give `//Coll/` paths.
+   - A response missing a field the crate's model requires must give the `unexpected answer` line naming the field,
+     not a crash or a blank result.
+   - Nothing may resend a write: azure_core's retry policy is off.
+   - Tests: `root_hosted_collection`, `missing_field_names_it` and `no_resend_on_503` (Task 6a).
 
 ---
 
@@ -380,6 +387,70 @@ body with a `scope()` echo for the tests.
       argument structs derive `Deserialize, JsonSchema` with `#[schemars(crate = "schemars")]`.
 - [ ] **Step 5: Commit**: `"Add the pull request read tools."`
 
+### Task 6a: Move onto azure_devops_rust_api
+
+Deviation D1 (flow.md). Tasks 3, 4 and 6 keep their behaviour and tests; what changes is who builds the requests and
+whose structs read the answers.
+
+**Files:** Modify `Cargo.toml`, `Cargo.lock`, `src/main.rs`, `src/api.rs`, `src/ctx.rs`, `src/pr.rs`,
+`tests/api.rs`, `tests/ctx.rs`, `tests/pr.rs` and `tests/fixtures/*.json`. Create `tests/fixtures.rs`.
+
+**Interfaces:**
+
+- `Cargo.toml`: `azure_devops_rust_api = { version = "=0.39.1", default-features = false, features = ["git",
+  "build", "pipelines", "policy", "wit", "core", "ims"] }` and `azure_core = "=1.1.0"`. `rustls` stays only for the
+  certificate-error check in the `source()` chain (`default-features = false, features = ["std"]`); the ring install
+  in `main.rs` goes.
+- `Api` gains one client per area, built once in `Api::new` and cloned freely: `pub git: git::Client`, `build`,
+  `pipelines`, `policy`, `wit`, `core`, `ims`, and `pub org: String` (the collection name). Each is built with:
+  - `.endpoint(base)`, where `base` is `ADO_ORG_URL` without its collection segment and trailing `/`
+    (`https://server/tfs`). Every call passes `org` as the crate's `organization`.
+  - `Credential::from_pat(pat)`.
+  - `.transport(Transport::new(Arc::new(client.clone())))`: our client, so timeouts, no redirects and
+    `X-TFS-FedAuthRedirect: Suppress` hold for crate calls too.
+  - `.retry(RetryOptions::none())`.
+  - `.per_try_policies(vec![guard])`. The guard is an azure_core `Policy` that:
+    - fails a request whose URL doesn't start with `ADO_ORG_URL` before it reaches the transport, so the PAT goes
+      nowhere else;
+    - turns a 203 with an HTML body into the 401 line.
+- `ApiError::from_az(e: azure_core::Error) -> ApiError`, mapping to the same lines as Task 3:
+  - `ErrorKind::HttpResponse` → the status lines, with `tf` and the message parsed from the raw body as now.
+  - `ErrorKind::DataConversion` → `unexpected answer from the server: {serde message}` (it names the field).
+  - Anything else → walk `source()` to the `reqwest::Error` and use the existing timeout, connect and TLS lines.
+- `Api::az(&self, f)` runs a crate call (`f: impl Fn() -> Fut`, so it can be called twice) and adds Task 3's
+  single `Retry-After` wait on 429. Builders' `.send()` and `.into_raw_response()` give the raw answer where a model
+  doesn't fit.
+- `get`, `get_text` and `send` stay for `/vsts/info` and `connectionData` only. Anything else hand-written needs a
+  one-line comment saying which crate model or call failed, and is reported as a deviation.
+- `Ctx`: an explicit repo → `git.repositories_client().get_repository`; a project alone →
+  `core.projects_client().get`; `user` → `ims` identities; `pipeline_id` → `build.definitions_client().list` with
+  `name`. `me` and `/vsts/info` stay hand-written.
+- `pr.rs`: every call through the crate (pull requests, threads, iterations and changes, work-item refs, policy
+  evaluations, builds, work items batch). Our response structs go; `resolve_pr` returns `git::models::GitPullRequest`.
+  The output lines stay byte for byte.
+
+- [ ] **Step 1: Fixtures fit the models.** `tests/fixtures.rs::fixtures_fit_models` deserializes every fixture into
+  the crate model its route returns (a table of file → type) and fails naming the file and field. Fill the fixtures
+  until it passes, with values shaped like a 2022.2 answer (Learn's 7.1 samples), not just the minimum.
+- [ ] **Step 2: Failing tests:**
+  - `sends_auth_version_and_suppress` (Task 3): asserts `api-version=7.1-preview` on a crate call; Basic auth and
+    the Suppress header unchanged.
+  - `root_hosted_collection`: `ADO_ORG_URL={base}/Coll/` → the logged path starts `/Coll/` and contains no `//`.
+  - `missing_field_names_it`: a fixture without a field the model requires → `isError`, and the text starts
+    `unexpected answer from the server` and names the field.
+  - `no_resend_on_503`: a 503 → exactly one request logged.
+  - `guard_refuses_outside_org` (unit, in `api.rs`): a request to another host through the guard → `Err`, nothing
+    sent.
+- [ ] **Step 3: Implement.** All tests from Tasks 2–6 pass unchanged, apart from the version assertions above.
+- [ ] **Step 4:** `cargo test`, `cargo clippy --all-targets -- -D warnings`, and `cargo tree -d -i reqwest` shows one
+  version.
+- [ ] **Step 5: Commit**: `"Move the Azure DevOps calls onto Microsoft's azure_devops_rust_api crate."`
+
+**From here on (Tasks 7–10):** where a task names an endpoint, that names the call: make it through the crate's
+client in `ctx.api` with `Api::az`, and read the crate's model. Query parameters named in a task are the builder's
+methods of the same name. `V71_P4` is gone: work-item comments go through `wit.comments_client()`. A fixture a task
+adds joins the `fixtures_fit_models` table.
+
 ### Task 7: Work item reads
 
 **Files:** Create `src/wi.rs`, `tests/wi.rs`, and fixtures `wi.json`, `wi-comments.json`, `wiql.json`. Modify
@@ -389,7 +460,7 @@ body with a `scope()` echo for the tests.
 
 - `wi_view(ctx, &WiViewArgs { project, id: u32, full })`.
   - `_apis/wit/workitems/{id}?$expand=relations` and comments
-    `{project}/_apis/wit/workItems/{id}/comments?$top=5&order=desc` at `V71_P4`, concurrently.
+    `{project}/_apis/wit/workItems/{id}/comments?$top=5&order=desc`, concurrently.
   - Lines:
     - `#{id} {type} {state}  "{title}"`
     - `assigned: {name or nobody}  area: {area}  iteration: {iteration}`
@@ -523,7 +594,7 @@ Phase → Job → Task, with one Task `skipped` and no log, and one Job `failed`
   - → `created #{id} {type} "{title}"`.
 - `wi_update(ctx, &WiUpdateArgs { project, id, state, assigned, title, fields: Option<BTreeMap<String,
   serde_json::Value>> })`. `fields` keys go to `/fields/{key}` verbatim. → `updated #{id}: {field names}`.
-- `wi_comment(ctx, &WiCommentArgs { project, id, text })`, at `V71_P4`. → `commented on #{id}`.
+- `wi_comment(ctx, &WiCommentArgs { project, id, text })`. → `commented on #{id}`.
 - `pipeline_run(ctx, &PipelineRunArgs { project, pipeline, branch, parameters: Option<BTreeMap<String, String>> })`.
   - POST `{project}/_apis/pipelines/{id}/runs` with `resources.repositories.self.refName` and
     `templateParameters`.
@@ -684,11 +755,13 @@ error lines, never raw JSON.
    - Paste back the mcp-azure summary lines.
    - If the old npm version was installed, also paste back whether Claude Code warned about the removed
      `ado_api_version` setting.
-2. **Connection.** In a clone, `repo_list`. This covers TLS through ESET, the PAT and API 7.1; a version error means
-   7.0 is needed.
+2. **Connection.** In a clone, `repo_list`. This covers TLS through ESET, the PAT and `7.1-preview`; a version error
+   means 7.0 is needed.
 3. **Remote resolution.** `pr_list` with no arguments in the clone, then in a worktree with `branch`.
 4. **Reads** on a real PR, work item and failed run: `pr_view`, `pr_threads`, `pr_files`, `wi_view`,
    `wi_query assigned=me`, `pipeline_runs`, `pipeline_view` and `pipeline_log`. Paste back anything noisy or wrong.
+   - An `unexpected answer from the server: missing field …` line means a crate model the server doesn't satisfy
+     (D1). Paste back the line and the tool; the fix is a small struct of ours for that call.
 5. **Writes**, on scratch items only. Run each write tool once on a scratch branch, PR and work item.
    - Confirm that the prompt appeared every time, including in auto mode.
    - Clean up with `pr_update status=abandoned`.

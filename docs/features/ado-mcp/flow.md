@@ -22,6 +22,31 @@ MCP server.
 - Gate 1, spec approved: 2026-10-18 ("approved"). ADR 0002 offered, not taken up.
 - Gate 2, plan approved: 2026-10-18 ("approved, subagent-driven"), plan revision 2, execution: subagent-driven
 
+## Deviations
+
+- **D1, 2026-10-18: use Microsoft's `azure_devops_rust_api` crate at runtime** (reverses the Options line "No Microsoft
+  `azure_devops_rust_api` crate"). Raised by the user after Task 6: hand-written calls mean writing the API contract
+  ourselves, and Microsoft no longer publishes the OpenAPI specs (MicrosoftDocs/vsts-rest-api-specs is gone). The
+  user's words: "lets just use the crate for now. Dont want to reverse engineer the api".
+  - Options: 1, the crate's clients and models at runtime; 2, the crate's models in tests only, calls stay ours.
+    Recommended 1; the user picked **1** ("1").
+  - Spike (0.39.1, against a local server, 2026-10-18):
+    - `.endpoint("https://server/tfs")` with organization `Coll` gives `/tfs/Coll/My%20Proj/_apis/...`.
+    - `Credential::from_pat` sends `Authorization: Basic base64(":" + pat)`.
+    - `.transport()` takes our own `reqwest::Client`, so our timeouts, no-redirect policy and default headers stay.
+    - azure_core 1.1 uses the same `reqwest =0.13.5` and the platform verifier, so ESET is unchanged.
+    - A failed call keeps the status and the raw body, so the `TF…` message and our one-line errors still work.
+    - Every call sends `api-version=7.1-preview`.
+  - Costs:
+    - The models are strict: one field the crate marks required and the server leaves out fails the whole call
+      ("missing field `project`", seen with our trimmed fixtures). Only the smoke test on 2022.2 shows how often.
+    - The crate forces azure_core's default features, so aws-lc-rs (C code) is compiled in. Release build 3 min
+      instead of 1.5; a one-call spike binary is 6.8 MB against our 5.4 MB.
+    - Tasks 3, 4 and 6 (done) are partly reworked.
+  - Kept: the remote and collection check before any request, the PAT only to `ADO_ORG_URL`, one-line errors,
+    output shaping, the write prompts, the cache, the installer and plugin work.
+  - Decision: pending (spec and plan revision 3 waiting for Gate 1 and Gate 2).
+
 ## Skipped
 
 ## Grounding
@@ -141,7 +166,7 @@ Report from the prior-art agent, 2026-10-18; every source was fetched in that ru
 Settled in the chat before this flow started (the user's words in quotes):
 
 - Language: Rust ("can we build it in rust?"), shipped like tui-review and web-mcp.
-- No Microsoft `azure_devops_rust_api` crate: "a lot of hell to use a crate that focuses on cloud primarily". Hand-written
+- ~~No Microsoft `azure_devops_rust_api` crate~~ (reversed by D1): "a lot of hell to use a crate that focuses on cloud primarily". Hand-written
   calls to "just the important endpoints for dev work, similar to what the gh cli provides".
 - Server: Azure DevOps Server 2022.2 (AzureDevopsServer_20240806.7), self-hosted. Auth: PAT ("I can create a key").
 - Pipelines: YAML only; classic Releases out.
