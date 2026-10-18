@@ -1,28 +1,32 @@
-//! timetrack: a TUI that times Azure DevOps work items and keeps the log in `%APPDATA%\timetrack` (or
-//! `TIMETRACK_DIR`). The collection and PAT come from `ADO_ORG_URL` and `ADO_PAT`, as for the MCP server; without them
-//! the timer still works on tickets already in the log.
+//! timetrack: a TUI that times Azure DevOps work items and your workday, and keeps the log in `%APPDATA%\timetrack`
+//! (or `TIMETRACK_DIR`). The collection and PAT come from `ADO_ORG_URL` and `ADO_PAT`, as for the MCP server; without
+//! them the timer still works on tickets already in the log. `TIMETRACK_TARGET` (`h:mm`, default `8:00`) is the daily
+//! target the overtime balance counts against.
 
 mod log;
 mod ui;
 
 use std::path::PathBuf;
 use std::sync::{Arc, mpsc};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use ado_mcp::{Api, Config, Ticket};
-use anyhow::{Context as _, Result};
+use anyhow::{Context as _, Result, bail};
 use jiff::Timestamp;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum View {
-    Tickets,
+pub enum Overlay {
     Today,
     Week,
+    Help,
 }
 
 /// What a background call brings back: the id it looked up (none: the "mine" list) and the tickets or an error.
 type Done = (Option<i32>, Result<Vec<Ticket>, String>);
+
+/// How long a status message stays.
+const STATUS: Duration = Duration::from_secs(5);
 
 pub struct App {
     pub log: log::Log,
@@ -33,10 +37,13 @@ pub struct App {
     pub selected: usize,
     pub filter: String,
     pub filtering: bool,
-    pub view: View,
-    /// Weeks back from this one, in the week view.
+    pub overlay: Option<Overlay>,
+    /// Weeks back from this one, in the week overlay.
     pub week: i64,
-    pub status: String,
+    /// The daily target, in seconds.
+    pub target: i64,
+    status: String,
+    status_at: Instant,
     pub loading: bool,
 }
 
@@ -54,6 +61,30 @@ impl App {
                     || t.id.to_string().contains(&f)
             })
             .collect()
+    }
+
+    /// The status message, until it goes stale.
+    #[must_use]
+    pub fn status(&self) -> &str {
+        if self.loading {
+            "loading…"
+        } else if self.status_at.elapsed() < STATUS {
+            &self.status
+        } else {
+            ""
+        }
+    }
+
+    fn say(&mut self, msg: impl Into<String>) {
+        self.status = msg.into();
+        self.status_at = Instant::now();
+    }
+
+    fn said(&mut self, r: Result<()>, ok: &str) {
+        match r {
+            Ok(()) => self.say(ok),
+            Err(e) => self.say(format!("{e:#}")),
+        }
     }
 
     /// `id`: look that one work item up; none: the open ones assigned to me.
@@ -84,24 +115,22 @@ impl App {
     fn received(&mut self, (id, res): Done) {
         self.loading = false;
         match (id, res) {
-            (_, Err(e)) => self.status = e,
+            (_, Err(e)) => self.say(e),
             (None, Ok(t)) => {
-                self.status = format!("{} open work items", t.len());
+                self.say(format!("{} open work items", t.len()));
                 self.tickets = t;
                 self.selected = self.selected.min(self.tickets.len().saturating_sub(1));
             }
             (Some(id), Ok(t)) => match t.into_iter().next() {
                 Some(t) => self.start(&t),
-                None => self.status = format!("no work item #{id}"),
+                None => self.say(format!("no work item #{id}")),
             },
         }
     }
 
     fn start(&mut self, t: &Ticket) {
-        self.status = match self.log.start(t.clone(), Timestamp::now()) {
-            Ok(()) => format!("timing #{} {}", t.id, t.title),
-            Err(e) => format!("{e:#}"),
-        };
+        let r = self.log.start(t.clone(), Timestamp::now());
+        self.said(r, &format!("timing #{}", t.id));
     }
 
     /// Starts the selected ticket; with none showing and an id typed in the filter, looks that id up.
@@ -109,7 +138,7 @@ impl App {
         if let Some(t) = self.visible().get(self.selected).map(|t| (*t).clone()) {
             self.start(&t);
         } else if let Ok(id) = self.filter.trim().trim_start_matches('#').parse() {
-            self.status = format!("looking up #{id}");
+            self.say(format!("looking up #{id}"));
             self.fetch(Some(id));
         }
     }
@@ -121,6 +150,10 @@ impl App {
         } else {
             self.selected.saturating_sub(1)
         };
+    }
+
+    fn toggle(&mut self, o: Overlay) {
+        self.overlay = (self.overlay != Some(o)).then_some(o);
     }
 
     /// Whether to quit.
@@ -148,36 +181,40 @@ impl App {
             }
             return false;
         }
+        let now = Timestamp::now();
         match code {
-            KeyCode::Char('q') | KeyCode::Esc => return true,
-            KeyCode::Tab => {
-                self.view = match self.view {
-                    View::Tickets => View::Today,
-                    View::Today => View::Week,
-                    View::Week => View::Tickets,
-                }
+            KeyCode::Char('q') => return true,
+            KeyCode::Esc if self.overlay.is_some() => self.overlay = None,
+            KeyCode::Esc => self.filter.clear(),
+            KeyCode::Char('t') => self.toggle(Overlay::Today),
+            KeyCode::Char('w') => self.toggle(Overlay::Week),
+            KeyCode::Char('?') => self.toggle(Overlay::Help),
+            KeyCode::Left | KeyCode::Char('h') if self.overlay == Some(Overlay::Week) => {
+                self.week += 1;
             }
-            KeyCode::Char('1') => self.view = View::Tickets,
-            KeyCode::Char('2') => self.view = View::Today,
-            KeyCode::Char('3') => self.view = View::Week,
-            KeyCode::Char('/') => {
-                self.view = View::Tickets;
-                self.filtering = true;
-            }
-            KeyCode::Char('s') => {
-                self.status = match self.log.stop(Timestamp::now()) {
-                    Ok(()) => "stopped".into(),
-                    Err(e) => format!("{e:#}"),
-                }
-            }
-            KeyCode::Char('r') => self.fetch(None),
-            KeyCode::Enter if self.view == View::Tickets => self.start_selected(),
-            KeyCode::Up | KeyCode::Char('k') => self.step(false),
-            KeyCode::Down | KeyCode::Char('j') => self.step(true),
-            KeyCode::Left | KeyCode::Char('h') if self.view == View::Week => self.week += 1,
-            KeyCode::Right | KeyCode::Char('l') if self.view == View::Week => {
+            KeyCode::Right | KeyCode::Char('l') if self.overlay == Some(Overlay::Week) => {
                 self.week = (self.week - 1).max(0);
             }
+            KeyCode::Char('c') if self.log.shift.is_some() => {
+                let r = self.log.clock_out(now);
+                self.said(r, "clocked out");
+            }
+            KeyCode::Char('c') => {
+                let r = self.log.clock_in(now);
+                self.said(r, "clocked in");
+            }
+            KeyCode::Char('s') => {
+                let r = self.log.stop(now);
+                self.said(r, "stopped");
+            }
+            KeyCode::Char('r') => self.fetch(None),
+            KeyCode::Char('/') => {
+                self.overlay = None;
+                self.filtering = true;
+            }
+            KeyCode::Enter if self.overlay.is_none() => self.start_selected(),
+            KeyCode::Up | KeyCode::Char('k') => self.step(false),
+            KeyCode::Down | KeyCode::Char('j') => self.step(true),
             _ => {}
         }
         false
@@ -192,14 +229,25 @@ fn data_dir() -> Result<PathBuf> {
         .context("set APPDATA or TIMETRACK_DIR to say where the log goes")
 }
 
+fn target() -> Result<i64> {
+    match std::env::var("TIMETRACK_TARGET") {
+        Ok(t) if !t.is_empty() => match log::parse_hm(&t) {
+            Some(secs) => Ok(secs),
+            None => bail!("TIMETRACK_TARGET is {t:?}; give it as h:mm, like 7:30"),
+        },
+        _ => Ok(8 * 3600),
+    }
+}
+
 fn main() -> Result<()> {
     if std::env::args().nth(1).is_some_and(|a| a == "--version") {
         println!("timetrack {}", env!("CARGO_PKG_VERSION"));
         return Ok(());
     }
+    let target = target()?;
     let log = log::Log::open(data_dir()?)?;
     let (api, status) = match Config::from_env().and_then(|c| Api::new(&c)) {
-        Ok(api) => (Some(Arc::new(api)), "loading work items…".to_owned()),
+        Ok(api) => (Some(Arc::new(api)), String::new()),
         // The config's errors end in a hint for the plugin, which doesn't apply here.
         Err(e) => (
             None,
@@ -226,16 +274,16 @@ fn main() -> Result<()> {
         selected: 0,
         filter: String::new(),
         filtering: false,
-        view: View::Tickets,
+        overlay: None,
         week: 0,
+        target,
         status,
+        status_at: Instant::now(),
         loading: false,
     };
     if app.log.bad > 0 {
-        app.status = format!(
-            "{} lines in log.jsonl don't parse and are skipped",
-            app.log.bad
-        );
+        let bad = app.log.bad;
+        app.say(format!("{bad} log lines don't parse and are skipped"));
     }
     app.fetch(None);
     ratatui::run(|term| -> Result<()> {
@@ -244,7 +292,7 @@ fn main() -> Result<()> {
             while let Ok(done) = app.rx.try_recv() {
                 app.received(done);
             }
-            // A short poll keeps the running timer's clock ticking.
+            // A short poll keeps the running clock ticking.
             if event::poll(Duration::from_millis(250))?
                 && let Event::Key(k) = event::read()?
                 // Windows reports releases too.
