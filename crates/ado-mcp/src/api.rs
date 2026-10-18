@@ -533,11 +533,12 @@ fn status_error(status: u16, ct: &str, body: &str, path: &str) -> ApiError {
         404 => err(format!("not found: {path}"), None),
         500.. => err(format!("the server failed ({status}); try again"), None),
         400..500 => {
-            let message = serde_json::from_str::<Value>(body)
+            let raw = serde_json::from_str::<Value>(body)
                 .ok()
-                .and_then(|v| v["message"].as_str().map(one_line))
-                .unwrap_or_else(|| format!("HTTP {status}"));
-            let tf = find_tf(&message);
+                .and_then(|v| v["message"].as_str().map(str::to_owned));
+            // The code first: the cut could drop it.
+            let tf = raw.as_deref().and_then(find_tf);
+            let message = raw.map_or_else(|| format!("HTTP {status}"), |m| one_line(&m));
             err(format!("the server refused it: {message}"), tf)
         }
         // A redirect (not followed) or an odd 1xx/2xx/3xx.
@@ -692,6 +693,10 @@ mod tests {
             "{rest}"
         );
         assert!(rest.ends_with('…'), "{rest}");
+        // The code is read before the cut.
+        let body = serde_json::json!({"message": format!("{} TF401179: exists", "a".repeat(400))});
+        let e = status_error(409, "application/json", &body.to_string(), "x");
+        assert_eq!(e.tf.as_deref(), Some("TF401179"));
     }
 
     /// Fails the test if a request gets past the guard.

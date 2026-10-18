@@ -48,15 +48,18 @@ impl Config {
     }
 }
 
-/// Not plain `http`, unless to this machine (the tests' fake server): Basic auth carries the PAT as is.
+/// `https`, or `http` to this machine only (the tests' fake server): Basic auth carries the PAT as is.
 fn secure(url: &Url) -> bool {
-    url.scheme() != "http"
-        || match url.host() {
+    match url.scheme() {
+        "https" => true,
+        "http" => match url.host() {
             Some(Host::Domain(d)) => d.eq_ignore_ascii_case("localhost"),
             Some(Host::Ipv4(ip)) => ip.is_loopback(),
             Some(Host::Ipv6(ip)) => ip.is_loopback(),
             None => false,
-        }
+        },
+        _ => false,
+    }
 }
 
 #[cfg(test)]
@@ -80,6 +83,9 @@ mod tests {
             "http://10.0.0.1/Coll/",
             "http://localhost.evil.example/Coll/",
             "http://[::2]/Coll/",
+            "ftp://ado.example/Coll/",
+            "file:///Coll/",
+            "ws://127.0.0.1/Coll/",
         ] {
             assert!(!ok(u), "{u}");
         }

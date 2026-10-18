@@ -459,3 +459,44 @@ fn runs_404_resolves_the_name_again() {
     assert!(text.starts_with("#1001 CI"), "{text}");
     assert_eq!(sent(&fx, DEFS).len(), 2);
 }
+
+#[test]
+fn log_window_offset_when_range_ignored() {
+    let fx = Fixture::start();
+    run_routes(&fx);
+    let mut logs: Value = serde_json::from_slice(&fixture("logs.json").body).unwrap();
+    logs["value"][2]["lineCount"] = json!(25_000);
+    fx.route(LOGS, vec![Resp::json(&logs)]);
+    // The server ignored the range and sent 26,000 lines (the log grew): the last 20,000 start at line 6001.
+    let body = "ok\r\n".repeat(6000) + &"##[error]x\r\n".repeat(400) + &"ok\r\n".repeat(19_600);
+    fx.route(
+        &format!("{LOGS}/4"),
+        vec![Resp::new(200, "text/plain", body)],
+    );
+    let text = ok(&mut env(&fx), "pipeline_log", json!({"run": 77}));
+    assert!(
+        text.contains(
+            "more error lines: pipeline_log run=77 step=\"Run tests\" full=true start=6301\n"
+        ),
+        "{}",
+        &text[..400]
+    );
+}
+
+#[test]
+fn log_default_small_or_unknown_count_reads_whole() {
+    for count in [json!(20_000), Value::Null] {
+        let fx = Fixture::start();
+        run_routes(&fx);
+        let mut logs: Value = serde_json::from_slice(&fixture("logs.json").body).unwrap();
+        logs["value"][2]["lineCount"] = count.clone();
+        fx.route(LOGS, vec![Resp::json(&logs)]);
+        let text = ok(&mut env(&fx), "pipeline_log", json!({"run": 77}));
+        assert!(text.starts_with("Run tests: failed\n"), "{count}: {text}");
+        let q = &queries(&fx, &format!("{LOGS}/4"))[0];
+        assert!(
+            !q.contains("startLine") && !q.contains("endLine"),
+            "{count}: {q}"
+        );
+    }
+}

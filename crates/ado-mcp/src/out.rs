@@ -43,10 +43,12 @@ pub fn args(pairs: &[(&str, Option<&str>)]) -> String {
 /// Characters per reply (Rulings R8, R11): past it, the reply is cut.
 pub const REPLY_MAX: usize = 40_000;
 
-/// A reply as Claude gets it: without terminal control, and at most `REPLY_MAX` characters before the cut line.
+/// A reply as Claude gets it: without terminal control, and at most `REPLY_MAX` characters before the cut line. The
+/// cut falls at the last line end before the limit, so no call is left half-cut; within one long line, at a char.
 pub fn finish(text: &str) -> String {
     let mut text = strip_ansi(text);
     if let Some((at, _)) = text.char_indices().nth(REPLY_MAX) {
+        let at = text[..at].rfind('\n').unwrap_or(at);
         text.truncate(at);
         text.push_str("\n… output cut at 40,000 characters; narrow the call (limit, id, step)");
     }
@@ -340,6 +342,16 @@ mod tests {
             )
         );
         assert_eq!(finish(&"a".repeat(REPLY_MAX)), "a".repeat(REPLY_MAX));
+    }
+
+    #[test]
+    fn finish_drops_a_half_cut_line() {
+        let text = "a".repeat(REPLY_MAX - 10) + "\n… more: pr_list status=all limit=40";
+        assert_eq!(
+            finish(&text),
+            "a".repeat(REPLY_MAX - 10)
+                + "\n… output cut at 40,000 characters; narrow the call (limit, id, step)"
+        );
     }
 
     #[test]

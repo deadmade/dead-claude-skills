@@ -604,7 +604,8 @@ pub(crate) async fn pr_threads(ctx: &Ctx, a: &PrThreadsArgs) -> Result<String, A
     let at = scope_args(&a.at);
     let all_arg = if all { " all=true" } else { "" };
     let full_arg = if full { " full=true" } else { "" };
-    let whole = format!("pr_threads id={id}{at}{all_arg} full=true");
+    let limit_arg = a.limit.map(|n| format!(" limit={n}")).unwrap_or_default();
+    let whole = format!("pr_threads id={id}{at}{all_arg} full=true{limit_arg}");
     let mut lines: Vec<String> = threads
         .iter()
         .map(|t| thread_text(t, full, &whole))

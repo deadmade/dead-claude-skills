@@ -816,7 +816,15 @@ fn threads_reply_is_capped() {
     let text = ok(&mut env(&fx), "pr_threads", json!({"id": 412, "limit": 30}));
     let tail = "\n… output cut at 40,000 characters; narrow the call (limit, id, step)";
     assert!(text.ends_with(tail), "{}", &text[text.len() - 200..]);
-    assert_eq!(text.chars().count(), 40_000 + tail.chars().count());
+    assert!(text.chars().count() <= 40_000 + tail.chars().count());
+    // Cut at a line end: the last line kept is a whole thread header or comment.
+    let kept = text.strip_suffix(tail).unwrap();
+    let last = kept.lines().last().unwrap();
+    let comment = format!("   J. Doe: {}", "y".repeat(1900));
+    assert!(
+        last == comment || (last.starts_with('#') && last.ends_with(" active")),
+        "{last:.40}"
+    );
 }
 
 #[test]
@@ -837,7 +845,7 @@ fn threads_full_and_scoped_calls() {
     );
     assert!(
         text.contains(
-            "\n      … 1000 more characters: pr_threads id=412 repo=\"My Repo\" all=true full=true\n"
+            "\n      … 1000 more characters: pr_threads id=412 repo=\"My Repo\" all=true full=true limit=1\n"
         ),
         "{text}"
     );

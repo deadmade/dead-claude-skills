@@ -16,7 +16,7 @@ use serde_json::json;
 
 use crate::api::{ApiError, V71_PREVIEW};
 use crate::ctx::{Ctx, given, seg};
-use crate::out::{args, cut, full_ref, more, ref_name, strip_ansi};
+use crate::out::{REPLY_MAX, args, cut, full_ref, more, ref_name, strip_ansi};
 
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "schemars")]
@@ -93,8 +93,9 @@ const ISSUES_MAX: usize = 20;
 const NAMES_MAX: usize = 20;
 /// Lines of error context an excerpt shows before it points at the full log.
 const EXCERPT_MAX: usize = 300;
-/// Characters per `full` page (Ruling R8): 2000 long lines would fill the reply.
-const PAGE_CHARS: usize = 40_000;
+/// Characters per `full` page (Ruling R8): 2000 long lines would fill the reply. Held under `REPLY_MAX` so the
+/// budget's own "not shown" line always fits.
+const PAGE_CHARS: usize = REPLY_MAX - 1000;
 
 /// `4m 55s`; empty while it hasn't finished.
 fn took(secs: Option<i64>) -> String {
@@ -531,6 +532,17 @@ fn unread(total: Result<Option<i64>, &ApiError>) -> i64 {
     }
 }
 
+/// The lines a default call reads, and the number of the log's line before the first: `skipped`, unless the server
+/// ignored the range and sent more than `WINDOW` lines, whose end is then the window.
+fn window(lines: &[(bool, String)], skipped: i64) -> (&[(bool, String)], u64) {
+    let from = lines.len().saturating_sub(WINDOW as usize);
+    if skipped > 0 && from > 0 {
+        (&lines[from..], from as u64)
+    } else {
+        (lines, skipped.unsigned_abs())
+    }
+}
+
 /// The `pipeline_log` call for `step` from line `start` on; `p` is the ` project=…` the call was given.
 fn page_call(run: u32, p: &str, step: &str, start: u64) -> String {
     format!("pipeline_log run={run}{p} step=\"{step}\" full=true start={start}")
@@ -769,14 +781,8 @@ pub(crate) async fn pipeline_log(ctx: &Ctx, a: &LogArgs) -> Result<String, ApiEr
             let room = out.room().saturating_sub(text.chars().count() + 300);
             page(&lines, start, total, room, |n| page_call(run, &p, step, n))
         } else {
-            // A server that ignored the range sent it all: its end is the window asked for.
-            let from = if skipped > 0 {
-                lines.len().saturating_sub(WINDOW as usize)
-            } else {
-                0
-            };
-            let skipped = skipped.unsigned_abs();
-            excerpt(&lines[from..], |n| page_call(run, &p, step, n + skipped))
+            let (lines, offset) = window(&lines, skipped);
+            excerpt(lines, |n| page_call(run, &p, step, n + offset))
         };
         let _ = write!(text, "\n{body}");
         out.add(text, call, &whole);
@@ -1021,10 +1027,11 @@ mod tests {
         let out = page_at(&plain(2500, 4), 1, Ok(None), next);
         assert_eq!(out.lines().count(), PAGE as usize + 1);
         assert!(out.ends_with("\n… more: next 2001"), "{out}");
-        // Ruling R8: 100-character lines stop at 40,000 characters (396 lines of 101 with the newline).
+        // Ruling R8: 100-character lines stop at 39,000 characters, under the 40,000 reply cap (386 lines of 101
+        // with the newline).
         let out = page_at(&plain(2000, 100), 501, Ok(Some(2500)), next);
-        assert_eq!(out.lines().count(), 397);
-        assert!(out.ends_with("\n… more: next 897"), "{out}");
+        assert_eq!(out.lines().count(), 387);
+        assert!(out.ends_with("\n… more: next 887"), "{out}");
         assert!(out.chars().count() < PAGE_CHARS + 100);
         // All shown: more only when the line count says the log goes on.
         assert_eq!(

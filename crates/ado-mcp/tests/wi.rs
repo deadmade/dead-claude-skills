@@ -551,3 +551,25 @@ fn view_full_reads_200_comments() {
     let q = &queries(&fx, COMMENTS)[0];
     assert!(q.contains("$top=200"), "{q}");
 }
+
+#[test]
+fn view_dot_project_does_not_climb() {
+    let fx = Fixture::start();
+    let mut wi: Value = serde_json::from_slice(&fixture("wi.json").body).unwrap();
+    // A server-supplied `..` must stay a segment, not climb out of the collection.
+    wi["fields"]["System.TeamProject"] = json!("..");
+    fx.route(WI123, vec![Resp::json(&wi)]);
+    fx.route(COMMENTS, vec![Resp::new(404, "text/plain", "gone")]);
+    let text = ok(&mut env(&fx), "wi_view", json!({"id": 123}));
+    assert!(
+        text.contains("\n\ncomments: unavailable (not found"),
+        "{text}"
+    );
+    let paths: Vec<String> = fx.requests().into_iter().map(|r| r.path).collect();
+    assert!(
+        paths
+            .iter()
+            .any(|p| p.starts_with("/tfs/Coll/%252E%252E/_apis/wit/workItems/123/comments")),
+        "{paths:?}"
+    );
+}

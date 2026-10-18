@@ -72,8 +72,9 @@ pub(crate) struct Ctx {
 
 /// A path segment, percent-encoded so a name can't add a `/`, `?` or `#` of its own, nor be `.` or `..`.
 pub(crate) fn seg(s: &str) -> String {
+    // URL parsing treats `%2E` as `.` and drops the segment; `%252E` reaches the server as the name `%2E`.
     if matches!(s, "." | "..") {
-        return s.replace('.', "%2E");
+        return s.replace('.', "%252E");
     }
     s.bytes().fold(String::new(), |mut out, b| {
         if b.is_ascii_alphanumeric() || b"-._~".contains(&b) {
@@ -379,9 +380,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn seg_encodes_dot_segments() {
-        assert_eq!(seg("."), "%2E");
-        assert_eq!(seg(".."), "%2E%2E");
+    fn seg_encodes() {
         assert_eq!(seg("a.b"), "a.b");
         assert_eq!(seg("My Proj/x"), "My%20Proj%2Fx");
     }
