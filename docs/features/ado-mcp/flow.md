@@ -119,6 +119,14 @@ Report from the prior-art agent, 2026-10-18; every source was fetched in that ru
     use the ids from `/vsts/info`.
   - The documented PAT write scopes look incomplete; test them against a real minimal PAT.
   - On Windows, rustls-platform-verifier checks revocation.
+- **azdocli, read in full on 2026-10-18** (clone of `christianhelle/azdocli` main, MIT, © 2025 Christian Helle).
+  It has about 17k lines of Rust, and 32 of its source files are built on `azure_devops_rust_api` (with
+  `.endpoint(...)` set to the on-prem URL, `src/auth/factory.rs:95`) plus tokio. Its logic is typed against that
+  crate's models, so it doesn't compile without the crate. Two parts are worth reading as references:
+  - `src/pr/comments.rs:141-183`: system-thread detection (every comment of type system or unknown), the
+    deleted-thread filter, and `file:line` from `threadContext.rightFileStart`/`leftFileStart`.
+  - `src/auth/url.rs`: splitting a collection URL into base and collection.
+  Its `migrate/` folder, half the code base, is irrelevant here.
 - **Approaches.**
   - **Hand-rolled REST over reqwest** (gh, glab, tea): fits.
   - **Generated SDK:** async, Services-first, more lookups.
@@ -147,5 +155,8 @@ Settled in the chat before this flow started (the user's words in quotes):
   - With B, the PAT is a `sensitive` userConfig value, which Claude Code keeps in the platform's secure credential
     store (manifest-reference, "Where values are stored"). So the server needs no credential code of its own, and
     the earlier `ado auth login` and Credential Manager proposal is dropped.
+- **Reusing azdocli** (the user asked, 2026-10-18): it is only a reference. Its code sits on the SDK the user ruled
+  out, so nothing copies over as is. A function ported close to verbatim keeps its MIT notice and gets a
+  THIRD_PARTY.md line _(my call)_.
 - TLS: the work browser shows the server's certificate as issued by ESET, i.e. ESET's HTTPS scanning re-signs traffic
   with a root it installed in the Windows store. So `ado` must trust the OS certificate store, not a bundled root list.
