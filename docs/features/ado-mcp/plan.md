@@ -12,7 +12,6 @@ DevOps Server 2022.2. It replaces the npm server in the `mcp-azure` plugin, and 
 the plugin.
 
 **Architecture:** One binary crate, `crates/ado-mcp`, shaped like web-mcp: no library, so items are `pub(crate)`.
-
 - `Api` wraps one `reqwest::Client` with timeouts, no redirects and error mapping, and holds the
   `azure_devops_rust_api` clients built on it (Task 6a). It sends the PAT only to URLs under `ADO_ORG_URL`.
 - `Ctx` resolves project, repo and branch from the git remote (checked against `ADO_ORG_URL` before any request,
@@ -117,7 +116,7 @@ THIRD_PARTY.md; README.md; CLAUDE.md; docs/features/ado-mcp/smoke.md
 - `tests/common/mod.rs` is web-mcp's file copied as is, minus the parts web-mcp alone needs (`PUBLIC`, agent-browser
   helpers).
 - It gains `pub struct Req { pub method: String, pub path: String /* with query */, pub headers: Vec<(String,
-String)>, pub body: Vec<u8> }` and `Fixture::requests() -> Vec<Req>`. The body is read by `Content-Length`.
+  String)>, pub body: Vec<u8> }` and `Fixture::requests() -> Vec<Req>`. The body is read by `Content-Length`.
 - Routes match on path, with the query when given (as in web-mcp).
 - `pub fn ado(fx: &Fixture, extra_env: &[(&str, &str)]) -> Mcp` spawns `CARGO_BIN_EXE_ado-mcp` with
   `ADO_ORG_URL={fx base}/tfs/Coll/` and `ADO_PAT=test-pat`, sets `ADO_PROJECT_DIR` to a temp dir, then initializes.
@@ -138,7 +137,7 @@ String)>, pub body: Vec<u8> }` and `Fixture::requests() -> Vec<Req>`. The body i
 **Interfaces:**
 
 - Produces: `pub(crate) struct Config { pub org_url: Url /* ends with / */, pub pat: String, pub default_project:
-Option<String>, pub project_dir: PathBuf }`. It doesn't derive `Debug`.
+  Option<String>, pub project_dir: PathBuf }`. It doesn't derive `Debug`.
 - Produces: `Config::from_env() -> anyhow::Result<Config>`.
   - It reads `ADO_ORG_URL` (required; a trailing `/` is added), `ADO_PAT` (required), `ADO_DEFAULT_PROJECT` (empty
     means `None`) and `ADO_PROJECT_DIR` (default: cwd).
@@ -256,9 +255,9 @@ body with a `scope()` echo for the tests.
 - Produces: `pub(crate) struct Ctx { pub api: Api, pub cfg: Config, cache: std::sync::Mutex<Cache> }`.
   - The lock is never held across `.await`. Concurrent misses may each fetch; the last write wins.
 - Produces: `#[derive(Clone)] pub(crate) struct Scope { pub project_id: String, pub project: String, pub repo_id:
-Option<String>, pub repo: Option<String>, pub branch: Option<String> }`.
+  Option<String>, pub repo: Option<String>, pub branch: Option<String> }`.
 - Produces: `async fn scope(&self, project: Option<&str>, repo: Option<&str>, branch: Option<&str>) ->
-Result<Scope, ApiError>`.
+  Result<Scope, ApiError>`.
   - An explicit `project` (and `repo`) wins: get `{project}/_apis/git/repositories/{repo}`, which carries
     `project.id`, and cache it. With no repo, get `_apis/projects/{project}`.
   - Otherwise `origin_url(project_dir)` → `https_remote` (an `Err` becomes the tool error, and nothing is sent) →
@@ -399,7 +398,7 @@ whose structs read the answers.
 **Interfaces:**
 
 - `Cargo.toml`: `azure_devops_rust_api = { version = "=0.39.1", default-features = false, features = ["git",
-"build", "pipelines", "policy", "wit", "core", "ims"] }` and `azure_core = "=1.1.0"`. `rustls` stays only for the
+  "build", "pipelines", "policy", "wit", "core", "ims"] }` and `azure_core = "=1.1.0"`. `rustls` stays only for the
   certificate-error check in the `source()` chain (`default-features = false, features = ["std"]`); the ring install
   in `main.rs` goes.
 - `Api` gains one client per area, built once in `Api::new` and cloned freely: `pub git: git::Client`, `build`,
@@ -431,8 +430,8 @@ whose structs read the answers.
   The output lines stay byte for byte.
 
 - [ ] **Step 1: Fixtures fit the models.** `tests/fixtures.rs::fixtures_fit_models` deserializes every fixture into
-      the crate model its route returns (a table of file → type) and fails naming the file and field. Fill the fixtures
-      until it passes, with values shaped like a 2022.2 answer (Learn's 7.1 samples), not just the minimum.
+  the crate model its route returns (a table of file → type) and fails naming the file and field. Fill the fixtures
+  until it passes, with values shaped like a 2022.2 answer (Learn's 7.1 samples), not just the minimum.
 - [ ] **Step 2: Failing tests:**
   - `sends_auth_version_and_suppress` (Task 3): asserts `api-version=7.1-preview` on a crate call; Basic auth and
     the Suppress header unchanged.
@@ -444,7 +443,7 @@ whose structs read the answers.
     sent.
 - [ ] **Step 3: Implement.** All tests from Tasks 2–6 pass unchanged, apart from the version assertions above.
 - [ ] **Step 4:** `cargo test`, `cargo clippy --all-targets -- -D warnings`, and `cargo tree -d -i reqwest` shows one
-      version.
+  version.
 - [ ] **Step 5: Commit**: `"Move the Azure DevOps calls onto Microsoft's azure_devops_rust_api crate."`
 
 **From here on (Tasks 7–10):** where a task names an endpoint, that names the call: make it through the crate's
@@ -540,7 +539,7 @@ Phase → Job → Task, with one Task `skipped` and no log, and one Job `failed`
 **Interfaces** (each returns one line naming what changed and the id):
 
 - `pr_create(ctx, &PrCreateArgs { title, description, target, draft, reviewers: Option<Vec<String>>, work_items:
-Option<Vec<u32>> })`.
+  Option<Vec<u32>> })`.
   - The source is `branch` or the scope branch. The target defaults to the repo's `defaultBranch`.
   - Reviewers go through `Ctx::user`.
   - A TF401179 error looks up the active PR for that source and target, and returns
@@ -594,7 +593,7 @@ Option<Vec<u32>> })`.
     `{org_url}_apis/wit/workItems/{parent}`.
   - → `created #{id} {type} "{title}"`.
 - `wi_update(ctx, &WiUpdateArgs { project, id, state, assigned, title, fields: Option<BTreeMap<String,
-serde_json::Value>> })`. `fields` keys go to `/fields/{key}` verbatim. → `updated #{id}: {field names}`.
+  serde_json::Value>> })`. `fields` keys go to `/fields/{key}` verbatim. → `updated #{id}: {field names}`.
 - `wi_comment(ctx, &WiCommentArgs { project, id, text })`. → `commented on #{id}`.
 - `pipeline_run(ctx, &PipelineRunArgs { project, pipeline, branch, parameters: Option<BTreeMap<String, String>> })`.
   - POST `{project}/_apis/pipelines/{id}/runs` with `resources.repositories.self.refName` and
@@ -635,7 +634,7 @@ serde_json::Value>> })`. `fields` keys go to `/fields/{key}` verbatim. → `upda
   - an `ado-mcp:` job like `:74-75`, and in `publish.needs` at `:78`
   - the comments at `:4` and `:87`
   - the notes at `:101-102`: `ado-mcp-*: the binary behind the mcp-azure plugin, for Windows and Linux x64; the
-installer downloads yours`
+    installer downloads yours`
 - Modify: `flake.nix`: an `adoMcp` `importTOML` and an `ado-mcp` `buildRustPackage` like `:98-109`, with
   `nativeCheckInputs = [pkgs.git]` and `checkType = "debug"` (for the `ADO_TIMEOUT_MS` hook).
 
@@ -656,12 +655,12 @@ installer downloads yours`
   - Add `binPath` (`type string`, title `ado-mcp binary`, description
     `Path to the ado-mcp binary. Default: ado-mcp on PATH.`, default `ado-mcp`).
   - `description`: `Azure DevOps Server tools for Claude: pull requests, work items and YAML pipelines, through the
-ado-mcp binary (self-hosted, PAT auth). Writes always ask first.`
+    ado-mcp binary (self-hosted, PAT auth). Writes always ask first.`
   - `ado_pat` description: `PAT with Code (Read & Write), Work Items (Read & Write), Build (Read & Execute), Project
-and Team (Read).`
+    and Team (Read).`
 - `.mcp.json`: `{"mcpServers":{"ado":{"command":"${user_config.binPath}","env":{"ADO_ORG_URL":
-"${user_config.ado_org_url}","ADO_PAT":"${user_config.ado_pat}","ADO_DEFAULT_PROJECT":
-"${user_config.ado_default_project}","ADO_PROJECT_DIR":"${CLAUDE_PROJECT_DIR}"}}}}`.
+  "${user_config.ado_org_url}","ADO_PAT":"${user_config.ado_pat}","ADO_DEFAULT_PROJECT":
+  "${user_config.ado_default_project}","ADO_PROJECT_DIR":"${CLAUDE_PROJECT_DIR}"}}}}`.
 
 **Installer interfaces (`core.mjs`):**
 

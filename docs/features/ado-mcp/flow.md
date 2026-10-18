@@ -154,7 +154,7 @@ Report from the prior-art agent, 2026-10-18; every source was fetched in that ru
   - `src/pr/comments.rs:141-183`: system-thread detection (every comment of type system or unknown), the
     deleted-thread filter, and `file:line` from `threadContext.rightFileStart`/`leftFileStart`.
   - `src/auth/url.rs`: splitting a collection URL into base and collection.
-    Its `migrate/` folder, half the code base, is irrelevant here.
+  Its `migrate/` folder, half the code base, is irrelevant here.
 - **Approaches.**
   - **Hand-rolled REST over reqwest** (gh, glab, tea): fits.
   - **Generated SDK:** async, Services-first, more lookups.
@@ -213,7 +213,7 @@ Settled in the chat before this flow started (the user's words in quotes):
     unattended install).
 - **Reusing azdocli** (the user asked, 2026-10-18): it is only a reference. Its code sits on the SDK the user ruled
   out, so nothing copies over as is. A function ported close to verbatim keeps its MIT notice and gets a
-  THIRD*PARTY.md line *(my call)\_.
+  THIRD_PARTY.md line _(my call)_.
 - TLS: the work browser shows the server's certificate as issued by ESET, i.e. ESET's HTTPS scanning re-signs traffic
   with a root it installed in the Windows store. So `ado` must trust the OS certificate store, not a bundled root list.
 
