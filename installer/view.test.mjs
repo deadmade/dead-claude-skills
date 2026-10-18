@@ -197,6 +197,7 @@ test('review lists only non-empty groups, token note and platform', () => {
   const out = text(s);
   assert.match(out, /Install\s+mcp-azure/);
   assert.match(out, /mcp-github \(finish in Claude Code\)/);
+  assert.doesNotMatch(out, /mcp-azure \(finish in Claude Code\)/);
   assert.match(out, /Remove\s+atlassian/);
   assert.doesNotMatch(out, /Turn on|Update/);
   assert.match(out, /Unchanged: 1 installed, 1 not installed/);

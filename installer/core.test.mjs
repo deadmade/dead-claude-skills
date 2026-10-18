@@ -51,6 +51,13 @@ import {
   idOf,
   withDependencies,
   BUNDLE,
+  SELF_CONFIGURED,
+  configPrompts,
+  configValues,
+  selfConfigure,
+  configureArgs,
+  configureSupported,
+  afterPrompts,
 } from './core.mjs';
 
 const json = (p) => JSON.parse(readFileSync(new URL(`../${p}`, import.meta.url), 'utf8'));
@@ -111,6 +118,86 @@ test('select installs, deselect uninstalls, token plugins hand off', () => {
   assert.deepEqual(plan.install, [`graphify@${M}`, `pyright-lsp@${O}`]);
   assert.deepEqual(plan.handoff, [`mcp-github@${M}`]);
   assert.deepEqual(plan.uninstall.sort(), [`mattpocock-picks@${M}`, `mcp-azure@${M}`]);
+});
+
+test('mcp-azure asks for its settings itself, in manifest order, without its binary path', () => {
+  assert.deepEqual(SELF_CONFIGURED, ['mcp-azure']);
+  const { userConfig } = json('plugins/opt-in/mcp/mcp-azure/.claude-plugin/plugin.json');
+  const prompts = configPrompts(userConfig, 'binPath', ['ado_org_url']);
+  assert.deepEqual(
+    prompts.map((p) => p.key),
+    ['ado_org_url', 'ado_pat', 'ado_default_project'],
+  );
+  assert.deepEqual(
+    prompts.filter((p) => p.secret).map((p) => p.key),
+    ['ado_pat'],
+  );
+  assert.deepEqual(
+    prompts.map((p) => [p.key, p.saved, p.required]),
+    [
+      ['ado_org_url', true, true],
+      ['ado_pat', false, true],
+      ['ado_default_project', false, false],
+    ],
+  );
+  assert.equal(prompts[0].title, userConfig.ado_org_url.title);
+});
+
+test('configValues trims answers, keeps saved values on empty and names what is missing', () => {
+  const { userConfig } = json('plugins/opt-in/mcp/mcp-azure/.claude-plugin/plugin.json');
+  const url = 'https://tfs.example/tfs/Coll';
+  const unsaved = configPrompts(userConfig, 'binPath', []);
+  assert.deepEqual(configValues(unsaved, { ado_org_url: ` ${url} `, ado_pat: '', ado_default_project: '' }), {
+    values: { ado_org_url: url },
+    missing: ['ado_pat'],
+  });
+  const saved = configPrompts(userConfig, 'binPath', ['ado_org_url', 'ado_pat']);
+  assert.deepEqual(configValues(saved, { ado_org_url: '', ado_pat: '  ', ado_default_project: 'My Project' }), {
+    values: { ado_default_project: 'My Project' },
+    missing: [],
+  });
+  assert.deepEqual(configValues(unsaved, { ado_org_url: url, ado_pat: 'test-pat' }), {
+    values: { ado_org_url: url, ado_pat: 'test-pat' },
+    missing: [],
+  });
+});
+
+test('selfConfigure prompts until every required key is saved', () => {
+  const requiredKeys = ['ado_org_url', 'ado_pat'];
+  const old = { configuredKeys: [], requiredKeys, supported: false };
+  assert.equal(selfConfigure({ ...old, installed: false }), 'handoff');
+  assert.equal(selfConfigure({ ...old, installed: true }), 'skip');
+  assert.equal(selfConfigure({ installed: false, configuredKeys: [], requiredKeys }), 'prompt');
+  assert.equal(selfConfigure({ installed: false, configuredKeys: requiredKeys, requiredKeys }), 'prompt');
+  assert.equal(selfConfigure({ installed: true, configuredKeys: requiredKeys, requiredKeys }), 'skip');
+  assert.equal(selfConfigure({ installed: true, configuredKeys: ['ado_org_url'], requiredKeys }), 'prompt');
+});
+
+test('configure needs Claude Code 2.1.285 or newer', () => {
+  assert.equal(configureSupported('2.1.302 (Claude Code)'), true);
+  assert.equal(configureSupported('2.1.285'), true);
+  assert.equal(configureSupported('3.0.0 (Claude Code)'), true);
+  assert.equal(configureSupported('2.1.284 (Claude Code)'), false);
+  assert.equal(configureSupported('1.9.999'), false);
+  assert.equal(configureSupported(''), false);
+  assert.equal(configureSupported(undefined), false);
+});
+
+test('afterPrompts hands off a new plugin without its token and names unset keys of an installed one', () => {
+  const id = `mcp-azure@${M}`;
+  assert.deepEqual(afterPrompts({ name: 'mcp-azure', id, installed: false, missing: ['ado_pat'] }), { handoff: true });
+  assert.deepEqual(afterPrompts({ name: 'mcp-azure', id, installed: true, missing: ['ado_pat'] }), {
+    unset: `mcp-azure: ado_pat not set; run /plugin configure ${id} in Claude Code`,
+  });
+  assert.deepEqual(afterPrompts({ name: 'mcp-azure', id, installed: false, missing: [] }), {});
+  assert.deepEqual(afterPrompts({ name: 'mcp-azure', id, installed: true, missing: [] }), {});
+});
+
+test('configureArgs reads the values from stdin, never from its arguments', () => {
+  const args = configureArgs(`mcp-azure@${M}`);
+  assert.deepEqual(args, ['plugin', 'configure', `mcp-azure@${M}`, '--values-stdin']);
+  for (const v of ['test-pat', 'https://tfs.example/tfs/Coll'])
+    assert.ok(!args.some((a) => a.includes(v)), `${v} is not an argument`);
 });
 
 test('duplicates are managed names from the wrong marketplace', () => {
@@ -288,6 +375,11 @@ test('reset keeps only our settings plus the dcg hook while dcg stays on', () =>
     permissions: { allow: ['Bash(ls)'] },
     hooks: { PreToolUse: [other, dcgEntry], Stop: [other] },
     enabledPlugins: { [`dead-skills@${M}`]: true, [`code-review@${O}`]: true, 'x@other': true },
+    pluginConfigs: {
+      [`web-mcp@${M}`]: { options: { binPath: '/home/me/.claude/bin/web-mcp' } },
+      [`code-review@${O}`]: { options: { a: '1' } },
+      'x@other': { options: { b: '2' } },
+    },
     extraKnownMarketplaces: {
       [O]: { source: { source: 'github', repo: 'anthropics/claude-plugins-official' } },
       other: {},
@@ -301,6 +393,11 @@ test('reset keeps only our settings plus the dcg hook while dcg stays on', () =>
   assert.equal(out.enabledPlugins[`code-review@${O}`], true);
   assert.deepEqual(Object.keys(out.extraKnownMarketplaces), [M, O]);
   assert.equal(out.enabledPlugins['x@other'], undefined);
+  assert.deepEqual(out.pluginConfigs, {
+    [`web-mcp@${M}`]: { options: { binPath: '/home/me/.claude/bin/web-mcp' } },
+    [`code-review@${O}`]: { options: { a: '1' } },
+  });
+  assert.equal(resetSettings({}, { dcg: false }).pluginConfigs, undefined);
   assert.ok(isStripped(out));
   assert.equal(resetSettings(before, { dcg: false }).hooks, undefined);
   assert.deepEqual(resetSettings(out, { statusLine: true, sandbox: false, dcg: true }), out);
@@ -378,7 +475,7 @@ test('web-mcp downloads its own archive, and each plugin is configured under its
   };
   for (const [k, target] of Object.entries(t)) {
     const [platform, arch] = k.split('-');
-    for (const name of ['tui-review', 'web-mcp']) {
+    for (const name of ['tui-review', 'web-mcp', 'ado-mcp']) {
       const a = binAsset(name, platform, arch, '1.2.3');
       assert.equal(a.file, `${name}-${target}.${platform === 'win32' ? 'zip' : 'tar.gz'}`);
       assert.equal(a.exe, name + (platform === 'win32' ? '.exe' : ''));
@@ -387,7 +484,12 @@ test('web-mcp downloads its own archive, and each plugin is configured under its
   assert.equal(binAsset('web-mcp', 'linux', 'ia32', '1.0.0'), undefined);
   assert.deepEqual(BIN_PLUGINS['tui-review'], { name: 'tui-review', key: 'binPath' });
   assert.deepEqual(BIN_PLUGINS['web-mcp'], { name: 'web-mcp', key: 'binPath' });
-  const dirs = { 'tui-review': 'plugins/shared/tui-review', 'web-mcp': 'plugins/shared/web-mcp' };
+  assert.deepEqual(BIN_PLUGINS['mcp-azure'], { name: 'ado-mcp', key: 'binPath' });
+  const dirs = {
+    'tui-review': 'plugins/shared/tui-review',
+    'web-mcp': 'plugins/shared/web-mcp',
+    'mcp-azure': 'plugins/opt-in/mcp/mcp-azure',
+  };
   for (const [plugin, { key }] of Object.entries(BIN_PLUGINS))
     assert.ok(json(`${dirs[plugin]}/.claude-plugin/plugin.json`).userConfig[key], `${plugin} has userConfig ${key}`);
   assert.match(unavailable('web-mcp', 'linux', 'ia32', '1.0.0'), /no web-mcp build for linux-ia32/);

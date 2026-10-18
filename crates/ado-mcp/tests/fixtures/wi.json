@@ -1,0 +1,52 @@
+{
+  "id": 123,
+  "rev": 7,
+  "fields": {
+    "System.TeamProject": "My Proj",
+    "System.WorkItemType": "Bug",
+    "System.State": "Active",
+    "System.Title": "Login fails behind the proxy",
+    "System.AssignedTo": {
+      "displayName": "Jane Roe",
+      "uniqueName": "CORP\\jroe",
+      "id": "5e8f1a77-0c2b-4d39-8e6a-1b7c3d9f4a02"
+    },
+    "System.AreaPath": "My Proj\\Web",
+    "System.IterationPath": "My Proj\\Sprint 12",
+    "System.Description": "<div>Open the <b>login</b> page&nbsp;behind the proxy.</div><div>It times out.</div>",
+    "Microsoft.VSTS.Common.AcceptanceCriteria": "<ul><li>Login works behind the proxy</li><li>No retry loop</li></ul>"
+  },
+  "relations": [
+    {
+      "rel": "System.LinkTypes.Hierarchy-Reverse",
+      "url": "http://dev.example/tfs/Coll/_apis/wit/workItems/100",
+      "attributes": { "isLocked": false, "name": "Parent" }
+    },
+    {
+      "rel": "System.LinkTypes.Hierarchy-Forward",
+      "url": "http://dev.example/tfs/Coll/_apis/wit/workItems/124",
+      "attributes": { "isLocked": false, "name": "Child" }
+    },
+    {
+      "rel": "System.LinkTypes.Hierarchy-Forward",
+      "url": "http://dev.example/tfs/Coll/_apis/wit/workItems/125",
+      "attributes": { "isLocked": false, "name": "Child" }
+    },
+    {
+      "rel": "System.LinkTypes.Related",
+      "url": "http://dev.example/tfs/Coll/_apis/wit/workItems/99",
+      "attributes": { "isLocked": false, "name": "Related" }
+    },
+    {
+      "rel": "ArtifactLink",
+      "url": "vstfs:///Git/PullRequestId/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455%2F3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01%2F412",
+      "attributes": { "name": "Pull Request" }
+    },
+    {
+      "rel": "ArtifactLink",
+      "url": "vstfs:///Git/Commit/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455%2F3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01%2F2d9e7b10aa",
+      "attributes": { "name": "Fixed in Commit" }
+    }
+  ],
+  "url": "http://dev.example/tfs/Coll/_apis/wit/workItems/123"
+}

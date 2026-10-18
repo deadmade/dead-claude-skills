@@ -1,0 +1,28 @@
+{
+  "_links": {
+    "self": { "href": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/Pipelines/12/runs/78" },
+    "web": { "href": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_build/results?buildId=78" }
+  },
+  "pipeline": {
+    "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/Pipelines/12?revision=7",
+    "id": 12,
+    "revision": 7,
+    "name": "CI",
+    "folder": "\\Build"
+  },
+  "state": "inProgress",
+  "createdDate": "2026-03-05T10:00:00.1234567Z",
+  "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/Pipelines/12/runs/78",
+  "resources": {
+    "repositories": {
+      "self": {
+        "repository": { "id": "2d9e7b10-4c1a-4f5e-9b3d-7a6c8e1f0b24", "type": "azureReposGit" },
+        "refName": "refs/heads/feature/x",
+        "version": "4f1c2b9e8d7a6c5b4a3f2e1d0c9b8a7f6e5d4c3b"
+      }
+    }
+  },
+  "templateParameters": { "env": "staging", "dry": "true" },
+  "id": 78,
+  "name": "20260305.1"
+}

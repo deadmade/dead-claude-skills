@@ -1,7 +1,7 @@
 name: Release
 
 # One release for the whole repo: scripts/release.mjs bumps package.json, the marketplace and every plugin to the
-# same version and tags vX.Y.Z; pushing that tag checks the repo, builds tui-review, web-mcp and cswap.exe (or carries the unchanged
+# same version and tags vX.Y.Z; pushing that tag checks the repo, builds tui-review, web-mcp, ado-mcp and cswap.exe (or carries the unchanged
 # cswap.exe over from the latest release) and publishes the release.
 on:
   push:
@@ -74,8 +74,11 @@ jobs:
   web-mcp:
     uses: ./.github/workflows/build-web-mcp.yml
 
+  ado-mcp:
+    uses: ./.github/workflows/build-ado-mcp.yml
+
   publish:
-    needs: [check, cswap-reuse, cswap, tui-review, web-mcp]
+    needs: [check, cswap-reuse, cswap, tui-review, web-mcp, ado-mcp]
     # cswap is skipped when its exe was carried over; any failure still stops the release.
     if: ${{ !cancelled() && !failure() }}
     runs-on: ubuntu-latest
@@ -84,7 +87,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # Every artifact of this run: cswap.exe, the tui-review and web-mcp archives, each with its .sha256.
+      # Every artifact of this run: cswap.exe, the tui-review, web-mcp and ado-mcp archives, each with its .sha256.
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
@@ -100,4 +103,5 @@ jobs:
 
           tui-review-*: the binary behind tui-review, for each platform; the installer downloads yours.
           web-mcp-*: the binary behind the web-mcp plugin, for Windows and Linux x64; the installer downloads yours.
+          ado-mcp-*: the binary behind the mcp-azure plugin, for Windows and Linux x64; the installer downloads yours. After updating mcp-azure from 0.4.0 or earlier (the npm server), re-run the installer so it downloads ado-mcp and sets binPath.
           cswap.exe is claude-swap $cswap (https://github.com/realiti4/claude-swap, MIT) compiled with Nuitka for Windows."

@@ -1,0 +1,19 @@
+{
+  "changeEntries": [
+    {
+      "changeTrackingId": 1,
+      "changeId": 1,
+      "item": {
+        "objectId": "abc123",
+        "path": "/old.txt",
+        "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/items/old.txt?versionType=Commit",
+        "gitObjectType": "blob",
+        "commitId": "9b1f3c2a7d4e5f60718293a4b5c6d7e8f9a0b1c2",
+        "originalObjectId": "0f1e2d3c4b5a69788796a5b4c3d2e1f0a9b8c7d6"
+      },
+      "changeType": "delete"
+    }
+  ],
+  "nextSkip": 0,
+  "nextTop": 0
+}

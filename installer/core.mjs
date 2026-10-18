@@ -226,13 +226,17 @@ export function stripDefaults(settings) {
   return out;
 }
 
-// Clean slate: only our settings survive, plus the official marketplace's entry and enabledPlugins entries from ours
-// and it (claude plugin install writes them; strip already uninstalled the official plugins we don't use)
+// Clean slate: only our settings survive, plus the official marketplace's entry and enabledPlugins and pluginConfigs
+// entries from ours and it (claude plugin install writes them; strip already uninstalled the official plugins we don't use)
 // and dcg's hook while dcg stays on (its installer only reruns on a toggle change, so dropping it would disable dcg).
 export function resetSettings(settings, { dcg, ...toggles }) {
   const out = stripDefaults(mergeSettings({}, toggles));
   for (const [id, v] of Object.entries(settings.enabledPlugins ?? {})) {
     if ([MARKETPLACE, OFFICIAL].includes(marketOf(id))) out.enabledPlugins[id] = v;
+  }
+  // The plugins' options, binPath included (their secrets live in .credentials.json, which clean never touches).
+  for (const [id, v] of Object.entries(settings.pluginConfigs ?? {})) {
+    if ([MARKETPLACE, OFFICIAL].includes(marketOf(id))) (out.pluginConfigs ??= {})[id] = v;
   }
   const official = settings.extraKnownMarketplaces?.[OFFICIAL];
   if (official) out.extraKnownMarketplaces[OFFICIAL] = official;
@@ -342,19 +346,73 @@ export function missingBinaries(platform, wanted, onPath) {
   });
 }
 
-// The binaries releases ship, built per platform by .github/workflows/build-{tui-review,web-mcp}.yml and attached to the
+// The binaries releases ship, built per platform by .github/workflows/build-{tui-review,web-mcp,ado-mcp}.yml and attached to the
 // vX.Y.Z release by release.yml. plugin: which plugin needs it; key: its userConfig key for the binary's path.
 export const BIN_PLUGINS = {
   'tui-review': { name: 'tui-review', key: 'binPath' },
   'web-mcp': { name: 'web-mcp', key: 'binPath' },
+  'mcp-azure': { name: 'ado-mcp', key: 'binPath' },
 };
+
+// Plugins whose settings, token included, the installer asks for and saves itself instead of handing them off.
+export const SELF_CONFIGURED = ['mcp-azure'];
+
+// What to ask for a self-configured plugin, in manifest order; binKey is set by applyBin, not asked.
+// configuredKeys: the option names `claude plugin configure <id> --json` lists as `configured`.
+export const configPrompts = (userConfig, binKey, configuredKeys) =>
+  Object.entries(userConfig)
+    .filter(([key]) => key !== binKey)
+    .map(([key, c]) => ({
+      key,
+      title: c.title,
+      description: c.description,
+      secret: c.sensitive === true,
+      required: c.required === true,
+      saved: configuredKeys.includes(key),
+    }));
+
+// The values to save (an empty answer keeps a saved value) and the required keys still without one.
+export function configValues(prompts, answers) {
+  const values = {};
+  const missing = [];
+  for (const p of prompts) {
+    const v = (answers[p.key] ?? '').trim();
+    if (v) values[p.key] = v;
+    else if (p.required && !p.saved) missing.push(p.key);
+  }
+  return { values, missing };
+}
+
+// supported: configureSupported(). Without `configure`, a new plugin gets the handoff note and an installed one is left
+// as it is.
+export function selfConfigure({ installed, configuredKeys, requiredKeys, supported = true }) {
+  if (!supported) return installed ? 'skip' : 'handoff';
+  return installed && requiredKeys.every((k) => configuredKeys.includes(k)) ? 'skip' : 'prompt';
+}
+
+// After the prompts: a new plugin still without a required value is handed off (nothing installed); an installed one
+// keeps what was given, and the summary names its unset keys, never values.
+export function afterPrompts({ name, id, installed, missing }) {
+  if (!missing.length) return {};
+  if (!installed) return { handoff: true };
+  return { unset: `${name}: ${missing.join(', ')} not set; run /plugin configure ${id} in Claude Code` };
+}
+
+// `claude plugin configure --values-stdin` came in Claude Code 2.1.285. out: what `claude --version` printed.
+export function configureSupported(out) {
+  const v = /(\d+\.\d+\.\d+)/.exec(out ?? '')?.[1];
+  return v !== undefined && !newer('2.1.285', v);
+}
+
+// The values go over stdin as JSON, never as arguments: the token must not show up in a process list.
+export const configureArgs = (id) => ['plugin', 'configure', id, '--values-stdin'];
 // Windows and Linux x64 only: no macOS or ARM builds.
 const BIN_TARGETS = {
   'win32-x64': 'x86_64-pc-windows-msvc',
   'linux-x64': 'x86_64-unknown-linux-musl',
 };
 
-// The release archive of binary `name` ('tui-review' or 'web-mcp') at `version` for this machine, or undefined where none is built.
+// The release archive of binary `name` ('tui-review', 'web-mcp' or 'ado-mcp') at `version` for this machine, or undefined where none is built.
 export function binAsset(name, platform, arch, version) {
   const target = BIN_TARGETS[`${platform}-${arch}`];
   if (!target) return undefined;

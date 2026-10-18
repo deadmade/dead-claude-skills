@@ -1,0 +1,18 @@
+{
+  "count": 1,
+  "value": [
+    {
+      "id": 77,
+      "rev": 3,
+      "fields": {
+        "System.Title": "Login fails behind the proxy",
+        "System.WorkItemType": "Bug",
+        "System.State": "Active",
+        "System.AreaPath": "My Proj",
+        "System.TeamProject": "My Proj",
+        "System.IterationPath": "My Proj\\Sprint 12"
+      },
+      "url": "http://dev.example/tfs/Coll/_apis/wit/workItems/77"
+    }
+  ]
+}

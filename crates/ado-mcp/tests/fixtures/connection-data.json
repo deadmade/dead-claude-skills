@@ -1,0 +1,13 @@
+{
+  "authenticatedUser": {
+    "id": "7c1e4d52-93ab-4f06-b1d8-5a2f6e0c9d13",
+    "providerDisplayName": "Alice Example",
+    "isActive": true
+  },
+  "authorizedUser": {
+    "id": "7c1e4d52-93ab-4f06-b1d8-5a2f6e0c9d13",
+    "providerDisplayName": "Alice Example",
+    "isActive": true
+  },
+  "deploymentType": "onPremises"
+}

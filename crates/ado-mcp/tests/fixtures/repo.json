@@ -1,0 +1,22 @@
+{
+  "id": "3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01",
+  "name": "R",
+  "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01",
+  "project": {
+    "id": "b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455",
+    "name": "My Proj",
+    "description": "Main product.",
+    "url": "http://dev.example/tfs/Coll/_apis/projects/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455",
+    "state": "wellFormed",
+    "revision": 41,
+    "visibility": "private",
+    "lastUpdateTime": "2025-11-04T10:12:33.47Z"
+  },
+  "defaultBranch": "refs/heads/main",
+  "size": 48213,
+  "remoteUrl": "http://dev.example/tfs/Coll/My%20Proj/_git/R",
+  "sshUrl": "ssh://dev.example:22/tfs/Coll/My%20Proj/_git/R",
+  "webUrl": "http://dev.example/tfs/Coll/My%20Proj/_git/R",
+  "isDisabled": false,
+  "isInMaintenance": false
+}

@@ -1,0 +1,11 @@
+2026-03-05T10:00:20.0000000Z ##[section]Starting: Run tests
+2026-03-05T10:00:21.0001234Z ##[group]Task         : Command line
+2026-03-05T10:00:22.0002468Z Version      : 2.212.0
+2026-03-05T10:00:23.0003702Z ##[endgroup]
+2026-03-05T10:00:24.0004936Z ##[command]cargo test
+2026-03-05T10:00:25.0006170Z [32mrunning 3 tests[0m
+2026-03-05T10:00:26.0007404Z test a ... ok
+2026-03-05T10:00:27.0008638Z [1;31mthread 'b' panicked at src/lib.rs:4[0m
+2026-03-05T10:00:28.0009872Z ##[warning]slow test
+2026-03-05T10:00:29.0011106Z ##[error]boom
+2026-03-05T10:00:20.0012340Z ##[section]Finishing: Run tests

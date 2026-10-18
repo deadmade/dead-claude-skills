@@ -1,0 +1,229 @@
+{
+  "count": 3,
+  "value": [
+    {
+      "pullRequestId": 412,
+      "codeReviewId": 1412,
+      "status": "active",
+      "isDraft": false,
+      "title": "Retry login on timeout",
+      "description": "Retries the login twice.\n\nSecond paragraph.",
+      "createdBy": {
+        "displayName": "Alice Example",
+        "id": "7c1e4d52-93ab-4f06-b1d8-5a2f6e0c9d13",
+        "uniqueName": "alice@example.com",
+        "url": "http://dev.example/tfs/Coll/_apis/Identities/7c1e4d52-93ab-4f06-b1d8-5a2f6e0c9d13",
+        "imageUrl": "http://dev.example/tfs/Coll/_api/_common/identityImage?id=7c1e4d52-93ab-4f06-b1d8-5a2f6e0c9d13"
+      },
+      "creationDate": "2026-03-02T09:30:11.123Z",
+      "sourceRefName": "refs/heads/feature/login-retry",
+      "targetRefName": "refs/heads/main",
+      "mergeStatus": "succeeded",
+      "repository": {
+        "id": "3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01",
+        "name": "R",
+        "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01",
+        "project": {
+          "id": "b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455",
+          "name": "My Proj",
+          "description": "Main product.",
+          "url": "http://dev.example/tfs/Coll/_apis/projects/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455",
+          "state": "wellFormed",
+          "revision": 41,
+          "visibility": "private",
+          "lastUpdateTime": "2025-11-04T10:12:33.47Z"
+        },
+        "defaultBranch": "refs/heads/main",
+        "size": 48213,
+        "remoteUrl": "http://dev.example/tfs/Coll/My%20Proj/_git/R",
+        "sshUrl": "ssh://dev.example:22/tfs/Coll/My%20Proj/_git/R",
+        "webUrl": "http://dev.example/tfs/Coll/My%20Proj/_git/R",
+        "isDisabled": false,
+        "isInMaintenance": false
+      },
+      "reviewers": [
+        {
+          "displayName": "J. Doe",
+          "id": "2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22",
+          "uniqueName": "j.@example.com",
+          "url": "http://dev.example/tfs/Coll/_apis/Identities/2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22",
+          "imageUrl": "http://dev.example/tfs/Coll/_api/_common/identityImage?id=2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22",
+          "vote": 10,
+          "isRequired": true,
+          "reviewerUrl": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/pullRequests/412/reviewers/2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22",
+          "hasDeclined": false,
+          "isFlagged": false
+        },
+        {
+          "displayName": "K. Roe",
+          "id": "2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a23",
+          "uniqueName": "k.@example.com",
+          "url": "http://dev.example/tfs/Coll/_apis/Identities/2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a23",
+          "imageUrl": "http://dev.example/tfs/Coll/_api/_common/identityImage?id=2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a23",
+          "vote": 0,
+          "isRequired": false,
+          "reviewerUrl": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/pullRequests/412/reviewers/2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a23",
+          "hasDeclined": false,
+          "isFlagged": false
+        }
+      ],
+      "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/pullRequests/412",
+      "_links": {
+        "self": {
+          "href": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/pullRequests/412"
+        }
+      },
+      "supportsIterations": true,
+      "artifactId": "vstfs:///Git/PullRequestId/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455%2f3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01%2f412",
+      "lastMergeSourceCommit": {
+        "commitId": "9b1f3c2a7d4e5f60718293a4b5c6d7e8f9a0b1c2",
+        "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/commits/9b1f3c2a7d4e5f60718293a4b5c6d7e8f9a0b1c2"
+      },
+      "lastMergeTargetCommit": {
+        "commitId": "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d",
+        "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/commits/1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d"
+      }
+    },
+    {
+      "pullRequestId": 409,
+      "codeReviewId": 1409,
+      "status": "active",
+      "isDraft": true,
+      "title": "Draft: new parser",
+      "description": "Retries the login twice.\n\nSecond paragraph.",
+      "createdBy": {
+        "displayName": "Bob Builder",
+        "id": "7c1e4d52-93ab-4f06-b1d8-5a2f6e0c9d13",
+        "uniqueName": "bob@example.com",
+        "url": "http://dev.example/tfs/Coll/_apis/Identities/7c1e4d52-93ab-4f06-b1d8-5a2f6e0c9d13",
+        "imageUrl": "http://dev.example/tfs/Coll/_api/_common/identityImage?id=7c1e4d52-93ab-4f06-b1d8-5a2f6e0c9d13"
+      },
+      "creationDate": "2026-03-02T09:30:11.123Z",
+      "sourceRefName": "refs/heads/feature/parser",
+      "targetRefName": "refs/heads/main",
+      "mergeStatus": "succeeded",
+      "repository": {
+        "id": "3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01",
+        "name": "R",
+        "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01",
+        "project": {
+          "id": "b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455",
+          "name": "My Proj",
+          "description": "Main product.",
+          "url": "http://dev.example/tfs/Coll/_apis/projects/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455",
+          "state": "wellFormed",
+          "revision": 41,
+          "visibility": "private",
+          "lastUpdateTime": "2025-11-04T10:12:33.47Z"
+        },
+        "defaultBranch": "refs/heads/main",
+        "size": 48213,
+        "remoteUrl": "http://dev.example/tfs/Coll/My%20Proj/_git/R",
+        "sshUrl": "ssh://dev.example:22/tfs/Coll/My%20Proj/_git/R",
+        "webUrl": "http://dev.example/tfs/Coll/My%20Proj/_git/R",
+        "isDisabled": false,
+        "isInMaintenance": false
+      },
+      "reviewers": [
+        {
+          "displayName": "J. Doe",
+          "id": "2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22",
+          "uniqueName": "j.@example.com",
+          "url": "http://dev.example/tfs/Coll/_apis/Identities/2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22",
+          "imageUrl": "http://dev.example/tfs/Coll/_api/_common/identityImage?id=2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22",
+          "vote": -10,
+          "isRequired": false,
+          "reviewerUrl": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/pullRequests/409/reviewers/2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a22",
+          "hasDeclined": false,
+          "isFlagged": false
+        },
+        {
+          "displayName": "K. Roe",
+          "id": "2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a23",
+          "uniqueName": "k.@example.com",
+          "url": "http://dev.example/tfs/Coll/_apis/Identities/2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a23",
+          "imageUrl": "http://dev.example/tfs/Coll/_api/_common/identityImage?id=2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a23",
+          "vote": 5,
+          "isRequired": false,
+          "reviewerUrl": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/pullRequests/409/reviewers/2d9e7b10-5f21-4c8a-a0b3-9c4e1d6f7a23",
+          "hasDeclined": false,
+          "isFlagged": false
+        }
+      ],
+      "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/pullRequests/409",
+      "_links": {
+        "self": {
+          "href": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/pullRequests/409"
+        }
+      },
+      "supportsIterations": true,
+      "artifactId": "vstfs:///Git/PullRequestId/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455%2f3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01%2f409",
+      "lastMergeSourceCommit": {
+        "commitId": "9b1f3c2a7d4e5f60718293a4b5c6d7e8f9a0b1c2",
+        "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/commits/9b1f3c2a7d4e5f60718293a4b5c6d7e8f9a0b1c2"
+      },
+      "lastMergeTargetCommit": {
+        "commitId": "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d",
+        "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/commits/1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d"
+      }
+    },
+    {
+      "pullRequestId": 405,
+      "codeReviewId": 1405,
+      "status": "active",
+      "isDraft": false,
+      "title": "Docs fix",
+      "description": "Retries the login twice.\n\nSecond paragraph.",
+      "createdBy": {
+        "displayName": "Alice Example",
+        "id": "7c1e4d52-93ab-4f06-b1d8-5a2f6e0c9d13",
+        "uniqueName": "alice@example.com",
+        "url": "http://dev.example/tfs/Coll/_apis/Identities/7c1e4d52-93ab-4f06-b1d8-5a2f6e0c9d13",
+        "imageUrl": "http://dev.example/tfs/Coll/_api/_common/identityImage?id=7c1e4d52-93ab-4f06-b1d8-5a2f6e0c9d13"
+      },
+      "creationDate": "2026-03-02T09:30:11.123Z",
+      "sourceRefName": "refs/heads/docs/fix",
+      "targetRefName": "refs/heads/main",
+      "mergeStatus": "succeeded",
+      "repository": {
+        "id": "3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01",
+        "name": "R",
+        "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01",
+        "project": {
+          "id": "b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455",
+          "name": "My Proj",
+          "description": "Main product.",
+          "url": "http://dev.example/tfs/Coll/_apis/projects/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455",
+          "state": "wellFormed",
+          "revision": 41,
+          "visibility": "private",
+          "lastUpdateTime": "2025-11-04T10:12:33.47Z"
+        },
+        "defaultBranch": "refs/heads/main",
+        "size": 48213,
+        "remoteUrl": "http://dev.example/tfs/Coll/My%20Proj/_git/R",
+        "sshUrl": "ssh://dev.example:22/tfs/Coll/My%20Proj/_git/R",
+        "webUrl": "http://dev.example/tfs/Coll/My%20Proj/_git/R",
+        "isDisabled": false,
+        "isInMaintenance": false
+      },
+      "reviewers": [],
+      "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/pullRequests/405",
+      "_links": {
+        "self": {
+          "href": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/pullRequests/405"
+        }
+      },
+      "supportsIterations": true,
+      "artifactId": "vstfs:///Git/PullRequestId/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455%2f3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01%2f405",
+      "lastMergeSourceCommit": {
+        "commitId": "9b1f3c2a7d4e5f60718293a4b5c6d7e8f9a0b1c2",
+        "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/commits/9b1f3c2a7d4e5f60718293a4b5c6d7e8f9a0b1c2"
+      },
+      "lastMergeTargetCommit": {
+        "commitId": "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d",
+        "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/commits/1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d"
+      }
+    }
+  ]
+}

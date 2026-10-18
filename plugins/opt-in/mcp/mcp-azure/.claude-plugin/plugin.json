@@ -1,7 +1,7 @@
 {
   "name": "mcp-azure",
   "version": "0.4.0",
-  "description": "Azure DevOps Server MCP server (self-hosted, PAT auth). Opt-in per machine; configure with /plugin configure.",
+  "description": "Azure DevOps Server tools for Claude: pull requests, work items and YAML pipelines, through the ado-mcp binary (self-hosted, PAT auth). Writes always ask first.",
   "author": {
     "name": "deadmade",
     "url": "https://github.com/deadmade"
@@ -17,7 +17,7 @@
     "ado_pat": {
       "type": "string",
       "title": "Azure DevOps personal access token",
-      "description": "PAT with Code (Read), Work Items (Read & Write), Build (Read), Wiki (Read).",
+      "description": "PAT with Code (Read & Write), Work Items (Read & Write), Build (Read & Execute), Project and Team (Read).",
       "sensitive": true,
       "required": true
     },
@@ -27,12 +27,11 @@
       "description": "Optional. Project used when a request doesn't name one.",
       "default": ""
     },
-    "ado_api_version": {
+    "binPath": {
       "type": "string",
-      "title": "Azure DevOps REST API version",
-      "description": "Highest version your server supports: Server 2022 = 7.0, 2020 = 6.0, 2019 = 5.0, Services = 7.1.",
-      "default": "7.0",
-      "options": ["7.1", "7.0", "6.0", "5.0"]
+      "title": "ado-mcp binary",
+      "description": "Path to the ado-mcp binary. Default: ado-mcp on PATH.",
+      "default": "ado-mcp"
     }
   }
 }

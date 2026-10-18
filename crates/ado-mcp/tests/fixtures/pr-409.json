@@ -1,0 +1,9 @@
+{
+  "$id": "1",
+  "innerException": null,
+  "message": "TF401179: An active pull request for the source and target branch already exists.",
+  "typeName": "Microsoft.TeamFoundation.Git.Server.GitPullRequestExistsException, Microsoft.TeamFoundation.Git.Server",
+  "typeKey": "GitPullRequestExistsException",
+  "errorCode": 0,
+  "eventId": 3000
+}

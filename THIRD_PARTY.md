@@ -19,12 +19,10 @@ note under the title covers leftover mentions, the frontmatter `description` is 
 Agent Skills" section is removed.
 The synced upstream commit is in `skills/paper-lookup/UPSTREAM`.
 
-## MCP servers (dead-skills, mcp-github, mcp-azure)
+## MCP servers (dead-skills, mcp-github)
 
 - **Context7**: hosted service by Upstash (https://context7.com), used over HTTP; nothing vendored.
 - **GitHub MCP server**: hosted by GitHub (https://github.com/github/github-mcp-server), used over HTTP; nothing vendored.
-- **@tiberriver256/mcp-server-azure-devops**: MIT, https://github.com/Tiberriver256/mcp-server-azure-devops.
-  Fetched at runtime with `npx` at a pinned version; not vendored.
 
 ## mattpocock-picks
 

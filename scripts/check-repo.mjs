@@ -73,6 +73,7 @@ for (const dir of pluginDirs) {
 const CRATES = [
   { cargo: 'crates/tui-review/Cargo.toml', lock: 'crates/tui-review/Cargo.lock', name: 'tui-review' },
   { cargo: 'crates/web-mcp/Cargo.toml', lock: 'crates/web-mcp/Cargo.lock', name: 'web-mcp' },
+  { cargo: 'crates/ado-mcp/Cargo.toml', lock: 'crates/ado-mcp/Cargo.lock', name: 'ado-mcp' },
 ];
 for (const { cargo, lock, name } of CRATES) {
   const crate = /^version = "(.*)"/m.exec(readFileSync(cargo, 'utf8'))?.[1];

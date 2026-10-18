@@ -53,7 +53,7 @@
     },
     {
       "name": "mcp-azure",
-      "description": "Azure DevOps Server MCP server (self-hosted, PAT). Opt-in per machine, configure with /plugin configure.",
+      "description": "Azure DevOps Server tools for Claude: pull requests, work items and YAML pipelines, through the ado-mcp binary (self-hosted, PAT auth). Writes always ask first. Opt-in.",
       "source": "./plugins/opt-in/mcp/mcp-azure",
       "category": "productivity"
     },

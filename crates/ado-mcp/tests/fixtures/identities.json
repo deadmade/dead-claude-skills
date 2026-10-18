@@ -1,0 +1,51 @@
+{
+  "count": 2,
+  "value": [
+    {
+      "id": "1a2b3c4d-0001-4000-8000-000000000001",
+      "providerDisplayName": "Bob Builder",
+      "isActive": true,
+      "descriptor": "Microsoft.TeamFoundation.Identity;S-1-5-21-1004336348-1177238915-682003330-1100",
+      "subjectDescriptor": "win.Uy0xLTUtMjEtMTAwNDMzNjM0OC0xMTc3MjM4OTE1LTY4MjAwMzMzMC0x0",
+      "isContainer": false,
+      "members": [],
+      "memberOf": [],
+      "memberIds": [],
+      "resourceVersion": 2,
+      "metaTypeId": 0,
+      "properties": {
+        "Account": {
+          "$type": "System.String",
+          "$value": "bob"
+        },
+        "SchemaClassName": {
+          "$type": "System.String",
+          "$value": "User"
+        }
+      }
+    },
+    {
+      "id": "1a2b3c4d-0002-4000-8000-000000000002",
+      "providerDisplayName": "Bobby Tables",
+      "isActive": true,
+      "descriptor": "Microsoft.TeamFoundation.Identity;S-1-5-21-1004336348-1177238915-682003330-1101",
+      "subjectDescriptor": "win.Uy0xLTUtMjEtMTAwNDMzNjM0OC0xMTc3MjM4OTE1LTY4MjAwMzMzMC0x1",
+      "isContainer": false,
+      "members": [],
+      "memberOf": [],
+      "memberIds": [],
+      "resourceVersion": 2,
+      "metaTypeId": 0,
+      "properties": {
+        "Account": {
+          "$type": "System.String",
+          "$value": "bobby"
+        },
+        "SchemaClassName": {
+          "$type": "System.String",
+          "$value": "User"
+        }
+      }
+    }
+  ]
+}

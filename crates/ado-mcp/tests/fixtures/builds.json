@@ -1,0 +1,173 @@
+{
+  "count": 2,
+  "value": [
+    {
+      "id": 1001,
+      "buildNumber": "20260305.1",
+      "status": "completed",
+      "result": "failed",
+      "queueTime": "2026-03-05T10:00:00.1Z",
+      "finishTime": "2026-03-05T10:05:00Z",
+      "definition": {
+        "id": 12,
+        "name": "CI",
+        "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/build/Definitions/12?revision=7",
+        "uri": "vstfs:///Build/Definition/12",
+        "path": "\\Build",
+        "type": "build",
+        "queueStatus": "enabled",
+        "revision": 7,
+        "project": {
+          "id": "b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455",
+          "name": "My Proj",
+          "description": "Main product.",
+          "url": "http://dev.example/tfs/Coll/_apis/projects/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455",
+          "state": "wellFormed",
+          "revision": 41,
+          "visibility": "private",
+          "lastUpdateTime": "2025-11-04T10:12:33.47Z"
+        }
+      },
+      "_links": {
+        "self": {
+          "href": "http://dev.example/tfs/Coll/_apis/build/Builds/1001"
+        }
+      },
+      "url": "http://dev.example/tfs/Coll/_apis/build/Builds/1001",
+      "project": {
+        "id": "b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455",
+        "name": "My Proj",
+        "description": "Main product.",
+        "url": "http://dev.example/tfs/Coll/_apis/projects/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455",
+        "state": "wellFormed",
+        "revision": 41,
+        "visibility": "private",
+        "lastUpdateTime": "2025-11-04T10:12:33.47Z"
+      },
+      "uri": "vstfs:///Build/Build/1001",
+      "sourceBranch": "refs/pull/412/merge",
+      "sourceVersion": "5d6c7b8a9f0e1d2c3b4a59687706f5e4d3c2b1a0",
+      "priority": "normal",
+      "reason": "pullRequest",
+      "startTime": "2026-03-05T10:00:05Z",
+      "keepForever": false,
+      "retainedByRelease": false,
+      "queue": {
+        "id": 3,
+        "name": "Default",
+        "pool": {
+          "id": 1,
+          "name": "Default"
+        }
+      },
+      "requestedFor": {
+        "displayName": "Alice Example",
+        "id": "7c1e4d52-93ab-4f06-b1d8-5a2f6e0c9d13",
+        "uniqueName": "alice@example.com",
+        "url": "http://dev.example/tfs/Coll/_apis/Identities/7c1e4d52-93ab-4f06-b1d8-5a2f6e0c9d13"
+      },
+      "logs": {
+        "id": 0,
+        "type": "Container",
+        "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/build/builds/1001/logs"
+      },
+      "repository": {
+        "id": "3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01",
+        "type": "TfsGit",
+        "name": "R",
+        "clean": null,
+        "checkoutSubmodules": false
+      },
+      "tags": [],
+      "validationResults": [],
+      "plans": [
+        {
+          "planId": "6b2e4a10-8c3d-4f5e-9a7b-1c2d3e4f5a6b"
+        }
+      ]
+    },
+    {
+      "id": 1000,
+      "buildNumber": "20260305.0",
+      "status": "inProgress",
+      "queueTime": "2026-03-05T09:50:00Z",
+      "definition": {
+        "id": 12,
+        "name": "CI",
+        "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/build/Definitions/12?revision=7",
+        "uri": "vstfs:///Build/Definition/12",
+        "path": "\\Build",
+        "type": "build",
+        "queueStatus": "enabled",
+        "revision": 7,
+        "project": {
+          "id": "b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455",
+          "name": "My Proj",
+          "description": "Main product.",
+          "url": "http://dev.example/tfs/Coll/_apis/projects/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455",
+          "state": "wellFormed",
+          "revision": 41,
+          "visibility": "private",
+          "lastUpdateTime": "2025-11-04T10:12:33.47Z"
+        }
+      },
+      "_links": {
+        "self": {
+          "href": "http://dev.example/tfs/Coll/_apis/build/Builds/1000"
+        }
+      },
+      "url": "http://dev.example/tfs/Coll/_apis/build/Builds/1000",
+      "project": {
+        "id": "b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455",
+        "name": "My Proj",
+        "description": "Main product.",
+        "url": "http://dev.example/tfs/Coll/_apis/projects/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455",
+        "state": "wellFormed",
+        "revision": 41,
+        "visibility": "private",
+        "lastUpdateTime": "2025-11-04T10:12:33.47Z"
+      },
+      "uri": "vstfs:///Build/Build/1000",
+      "sourceBranch": "refs/heads/main",
+      "sourceVersion": "5d6c7b8a9f0e1d2c3b4a59687706f5e4d3c2b1a0",
+      "priority": "normal",
+      "reason": "individualCI",
+      "startTime": "2026-03-05T09:50:04Z",
+      "keepForever": false,
+      "retainedByRelease": false,
+      "queue": {
+        "id": 3,
+        "name": "Default",
+        "pool": {
+          "id": 1,
+          "name": "Default"
+        }
+      },
+      "requestedFor": {
+        "displayName": "Alice Example",
+        "id": "7c1e4d52-93ab-4f06-b1d8-5a2f6e0c9d13",
+        "uniqueName": "alice@example.com",
+        "url": "http://dev.example/tfs/Coll/_apis/Identities/7c1e4d52-93ab-4f06-b1d8-5a2f6e0c9d13"
+      },
+      "logs": {
+        "id": 0,
+        "type": "Container",
+        "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/build/builds/1000/logs"
+      },
+      "repository": {
+        "id": "3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01",
+        "type": "TfsGit",
+        "name": "R",
+        "clean": null,
+        "checkoutSubmodules": false
+      },
+      "tags": [],
+      "validationResults": [],
+      "plans": [
+        {
+          "planId": "6b2e4a10-8c3d-4f5e-9a7b-1c2d3e4f5a6b"
+        }
+      ]
+    }
+  ]
+}
