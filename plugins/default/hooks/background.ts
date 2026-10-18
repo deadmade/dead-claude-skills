@@ -15,15 +15,19 @@ while [ "$p" -gt 1 ]; do
 done
 exit 1`;
 
-// Windows: no /dev/pts; CONOUT$ is the console the child shares with Claude, even with stdout piped. Opened through
-// CreateFileW because .NET's FileStream won't open device names.
-export const PS = `$sig = '[DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Unicode)] public static extern IntPtr CreateFileW(string n, uint a, uint s, IntPtr p, uint c, uint f, IntPtr t);'
+// Windows: no /dev/pts. The engine starts the child hidden (windowsHide), which gives it a new console of its own, so
+// it swaps that for its parent's (Claude's) before opening CONOUT$, and lets go again so its own exit leaves Claude's
+// console alone. CONOUT$ is opened through CreateFileW because .NET's FileStream won't open device names. One line per
+// statement: `-Command -` runs stdin line by line.
+export const PS = `$sig = '[DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Unicode)] public static extern IntPtr CreateFileW(string n, uint a, uint s, IntPtr p, uint c, uint f, IntPtr t); [DllImport("kernel32.dll")] public static extern bool FreeConsole(); [DllImport("kernel32.dll")] public static extern bool AttachConsole(int p);'
 $k = Add-Type -MemberDefinition $sig -Name K -Namespace NightBg -PassThru
+$null = $k::FreeConsole()
+if (-not $k::AttachConsole(-1)) { exit 1 }
 $h = $k::CreateFileW('CONOUT$', 0x40000000, 3, [IntPtr]::Zero, 3, 0, [IntPtr]::Zero)
-if ($h -eq [IntPtr](-1)) { exit 1 }
+if ($h -eq [IntPtr](-1)) { $null = $k::FreeConsole(); exit 1 }
 $fs = New-Object IO.FileStream((New-Object Microsoft.Win32.SafeHandles.SafeFileHandle($h, $true)), [IO.FileAccess]::Write)
 $b = [Text.Encoding]::ASCII.GetBytes([string][char]27 + $env:NIGHT_CITY_OSC + [char]7)
-$fs.Write($b, 0, $b.Length); $fs.Close()`;
+$fs.Write($b, 0, $b.Length); $fs.Close(); $null = $k::FreeConsole()`;
 
 // Absolute paths: a bare name is looked up in the session's working directory first on Windows, so a project could
 // plant its own `sh.exe` or `powershell.exe`.
@@ -35,8 +39,7 @@ export const PS_PATH = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershe
 export const isNightCity = (theme: unknown) => typeof theme === 'string' && theme.endsWith(':night-city');
 
 // Mods have no platform API: try the POSIX route, fall back to PowerShell when sh is missing or finds no tty.
-// shortcut: a crash or kill skips the reset and the terminal keeps the color until `printf '\033]111\007'`; Windows
-// Terminal may ignore OSC 111 (untested), then send the original color back with OSC 11 instead.
+// shortcut: a crash or kill skips the reset and the terminal keeps the color until `printf '\033]111\007'`.
 export async function paint($: $, osc: string): Promise<boolean> {
   try {
     if ((await $.process.run([SH_PATH, '-c', SH, 'sh', osc])).exitCode === 0) return true;
