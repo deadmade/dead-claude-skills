@@ -2,7 +2,7 @@
 phase: ground
 ---
 
-# ado CLI: flow
+# ado MCP server: flow
 
 ## Request
 
@@ -75,6 +75,56 @@ Shipping a third binary follows web-mcp's path:
 
 ## Prior art
 
+Report from the prior-art agent, 2026-10-18; every source was fetched in that run.
+
+- **`az devops` refuses Azure DevOps Server outright.** Since extension 1.0.6, `resolve_instance_project_and_repo`
+  raises "doesn't support Azure DevOps Server"
+  ([services.py](https://raw.githubusercontent.com/Azure/azure-devops-cli-extension/master/azure-devops/azext_devops/dev/common/services.py),
+  [#1172](https://github.com/Azure/azure-devops-cli-extension/issues/1172)).
+  - Worth copying: it resolves a git remote with `GET {remoteUrl}/vsts/info` (header
+    `X-TFS-FedAuthRedirect: Suppress`). The answer gives the server URL, project id and repo id, which settles where
+    the collection ends in URLs like `/tfs/Coll/…`.
+  - It caches that answer per remote.
+- **gh, glab, tea.**
+  - Remote parsing: scp-style `host:path` becomes `ssh://`; with several remotes, `upstream` beats `origin`.
+  - Tokens go to the OS keyring, with environment variables overriding.
+  - Output when stdout isn't a terminal: tables without headers
+    ([go-gh table.go](https://raw.githubusercontent.com/cli/go-gh/trunk/pkg/tableprinter/table.go)).
+- **azdocli (Rust, community).** Works on-prem, PAT encrypted with DPAPI on Windows. No remote inference, and its
+  output uses emoji. Not a base to fork.
+- **REST facts at 7.1, from the Server docs.**
+  - **Threads.**
+    - `commentType` is `text|codeChange|system`.
+    - System threads carry a `CodeReviewThreadType` property (`VoteUpdate`, `ReviewersUpdate`, `RefUpdate`,
+      `MergeAttempt`).
+    - Thread status is `active|fixed|wontFix|closed|byDesign|pending`.
+  - **PR update.**
+    - `mergeStrategy` is `noFastForward|squash|rebase|rebaseMerge`.
+    - A description holds at most 4000 characters.
+    - Votes are 10, 5, 0, -5 or -10, set by PUT on the reviewer.
+  - **Policy evaluations.** They need `7.1-preview.1`, and their `artifactId` is
+    `vstfs:///CodeReview/CodeReviewId/{projectId}/{prId}`, not the PR's own artifactId.
+  - **Work items.**
+    - Updates are JSON Patch (`application/json-patch+json`), with `test /rev` for optimistic locking.
+    - A batch get takes at most 200 ids, and WIQL is a POST.
+    - Comments need `7.1-preview.4` and page with a `continuationToken`.
+  - **Builds.**
+    - Failures are found in the timeline: records with `result=failed`, their `issues[]` and `log.id`.
+    - Logs take `startLine`/`endLine`.
+    - The continuation token comes back in the `X-MS-ContinuationToken` header (per the official Python SDK).
+  - **Runs.** POST `_apis/pipelines/{id}/runs`.
+- **Pitfalls.**
+  - PAT authentication fails on Server if IIS Basic Authentication is turned on.
+  - Project names with spaces break tools that percent-encode only part of the path. Decode the remote once, then
+    use the ids from `/vsts/info`.
+  - The documented PAT write scopes look incomplete; test them against a real minimal PAT.
+  - On Windows, rustls-platform-verifier checks revocation.
+- **Approaches.**
+  - **Hand-rolled REST over reqwest** (gh, glab, tea): fits.
+  - **Generated SDK:** async, Services-first, more lookups.
+  - **Wrapping `az`:** blocked on Server.
+  - **Forking azdocli:** wrong output style.
+
 ## Options
 
 Settled in the chat before this flow started (the user's words in quotes):
@@ -91,5 +141,11 @@ Settled in the chat before this flow started (the user's words in quotes):
 - Read and write, "like gh".
 - Windows first ("windows primarly"): PAT in Windows Credential Manager, file on Linux, `ADO_PAT` override (proposal).
 - The user tests against the real server at work once a build exists.
+- **Interface: B, an MCP server only** ("B pls, goal is for claude I can use the ui"), picked 2026-10-18.
+  - Rejected: A, a CLI only, which would need a binary path, Bash permission rules and Windows shell quoting.
+  - Rejected: C, a CLI and MCP from one binary.
+  - With B, the PAT is a `sensitive` userConfig value, which Claude Code keeps in the platform's secure credential
+    store (manifest-reference, "Where values are stored"). So the server needs no credential code of its own, and
+    the earlier `ado auth login` and Credential Manager proposal is dropped.
 - TLS: the work browser shows the server's certificate as issued by ESET, i.e. ESET's HTTPS scanning re-signs traffic
   with a root it installed in the Windows store. So `ado` must trust the OS certificate store, not a bundled root list.
