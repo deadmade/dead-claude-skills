@@ -14,8 +14,7 @@ use serde_json::{Value, json};
 
 use crate::api::ApiError;
 use crate::ctx::{Ctx, given, seg};
-use crate::out::{DESC_MAX, clip, cut, html_to_text, more};
-use crate::pr::unexpected;
+use crate::out::{DESC_MAX, args, clip, cut, html_to_text, more};
 
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "schemars")]
@@ -24,7 +23,8 @@ pub(crate) struct WiViewArgs {
     pub project: Option<String>,
     /// Work item id.
     pub id: u32,
-    /// Show the whole description, acceptance criteria and comments instead of the first 4000 characters.
+    /// Show the whole description, acceptance criteria and comments instead of the first 4000 characters, and up
+    /// to 200 comments instead of the last 5.
     pub full: Option<bool>,
 }
 
@@ -128,17 +128,14 @@ fn links(w: &WorkItem, mark: char, rel: &str, needle: &str) -> String {
     ids.join(", ")
 }
 
-/// Rich text as plain text, cut after the conversion so the cut counts readable characters.
-fn text(html: &str, full: bool, id: i32) -> String {
+/// Rich text as plain text, cut after the conversion so the cut counts readable characters; `whole` is the call
+/// that shows it all.
+fn text(html: &str, full: bool, whole: &str) -> String {
     let t = html_to_text(html);
-    if full {
-        t
-    } else {
-        clip(&t, DESC_MAX, &format!("wi_view id={id} full=true"))
-    }
+    if full { t } else { clip(&t, DESC_MAX, whole) }
 }
 
-fn comments(list: &CommentList, full: bool, id: i32) -> String {
+fn comments(list: &CommentList, full: bool, whole: &str) -> String {
     let mut out = String::from("comments:");
     for c in &list.comments {
         let date = c
@@ -148,7 +145,7 @@ fn comments(list: &CommentList, full: bool, id: i32) -> String {
             .created_by
             .as_ref()
             .and_then(|a| a.graph_subject_base.display_name.as_deref());
-        let body = text(c.text.as_deref().unwrap_or_default(), full, id);
+        let body = text(c.text.as_deref().unwrap_or_default(), full, whole);
         let _ = write!(
             out,
             "\n  {date} {}: {}",
@@ -158,8 +155,11 @@ fn comments(list: &CommentList, full: bool, id: i32) -> String {
     }
     let total = usize::try_from(list.total_count.unwrap_or_default()).unwrap_or_default();
     let older = total.saturating_sub(list.comments.len());
-    if older > 0 {
+    // A `full` call fetched the most it can: there is no bigger call to name.
+    if older > 0 && full {
         let _ = write!(out, "\n  … {older} older comments");
+    } else if older > 0 {
+        let _ = write!(out, "\n  … {older} older comments: {whole}");
     }
     out
 }
@@ -170,6 +170,11 @@ pub(crate) async fn wi_view(ctx: &Ctx, a: &WiViewArgs) -> Result<String, ApiErro
     let id = a.id;
     let num = wi_id(id)?;
     let full = a.full == Some(true);
+    let whole = format!(
+        "wi_view id={id}{} full=true",
+        args(&[("project", a.project.as_deref())])
+    );
+    let top = if full { 200 } else { 5 };
     let scope = ctx.scope(a.project.as_deref(), None, None).await?;
     let (api, proj) = (&ctx.api, seg(&scope.project_id));
     let comments_in = |proj: String| async move {
@@ -177,7 +182,7 @@ pub(crate) async fn wi_view(ctx: &Ctx, a: &WiViewArgs) -> Result<String, ApiErro
             api.wit
                 .comments_client()
                 .get_comments(&api.org, &proj, num)
-                .top(5)
+                .top(top)
                 .order(CommentSortOrder::Desc)
                 .into_future()
         })
@@ -232,14 +237,17 @@ pub(crate) async fn wi_view(ctx: &Ctx, a: &WiViewArgs) -> Result<String, ApiErro
         ),
     ] {
         let html = item.fields.get(f).and_then(Value::as_str);
-        if let Some(t) = html.map(|h| text(h, full, num)).filter(|t| !t.is_empty()) {
+        if let Some(t) = html
+            .map(|h| text(h, full, &whole))
+            .filter(|t| !t.is_empty())
+        {
             let _ = write!(out, "\n\n{label}{t}");
         }
     }
     match notes {
         Ok(list) if list.comments.is_empty() => {}
         Ok(list) => {
-            let _ = write!(out, "\n\n{}", comments(&list, full, num));
+            let _ = write!(out, "\n\n{}", comments(&list, full, &whole));
         }
         Err(e) => {
             let _ = write!(out, "\n\ncomments: unavailable ({e})");
@@ -286,22 +294,13 @@ fn next_call(a: &WiQueryArgs, limit: usize) -> String {
     if given(a.wiql.as_deref()).is_some() {
         call.push_str(" (the same wiql)");
     }
-    let args = [
-        ("project", &a.project),
-        ("assigned", &a.assigned),
-        ("state", &a.state),
-        ("type", &a.r#type),
-        ("title", &a.title),
-    ];
-    for (k, v) in args {
-        if let Some(v) = given(v.as_deref()) {
-            if v.contains(' ') {
-                let _ = write!(call, " {k}=\"{v}\"");
-            } else {
-                let _ = write!(call, " {k}={v}");
-            }
-        }
-    }
+    call += &args(&[
+        ("project", a.project.as_deref()),
+        ("assigned", a.assigned.as_deref()),
+        ("state", a.state.as_deref()),
+        ("type", a.r#type.as_deref()),
+        ("title", a.title.as_deref()),
+    ]);
     let _ = write!(call, " limit={}", limit * 2);
     call
 }
@@ -375,7 +374,7 @@ pub(crate) async fn wi_query(ctx: &Ctx, a: &WiQueryArgs) -> Result<String, ApiEr
             .await?
             .into_raw_response()
             .into_body();
-        let batch: Batch = serde_json::from_slice(&raw).map_err(|e| unexpected(&e))?;
+        let batch: Batch = serde_json::from_slice(&raw).map_err(|e| ApiError::unreadable(&e))?;
         items.extend(batch.value.into_iter().flatten());
     }
     // The batch needn't answer in the order asked; the query's order is the one that counts.

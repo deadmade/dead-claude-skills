@@ -18,7 +18,7 @@ use serde_json::{Map, Value};
 
 use crate::api::{ApiError, V71_PREVIEW};
 use crate::ctx::{Ctx, Scope, given, seg};
-use crate::out::{DESC_MAX, clip, cut, more, ref_name};
+use crate::out::{DESC_MAX, args, clip, cut, full_ref, more, ref_name};
 
 /// Where a tool works; all three default to the clone the server runs in.
 #[derive(Deserialize, JsonSchema)]
@@ -71,6 +71,8 @@ pub(crate) struct PrThreadsArgs {
     pub id: Option<u32>,
     /// Also show resolved threads.
     pub all: Option<bool>,
+    /// Show whole comments instead of the first 2000 characters of each.
+    pub full: Option<bool>,
     /// How many threads to show. Default 20.
     pub limit: Option<usize>,
 }
@@ -98,6 +100,14 @@ impl Where {
     }
 }
 
+/// ` project=… repo=…` as given: a call by id must name the same repo.
+fn scope_args(at: &Where) -> String {
+    args(&[
+        ("project", at.project.as_deref()),
+        ("repo", at.repo.as_deref()),
+    ])
+}
+
 /// The scope's repo id and project id, as path segments.
 fn ids(s: &Scope) -> Result<(String, String), ApiError> {
     Ok((seg(repo_id(s)?), seg(&s.project_id)))
@@ -109,15 +119,6 @@ fn repo_id(s: &Scope) -> Result<&str, ApiError> {
             "no repo: pass repo, or open Claude Code in a clone of an Azure DevOps repo",
         )
     })
-}
-
-/// `refs/heads/{branch}`, unless it already is a ref.
-pub(crate) fn full_ref(branch: &str) -> String {
-    if branch.starts_with("refs/") {
-        branch.to_owned()
-    } else {
-        format!("refs/heads/{branch}")
-    }
 }
 
 fn name(i: &IdentityRef) -> &str {
@@ -226,7 +227,16 @@ pub(crate) async fn pr_list(ctx: &Ctx, a: &PrListArgs) -> Result<String, ApiErro
     let (prs, has_more) = cut(prs.value, limit);
     let mut lines: Vec<String> = prs.iter().map(line).collect();
     if has_more {
-        lines.push(more(&format!("pr_list limit={}", limit * 2)));
+        let filters = args(&[
+            ("project", a.at.project.as_deref()),
+            ("repo", a.at.repo.as_deref()),
+            ("status", a.status.as_deref()),
+            ("creator", a.creator.as_deref()),
+            ("reviewer", a.reviewer.as_deref()),
+            ("source", a.source.as_deref()),
+            ("target", a.target.as_deref()),
+        ]);
+        lines.push(more(&format!("pr_list{filters} limit={}", limit * 2)));
     }
     Ok(if lines.is_empty() {
         "no pull requests".into()
@@ -480,7 +490,8 @@ pub(crate) async fn pr_view(ctx: &Ctx, a: &PrViewArgs) -> Result<String, ApiErro
         let desc = if a.full == Some(true) {
             desc.to_owned()
         } else {
-            clip(desc, DESC_MAX, &format!("pr_view id={id} full=true"))
+            let at = scope_args(&a.at);
+            clip(desc, DESC_MAX, &format!("pr_view id={id}{at} full=true"))
         };
         let _ = write!(out, "\n\n{desc}");
     }
@@ -519,7 +530,8 @@ fn rel(path: &str) -> &str {
     path.trim_start_matches('/')
 }
 
-fn thread_text(t: &CommentThread) -> String {
+/// A thread with its comments; unless `full`, each is cut at 2000 characters, pointing at `whole`.
+fn thread_text(t: &CommentThread, full: bool, whole: &str) -> String {
     let mut out = format!("#{} {}", t.id.unwrap_or_default(), status(t));
     if let Some(ctx) = &t.thread_context
         && let Some(path) = &ctx.file_path
@@ -534,11 +546,12 @@ fn thread_text(t: &CommentThread) -> String {
         }
     }
     for c in &t.comments {
-        let text = clip(
-            c.content.as_deref().unwrap_or_default().trim(),
-            2000,
-            "the full comment is in the web UI",
-        );
+        let text = c.content.as_deref().unwrap_or_default().trim();
+        let text = if full {
+            text.to_owned()
+        } else {
+            clip(text, 2000, whole)
+        };
         let _ = write!(
             out,
             "\n   {}: {}",
@@ -549,10 +562,6 @@ fn thread_text(t: &CommentThread) -> String {
     out
 }
 
-pub(crate) fn unexpected(e: &serde_json::Error) -> ApiError {
-    ApiError::local(format!("unexpected answer from the server: {e}"))
-}
-
 /// # Errors
 /// When the scope, the PR or the server fails.
 pub(crate) async fn pr_threads(ctx: &Ctx, a: &PrThreadsArgs) -> Result<String, ApiError> {
@@ -560,6 +569,7 @@ pub(crate) async fn pr_threads(ctx: &Ctx, a: &PrThreadsArgs) -> Result<String, A
     let (api, (repo, proj)) = (&ctx.api, ids(&s)?);
     let id = pr.pull_request_id;
     let all = a.all == Some(true);
+    let full = a.full == Some(true);
     let limit = a.limit.unwrap_or(20).max(1);
     let body = api
         .az(|| {
@@ -572,8 +582,8 @@ pub(crate) async fn pr_threads(ctx: &Ctx, a: &PrThreadsArgs) -> Result<String, A
         .into_raw_response()
         .into_body();
     let list: GitPullRequestCommentThreadList =
-        serde_json::from_slice(&body).map_err(|e| unexpected(&e))?;
-    let props: List<Props> = serde_json::from_slice(&body).map_err(|e| unexpected(&e))?;
+        serde_json::from_slice(&body).map_err(|e| ApiError::unreadable(&e))?;
+    let props: List<Props> = serde_json::from_slice(&body).map_err(|e| ApiError::unreadable(&e))?;
     let mut threads: Vec<CommentThread> = list
         .value
         .into_iter()
@@ -591,17 +601,23 @@ pub(crate) async fn pr_threads(ctx: &Ctx, a: &PrThreadsArgs) -> Result<String, A
     }
     let hidden = before - threads.len();
     let (threads, has_more) = cut(threads, limit);
-    let mut lines: Vec<String> = threads.iter().map(thread_text).collect();
+    let at = scope_args(&a.at);
+    let all_arg = if all { " all=true" } else { "" };
+    let full_arg = if full { " full=true" } else { "" };
+    let whole = format!("pr_threads id={id}{at}{all_arg} full=true");
+    let mut lines: Vec<String> = threads
+        .iter()
+        .map(|t| thread_text(t, full, &whole))
+        .collect();
     if has_more {
-        let all_arg = if all { " all=true" } else { "" };
         lines.push(more(&format!(
-            "pr_threads id={id}{all_arg} limit={}",
+            "pr_threads id={id}{at}{all_arg}{full_arg} limit={}",
             limit * 2
         )));
     }
     if hidden > 0 {
         lines.push(format!(
-            "{hidden} resolved threads hidden: pr_threads id={id} all=true"
+            "{hidden} resolved threads hidden: pr_threads id={id}{at} all=true{full_arg}"
         ));
     }
     Ok(if lines.is_empty() {
@@ -675,8 +691,12 @@ pub(crate) async fn pr_files(ctx: &Ctx, a: &PrFilesArgs) -> Result<String, ApiEr
         .collect();
     // The names come from the server and a branch name may hold shell syntax: only plain ones go in a command.
     let plain = [target, source].iter().all(|n| plain_ref(n));
-    if has_more && plain {
-        lines.push(more(&format!("git diff {target}...{source} --stat")));
+    if has_more {
+        lines.push(if plain {
+            more(&format!("git diff {target}...{source} --stat"))
+        } else {
+            "… more than 2000 files; compare the branches with git diff --stat".into()
+        });
     }
     lines.push(if plain {
         format!("diff: git diff {target}...{source}")

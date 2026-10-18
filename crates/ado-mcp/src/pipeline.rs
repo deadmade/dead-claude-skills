@@ -16,8 +16,7 @@ use serde_json::json;
 
 use crate::api::{ApiError, V71_PREVIEW};
 use crate::ctx::{Ctx, given, seg};
-use crate::out::{cut, more, ref_name};
-use crate::pr::full_ref;
+use crate::out::{args, cut, full_ref, more, ref_name, strip_ansi};
 
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "schemars")]
@@ -85,6 +84,8 @@ const CONTEXT: usize = 5;
 const TAIL: usize = 50;
 /// Lines per `full` call.
 const PAGE: u32 = 2000;
+/// The most lines a default (non-`full`) call reads of a step's log: its end, where the errors and the tail are.
+const WINDOW: u32 = 20_000;
 /// A log line is cut here: one minified file on a line would fill the reply.
 const LINE_MAX: usize = 1000;
 const ISSUES_MAX: usize = 20;
@@ -111,26 +112,15 @@ fn run_id(run: u32) -> Result<i32, ApiError> {
 
 /// The same call for the next page.
 fn next_runs(a: &RunsArgs, limit: usize) -> String {
-    let mut call = String::from("pipeline_runs");
     let pr = a.pr.map(|n| n.to_string());
-    let args = [
-        ("project", &a.project),
-        ("pipeline", &a.pipeline),
-        ("branch", &a.branch),
-        ("pr", &pr),
-        ("result", &a.result),
-    ];
-    for (k, v) in args {
-        if let Some(v) = given(v.as_deref()) {
-            if v.contains(' ') {
-                let _ = write!(call, " {k}=\"{v}\"");
-            } else {
-                let _ = write!(call, " {k}={v}");
-            }
-        }
-    }
-    let _ = write!(call, " limit={}", limit * 2);
-    call
+    let filters = args(&[
+        ("project", a.project.as_deref()),
+        ("pipeline", a.pipeline.as_deref()),
+        ("branch", a.branch.as_deref()),
+        ("pr", pr.as_deref()),
+        ("result", a.result.as_deref()),
+    ]);
+    format!("pipeline_runs{filters} limit={}", limit * 2)
 }
 
 /// # Errors
@@ -161,30 +151,39 @@ pub(crate) async fn pipeline_runs(ctx: &Ctx, a: &RunsArgs) -> Result<String, Api
     let builds = ctx
         .retry_stale(&first.key, || async {
             let s = ctx.scope(p, None, None).await?;
-            let def = match given(a.pipeline.as_deref()) {
+            let name = given(a.pipeline.as_deref());
+            let def = match name {
                 Some(n) => Some(ctx.pipeline_id(&s, n).await?.to_string()),
                 None => None,
             };
             let (api, proj) = (&ctx.api, seg(&s.project_id));
-            api.az(|| {
-                let mut b = api
-                    .build
-                    .builds_client()
-                    .list(&api.org, &proj)
-                    .query_order(BuildQueryOrder::QueueTimeDescending)
-                    .top(top);
-                if let Some(d) = &def {
-                    b = b.definitions(d);
-                }
-                if let Some(br) = &branch {
-                    b = b.branch_name(br);
-                }
-                if let Some(r) = &result {
-                    b = b.result_filter(r.clone());
-                }
-                b.into_future()
-            })
-            .await
+            let found = api
+                .az(|| {
+                    let mut b = api
+                        .build
+                        .builds_client()
+                        .list(&api.org, &proj)
+                        .query_order(BuildQueryOrder::QueueTimeDescending)
+                        .top(top);
+                    if let Some(d) = &def {
+                        b = b.definitions(d);
+                    }
+                    if let Some(br) = &branch {
+                        b = b.branch_name(br);
+                    }
+                    if let Some(r) = &result {
+                        b = b.result_filter(r.clone());
+                    }
+                    b.into_future()
+                })
+                .await;
+            // A 404 may be a pipeline id gone stale too: `retry_stale` then looks the name up again.
+            if let (Err(e), Some(n)) = (&found, name)
+                && e.status == Some(404)
+            {
+                ctx.forget_pipeline(&s, n);
+            }
+            found
         })
         .await?;
     let (builds, has_more) = cut(builds.value, limit);
@@ -392,73 +391,13 @@ pub(crate) async fn pipeline_view(ctx: &Ctx, a: &RunArgs) -> Result<String, ApiE
         .collect();
     if !issues.is_empty() {
         lines.push("issues:".into());
+        let p = args(&[("project", a.project.as_deref())]);
         lines.extend(issue_lines(
             &issues,
-            &format!(": pipeline_log run={}", a.run),
+            &format!(": pipeline_log run={}{p}", a.run),
         ));
     }
     Ok(lines.join("\n"))
-}
-
-type Chars<'a> = std::iter::Peekable<std::str::Chars<'a>>;
-
-/// Skips the rest of an OSC, DCS, APC or PM string, up to BEL, ST or `ESC \`. Returns true when another escape
-/// ended it: that `ESC` is consumed and starts a sequence of its own.
-fn skip_string(chars: &mut Chars) -> bool {
-    while let Some(c) = chars.next() {
-        match c {
-            '\x07' | '\u{9c}' => return false,
-            '\x1b' if chars.peek() == Some(&'\\') => {
-                chars.next();
-                return false;
-            }
-            '\x1b' => return true,
-            _ => {}
-        }
-    }
-    false
-}
-
-/// Skips the rest of a CSI sequence: parameter and intermediate bytes, then a final byte in `@`..=`~`.
-fn skip_csi(chars: &mut Chars) {
-    for c in chars.by_ref() {
-        if ('@'..='~').contains(&c) {
-            return;
-        }
-    }
-}
-
-/// The text without terminal control: CSI, and OSC, DCS, APC and PM strings (7- and 8-bit; an OSC 8 hyperlink
-/// would leak its URL), any other escape with the character after it, and every other control character but `\t`
-/// (`\n` becomes a space). Linear: an escape inside a string is handled in this loop, not by recursing.
-fn strip_ansi(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    let mut chars = s.chars().peekable();
-    let mut esc = false;
-    loop {
-        let c = if std::mem::take(&mut esc) {
-            '\x1b'
-        } else if let Some(c) = chars.next() {
-            c
-        } else {
-            break;
-        };
-        match c {
-            '\x1b' => match chars.next() {
-                Some('[') => skip_csi(&mut chars),
-                Some(']' | 'P' | '_' | '^') => esc = skip_string(&mut chars),
-                _ => {}
-            },
-            '\u{9b}' => skip_csi(&mut chars),
-            '\u{90}' | '\u{9d}' | '\u{9e}' | '\u{9f}' => esc = skip_string(&mut chars),
-            '\t' => out.push(c),
-            // Only issue messages hold line breaks; log lines are split already.
-            '\n' => out.push(' '),
-            c if c.is_control() => {}
-            c => out.push(c),
-        }
-    }
-    out
 }
 
 /// The line without a leading `2026-03-05T10:00:20.1234567Z `.
@@ -544,6 +483,7 @@ fn targets<'a>(
     recs: &'a [TimelineRecord],
     step: Option<&str>,
     run: u32,
+    p: &str,
 ) -> Result<Targets<'a>, ApiError> {
     let tasks = || recs.iter().filter(|r| kind(r) == "Task");
     if let Some(step) = step {
@@ -572,16 +512,28 @@ fn targets<'a>(
         {
             let issues: Vec<String> = job.issues.iter().map(issue).collect();
             let mut lines = vec![format!("{}: failed with no failed step", name(job))];
-            lines.extend(issue_lines(&issues, &format!(": pipeline_view run={run}")));
+            lines.extend(issue_lines(
+                &issues,
+                &format!(": pipeline_view run={run}{p}"),
+            ));
             notes.push((lines.join("\n"), name(job).to_owned()));
         }
     }
     Ok((hits, notes))
 }
 
-/// The `pipeline_log` call for `step` from line `start` on.
-fn page_call(run: u32, step: &str, start: u64) -> String {
-    format!("pipeline_log run={run} step=\"{step}\" full=true start={start}")
+/// How many lines a default call leaves unread of a log `total` lines long: all but the last `WINDOW`, which hold
+/// what the excerpt shows (a log can be huge); 0 when the count is unknown.
+fn unread(total: Result<Option<i64>, &ApiError>) -> i64 {
+    match total {
+        Ok(Some(n)) => (n - i64::from(WINDOW)).max(0),
+        _ => 0,
+    }
+}
+
+/// The `pipeline_log` call for `step` from line `start` on; `p` is the ` project=…` the call was given.
+fn page_call(run: u32, p: &str, step: &str, start: u64) -> String {
+    format!("pipeline_log run={run}{p} step=\"{step}\" full=true start={start}")
 }
 
 /// The job a step runs in, by name.
@@ -734,7 +686,8 @@ pub(crate) async fn pipeline_log(ctx: &Ctx, a: &LogArgs) -> Result<String, ApiEr
     let run = a.run;
     let (proj, t) = timeline(ctx, a.project.as_deref(), run).await?;
     let id = run_id(run)?;
-    let (mut targets, notes) = targets(&t.records, given(a.step.as_deref()), run)?;
+    let p = args(&[("project", a.project.as_deref())]);
+    let (mut targets, notes) = targets(&t.records, given(a.step.as_deref()), run, &p)?;
     if targets.is_empty() && notes.is_empty() {
         return Ok(format!(
             "run #{run} has no failed step; pass step to read one"
@@ -750,22 +703,20 @@ pub(crate) async fn pipeline_log(ctx: &Ctx, a: &LogArgs) -> Result<String, ApiEr
         out.head(full_head(&t.records, &targets));
         targets.truncate(1);
     }
-    let counts = if full {
-        api.az(|| {
+    // The line counts page a `full` call and bound the default one's download.
+    let counts = api
+        .az(|| {
             api.build
                 .builds_client()
                 .get_build_logs(&api.org, &proj, id)
                 .into_future()
         })
         .await
-        .map(|l| l.value)
-    } else {
-        Ok(Vec::new())
-    };
+        .map(|l| l.value);
     for r in targets {
         let step = name(r);
-        let call = format!("pipeline_log run={run} step=\"{step}\"");
-        let whole = page_call(run, step, 1);
+        let call = format!("pipeline_log run={run}{p} step=\"{step}\"");
+        let whole = page_call(run, &p, step, 1);
         if out.spent {
             out.add(String::new(), call, &whole);
             continue;
@@ -775,6 +726,18 @@ pub(crate) async fn pipeline_log(ctx: &Ctx, a: &LogArgs) -> Result<String, ApiEr
             out.add(format!("{step}: no log ({})", state(r)), call, &whole);
             continue;
         };
+        let total = counts.as_ref().map(|c| {
+            c.iter()
+                .find(|c| c.build_log_reference.id == log.id)
+                .and_then(|c| c.line_count)
+        });
+        let skipped = if full { 0 } else { unread(total) };
+        if skipped > 0 {
+            let _ = write!(
+                text,
+                " (first {skipped} lines not read; {whole} shows them)"
+            );
+        }
         // The crate reads this answer as a JSON string; the log is plain text, so the raw body it is.
         let raw = api
             .az(|| {
@@ -784,6 +747,10 @@ pub(crate) async fn pipeline_log(ctx: &Ctx, a: &LogArgs) -> Result<String, ApiEr
                     .get_build_log(&api.org, &proj, id, log.id);
                 if full {
                     b = b.start_line(i64::from(start)).end_line(i64::from(end));
+                } else if skipped > 0 {
+                    b = b
+                        .start_line(skipped + 1)
+                        .end_line(skipped + i64::from(WINDOW));
                 }
                 b.send()
             })
@@ -798,22 +765,24 @@ pub(crate) async fn pipeline_log(ctx: &Ctx, a: &LogArgs) -> Result<String, ApiEr
             Ok(body) => clean_log(&String::from_utf8_lossy(&body)),
         };
         let body = if full {
-            let total = counts.as_ref().map(|c| {
-                c.iter()
-                    .find(|c| c.build_log_reference.id == log.id)
-                    .and_then(|c| c.line_count)
-            });
             // Room for the header, the more line and the separators.
             let room = out.room().saturating_sub(text.chars().count() + 300);
-            page(&lines, start, total, room, |n| page_call(run, step, n))
+            page(&lines, start, total, room, |n| page_call(run, &p, step, n))
         } else {
-            excerpt(&lines, |n| page_call(run, step, n))
+            // A server that ignored the range sent it all: its end is the window asked for.
+            let from = if skipped > 0 {
+                lines.len().saturating_sub(WINDOW as usize)
+            } else {
+                0
+            };
+            let skipped = skipped.unsigned_abs();
+            excerpt(&lines[from..], |n| page_call(run, &p, step, n + skipped))
         };
         let _ = write!(text, "\n{body}");
         out.add(text, call, &whole);
     }
     for (note, job) in notes {
-        out.add(note, format!("{job} (pipeline_view run={run})"), "");
+        out.add(note, format!("{job} (pipeline_view run={run}{p})"), "");
     }
     Ok(out.finish())
 }
@@ -853,7 +822,13 @@ pub(crate) async fn pipeline_run(ctx: &Ctx, a: &PipelineRunArgs) -> Result<Strin
                 .into_future()
         })
         .await
-        .map_err(|e| e.with_what(&format!("pipeline {}", a.pipeline.trim())))?;
+        .map_err(|e| {
+            // Not resent (a write), but the next call looks the name up again.
+            if e.status == Some(404) {
+                ctx.forget_pipeline(&s, &a.pipeline);
+            }
+            e.with_what(&format!("pipeline {}", a.pipeline.trim()))
+        })?;
     Ok(format!(
         "queued run #{} of {} on {}",
         run.run_reference.id,
@@ -1015,7 +990,7 @@ mod tests {
     #[test]
     fn excerpt_caps_errors() {
         let lines: Vec<(bool, String)> = (0..5000).map(|i| (true, format!("ERROR {i}"))).collect();
-        let out = excerpt(&lines, |n| page_call(7, "T", n));
+        let out = excerpt(&lines, |n| page_call(7, "", "T", n));
         let out: Vec<&str> = out.lines().collect();
         assert_eq!(out.len(), EXCERPT_MAX + 2 + TAIL, "{out:?}");
         assert_eq!(out[EXCERPT_MAX - 1], "ERROR 299");
@@ -1159,7 +1134,7 @@ mod tests {
         let recs = records(serde_json::json!([
             {"id": "j", "type": "Job", "name": "Deploy", "result": "failed", "issues": issues},
         ]));
-        let (hits, notes) = targets(&recs, None, 7).unwrap();
+        let (hits, notes) = targets(&recs, None, 7, "").unwrap();
         assert_eq!(hits.len(), 0);
         let lines: Vec<&str> = notes[0].0.lines().collect();
         assert_eq!(lines.len(), 1 + ISSUES_MAX + 1);
@@ -1172,7 +1147,7 @@ mod tests {
         let tasks: Vec<serde_json::Value> = (0..25)
             .map(|i| serde_json::json!({"type": "Task", "name": format!("t{i}")}))
             .collect();
-        let e = targets(&records(serde_json::Value::Array(tasks)), Some("x"), 7).unwrap_err();
+        let e = targets(&records(serde_json::Value::Array(tasks)), Some("x"), 7, "").unwrap_err();
         assert!(
             e.msg
                 .starts_with("no step \"x\" in run #7; its steps: t0, t1,"),

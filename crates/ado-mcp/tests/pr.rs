@@ -779,3 +779,118 @@ fn update_only_given_fields() {
     }
     assert_eq!(bodies(&fx, "PATCH", &pr).len(), 2);
 }
+
+#[test]
+fn view_strips_control_sequences() {
+    let fx = Fixture::start();
+    view_routes(&fx);
+    let mut pr: Value = serde_json::from_slice(&fixture("pr.json").body).unwrap();
+    pr["description"] =
+        json!("See \x1b]8;;https://evil.example/x\x07the docs\x1b]8;;\x07 now\x07\n\tdone");
+    fx.route(&format!("{PRS}/412"), vec![Resp::json(&pr)]);
+    let text = ok(&mut env(&fx), "pr_view", json!({"id": 412}));
+    assert!(text.ends_with("See the docs now\n\tdone"), "{text:?}");
+    for noise in ["\x1b", "\x07", "evil.example"] {
+        assert!(!text.contains(noise), "{noise:?} in {text:?}");
+    }
+}
+
+/// `n` active threads, each with one comment of `len` characters.
+fn long_threads(n: i64, len: usize) -> Resp {
+    let threads: Vec<Value> = (1..=n)
+        .map(|i| {
+            json!({"id": i, "status": "active", "comments": [
+                {"id": 1, "content": "y".repeat(len), "commentType": "text",
+                 "author": {"displayName": "J. Doe", "id": JANE}}
+            ]})
+        })
+        .collect();
+    Resp::json(&json!({"value": threads}))
+}
+
+#[test]
+fn threads_reply_is_capped() {
+    let fx = Fixture::start();
+    fx.route(&format!("{PRS}/412"), vec![fixture("pr.json")]);
+    fx.route(&format!("{PR412}/threads"), vec![long_threads(30, 1900)]);
+    let text = ok(&mut env(&fx), "pr_threads", json!({"id": 412, "limit": 30}));
+    let tail = "\n… output cut at 40,000 characters; narrow the call (limit, id, step)";
+    assert!(text.ends_with(tail), "{}", &text[text.len() - 200..]);
+    assert_eq!(text.chars().count(), 40_000 + tail.chars().count());
+}
+
+#[test]
+fn threads_full_and_scoped_calls() {
+    let fx = Fixture::start();
+    fx.route(&format!("{PRS}/412"), vec![fixture("pr.json")]);
+    fx.route(&format!("{PR412}/threads"), vec![long_threads(2, 3000)]);
+    // The repo by name: every call the reply names carries it.
+    fx.route(
+        &format!("/tfs/Coll/{PROJ}/_apis/git/repositories/My%20Repo"),
+        vec![fixture("repo.json")],
+    );
+    let mut mcp = env(&fx);
+    let text = ok(
+        &mut mcp,
+        "pr_threads",
+        json!({"id": 412, "limit": 1, "all": true, "repo": "My Repo"}),
+    );
+    assert!(
+        text.contains(
+            "\n      … 1000 more characters: pr_threads id=412 repo=\"My Repo\" all=true full=true\n"
+        ),
+        "{text}"
+    );
+    assert!(
+        text.ends_with("\n… more: pr_threads id=412 repo=\"My Repo\" all=true limit=2"),
+        "{text}"
+    );
+    let text = ok(
+        &mut mcp,
+        "pr_threads",
+        json!({"id": 412, "limit": 1, "full": true}),
+    );
+    assert!(text.contains(&"y".repeat(3000)), "{text}");
+    assert!(!text.contains("more characters"), "{text}");
+    assert!(
+        text.ends_with("\n… more: pr_threads id=412 full=true limit=2"),
+        "{text}"
+    );
+}
+
+#[test]
+fn list_more_line_keeps_filters() {
+    let fx = Fixture::start();
+    fx.route(PRS, vec![fixture("pr-list.json")]);
+    let text = ok(
+        &mut env(&fx),
+        "pr_list",
+        json!({"limit": 2, "status": "all", "source": "feature/x", "target": "main"}),
+    );
+    assert!(
+        text.ends_with("\n… more: pr_list status=all source=feature/x target=main limit=4"),
+        "{text}"
+    );
+}
+
+#[test]
+fn files_odd_refs_still_say_cut() {
+    let fx = Fixture::start();
+    let mut pr: Value = serde_json::from_slice(&fixture("pr.json").body).unwrap();
+    pr["sourceRefName"] = json!("refs/heads/x;rm -rf ~");
+    fx.route(&format!("{PRS}/412"), vec![Resp::json(&pr)]);
+    fx.route(
+        &format!("{PR412}/iterations"),
+        vec![fixture("iterations.json")],
+    );
+    fx.route(
+        &format!("{PR412}/iterations/2/changes"),
+        vec![Resp::json(&json!({"changeEntries": [], "nextSkip": 5}))],
+    );
+    let text = ok(&mut env(&fx), "pr_files", json!({"id": 412}));
+    assert_eq!(
+        text,
+        "… more than 2000 files; compare the branches with git diff --stat\n\
+         diff: run git diff between the target and source branches"
+    );
+}

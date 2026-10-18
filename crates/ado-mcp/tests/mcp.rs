@@ -43,6 +43,22 @@ fn missing_url_is_one_line() {
     assert!(!err.contains("test-pat"), "{err}");
 }
 
+#[test]
+fn plain_http_url_is_refused() {
+    let out = Command::new(env!("CARGO_BIN_EXE_ado-mcp"))
+        .env("ADO_ORG_URL", "http://ado.example/tfs/Coll/")
+        .env("ADO_PAT", "test-pat")
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    let err = String::from_utf8(out.stderr).unwrap();
+    assert!(
+        err.contains("ADO_ORG_URL must be https (the PAT would travel in clear text)"),
+        "{err}"
+    );
+}
+
 const READS: [&str; 10] = [
     "pipeline_log",
     "pipeline_runs",

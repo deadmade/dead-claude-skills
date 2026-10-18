@@ -70,8 +70,11 @@ pub(crate) struct Ctx {
     cache: Mutex<Cache>,
 }
 
-/// A path segment, percent-encoded so a name can't add a `/`, `?` or `#` of its own.
+/// A path segment, percent-encoded so a name can't add a `/`, `?` or `#` of its own, nor be `.` or `..`.
 pub(crate) fn seg(s: &str) -> String {
+    if matches!(s, "." | "..") {
+        return s.replace('.', "%2E");
+    }
     s.bytes().fold(String::new(), |mut out, b| {
         if b.is_ascii_alphanumeric() || b"-._~".contains(&b) {
             out.push(char::from(b));
@@ -304,6 +307,13 @@ impl Ctx {
         }
     }
 
+    /// Drops the cached id of the pipeline `name`, so the next call looks the name up again (one that 404s may have
+    /// been deleted and recreated).
+    pub fn forget_pipeline(&self, scope: &Scope, name: &str) {
+        let key = (scope.project_id.clone(), name.trim().to_lowercase());
+        self.cache().pipelines.remove(&key);
+    }
+
     /// A pipeline's definition id from its id or its name.
     ///
     /// # Errors
@@ -361,5 +371,18 @@ impl Ctx {
                 )))
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn seg_encodes_dot_segments() {
+        assert_eq!(seg("."), "%2E");
+        assert_eq!(seg(".."), "%2E%2E");
+        assert_eq!(seg("a.b"), "a.b");
+        assert_eq!(seg("My Proj/x"), "My%20Proj%2Fx");
     }
 }

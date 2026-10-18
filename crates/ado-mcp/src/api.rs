@@ -27,7 +27,7 @@ use crate::config::Config;
 
 /// `connectionData`.
 pub(crate) const V71_P1: &str = "7.1-preview.1";
-/// What the crate sends, for the one call it can't express (`pr_list status=all`).
+/// What the crate sends, for the calls sent by hand: `pr_list status=all` and `pipeline_cancel`.
 pub(crate) const V71_PREVIEW: &str = "7.1-preview";
 
 const TIMEOUT: Duration = Duration::from_mins(1);
@@ -59,6 +59,11 @@ impl ApiError {
             tf: None,
             msg: msg.into(),
         }
+    }
+
+    /// A body our own serde struct can't read; names the field, like the crate's own error.
+    pub(crate) fn unreadable(e: &serde_json::Error) -> Self {
+        Self::local(format!("unexpected answer from the server: {e}"))
     }
 
     /// Words a 404 as `not found: {label}`; other errors stay as they are.
@@ -500,6 +505,16 @@ fn find_tf(s: &str) -> Option<String> {
     })
 }
 
+/// The server's message on one line of at most 300 characters (`…` marks a cut).
+fn one_line(message: &str) -> String {
+    let mut line = message.split_whitespace().collect::<Vec<_>>().join(" ");
+    if let Some((at, _)) = line.char_indices().nth(300) {
+        line.truncate(at);
+        line.push('…');
+    }
+    line
+}
+
 fn status_error(status: u16, ct: &str, body: &str, path: &str) -> ApiError {
     let err = |msg: String, tf| ApiError {
         status: Some(status),
@@ -520,7 +535,7 @@ fn status_error(status: u16, ct: &str, body: &str, path: &str) -> ApiError {
         400..500 => {
             let message = serde_json::from_str::<Value>(body)
                 .ok()
-                .and_then(|v| v["message"].as_str().map(str::to_owned))
+                .and_then(|v| v["message"].as_str().map(one_line))
                 .unwrap_or_else(|| format!("HTTP {status}"));
             let tf = find_tf(&message);
             err(format!("the server refused it: {message}"), tf)
@@ -659,6 +674,24 @@ mod tests {
             find_tf("TF12 and TFabcdef and TF000123"),
             Some("TF000123".into())
         );
+    }
+
+    #[test]
+    fn refused_message_is_one_short_line() {
+        let msg = format!("{}\n\n  {}\r\n", "a".repeat(200), "b ".repeat(200));
+        let body = serde_json::json!({"message": msg}).to_string();
+        let e = status_error(400, "application/json", &body, "x");
+        let rest = e.msg.strip_prefix("the server refused it: ").unwrap();
+        assert!(
+            !rest.contains(['\n', '\r']) && !rest.contains("  "),
+            "{rest}"
+        );
+        assert_eq!(rest.chars().count(), 301, "{rest}");
+        assert!(
+            rest.starts_with(&format!("{} b b", "a".repeat(200))),
+            "{rest}"
+        );
+        assert!(rest.ends_with('…'), "{rest}");
     }
 
     /// Fails the test if a request gets past the guard.

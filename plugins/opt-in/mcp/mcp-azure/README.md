@@ -16,8 +16,10 @@ Reads, each named `mcp__plugin_mcp-azure_ado__<tool>`:
 - `pr_list`: pull requests in the repo, by status (default active), creator, reviewer, source or target branch.
 - `pr_view`: reviewers and votes, policy checks, linked work items, the latest run and the description.
 - `pr_threads`: review threads with file and line; system threads, and unless `all` resolved ones, are left out.
+  Comments are cut at 2000 characters unless `full`.
 - `pr_files`: the files the latest iteration changes, plus the `git diff` command for the patch.
-- `wi_view`: a work item with its parent, children, linked PRs, description, acceptance criteria and last 5 comments.
+- `wi_view`: a work item with its parent, children, linked PRs, description, acceptance criteria and last 5 comments
+  (`full`: the whole texts and up to 200 comments).
 - `wi_query`: work items by assignee (`me` or a name), state, type or title text, or a raw WIQL query.
 - `pipeline_runs`: recent runs, newest first, by pipeline, branch, PR or result.
 - `pipeline_view`: a run's stages and jobs with result and duration, and its errors and warnings.

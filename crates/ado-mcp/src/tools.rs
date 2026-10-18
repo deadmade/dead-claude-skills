@@ -10,6 +10,7 @@ use rmcp::handler::server::wrapper::Parameters;
 use crate::api::ApiError;
 use crate::config::Config;
 use crate::ctx::Ctx;
+use crate::out;
 use crate::pipeline::{self, LogArgs, PipelineRunArgs, ProjectArgs, RunArgs, RunsArgs};
 use crate::pr::{
     self, PrCommentArgs, PrCompleteArgs, PrCreateArgs, PrFilesArgs, PrListArgs, PrReplyArgs,
@@ -72,10 +73,12 @@ fn error(msg: impl Into<String>) -> CallToolResult {
     CallToolResult::error(vec![ContentBlock::text(msg)])
 }
 
+/// Every tool's answer goes out through here: server text (titles, comments, log lines) may hold terminal control,
+/// and any reply is capped.
 fn reply(r: Result<String, ApiError>) -> CallToolResult {
     match r {
-        Ok(text) => CallToolResult::success(vec![ContentBlock::text(text)]),
-        Err(e) => error(e.to_string()),
+        Ok(text) => CallToolResult::success(vec![ContentBlock::text(out::finish(&text))]),
+        Err(e) => error(out::finish(&e.to_string())),
     }
 }
 
@@ -98,7 +101,7 @@ impl Server {
     }
 
     #[tool(
-        description = "Show a pull request's review threads with file and line (system threads and, unless all, resolved ones are left out). Without id, the active PR of the current branch.",
+        description = "Show a pull request's review threads with file and line (system threads and, unless all, resolved ones are left out); comments are cut at 2000 characters unless full. Without id, the active PR of the current branch.",
         annotations(read_only_hint = true)
     )]
     async fn pr_threads(&self, Parameters(a): Parameters<PrThreadsArgs>) -> CallToolResult {
@@ -167,7 +170,7 @@ impl Server {
     }
 
     #[tool(
-        description = "Show a work item: type, state, title, assignee, area and iteration, parent, children, linked PRs, the description and acceptance criteria as plain text, and the last 5 comments.",
+        description = "Show a work item: type, state, title, assignee, area and iteration, parent, children, linked PRs, the description and acceptance criteria as plain text, and the last 5 comments (full: the whole texts and up to 200 comments).",
         annotations(read_only_hint = true)
     )]
     async fn wi_view(&self, Parameters(a): Parameters<WiViewArgs>) -> CallToolResult {

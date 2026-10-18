@@ -1,5 +1,7 @@
 //! Plain-text output helpers: the shapes every tool's reply is built from. Pure, no I/O.
 
+use std::fmt::Write as _;
+
 /// How much of a work item description or comment a view shows before pointing at the full call.
 pub const DESC_MAX: usize = 4000;
 
@@ -19,6 +21,36 @@ pub fn cut<T>(mut items: Vec<T>, limit: usize) -> (Vec<T>, bool) {
     let more = items.len() > limit;
     items.truncate(limit);
     (items, more)
+}
+
+/// ` k=v` for each argument given, quoted when it holds a space: the filters and scope a call repeats.
+pub fn args(pairs: &[(&str, Option<&str>)]) -> String {
+    let mut out = String::new();
+    for (k, v) in pairs {
+        match v.map(str::trim).filter(|v| !v.is_empty()) {
+            Some(v) if v.contains(' ') => {
+                let _ = write!(out, " {k}=\"{v}\"");
+            }
+            Some(v) => {
+                let _ = write!(out, " {k}={v}");
+            }
+            None => {}
+        }
+    }
+    out
+}
+
+/// Characters per reply (Rulings R8, R11): past it, the reply is cut.
+pub const REPLY_MAX: usize = 40_000;
+
+/// A reply as Claude gets it: without terminal control, and at most `REPLY_MAX` characters before the cut line.
+pub fn finish(text: &str) -> String {
+    let mut text = strip_ansi(text);
+    if let Some((at, _)) = text.char_indices().nth(REPLY_MAX) {
+        text.truncate(at);
+        text.push_str("\n… output cut at 40,000 characters; narrow the call (limit, id, step)");
+    }
+    text
 }
 
 /// The trailer line that tells the model how to ask for the next page.
@@ -117,6 +149,74 @@ fn tag_end(html: &[u8], from: usize, seen: &mut [u8]) -> Option<usize> {
     None
 }
 
+type Chars<'a> = std::iter::Peekable<std::str::Chars<'a>>;
+
+/// Skips the rest of an OSC, DCS, APC or PM string, up to BEL, ST or `ESC \`. Returns true when another escape
+/// ended it: that `ESC` is consumed and starts a sequence of its own.
+fn skip_string(chars: &mut Chars) -> bool {
+    while let Some(c) = chars.next() {
+        match c {
+            '\x07' | '\u{9c}' => return false,
+            '\x1b' if chars.peek() == Some(&'\\') => {
+                chars.next();
+                return false;
+            }
+            '\x1b' => return true,
+            _ => {}
+        }
+    }
+    false
+}
+
+/// Skips the rest of a CSI sequence: parameter and intermediate bytes, then a final byte in `@`..=`~`.
+fn skip_csi(chars: &mut Chars) {
+    for c in chars.by_ref() {
+        if ('@'..='~').contains(&c) {
+            return;
+        }
+    }
+}
+
+/// The text without terminal control: CSI, and OSC, DCS, APC and PM strings (7- and 8-bit; an OSC 8 hyperlink
+/// would leak its URL), any other escape with the character after it, and every other control character but `\n`
+/// and `\t`. Linear: an escape inside a string is handled in this loop, not by recursing.
+pub fn strip_ansi(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    let mut esc = false;
+    loop {
+        let c = if std::mem::take(&mut esc) {
+            '\x1b'
+        } else if let Some(c) = chars.next() {
+            c
+        } else {
+            break;
+        };
+        match c {
+            '\x1b' => match chars.next() {
+                Some('[') => skip_csi(&mut chars),
+                Some(']' | 'P' | '_' | '^') => esc = skip_string(&mut chars),
+                _ => {}
+            },
+            '\u{9b}' => skip_csi(&mut chars),
+            '\u{90}' | '\u{9d}' | '\u{9e}' | '\u{9f}' => esc = skip_string(&mut chars),
+            '\t' | '\n' => out.push(c),
+            c if c.is_control() => {}
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+/// `refs/heads/{branch}`, unless it already is a ref.
+pub fn full_ref(branch: &str) -> String {
+    if branch.starts_with("refs/") {
+        branch.to_owned()
+    } else {
+        format!("refs/heads/{branch}")
+    }
+}
+
 /// A branch name without its `refs/heads/` prefix.
 pub fn ref_name(r: &str) -> &str {
     r.strip_prefix("refs/heads/").unwrap_or(r)
@@ -212,7 +312,34 @@ mod tests {
 
     #[test]
     fn more_names_the_call() {
-        assert_eq!(more("wi_list skip=20"), "… more: wi_list skip=20");
+        assert_eq!(more("wi_query limit=40"), "… more: wi_query limit=40");
+    }
+
+    #[test]
+    fn args_quote_and_skip() {
+        let out = args(&[
+            ("project", Some("My Proj")),
+            ("repo", None),
+            ("state", Some(" ")),
+            ("all", Some("true")),
+        ]);
+        assert_eq!(out, " project=\"My Proj\" all=true");
+    }
+
+    #[test]
+    fn finish_strips_and_caps() {
+        assert_eq!(
+            finish("a\x1b]8;;https://x.example/\x07b\x1b]8;;\x07\x07\n\tc\x1b[31md"),
+            "ab\n\tcd"
+        );
+        let out = finish(&"ü".repeat(REPLY_MAX + 1));
+        assert!(out.starts_with(&"ü".repeat(REPLY_MAX)));
+        assert!(
+            out.ends_with(
+                "ü\n… output cut at 40,000 characters; narrow the call (limit, id, step)"
+            )
+        );
+        assert_eq!(finish(&"a".repeat(REPLY_MAX)), "a".repeat(REPLY_MAX));
     }
 
     #[test]

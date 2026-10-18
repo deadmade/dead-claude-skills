@@ -104,7 +104,10 @@ fn view_lines() {
         text.contains("comments:\n  2026-03-06 Jane Roe: Seen it on staging too.\n  2026-03-05 Bob Builder: Proxy logs attached."),
         "{text}"
     );
-    assert!(text.ends_with("\n  … 3 older comments"), "{text}");
+    assert!(
+        text.ends_with("\n  … 3 older comments: wi_view id=123 full=true"),
+        "{text}"
+    );
     for leak in ["<", "&nbsp;", "http", "vstfs", PROJ, "#99", "2d9e7b10"] {
         assert!(!text.contains(leak), "{leak} in {text}");
     }
@@ -535,4 +538,16 @@ fn wi_write_sent_once_on_404() {
     for path in [WI123, COMMENTS, STORY] {
         assert_eq!(requests(&fx, path).len(), 1, "{path}");
     }
+}
+
+#[test]
+fn view_full_reads_200_comments() {
+    let fx = Fixture::start();
+    fx.route(WI123, vec![fixture("wi.json")]);
+    fx.route(COMMENTS, vec![fixture("wi-comments.json")]);
+    let text = ok(&mut env(&fx), "wi_view", json!({"id": 123, "full": true}));
+    // The fixture says 8 and sends 5: nothing more to fetch, so no call is named.
+    assert!(text.ends_with("\n  … 3 older comments"), "{text}");
+    let q = &queries(&fx, COMMENTS)[0];
+    assert!(q.contains("$top=200"), "{q}");
 }

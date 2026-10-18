@@ -397,3 +397,65 @@ fn pipeline_write_sent_once_on_404() {
     assert_eq!(sent(&fx, &build).len(), 1);
     assert_eq!(sent(&fx, RUNS12).len(), 1);
 }
+
+#[test]
+fn log_default_reads_the_last_lines() {
+    let fx = Fixture::start();
+    run_routes(&fx);
+    let mut logs: Value = serde_json::from_slice(&fixture("logs.json").body).unwrap();
+    logs["value"][2]["lineCount"] = json!(25_000);
+    fx.route(LOGS, vec![Resp::json(&logs)]);
+    // The window's 20,000 lines: 400 errors first, so the excerpt points past them.
+    let body = "##[error]x\r\n".repeat(400) + &"ok\r\n".repeat(19_600);
+    fx.route(
+        &format!("{LOGS}/4"),
+        vec![Resp::new(200, "text/plain", body)],
+    );
+    let text = ok(&mut env(&fx), "pipeline_log", json!({"run": 77}));
+    assert!(
+        text.starts_with(
+            "Run tests: failed (first 5000 lines not read; pipeline_log run=77 step=\"Run tests\" full=true start=1 shows them)\n"
+        ),
+        "{}",
+        &text[..300]
+    );
+    assert!(
+        text.contains(
+            "more error lines: pipeline_log run=77 step=\"Run tests\" full=true start=5301\n"
+        ),
+        "{text}"
+    );
+    let q = &queries(&fx, &format!("{LOGS}/4"))[0];
+    assert!(
+        q.contains("startLine=5001") && q.contains("endLine=25000"),
+        "{q}"
+    );
+}
+
+#[test]
+fn run_404_resolves_the_name_again() {
+    let fx = Fixture::start();
+    fx.route(DEFS, vec![fixture("definitions.json")]);
+    fx.route(RUNS12, vec![Resp::new(404, "text/plain", "gone")]);
+    let mut mcp = env(&fx);
+    for _ in 0..2 {
+        let (err, text) = mcp.call("pipeline_run", json!({"pipeline": "CI", "branch": "main"}));
+        assert!(err, "{text}");
+        assert_eq!(text, "not found: pipeline CI");
+    }
+    assert_eq!(sent(&fx, DEFS).len(), 2);
+    assert_eq!(sent(&fx, RUNS12).len(), 2);
+}
+
+#[test]
+fn runs_404_resolves_the_name_again() {
+    let fx = Fixture::start();
+    fx.route(DEFS, vec![fixture("definitions.json")]);
+    fx.route(
+        BUILDS,
+        vec![Resp::new(404, "text/plain", "gone"), fixture("builds.json")],
+    );
+    let text = ok(&mut env(&fx), "pipeline_runs", json!({"pipeline": "CI"}));
+    assert!(text.starts_with("#1001 CI"), "{text}");
+    assert_eq!(sent(&fx, DEFS).len(), 2);
+}
