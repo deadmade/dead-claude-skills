@@ -177,7 +177,7 @@ impl Server {
     }
 
     #[tool(
-        description = "Change a pull request's title or description, make it a draft or publish it (draft), or abandon or reactivate it (status). Only the given fields change. Without id, the active PR of the current branch."
+        description = "Change a pull request's title or description, or abandon or reactivate it (status). Only the given fields change. Without id, the active PR of the current branch."
     )]
     async fn pr_update(&self, Parameters(a): Parameters<PrUpdateArgs>) -> CallToolResult {
         reply(pr::pr_update(&self.ctx, &a).await)

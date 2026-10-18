@@ -7,15 +7,14 @@ use azure_devops_rust_api::build::models::BuildQueryOrder;
 use azure_devops_rust_api::git::models::{
     Comment, CommentPosition, CommentThread, CommentThreadContext, GitPullRequest,
     GitPullRequestCommentThread, GitPullRequestCommentThreadList, GitPullRequestCompletionOptions,
-    GitPullRequestCreateOptions, GitPullRequestList, IdentityId, IdentityRef, IdentityRefWithVote,
-    PullRequestStatus, ResourceRef, comment::CommentType, comment_thread, git_pull_request,
-    git_pull_request_completion_options::MergeStrategy,
+    GitPullRequestCreateOptions, GitPullRequestList, GitPullRequestUpdateOptions, IdentityId,
+    IdentityRef, IdentityRefWithVote, PullRequestStatus, ResourceRef, comment::CommentType,
+    comment_thread, git_pull_request, git_pull_request_completion_options::MergeStrategy,
 };
 use azure_devops_rust_api::wit::models::WorkItemBatchGetRequest;
-use reqwest::Method;
 use rmcp::schemars::{self, JsonSchema};
 use serde::Deserialize;
-use serde_json::{Map, Value, json};
+use serde_json::{Map, Value};
 
 use crate::api::{ApiError, V71_PREVIEW};
 use crate::ctx::{Ctx, Scope, given, seg};
@@ -690,7 +689,7 @@ pub(crate) async fn pr_files(ctx: &Ctx, a: &PrFilesArgs) -> Result<String, ApiEr
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "schemars")]
 pub(crate) struct PrCreateArgs {
-    /// Where, and `branch` is the source. Default: the clone's current branch.
+    /// Where; source = `branch` (default: the clone's current branch).
     #[serde(flatten)]
     pub at: Where,
     pub title: String,
@@ -714,8 +713,6 @@ pub(crate) struct PrUpdateArgs {
     pub id: Option<u32>,
     pub title: Option<String>,
     pub description: Option<String>,
-    /// true makes it a draft, false publishes it.
-    pub draft: Option<bool>,
     /// abandoned or active (reactivates an abandoned PR).
     pub status: Option<String>,
 }
@@ -797,6 +794,9 @@ pub(crate) async fn pr_create(ctx: &Ctx, a: &PrCreateArgs) -> Result<String, Api
         });
     }
     let first = a.at.scope(ctx).await?;
+    if first.branch.is_none() {
+        return Err(ApiError::local("no branch: pass branch"));
+    }
     let (s, target) = ctx
         .retry_stale(&first.key, || async {
             let s = a.at.scope(ctx).await?;
@@ -818,11 +818,7 @@ pub(crate) async fn pr_create(ctx: &Ctx, a: &PrCreateArgs) -> Result<String, Api
             Ok((s, t))
         })
         .await?;
-    let source = full_ref(
-        s.branch
-            .as_deref()
-            .ok_or_else(|| ApiError::local("no branch: pass branch"))?,
-    );
+    let source = full_ref(s.branch.as_deref().unwrap_or_default());
     let (api, (repo, proj)) = (&ctx.api, ids(&s)?);
     let body = GitPullRequestCreateOptions {
         description: a.description.clone(),
@@ -874,47 +870,52 @@ pub(crate) async fn pr_create(ctx: &Ctx, a: &PrCreateArgs) -> Result<String, Api
     Ok(format!("created !{} {arrow}{draft}", pr.pull_request_id))
 }
 
-/// Sends a `PATCH` to the PR. By hand: the crate's `GitPullRequestUpdateOptions` has no `isDraft` or `lastMergeSourceCommit`.
-async fn patch_pr(ctx: &Ctx, s: &Scope, id: i32, body: &Value) -> Result<GitPullRequest, ApiError> {
-    let (repo, proj) = ids(s)?;
-    let path = format!("{proj}/_apis/git/repositories/{repo}/pullrequests/{id}");
-    ctx.api
-        .send(Method::PATCH, &path, &[], V71_PREVIEW, body, false)
-        .await
+/// Updates the PR with `opts`; `mergeStatus` (the crate's mis-named merge options) is never set.
+async fn update_pr(
+    ctx: &Ctx,
+    s: &Scope,
+    id: i32,
+    opts: GitPullRequestUpdateOptions,
+) -> Result<GitPullRequest, ApiError> {
+    let (api, (repo, proj)) = (&ctx.api, ids(s)?);
+    api.az(|| {
+        api.git
+            .pull_requests_client()
+            .update(&api.org, &repo, &proj, id, opts.clone())
+            .into_future()
+    })
+    .await
 }
 
 /// # Errors
 /// When nothing or a bad status is given, or the scope, the PR or the server fails.
 pub(crate) async fn pr_update(ctx: &Ctx, a: &PrUpdateArgs) -> Result<String, ApiError> {
-    let mut body = Map::new();
-    let mut fields = Vec::new();
-    let mut put = |field: &'static str, key: &str, v: Value| {
-        fields.push(field);
-        body.insert(key.into(), v);
+    let status = match given(a.status.as_deref()) {
+        None => None,
+        Some("abandoned") => Some(PullRequestStatus::Abandoned),
+        Some("active") => Some(PullRequestStatus::Active),
+        Some(_) => return Err(ApiError::local("status is abandoned or active")),
     };
-    if let Some(t) = &a.title {
-        put("title", "title", json!(t));
-    }
-    if let Some(d) = &a.description {
-        put("description", "description", json!(d));
-    }
-    if let Some(d) = a.draft {
-        put("draft", "isDraft", json!(d));
-    }
-    if let Some(st) = given(a.status.as_deref()) {
-        if !matches!(st, "abandoned" | "active") {
-            return Err(ApiError::local("status is abandoned or active"));
-        }
-        put("status", "status", json!(st));
-    }
+    let opts = GitPullRequestUpdateOptions {
+        title: a.title.clone(),
+        description: a.description.clone(),
+        status,
+        ..GitPullRequestUpdateOptions::default()
+    };
+    let given = [
+        ("title", opts.title.is_some()),
+        ("description", opts.description.is_some()),
+        ("status", opts.status.is_some()),
+    ];
+    let fields: Vec<&str> = given.iter().filter(|f| f.1).map(|f| f.0).collect();
     if fields.is_empty() {
         return Err(ApiError::local(
-            "nothing to update: give title, description, draft or status",
+            "nothing to update: give title, description or status",
         ));
     }
     let (s, pr) = find_pr(ctx, &a.at, a.id).await?;
     let id = pr.pull_request_id;
-    patch_pr(ctx, &s, id, &Value::Object(body)).await?;
+    update_pr(ctx, &s, id, opts).await?;
     Ok(format!("updated !{id}: {}", fields.join(", ")))
 }
 
@@ -944,7 +945,7 @@ pub(crate) async fn pr_comment(ctx: &Ctx, a: &PrCommentArgs) -> Result<String, A
                 offset: Some(1),
             };
             Some(CommentThreadContext {
-                file_path: Some(format!("/{}", rel(f))),
+                file_path: Some(format!("/{}", rel(&f.replace('\\', "/")))),
                 right_file_start: Some(pos.clone()),
                 right_file_end: Some(pos),
                 ..CommentThreadContext::default()
@@ -1075,7 +1076,7 @@ pub(crate) async fn pr_vote(ctx: &Ctx, a: &PrVoteArgs) -> Result<String, ApiErro
 }
 
 /// # Errors
-/// When the strategy is unknown, the PR has no source commit yet, or the scope, the PR or the server fails.
+/// When the strategy is unknown, or the scope, the PR or the server fails.
 pub(crate) async fn pr_complete(ctx: &Ctx, a: &PrCompleteArgs) -> Result<String, ApiError> {
     let strategy = match given(a.strategy.as_deref()).unwrap_or("squash") {
         "squash" => MergeStrategy::Squash,
@@ -1097,22 +1098,17 @@ pub(crate) async fn pr_complete(ctx: &Ctx, a: &PrCompleteArgs) -> Result<String,
     };
     let (s, pr) = find_pr(ctx, &a.at, a.id).await?;
     let id = pr.pull_request_id;
+    let mut opts = GitPullRequestUpdateOptions {
+        completion_options: Some(options),
+        ..GitPullRequestUpdateOptions::default()
+    };
     if a.auto == Some(true) {
-        let me = ctx.me().await?;
-        let body = json!({"autoCompleteSetBy": {"id": me.id}, "completionOptions": options});
-        patch_pr(ctx, &s, id, &body).await?;
+        opts.auto_complete_set_by = Some(IdentityRef::new(ctx.me().await?.id));
+        update_pr(ctx, &s, id, opts).await?;
         return Ok(format!("auto-complete set on !{id}"));
     }
-    let commit = pr
-        .last_merge_source_commit
-        .and_then(|c| c.commit_id)
-        .ok_or_else(|| ApiError::local(format!("PR !{id} has no source commit to merge yet")))?;
-    let body = json!({
-        "status": "completed",
-        "lastMergeSourceCommit": {"commitId": commit},
-        "completionOptions": options,
-    });
-    let done = patch_pr(ctx, &s, id, &body).await?;
+    opts.status = Some(PullRequestStatus::Completed);
+    let done = update_pr(ctx, &s, id, opts).await?;
     Ok(if done.status == git_pull_request::Status::Completed {
         format!("completed !{id} ({strategy})")
     } else {

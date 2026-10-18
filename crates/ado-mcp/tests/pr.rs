@@ -571,6 +571,25 @@ fn comment_anchor() {
     );
     let at = &body["threadContext"];
     assert_eq!(at["rightFileStart"], at["rightFileEnd"]);
+    // A Windows path anchors to the same file.
+    ok(
+        &mut env(&fx),
+        "pr_comment",
+        json!({"id": 412, "text": "x", "file": "\\src\\auth.rs", "line": 88}),
+    );
+    let sent = bodies(&fx, "POST", &threads);
+    assert_eq!(sent[1]["threadContext"]["filePath"], "/src/auth.rs");
+}
+
+#[test]
+fn write_sent_once_on_404() {
+    let fx = Fixture::start();
+    fx.route(&format!("{PRS}/412"), vec![fixture("pr.json")]);
+    let threads = format!("{PR412}/threads");
+    fx.route(&threads, vec![Resp::new(404, "text/plain", "gone")]);
+    let (err, text) = env(&fx).call("pr_comment", json!({"id": 412, "text": "x"}));
+    assert!(err, "{text}");
+    assert_eq!(bodies(&fx, "POST", &threads).len(), 1);
 }
 
 #[test]
@@ -651,9 +670,7 @@ fn vote_values() {
     let mut mcp = env(&fx);
     let text = ok(&mut mcp, "pr_vote", json!({"id": 412, "vote": "reject"}));
     assert_eq!(text, "voted reject on !412");
-    let sent = bodies(&fx, "PUT", &me);
-    assert_eq!(sent.len(), 1);
-    assert_eq!(sent[0]["vote"], -10);
+    assert_eq!(bodies(&fx, "PUT", &me), [json!({"id": ALICE, "vote": -10})]);
     let (err, text) = mcp.call("pr_vote", json!({"id": 412, "vote": "maybe"}));
     assert!(err);
     assert_eq!(
@@ -705,7 +722,6 @@ fn complete_never_bypasses() {
     assert_eq!(
         sent[0],
         json!({"status": "completed",
-               "lastMergeSourceCommit": {"commitId": "9b1f3c2a7d4e5f60718293a4b5c6d7e8f9a0b1c2"},
                "completionOptions": {"mergeStrategy": "squash", "deleteSourceBranch": true,
                                      "transitionWorkItems": true}})
     );
@@ -731,9 +747,9 @@ fn update_only_given_fields() {
     let text = ok(
         &mut mcp,
         "pr_update",
-        json!({"id": 412, "title": "New title", "draft": false}),
+        json!({"id": 412, "title": "New title", "description": "Why."}),
     );
-    assert_eq!(text, "updated !412: title, draft");
+    assert_eq!(text, "updated !412: title, description");
     let text = ok(
         &mut mcp,
         "pr_update",
@@ -743,7 +759,7 @@ fn update_only_given_fields() {
     assert_eq!(
         bodies(&fx, "PATCH", &pr),
         [
-            json!({"title": "New title", "isDraft": false}),
+            json!({"title": "New title", "description": "Why."}),
             json!({"status": "abandoned"})
         ]
     );
@@ -754,7 +770,7 @@ fn update_only_given_fields() {
         ),
         (
             json!({"id": 412}),
-            "nothing to update: give title, description, draft or status",
+            "nothing to update: give title, description or status",
         ),
     ] {
         let (err, text) = mcp.call("pr_update", args);
