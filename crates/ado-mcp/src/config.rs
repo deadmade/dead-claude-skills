@@ -21,7 +21,9 @@ impl Config {
     pub fn from_env() -> Result<Self> {
         let var = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
         let need = |k: &str| {
-            var(k).with_context(|| format!("{k} is not set: configure it with /plugin configure mcp-azure"))
+            var(k).with_context(|| {
+                format!("{k} is not set: configure it with /plugin configure mcp-azure")
+            })
         };
         let mut org = need("ADO_ORG_URL")?;
         let pat = need("ADO_PAT")?;
