@@ -1,5 +1,4 @@
 //! Maps a git remote onto the configured collection, so a PAT is only ever sent to `ADO_ORG_URL`.
-#![allow(dead_code)] // called by the context that comes with Task 4
 
 use std::path::Path;
 use std::process::Command;

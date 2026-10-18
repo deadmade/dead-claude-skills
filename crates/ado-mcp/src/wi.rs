@@ -1,15 +1,16 @@
-//! The work item read tools: `wi_view` and `wi_query`.
+//! The work item tools: the reads `wi_view` and `wi_query`, and the writes `wi_create`, `wi_update` and `wi_comment`.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::Write as _;
 
 use azure_devops_rust_api::wit::models::{
-    CommentList, CommentSortOrder, Wiql, WorkItem, WorkItemBatchGetRequest, WorkItemExpand,
+    CommentCreate, CommentList, CommentSortOrder, JsonPatchOperation, Wiql, WorkItem,
+    WorkItemBatchGetRequest, WorkItemExpand, json_patch_operation::Op,
     work_item_batch_get_request::ErrorPolicy, work_item_query_result::QueryResultType,
 };
 use rmcp::schemars::{self, JsonSchema};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use crate::api::{Api, ApiError};
 use crate::ctx::{Ctx, given, seg};
@@ -44,6 +45,47 @@ pub(crate) struct WiQueryArgs {
     pub title: Option<String>,
     /// How many to list. Default 20.
     pub limit: Option<usize>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[schemars(crate = "schemars")]
+pub(crate) struct WiCreateArgs {
+    /// Project name or id. Default: the clone's project.
+    pub project: Option<String>,
+    /// Work item type, such as Bug, Task or User Story.
+    pub r#type: String,
+    pub title: String,
+    /// The description (HTML).
+    pub description: Option<String>,
+    /// Assignee: `me` or a display name.
+    pub assigned: Option<String>,
+    /// The parent work item's id.
+    pub parent: Option<u32>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[schemars(crate = "schemars")]
+pub(crate) struct WiUpdateArgs {
+    /// Work item id (unique in the collection, so no project).
+    pub id: u32,
+    /// New state, such as Active or Resolved.
+    pub state: Option<String>,
+    /// New assignee: `me` or a display name.
+    pub assigned: Option<String>,
+    pub title: Option<String>,
+    /// Any other fields, by reference name (`Microsoft.VSTS.Common.Priority`, `Custom.Team`) → value.
+    pub fields: Option<BTreeMap<String, Value>>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[schemars(crate = "schemars")]
+pub(crate) struct WiCommentArgs {
+    /// Project name or id. Default: the clone's project.
+    pub project: Option<String>,
+    /// Work item id.
+    pub id: u32,
+    /// The comment (HTML).
+    pub text: String,
 }
 
 /// A string field, or `?`.
@@ -126,8 +168,7 @@ fn comments(list: &CommentList, full: bool, id: i32) -> String {
 /// When the scope, the work item or the server fails.
 pub(crate) async fn wi_view(ctx: &Ctx, a: &WiViewArgs) -> Result<String, ApiError> {
     let id = a.id;
-    let num =
-        i32::try_from(id).map_err(|_| ApiError::local(format!("not found: work item #{id}")))?;
+    let num = wi_id(id)?;
     let full = a.full == Some(true);
     let scope = ctx.scope(a.project.as_deref(), None, None).await?;
     let (api, proj) = (&ctx.api, seg(&scope.project_id));
@@ -427,9 +468,172 @@ pub async fn tickets(api: &Api, ids: &[i32]) -> Result<Vec<Ticket>, ApiError> {
         .collect())
 }
 
+fn wi_id(id: u32) -> Result<i32, ApiError> {
+    i32::try_from(id).map_err(|_| ApiError::local(format!("not found: work item #{id}")))
+}
+
+/// A field reference name such as `System.Title` or `Custom.Team_Name`: two or more `.`-separated words of ASCII
+/// letters, digits and `_`, so nothing can end the JSON Patch path.
+fn field_name(k: &str) -> bool {
+    let mut parts = k.split('.');
+    let word = |p: &str| !p.is_empty() && p.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_');
+    parts.clone().count() >= 2 && parts.all(word)
+}
+
+fn add(path: String, value: Value) -> JsonPatchOperation {
+    JsonPatchOperation {
+        op: Some(Op::Add),
+        path: Some(path),
+        value: Some(value),
+        from: None,
+    }
+}
+
+/// The assignee as the server takes it: the one matching user's display name.
+async fn assignee_name(ctx: &Ctx, who: Option<&str>) -> Result<Option<Value>, ApiError> {
+    Ok(match given(who) {
+        Some(u) => Some(Value::String(ctx.user(u).await?.name)),
+        None => None,
+    })
+}
+
+/// # Errors
+/// When the assignee, the scope or the server fails.
+pub(crate) async fn wi_create(ctx: &Ctx, a: &WiCreateArgs) -> Result<String, ApiError> {
+    let kind = given(Some(&a.r#type)).ok_or_else(|| ApiError::local("no type: pass type"))?;
+    if given(Some(&a.title)).is_none() {
+        return Err(ApiError::local("no title: pass title"));
+    }
+    let mut ops = vec![add("/fields/System.Title".into(), json!(a.title))];
+    if let Some(d) = &a.description {
+        ops.push(add("/fields/System.Description".into(), json!(d)));
+    }
+    if let Some(who) = assignee_name(ctx, a.assigned.as_deref()).await? {
+        ops.push(add("/fields/System.AssignedTo".into(), who));
+    }
+    if let Some(p) = a.parent {
+        let url = format!("{}_apis/wit/workItems/{p}", ctx.cfg.org_url);
+        let rel = json!({"rel": "System.LinkTypes.Hierarchy-Reverse", "url": url});
+        ops.push(add("/relations/-".into(), rel));
+    }
+    let proj = seg(&ctx
+        .scope(a.project.as_deref(), None, None)
+        .await?
+        .project_id);
+    let api = &ctx.api;
+    let item = api
+        .az(|| {
+            api.wit
+                .work_items_client()
+                .create(&api.org, ops.clone(), &proj, seg(kind))
+                .into_future()
+        })
+        .await
+        .map_err(|e| e.with_what(&format!("work item type {kind}")))?;
+    Ok(format!("created #{} {kind} \"{}\"", item.id, a.title))
+}
+
+/// # Errors
+/// When nothing or a bad field name is given, or the assignee, the work item or the server fails.
+pub(crate) async fn wi_update(ctx: &Ctx, a: &WiUpdateArgs) -> Result<String, ApiError> {
+    let mut fields = a.fields.clone().unwrap_or_default();
+    if let Some(k) = fields.keys().find(|k| !field_name(k)) {
+        return Err(ApiError::local(format!("bad field name: {k}")));
+    }
+    for (k, v) in [("System.State", &a.state), ("System.Title", &a.title)] {
+        if let Some(v) = v {
+            fields.insert(k.into(), json!(v));
+        }
+    }
+    if fields.is_empty() && given(a.assigned.as_deref()).is_none() {
+        return Err(ApiError::local(
+            "nothing to update: give state, assigned, title or fields",
+        ));
+    }
+    let num = wi_id(a.id)?;
+    if let Some(who) = assignee_name(ctx, a.assigned.as_deref()).await? {
+        fields.insert("System.AssignedTo".into(), who);
+    }
+    let names: Vec<&str> = fields.keys().map(String::as_str).collect();
+    let names = names.join(", ");
+    let ops: Vec<JsonPatchOperation> = fields
+        .into_iter()
+        .map(|(k, v)| add(format!("/fields/{k}"), v))
+        .collect();
+    let api = &ctx.api;
+    // No project: an id is unique in the collection, so an item in any project updates. The guard cuts the `//`.
+    api.az(|| {
+        api.wit
+            .work_items_client()
+            .update(&api.org, ops.clone(), num, "")
+            .into_future()
+    })
+    .await
+    .map_err(|e| e.with_what(&format!("work item #{}", a.id)))?;
+    Ok(format!("updated #{}: {names}", a.id))
+}
+
+/// # Errors
+/// When the scope, the work item or the server fails.
+pub(crate) async fn wi_comment(ctx: &Ctx, a: &WiCommentArgs) -> Result<String, ApiError> {
+    let num = wi_id(a.id)?;
+    let proj = seg(&ctx
+        .scope(a.project.as_deref(), None, None)
+        .await?
+        .project_id);
+    let body = CommentCreate {
+        text: Some(a.text.clone()),
+    };
+    let api = &ctx.api;
+    api.az(|| {
+        api.wit
+            .comments_client()
+            .add_comment(&api.org, body.clone(), &proj, num)
+            .into_future()
+    })
+    .await
+    // The comments path needs the item's project; a retry elsewhere would send the write twice.
+    .map_err(|e| {
+        let id = a.id;
+        e.with_what(&format!(
+            "work item #{id} (if #{id} is in another project, pass project)"
+        ))
+    })?;
+    Ok(format!("commented on #{}", a.id))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn field_names() {
+        for good in [
+            "System.Title",
+            "Custom.Team_Name",
+            "Microsoft.VSTS.Common.Priority",
+        ] {
+            assert!(field_name(good), "{good}");
+        }
+        for bad in [
+            "",
+            "a/b",
+            "a b",
+            "x~1",
+            "-",
+            "a\"b",
+            "Ünter",
+            ".",
+            "..",
+            ".Title",
+            "System..Title",
+            "_",
+            "System.",
+            "Title",
+        ] {
+            assert!(!field_name(bad), "{bad}");
+        }
+    }
 
     #[test]
     fn last_ids() {

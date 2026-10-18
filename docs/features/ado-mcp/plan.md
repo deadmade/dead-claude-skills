@@ -768,6 +768,8 @@ error lines, never raw JSON.
      text, not the JSON lines form. Also check whether a YAML run without stages prints a `__default` stage line.
    - `pipeline_log … full=true` on a log over 2000 lines, then the `start=` call it offers: the second page must
      start where the first stopped (a server that ignores `startLine` would repeat the opening lines).
+   - `wi_update assigned=<a colleague's name>` on a scratch work item: the assignee is sent as a display name; paste
+     back any "ambiguous" or "unknown identity" error.
    - `pr_complete` without `auto` on a scratch PR (D4): it sends no `lastMergeSourceCommit`; paste back the line,
      especially any error naming that field.
    - `pr_files` on a PR with a renamed file and, if one exists, a file whose encoding changed: the crate's

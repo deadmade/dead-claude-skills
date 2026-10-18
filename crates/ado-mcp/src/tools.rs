@@ -1,4 +1,3 @@
-use std::fmt::Write as _;
 use std::sync::Arc;
 
 use rmcp::handler::server::router::tool::ToolRouter;
@@ -7,18 +6,16 @@ use rmcp::{ServerHandler, tool, tool_handler, tool_router};
 use serde_json::json;
 
 use rmcp::handler::server::wrapper::Parameters;
-use rmcp::schemars::{self, JsonSchema};
-use serde::Deserialize;
 
 use crate::api::ApiError;
 use crate::config::Config;
-use crate::ctx::{Ctx, seg};
-use crate::pipeline::{self, LogArgs, ProjectArgs, RunArgs, RunsArgs};
+use crate::ctx::Ctx;
+use crate::pipeline::{self, LogArgs, PipelineRunArgs, ProjectArgs, RunArgs, RunsArgs};
 use crate::pr::{
     self, PrCommentArgs, PrCompleteArgs, PrCreateArgs, PrFilesArgs, PrListArgs, PrReplyArgs,
     PrThreadStatusArgs, PrThreadsArgs, PrUpdateArgs, PrViewArgs, PrVoteArgs,
 };
-use crate::wi::{self, WiQueryArgs, WiViewArgs};
+use crate::wi::{self, WiCommentArgs, WiCreateArgs, WiQueryArgs, WiUpdateArgs, WiViewArgs};
 
 /// The tools that change something on the server. Claude Code prompts on every call to these.
 pub(crate) const WRITES: [&str; 12] = [
@@ -82,60 +79,8 @@ fn reply(r: Result<String, ApiError>) -> CallToolResult {
     }
 }
 
-// Temporary, for the context tests; Task 11 removes it.
-#[derive(Deserialize, JsonSchema)]
-#[schemars(crate = "schemars")]
-struct ScopeEchoArgs {
-    project: Option<String>,
-    repo: Option<String>,
-    branch: Option<String>,
-    /// A user to look up (`me` or a name); prints only that user.
-    user: Option<String>,
-    /// A pipeline name or id to resolve in the scope.
-    pipeline: Option<String>,
-    /// Also ask the server for the repo by its id, retrying once if that id is stale.
-    check: Option<bool>,
-}
-
 #[tool_router]
 impl Server {
-    // Temporary diagnostic; Task 11 removes it.
-    #[tool(
-        description = "Check that the Azure DevOps server answers and the PAT works; prints how many projects it listed.",
-        annotations(read_only_hint = true)
-    )]
-    async fn ping(&self) -> CallToolResult {
-        let api = &self.ctx.api;
-        match api
-            .az(|| {
-                api.core
-                    .projects_client()
-                    .list(&api.org)
-                    .top(1)
-                    .into_future()
-            })
-            .await
-        {
-            Ok(v) => CallToolResult::success(vec![ContentBlock::text(format!(
-                "projects: {}",
-                v.count.unwrap_or_default()
-            ))]),
-            Err(e) => error(e.to_string()),
-        }
-    }
-
-    // Temporary, for the context tests; Task 11 removes it.
-    #[tool(
-        description = "Print the resolved project, repo and branch (and a user or pipeline).",
-        annotations(read_only_hint = true)
-    )]
-    async fn scope_echo(&self, Parameters(a): Parameters<ScopeEchoArgs>) -> CallToolResult {
-        match self.echo(a).await {
-            Ok(text) => CallToolResult::success(vec![ContentBlock::text(text)]),
-            Err(e) => error(e.to_string()),
-        }
-    }
-
     #[tool(
         description = "List pull requests, one line each (id, status, branches, title, author, approvals). Defaults to the active ones in this repo.",
         annotations(read_only_hint = true)
@@ -238,6 +183,37 @@ impl Server {
     }
 
     #[tool(
+        description = "Create a work item of a type (Bug, Task, User Story, …) with a title, and optionally a description (HTML), an assignee (`me` or a name) and a parent work item."
+    )]
+    async fn wi_create(&self, Parameters(a): Parameters<WiCreateArgs>) -> CallToolResult {
+        reply(wi::wi_create(&self.ctx, &a).await)
+    }
+
+    #[tool(
+        description = "Change a work item's state, assignee (`me` or a name), title, or any other field by reference name (fields: {\"Microsoft.VSTS.Common.Priority\": 1}). Only the given fields change."
+    )]
+    async fn wi_update(&self, Parameters(a): Parameters<WiUpdateArgs>) -> CallToolResult {
+        reply(wi::wi_update(&self.ctx, &a).await)
+    }
+
+    #[tool(description = "Add a comment (HTML) to a work item.")]
+    async fn wi_comment(&self, Parameters(a): Parameters<WiCommentArgs>) -> CallToolResult {
+        reply(wi::wi_comment(&self.ctx, &a).await)
+    }
+
+    #[tool(
+        description = "Queue a run of a pipeline (name or id) on a branch (default: the current branch), with optional template parameters."
+    )]
+    async fn pipeline_run(&self, Parameters(a): Parameters<PipelineRunArgs>) -> CallToolResult {
+        reply(pipeline::pipeline_run(&self.ctx, &a).await)
+    }
+
+    #[tool(description = "Cancel a pipeline run (the run id from pipeline_runs).")]
+    async fn pipeline_cancel(&self, Parameters(a): Parameters<RunArgs>) -> CallToolResult {
+        reply(pipeline::pipeline_cancel(&self.ctx, &a).await)
+    }
+
+    #[tool(
         description = "List recent pipeline runs, newest first, one line each (id, pipeline, branch, result, date, duration). Filter by pipeline (name or id), branch, PR or result.",
         annotations(read_only_hint = true)
     )]
@@ -267,53 +243,6 @@ impl Server {
     )]
     async fn repo_list(&self, Parameters(a): Parameters<ProjectArgs>) -> CallToolResult {
         reply(pipeline::repo_list(&self.ctx, &a).await)
-    }
-}
-
-impl Server {
-    #[allow(clippy::many_single_char_names)] // temporary
-    async fn echo(&self, a: ScopeEchoArgs) -> Result<String, crate::api::ApiError> {
-        let ctx = &self.ctx;
-        if let Some(u) = &a.user {
-            let m = ctx.user(u).await?;
-            return Ok(format!("user: {} {}", m.id, m.name));
-        }
-        let (p, r, b) = (a.project.as_deref(), a.repo.as_deref(), a.branch.as_deref());
-        let first = ctx.scope(p, r, b).await?;
-        let s = if a.check == Some(true) {
-            ctx.retry_stale(&first.key, || async {
-                let s = ctx.scope(p, r, b).await?;
-                if let Some(id) = &s.repo_id {
-                    let api = &ctx.api;
-                    api.az(|| {
-                        api.git
-                            .repositories_client()
-                            .get_repository(&api.org, seg(id), seg(&s.project_id))
-                            .into_future()
-                    })
-                    .await?;
-                }
-                Ok(s)
-            })
-            .await?
-        } else {
-            first
-        };
-        let dash = |o: &Option<String>| o.clone().unwrap_or_else(|| "-".into());
-        let repo = match &s.repo_id {
-            Some(id) => format!("{id} {}", dash(&s.repo)),
-            None => "-".into(),
-        };
-        let mut out = format!(
-            "project: {} {}\nrepo: {repo}\nbranch: {}",
-            s.project_id,
-            s.project,
-            dash(&s.branch)
-        );
-        if let Some(n) = &a.pipeline {
-            let _ = write!(out, "\npipeline: {}", ctx.pipeline_id(&s, n).await?);
-        }
-        Ok(out)
     }
 }
 

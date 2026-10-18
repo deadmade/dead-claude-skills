@@ -310,3 +310,90 @@ fn log_matrix_steps_failed_first() {
         assert_eq!(queries(&fx, &format!("{LOGS}/{id}")).len(), 0, "log {id}");
     }
 }
+
+const DEFS: &str = "/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/build/definitions";
+const RUNS12: &str = "/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/pipelines/12/runs";
+
+fn sent(fx: &Fixture, path: &str) -> Vec<common::Req> {
+    fx.requests()
+        .into_iter()
+        .filter(|r| r.path.split('?').next() == Some(path))
+        .collect()
+}
+
+fn body(r: &common::Req) -> Value {
+    serde_json::from_slice(&r.body).unwrap()
+}
+
+#[test]
+fn run_ref_and_params() {
+    let fx = Fixture::start();
+    fx.route(DEFS, vec![fixture("definitions.json")]);
+    fx.route(RUNS12, vec![fixture("pipeline-run.json")]);
+    let mut mcp = env(&fx);
+    let text = ok(
+        &mut mcp,
+        "pipeline_run",
+        json!({"pipeline": "CI", "branch": "feature/x", "parameters": {"env": "staging", "dry": "true"}}),
+    );
+    assert_eq!(text, "queued run #78 of CI on feature/x");
+    // No branch: the clone's.
+    let text = ok(&mut mcp, "pipeline_run", json!({"pipeline": "12"}));
+    assert_eq!(text, "queued run #78 of CI on main");
+    let reqs = sent(&fx, RUNS12);
+    assert_eq!(reqs.len(), 2);
+    assert_eq!(reqs[0].method, "POST");
+    assert!(!reqs[0].path.contains("staging"), "{}", reqs[0].path);
+    assert_eq!(
+        body(&reqs[0]),
+        json!({
+            "resources": {"repositories": {"self": {"refName": "refs/heads/feature/x"}}},
+            "templateParameters": {"dry": "true", "env": "staging"},
+        })
+    );
+    assert_eq!(
+        body(&reqs[1]),
+        json!({"resources": {"repositories": {"self": {"refName": "refs/heads/main"}}}})
+    );
+}
+
+#[test]
+fn cancel_body() {
+    let fx = Fixture::start();
+    let build = format!("{BUILDS}/77");
+    fx.route(
+        &build,
+        vec![Resp::json(&json!({"id": 77, "status": "cancelling"}))],
+    );
+    let text = ok(&mut env(&fx), "pipeline_cancel", json!({"run": 77}));
+    assert_eq!(text, "cancelling run #77");
+    let reqs = sent(&fx, &build);
+    assert_eq!(reqs.len(), 1);
+    assert_eq!(reqs[0].method, "PATCH");
+    assert_eq!(reqs[0].header("content-type"), Some("application/json"));
+    assert_eq!(queries(&fx, &build), ["api-version=7.1-preview"]);
+    assert_eq!(body(&reqs[0]), json!({"status": "cancelling"}));
+}
+
+#[test]
+fn pipeline_write_sent_once_on_404() {
+    let fx = Fixture::start();
+    let build = format!("{BUILDS}/77");
+    fx.route(&build, vec![Resp::new(404, "text/plain", "gone")]);
+    fx.route(RUNS12, vec![Resp::new(404, "text/plain", "gone")]);
+    let mut mcp = env(&fx);
+    for (tool, args, want) in [
+        ("pipeline_cancel", json!({"run": 77}), "not found: run #77"),
+        (
+            "pipeline_run",
+            json!({"pipeline": "12", "branch": "main"}),
+            "not found: pipeline 12",
+        ),
+    ] {
+        let (err, text) = mcp.call(tool, args);
+        assert!(err, "{tool}: {text}");
+        assert_eq!(text, want);
+    }
+    assert_eq!(sent(&fx, &build).len(), 1);
+    assert_eq!(sent(&fx, RUNS12).len(), 1);
+}

@@ -74,6 +74,12 @@ MCP server.
     lists the updatable fields (status, title, description, completionOptions, mergeOptions, autoCompleteSetBy.id,
     targetRefName), and neither is among them, so B follows the documented call. The smoke test checks a direct
     `pr_complete`; if the server demands the commit, D4 comes back to the user.
+- **D5, 2026-10-18: `pipeline_cancel` is a hand-sent PATCH** (Task 10). The crate's `update_build` takes a whole
+  `Build` and always serializes its required fields (definition, id, priority, project, reason), so it can't send
+  just `{"status":"cancelling"}`. Options: A, a hand-sent PATCH of `{"status":"cancelling"}` through our `Api::send`
+  (guard and error lines unchanged); B, GET the build through the crate and PATCH the whole object back (two calls,
+  and it writes back every field it read, so a change made in between could be overwritten). Recommended A.
+  - Decision: 2026-10-18, A ("a is ok").
 
 ## Skipped
 
