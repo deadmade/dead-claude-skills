@@ -1,0 +1,14 @@
+{
+  "serverVersion": "18.2.0.0",
+  "repository": {
+    "id": "3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01",
+    "name": "R",
+    "project": {
+      "id": "b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455",
+      "name": "My Proj",
+      "state": "wellFormed",
+      "visibility": "private"
+    },
+    "defaultBranch": "refs/heads/main"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "count": 2,
+  "value": [
+    {
+      "id": "1a2b3c4d-0001-4000-8000-000000000001",
+      "providerDisplayName": "Bob Builder",
+      "isActive": true
+    },
+    {
+      "id": "1a2b3c4d-0002-4000-8000-000000000002",
+      "providerDisplayName": "Bobby Tables",
+      "isActive": true
+    }
+  ]
+}

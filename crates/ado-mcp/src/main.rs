@@ -1,9 +1,8 @@
 mod api;
 mod config;
+mod ctx;
 mod remote;
 mod tools;
-
-use std::sync::Arc;
 
 use rmcp::{ServiceExt, transport::stdio};
 
@@ -16,7 +15,7 @@ async fn main() -> anyhow::Result<()> {
     let cfg = config::Config::from_env()?;
     // ring, not aws-lc-rs: no cmake or C toolchain needed to build.
     let _ = rustls::crypto::ring::default_provider().install_default();
-    tools::Server::new(Arc::new(cfg))?
+    tools::Server::new(cfg)?
         .serve(stdio())
         .await?
         .waiting()

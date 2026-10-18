@@ -313,6 +313,30 @@ impl Mcp {
         (r["isError"] == true, text(&r).to_owned())
     }
 
+    /// Sends every call before reading any answer, so the server handles them at the same time; the results keep the order of `args`.
+    pub fn call_all(&mut self, tool: &str, args: Vec<Value>) -> Vec<(bool, String)> {
+        let first = self.next_id;
+        for (i, a) in args.iter().enumerate() {
+            let id = first + i as u64;
+            self.send(&json!({"jsonrpc":"2.0","id":id,"method":"tools/call",
+                              "params":{"name":tool,"arguments":a}}));
+        }
+        self.next_id += args.len() as u64;
+        let mut got: HashMap<u64, (bool, String)> = HashMap::new();
+        while got.len() < args.len() {
+            let mut line = String::new();
+            assert!(self.out.read_line(&mut line).unwrap() > 0, "server exited");
+            let v: Value = serde_json::from_str(&line).unwrap();
+            if let Some(id) = v["id"].as_u64().filter(|id| *id >= first) {
+                let r = &v["result"];
+                got.insert(id, (r["isError"] == true, text(r).to_owned()));
+            }
+        }
+        (first..self.next_id)
+            .map(|id| got.remove(&id).unwrap())
+            .collect()
+    }
+
     /// Closes the server's stdin, as Claude Code does when it exits, and waits for the server to finish.
     pub fn finish(&mut self) {
         self.stdin = None;

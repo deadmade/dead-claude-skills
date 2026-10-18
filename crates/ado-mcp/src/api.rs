@@ -44,7 +44,7 @@ impl fmt::Display for ApiError {
 impl std::error::Error for ApiError {}
 
 impl ApiError {
-    fn local(msg: impl Into<String>) -> Self {
+    pub(crate) fn local(msg: impl Into<String>) -> Self {
         Self {
             status: None,
             tf: None,
@@ -240,7 +240,8 @@ impl Api {
     }
 
     fn net_err(&self, e: &reqwest::Error, url: &Url) -> ApiError {
-        if e.is_timeout() {
+        // A connect timeout is both; it is the host that can't be reached, not a slow answer.
+        if e.is_timeout() && !e.is_connect() {
             return ApiError::local(format!(
                 "the server didn't answer in {} s",
                 self.timeout.as_secs()
@@ -294,16 +295,16 @@ fn unexpected(status: u16, ct: &str) -> ApiError {
 }
 
 /// The segment after `_apis/` decides which PAT scope was missing.
-fn scope(path: &str) -> &'static str {
+fn scope(path: &str) -> Option<&'static str> {
     let area = path
         .split_once("_apis/")
         .and_then(|(_, r)| r.split(['/', '?']).next());
     match area {
-        Some("git" | "policy") => "Code",
-        Some("wit") => "Work Items",
-        Some("build" | "pipelines") => "Build",
-        Some("projects" | "identities" | "connectionData") => "Project and Team (Read)",
-        _ => "a broader",
+        Some("git" | "policy") => Some("Code"),
+        Some("wit") => Some("Work Items"),
+        Some("build" | "pipelines") => Some("Build"),
+        Some("projects" | "identities" | "connectionData") => Some("Project and Team (Read)"),
+        _ => None,
     }
 }
 
@@ -328,8 +329,8 @@ fn status_error(status: u16, ct: &str, body: &str, path: &str) -> ApiError {
         401 | 203 => err(PAT_LINE.into(), None),
         403 => err(
             format!(
-                "the PAT may not do this: it needs the {} scope",
-                scope(path)
+                "the PAT may not do this: it needs {}",
+                scope(path).map_or("a broader scope".into(), |s| format!("the {s} scope"))
             ),
             None,
         ),
@@ -417,7 +418,43 @@ mod tests {
         f("P/_apis/pipelines/1/runs", "Build");
         f("_apis/projects", "Project and Team (Read)");
         f("_apis/connectionData", "Project and Team (Read)");
-        f("P/_apis/other", "a broader");
+    }
+
+    #[test]
+    fn unnamed_scope_reads_as_a_broader_one() {
+        for p in ["P/_apis/other", "no-area"] {
+            assert_eq!(
+                status_error(403, "", "", p).msg,
+                "the PAT may not do this: it needs a broader scope"
+            );
+        }
+    }
+
+    // Linux queues the SYNs of a full backlog; Windows refuses them.
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn connect_timeout_is_not_a_slow_answer() {
+        let api = api(); // installs the crypto provider
+        // Fill a listener's accept queue, then the next connect hangs until its timeout.
+        let l = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let addr = l.local_addr().unwrap();
+        let mut held = Vec::new();
+        while let Ok(c) = std::net::TcpStream::connect_timeout(&addr, Duration::from_millis(100)) {
+            held.push(c);
+            assert!(held.len() < 100_000, "the queue never filled");
+        }
+        let url = Url::parse(&format!("http://{addr}/")).unwrap();
+        let e = Client::builder()
+            .connect_timeout(Duration::from_millis(100))
+            .build()
+            .unwrap()
+            .get(url.clone())
+            .send()
+            .await
+            .unwrap_err();
+        assert!(e.is_connect() && e.is_timeout(), "{e:?}");
+        let msg = api.net_err(&e, &url).msg;
+        assert!(msg.starts_with("can't reach 127.0.0.1: "), "{msg}");
     }
 
     #[test]

@@ -1,0 +1,12 @@
+{
+  "count": 1,
+  "value": [
+    {
+      "id": 12,
+      "name": "CI",
+      "path": "\\Build",
+      "type": "build",
+      "queueStatus": "enabled"
+    }
+  ]
+}

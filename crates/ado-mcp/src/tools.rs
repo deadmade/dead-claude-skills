@@ -1,3 +1,4 @@
+use std::fmt::Write as _;
 use std::sync::Arc;
 
 use rmcp::handler::server::router::tool::ToolRouter;
@@ -5,8 +6,13 @@ use rmcp::model::{CallToolResult, ContentBlock, Implementation, ServerCapabiliti
 use rmcp::{ServerHandler, tool, tool_handler, tool_router};
 use serde_json::{Value, json};
 
-use crate::api::{Api, V71};
+use rmcp::handler::server::wrapper::Parameters;
+use rmcp::schemars::{self, JsonSchema};
+use serde::Deserialize;
+
+use crate::api::V71;
 use crate::config::Config;
+use crate::ctx::Ctx;
 
 /// The tools that change something on the server. Claude Code prompts on every call to these.
 pub(crate) const WRITES: [&str; 12] = [
@@ -38,18 +44,15 @@ about to do, then call it once; in dontAsk mode these calls are denied.\n\
 - Lists show 20 items and say how to get more (limit). Long text is cut with the call that shows the rest.";
 
 pub struct Server {
-    // Read by the tools from Task 4 on.
-    #[allow(dead_code)]
-    cfg: Arc<Config>,
-    api: Api,
+    ctx: Arc<Ctx>,
     router: ToolRouter<Self>,
 }
 
 impl Server {
     /// # Errors
     /// When the HTTP client can't be built.
-    pub fn new(cfg: Arc<Config>) -> anyhow::Result<Self> {
-        let api = Api::new(&cfg)?;
+    pub fn new(cfg: Config) -> anyhow::Result<Self> {
+        let ctx = Arc::new(Ctx::new(cfg)?);
         let mut router = Self::tool_router();
         for name in WRITES {
             if let Some(tool) = router.map.get_mut(name) {
@@ -58,12 +61,27 @@ impl Server {
                 tool.attr.meta = serde_json::from_value(meta).ok();
             }
         }
-        Ok(Self { cfg, api, router })
+        Ok(Self { ctx, router })
     }
 }
 
 fn error(msg: impl Into<String>) -> CallToolResult {
     CallToolResult::error(vec![ContentBlock::text(msg)])
+}
+
+// Temporary, for the context tests; Task 11 removes it.
+#[derive(Deserialize, JsonSchema)]
+#[schemars(crate = "schemars")]
+struct ScopeEchoArgs {
+    project: Option<String>,
+    repo: Option<String>,
+    branch: Option<String>,
+    /// A user to look up (`me` or a name); prints only that user.
+    user: Option<String>,
+    /// A pipeline name or id to resolve in the scope.
+    pipeline: Option<String>,
+    /// Also ask the server for the repo by its id, retrying once if that id is stale.
+    check: Option<bool>,
 }
 
 #[tool_router]
@@ -75,6 +93,7 @@ impl Server {
     )]
     async fn ping(&self) -> CallToolResult {
         match self
+            .ctx
             .api
             .get::<Value>("_apis/projects", &[("$top", "1".into())], V71)
             .await
@@ -85,6 +104,59 @@ impl Server {
             ))]),
             Err(e) => error(e.to_string()),
         }
+    }
+
+    // Temporary, for the context tests; Task 11 removes it.
+    #[tool(
+        description = "Print the resolved project, repo and branch (and a user or pipeline).",
+        annotations(read_only_hint = true)
+    )]
+    async fn scope_echo(&self, Parameters(a): Parameters<ScopeEchoArgs>) -> CallToolResult {
+        match self.echo(a).await {
+            Ok(text) => CallToolResult::success(vec![ContentBlock::text(text)]),
+            Err(e) => error(e.to_string()),
+        }
+    }
+}
+
+impl Server {
+    #[allow(clippy::many_single_char_names)] // temporary
+    async fn echo(&self, a: ScopeEchoArgs) -> Result<String, crate::api::ApiError> {
+        let ctx = &self.ctx;
+        if let Some(u) = &a.user {
+            let m = ctx.user(u).await?;
+            return Ok(format!("user: {} {}", m.id, m.name));
+        }
+        let (p, r, b) = (a.project.as_deref(), a.repo.as_deref(), a.branch.as_deref());
+        let first = ctx.scope(p, r, b).await?;
+        let s = if a.check == Some(true) {
+            ctx.retry_stale(&first.key, || async {
+                let s = ctx.scope(p, r, b).await?;
+                if let Some(id) = &s.repo_id {
+                    let path = format!("{}/_apis/git/repositories/{id}", s.project_id);
+                    ctx.api.get::<Value>(&path, &[], V71).await?;
+                }
+                Ok(s)
+            })
+            .await?
+        } else {
+            first
+        };
+        let dash = |o: &Option<String>| o.clone().unwrap_or_else(|| "-".into());
+        let repo = match &s.repo_id {
+            Some(id) => format!("{id} {}", dash(&s.repo)),
+            None => "-".into(),
+        };
+        let mut out = format!(
+            "project: {} {}\nrepo: {repo}\nbranch: {}",
+            s.project_id,
+            s.project,
+            dash(&s.branch)
+        );
+        if let Some(n) = &a.pipeline {
+            let _ = write!(out, "\npipeline: {}", ctx.pipeline_id(&s, n).await?);
+        }
+        Ok(out)
     }
 }
 
