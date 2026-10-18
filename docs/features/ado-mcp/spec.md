@@ -1,6 +1,6 @@
 # ado-mcp: spec
 
-Status: draft, before the grill and Gate 1. Written from the chat and the decisions in [flow.md](flow.md) (Options).
+Status: draft, before the grill and Gate 1. Builder check done; its two questions answered 2026-10-18. Written from the chat and the decisions in [flow.md](flow.md) (Options).
 Choices marked _(my call)_ were not made by the user.
 
 ## Intent
@@ -58,7 +58,12 @@ downloaded when it runs. The user doesn't need a terminal tool: "goal is for cla
        - `step` picks another step; `full: true` with `start`/`end` lines returns the raw range, capped _(my call:
          2000 lines per call)_
      - `repo_list`: repos in the project.
-   - **Writes.** Not pre-approved; the user sees a permission prompt for each.
+   - **Writes.** Every write tool carries `_meta["anthropic/requiresUserInteraction"]: true` in `tools/list` (the
+     user's choice, 2026-10-18). Claude Code then prompts on every call, even in auto and bypass modes, offers no
+     "don't ask again", and ignores allow rules (code.claude.com/docs/en/mcp, "Require approval for a specific
+     tool"; Claude Code ≥ 2.1.214). In `dontAsk` mode such calls are denied.
+     - Reads carry no mark. The user allows them once with "don't ask again"; no installer rules are written. The
+       README lists the read tool names `mcp__plugin_mcp-azure_ado__<tool>`.
      - `pr_create`: title, description, source (default: current branch), target (default: the repo's default
        branch), draft, reviewers, linked work items.
      - `pr_update`: title, description, draft ↔ published, abandon or reactivate.
@@ -155,6 +160,8 @@ downloaded when it runs. The user doesn't need a terminal tool: "goal is for cla
 - A diff tool (local git does it).
 - Azure DevOps Services (cloud): not targeted or tested, though not deliberately blocked.
 - macOS or ARM builds.
+- A custom CA setting for Linux/WSL. The user never runs Claude Code under WSL or Linux at work (2026-10-18), and on
+  Linux at home the system bundle covers public certificates.
 
 ## Anti-goals
 

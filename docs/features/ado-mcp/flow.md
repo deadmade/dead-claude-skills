@@ -1,5 +1,5 @@
 ---
-phase: brainstorm
+phase: grill
 ---
 
 # ado MCP server: flow
@@ -164,6 +164,12 @@ Settled in the chat before this flow started (the user's words in quotes):
     `ado_api_version`), and gains `binPath`.
   - `@tiberriver256/mcp-server-azure-devops` leaves the repo and THIRD_PARTY.md.
   - Rejected: a new plugin alongside mcp-azure.
+- **Permissions** (builder check, 2026-10-18):
+  - Options offered: A, allow the reads on first use; B, the installer writes allow rules. Recommended A.
+  - The user asked whether Claude can always ask. Answer: yes, through the server-side
+    `anthropic/requiresUserInteraction` mark.
+  - Picked: "writes only". Write tools carry the mark; reads are allowed on first use (A).
+- **Linux CA**: "no wsl at work", so there is no CA setting.
 - **Reusing azdocli** (the user asked, 2026-10-18): it is only a reference. Its code sits on the SDK the user ruled
   out, so nothing copies over as is. A function ported close to verbatim keeps its MIT notice and gets a
   THIRD_PARTY.md line _(my call)_.
