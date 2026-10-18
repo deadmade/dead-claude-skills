@@ -1,7 +1,5 @@
 //! The Azure DevOps client: the crate's clients behind our own reqwest client, PAT auth, timeouts, and errors that
 //! fit on one line. `/vsts/info` and `connectionData`, which the crate doesn't cover, are sent by hand.
-// The tools that use the rest of this come with later tasks.
-#![allow(dead_code)]
 
 use std::error::Error as _;
 use std::fmt;
@@ -324,22 +322,6 @@ impl Api {
             .await
     }
 
-    /// Like [`Api::get`], for an answer that is plain text (a log).
-    ///
-    /// # Errors
-    /// See [`Api::get`].
-    pub async fn get_text(
-        &self,
-        path: &str,
-        query: &[(&str, String)],
-        ver: &str,
-    ) -> Result<String, ApiError> {
-        Ok(self
-            .exec(Method::GET, path, query, ver, None, "text/plain")
-            .await?
-            .2)
-    }
-
     /// A request with a JSON body (none for `Value::Null`); `json_patch` sends it as `application/json-patch+json`.
     ///
     /// # Errors
@@ -354,9 +336,7 @@ impl Api {
         json_patch: bool,
     ) -> Result<T, ApiError> {
         let body = (!body.is_null()).then_some((body, json_patch));
-        let (status, ct, text) = self
-            .exec(method, path, query, ver, body, "application/json")
-            .await?;
+        let (status, ct, text) = self.exec(method, path, query, ver, body).await?;
         // 204 and friends have no body.
         let text = if text.trim().is_empty() {
             "null"
@@ -396,7 +376,6 @@ impl Api {
         query: &[(&str, String)],
         ver: &str,
         body: Option<(&Value, bool)>,
-        accept: &str,
     ) -> Result<(u16, String, String), ApiError> {
         let url = self.url(path, query, ver)?;
         let mut throttled_once = false;
@@ -404,7 +383,7 @@ impl Api {
             let mut req = self
                 .client
                 .request(method.clone(), url.clone())
-                .header(ACCEPT, accept);
+                .header(ACCEPT, "application/json");
             if let Some((json, patch)) = body {
                 let ct = if patch {
                     "application/json-patch+json"
@@ -579,7 +558,7 @@ mod tests {
             "/tfs/Other/_apis/projects",
             "../x",
         ] {
-            let e = api.get_text(path, &[], V71_P1).await.unwrap_err();
+            let e = api.get::<Value>(path, &[], V71_P1).await.unwrap_err();
             assert!(
                 e.status.is_none() && e.msg.contains("outside the configured collection"),
                 "{path}: {e}"

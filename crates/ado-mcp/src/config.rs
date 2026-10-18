@@ -4,7 +4,6 @@ use anyhow::{Context as _, Result, bail};
 use url::Url;
 
 /// What the plugin's `.mcp.json` passes in. No `Debug`: the PAT must not reach a log by accident.
-#[allow(dead_code)] // the fields are read by the API client and tools that come with later tasks
 pub struct Config {
     /// The collection URL, always ending in `/` so `Url::join` keeps the collection.
     pub org_url: Url,

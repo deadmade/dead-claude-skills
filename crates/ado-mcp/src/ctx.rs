@@ -1,7 +1,5 @@
 //! What every tool needs first: the project and repo (from arguments, the git remote or the default project), who
 //! "me" is, who a name is, and which pipeline a name means. Answers are cached for the life of the server.
-// The tools that use all of this come with later tasks.
-#![allow(dead_code)]
 
 use std::collections::HashMap;
 use std::fmt::Write as _;
@@ -22,7 +20,6 @@ pub(crate) struct Scope {
     pub project_id: String,
     pub project: String,
     pub repo_id: Option<String>,
-    pub repo: Option<String>,
     pub branch: Option<String>,
 }
 
@@ -43,7 +40,6 @@ struct Proj {
 #[derive(Deserialize)]
 struct Repo {
     id: String,
-    name: String,
     project: Proj,
 }
 
@@ -161,7 +157,7 @@ impl Ctx {
         self.cached(key.clone(), async {
             let (api, p) = (&self.api, seg(project));
             // The two answers carry different `TeamProjectReference` types.
-            let (project_id, project_name, repo) = if let Some(r) = repo {
+            let (project_id, project_name, repo_id) = if let Some(r) = repo {
                 let found = api
                     .az(|| {
                         api.git
@@ -172,7 +168,7 @@ impl Ctx {
                     .await
                     .map_err(|e| e.with_what(&format!("repo {r} in {project}")))?;
                 let p = found.project;
-                (p.id, p.name, Some((found.id, found.name)))
+                (p.id, p.name, Some(found.id))
             } else {
                 let found = api
                     .az(|| api.core.projects_client().get(&api.org, &p).into_future())
@@ -188,8 +184,7 @@ impl Ctx {
                 key,
                 project_id,
                 project: project_name,
-                repo_id: repo.as_ref().map(|r| r.0.clone()),
-                repo: repo.map(|r| r.1),
+                repo_id,
                 branch: None,
             })
         })
@@ -216,7 +211,6 @@ impl Ctx {
                         project_id: r.project.id,
                         project: r.project.name,
                         repo_id: Some(r.id),
-                        repo: Some(r.name),
                         branch: None,
                     })
                 })
