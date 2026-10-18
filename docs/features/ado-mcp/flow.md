@@ -1,5 +1,5 @@
 ---
-phase: evaluate
+phase: execute
 ---
 
 # ado MCP server: flow
@@ -20,7 +20,7 @@ MCP server.
 ## Gates
 
 - Gate 1, spec approved: 2026-10-18 ("approved"). ADR 0002 offered, not taken up.
-- Gate 2, plan approved:
+- Gate 2, plan approved: 2026-10-18 ("approved, subagent-driven"), plan revision 2, execution: subagent-driven
 
 ## Skipped
 
