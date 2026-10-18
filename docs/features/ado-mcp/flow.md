@@ -12,7 +12,7 @@ MCP server.
 
 ## Artifacts
 
-- Spec:
+- Spec: [spec.md](spec.md) (draft, builder check done 2026-10-18)
 - Plan:
 - ADRs:
 - CONTEXT.md:
@@ -25,6 +25,9 @@ MCP server.
 ## Skipped
 
 ## Grounding
+
+Written for the CLI design. With the MCP-only choice, read `crates/ado` as `crates/ado-mcp` and
+`plugins/opt-in/ado` as the existing `plugins/opt-in/mcp/mcp-azure`.
 
 Shipping a third binary follows web-mcp's path:
 
