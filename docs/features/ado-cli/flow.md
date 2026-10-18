@@ -44,3 +44,5 @@ Settled in the chat before this flow started (the user's words in quotes):
 - Read and write, "like gh".
 - Windows first ("windows primarly"): PAT in Windows Credential Manager, file on Linux, `ADO_PAT` override (proposal).
 - The user tests against the real server at work once a build exists.
+- TLS: the work browser shows the server's certificate as issued by ESET, i.e. ESET's HTTPS scanning re-signs traffic
+  with a root it installed in the Windows store. So `ado` must trust the OS certificate store, not a bundled root list.
