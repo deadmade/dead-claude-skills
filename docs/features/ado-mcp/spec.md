@@ -36,7 +36,8 @@ downloaded when it runs. The user doesn't need a terminal tool: "goal is for cla
      `build`, `pipelines`, `policy`, `wit`, `core` and `ims` features), so the request shapes and models are
      Microsoft's, not ours (flow.md, D1). The crate's clients point at the collection with `.endpoint()` and send
      through our own `reqwest` client (`.transport()`).
-   - Hand-written requests remain only where the crate has no call: `/vsts/info` and `_apis/connectionData`. A
+   - Hand-written requests remain only where the crate has no call: `/vsts/info`, `_apis/connectionData`, and
+     `pr_list status=all` (the crate's status enum has no `all`; flow.md, D2). A
      crate model that the user's server doesn't satisfy (a required field it leaves out) gets the same: the raw
      response through the crate's `.send()` and a small serde struct of ours, named in a comment.
 
@@ -159,7 +160,8 @@ downloaded when it runs. The user doesn't need a terminal tool: "goal is for cla
      - TLS failure: says the certificate isn't trusted and that the server uses the Windows store
 
 8. **API version 7.1.** Azure DevOps Server 2022.1 and later accept it. Calls through the crate send its
-   `7.1-preview` (the newest resource version up to 7.1); our two hand-written calls send `7.1-preview.1`.
+   `7.1-preview` (the newest resource version up to 7.1). Of the hand-written calls, `connectionData` sends
+   `7.1-preview.1`, `pr_list status=all` sends `7.1-preview`, and `/vsts/info` takes no version.
    - The `ado_api_version` option is removed (grill Q1). An older server gets a clear error instead of half-working
      calls, and a stale value in someone's settings is ignored.
    - If the smoke test shows the user's server accepts only 7.0, the option comes back.

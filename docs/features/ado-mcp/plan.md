@@ -762,6 +762,8 @@ error lines, never raw JSON.
    `wi_query assigned=me`, `pipeline_runs`, `pipeline_view` and `pipeline_log`. Paste back anything noisy or wrong.
    - An `unexpected answer from the server: missing field …` line means a crate model the server doesn't satisfy
      (D1). Paste back the line and the tool; the fix is a small struct of ours for that call.
+   - `pr_files` on a PR with a renamed file and, if one exists, a file whose encoding changed: the crate's
+     change-type enum knows only some flag combinations.
 5. **Writes**, on scratch items only. Run each write tool once on a scratch branch, PR and work item.
    - Confirm that the prompt appeared every time, including in auto mode.
    - Clean up with `pr_update status=abandoned`.

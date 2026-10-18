@@ -47,6 +47,17 @@ MCP server.
   - Kept: the remote and collection check before any request, the PAT only to `ADO_ORG_URL`, one-line errors,
     output shaping, the write prompts, the cache, the installer and plugin work.
   - Decision: 2026-10-18, spec and plan revision 3 approved ("I approve").
+- **D2, 2026-10-18: three places where the crate falls short** (found in Task 6a, confirmed against the crate's
+  source in review).
+  - `pr_list status=all`: `PullRequestStatus` has no `All` and the builder takes no extra query, so that one request
+    is built by hand (still read into the crate's `GitPullRequestList`).
+  - `pr_threads`: the crate's `PropertiesCollection` drops property names, and `CodeReviewThreadType` is how system
+    threads are hidden, so the raw body is parsed for that field too.
+  - Work-item titles in `pr_view`: the batch call exists only per project, so it is sent with an empty project
+    (linked items can live in other projects) and the guard drops the empty segment.
+  - Options: A, keep these three; B, replace `status=all` with three crate calls merged (worse ordering and paging).
+    Recommended A.
+  - Decision: pending.
 
 ## Skipped
 
