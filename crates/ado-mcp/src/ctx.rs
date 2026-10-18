@@ -316,7 +316,8 @@ impl Ctx {
     /// When the name matches none or several (the folders are named), or the server refuses.
     pub async fn pipeline_id(&self, scope: &Scope, name_or_id: &str) -> Result<i32, ApiError> {
         let name = name_or_id.trim();
-        if let Ok(id) = name.parse() {
+        // Unsigned first: `-1` is a name, not a definition id.
+        if let Some(id) = name.parse::<u32>().ok().and_then(|n| i32::try_from(n).ok()) {
             return Ok(id);
         }
         let key = (scope.project_id.clone(), name.to_lowercase());

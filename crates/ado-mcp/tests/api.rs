@@ -241,3 +241,13 @@ fn no_resend_on_503() {
     assert!(err);
     assert_eq!(fx.requests().len(), 1);
 }
+
+#[test]
+fn no_resend_on_dropped_connection() {
+    let fx = Fixture::start();
+    fx.route(ROUTE, vec![Resp::hang_up()]);
+    let (err, text) = ping(&fx);
+    assert!(err);
+    assert!(text.starts_with("can't reach 127.0.0.1: "), "{text}");
+    assert_eq!(fx.requests().len(), 1);
+}

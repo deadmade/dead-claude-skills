@@ -375,3 +375,18 @@ fn bad_names_and_empty_user() {
     );
     assert!(fx.requests().is_empty(), "{:?}", paths(&fx));
 }
+
+#[test]
+fn negative_pipeline_is_a_name() {
+    let fx = Fixture::start();
+    fx.route(DEFS, vec![fixture("definitions.json")]);
+    let (mut mcp, _) = pipeline_env(&fx);
+    let (err, text) = mcp.call("scope_echo", json!({"pipeline": "-1"}));
+    assert!(err);
+    assert_eq!(text, "not found: pipeline \"-1\"");
+    let q = paths(&fx)
+        .into_iter()
+        .find(|p| p.starts_with(DEFS))
+        .unwrap();
+    assert!(q.contains("name=-1"), "{q}");
+}

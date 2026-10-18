@@ -19,6 +19,8 @@ pub struct Resp {
     pub headers: Vec<(String, String)>,
     pub body: Vec<u8>,
     pub delay: Duration,
+    /// Close the connection after reading the request, without answering.
+    pub hang_up: bool,
 }
 
 impl Resp {
@@ -28,6 +30,14 @@ impl Resp {
             headers: vec![("Content-Type".into(), content_type.into())],
             body: body.into(),
             delay: Duration::ZERO,
+            hang_up: false,
+        }
+    }
+    /// A connection the server closes after reading the request.
+    pub fn hang_up() -> Self {
+        Self {
+            hang_up: true,
+            ..Self::new(200, "text/plain", "")
         }
     }
     pub fn json(body: &Value) -> Self {
@@ -170,6 +180,9 @@ fn serve(conn: TcpStream, state: &Mutex<State>) {
         }
     };
     let resp = resp.unwrap_or_else(|| file(&path));
+    if resp.hang_up {
+        return;
+    }
     std::thread::sleep(resp.delay);
     let mut out = conn;
     let mut head = format!(
