@@ -1,5 +1,5 @@
 ---
-phase: plan
+phase: evaluate
 ---
 
 # ado MCP server: flow
@@ -13,7 +13,7 @@ MCP server.
 ## Artifacts
 
 - Spec: [spec.md](spec.md) (draft, builder check done 2026-10-18)
-- Plan:
+- Plan: [plan.md](plan.md) (2026-10-18)
 - ADRs:
 - Glossary: [GLOSSARY.md](../../../GLOSSARY.md), section "Azure DevOps (mcp-azure)"
 
