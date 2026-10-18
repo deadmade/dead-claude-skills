@@ -79,7 +79,7 @@ MCP server.
   just `{"status":"cancelling"}`. Options: A, a hand-sent PATCH of `{"status":"cancelling"}` through our `Api::send`
   (guard and error lines unchanged); B, GET the build through the crate and PATCH the whole object back (two calls,
   and it writes back every field it read, so a change made in between could be overwritten). Recommended A.
-  - Decision: pending.
+  - Decision: 2026-10-18, A ("a is ok").
 
 ## Skipped
 
