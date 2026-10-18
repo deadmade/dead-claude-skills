@@ -764,6 +764,8 @@ error lines, never raw JSON.
      (D1). Paste back the line and the tool; the fix is a small struct of ours for that call.
    - `pipeline_view` on a real run: the crate asks for the timeline as `…/timeline/` (empty timeline id, trailing
      slash), which only a real server can confirm.
+   - `pipeline_log` on a real failed run: the crate sends no `Accept: text/plain`, so check the log comes back as
+     text, not the JSON lines form. Also check whether a YAML run without stages prints a `__default` stage line.
    - `pr_files` on a PR with a renamed file and, if one exists, a file whose encoding changed: the crate's
      change-type enum knows only some flag combinations.
 5. **Writes**, on scratch items only. Run each write tool once on a scratch branch, PR and work item.
