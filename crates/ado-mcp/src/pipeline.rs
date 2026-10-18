@@ -1,6 +1,6 @@
 //! The pipeline read tools: `pipeline_runs`, `pipeline_view` and `pipeline_log`; and `repo_list`.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 
 use azure_devops_rust_api::build::models::{
@@ -262,7 +262,17 @@ fn issue(i: &Issue) -> String {
         .unwrap_or_default();
     let msg = strip_ansi(i.message.as_deref().unwrap_or_default());
     let words: Vec<&str> = msg.split_whitespace().collect();
-    format!("{kind} {}", words.join(" "))
+    let mut line = format!("{kind} {}", words.join(" "));
+    cap(&mut line);
+    line
+}
+
+/// `text` cut to `LINE_MAX` characters, marked with `…`.
+fn cap(text: &mut String) {
+    if let Some((at, _)) = text.char_indices().nth(LINE_MAX) {
+        text.truncate(at);
+        text.push('…');
+    }
 }
 
 /// The first 20 issues as indented lines, then how many were left out.
@@ -298,8 +308,16 @@ fn name_list(names: &[&str]) -> String {
 type Children<'a> = HashMap<Option<&'a str>, Vec<&'a TimelineRecord>>;
 
 /// Stage and Job lines under `parent`, by `order`; a Phase's Jobs show at the Phase's own level.
-fn tree(kids: &Children, parent: Option<&str>, depth: usize, hops: u8, out: &mut Vec<String>) {
-    // The records come from the server: a parent loop (duplicate ids) must not recurse forever.
+fn tree<'a>(
+    kids: &Children<'a>,
+    parent: Option<&str>,
+    depth: usize,
+    hops: u8,
+    seen: &mut HashSet<&'a str>,
+    out: &mut Vec<String>,
+) {
+    // The records come from the server. `seen` expands each id once, so records that loop (duplicate ids) can't
+    // fan out; `hops` bounds the recursion, which a long chain of distinct ids would otherwise deepen.
     if hops > 4 {
         return;
     }
@@ -321,10 +339,13 @@ fn tree(kids: &Children, parent: Option<&str>, depth: usize, hops: u8, out: &mut
         }
         // A Job's children are Tasks, which aren't shown; a record without an id has none.
         let Some(id) = r.id.as_deref() else { continue };
-        match k {
-            "Phase" => tree(kids, Some(id), depth, hops + 1, out),
-            "Stage" => tree(kids, Some(id), depth + 1, hops + 1, out),
-            _ => {}
+        let deeper = match k {
+            "Phase" => depth,
+            "Stage" => depth + 1,
+            _ => continue,
+        };
+        if seen.insert(id) {
+            tree(kids, Some(id), deeper, hops + 1, seen, out);
         }
     }
 }
@@ -341,7 +362,7 @@ pub(crate) async fn pipeline_view(ctx: &Ctx, a: &RunArgs) -> Result<String, ApiE
         v.sort_by_key(|r| r.order);
     }
     let mut lines = Vec::new();
-    tree(&kids, None, 0, 0, &mut lines);
+    tree(&kids, None, 0, 0, &mut HashSet::new(), &mut lines);
     if lines.is_empty() {
         lines.push(format!("run #{} has no stages or jobs yet", a.run));
     }
@@ -361,22 +382,27 @@ pub(crate) async fn pipeline_view(ctx: &Ctx, a: &RunArgs) -> Result<String, ApiE
     Ok(lines.join("\n"))
 }
 
-/// Skips the rest of an OSC string: up to BEL, ST or `ESC \`.
-fn skip_osc(chars: &mut std::str::Chars) {
+type Chars<'a> = std::iter::Peekable<std::str::Chars<'a>>;
+
+/// Skips the rest of an OSC, DCS, APC or PM string, up to BEL, ST or `ESC \`. Returns true when another escape
+/// ended it: that `ESC` is consumed and starts a sequence of its own.
+fn skip_string(chars: &mut Chars) -> bool {
     while let Some(c) = chars.next() {
         match c {
-            '\x07' | '\u{9c}' => return,
-            '\x1b' => {
+            '\x07' | '\u{9c}' => return false,
+            '\x1b' if chars.peek() == Some(&'\\') => {
                 chars.next();
-                return;
+                return false;
             }
+            '\x1b' => return true,
             _ => {}
         }
     }
+    false
 }
 
 /// Skips the rest of a CSI sequence: parameter and intermediate bytes, then a final byte in `@`..=`~`.
-fn skip_csi(chars: &mut std::str::Chars) {
+fn skip_csi(chars: &mut Chars) {
     for c in chars.by_ref() {
         if ('@'..='~').contains(&c) {
             return;
@@ -384,21 +410,29 @@ fn skip_csi(chars: &mut std::str::Chars) {
     }
 }
 
-/// The text without terminal control: CSI and OSC sequences (7- and 8-bit), any other escape with the character
-/// after it, and every other control character but `\t` (`\n` becomes a space).
+/// The text without terminal control: CSI, and OSC, DCS, APC and PM strings (7- and 8-bit; an OSC 8 hyperlink
+/// would leak its URL), any other escape with the character after it, and every other control character but `\t`
+/// (`\n` becomes a space). Linear: an escape inside a string is handled in this loop, not by recursing.
 fn strip_ansi(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
-    let mut chars = s.chars();
-    while let Some(c) = chars.next() {
+    let mut chars = s.chars().peekable();
+    let mut esc = false;
+    loop {
+        let c = if std::mem::take(&mut esc) {
+            '\x1b'
+        } else if let Some(c) = chars.next() {
+            c
+        } else {
+            break;
+        };
         match c {
             '\x1b' => match chars.next() {
                 Some('[') => skip_csi(&mut chars),
-                // An OSC 8 hyperlink would leak its URL.
-                Some(']') => skip_osc(&mut chars),
+                Some(']' | 'P' | '_' | '^') => esc = skip_string(&mut chars),
                 _ => {}
             },
             '\u{9b}' => skip_csi(&mut chars),
-            '\u{9d}' => skip_osc(&mut chars),
+            '\u{90}' | '\u{9d}' | '\u{9e}' | '\u{9f}' => esc = skip_string(&mut chars),
             '\t' => out.push(c),
             // Only issue messages hold line breaks; log lines are split already.
             '\n' => out.push(' '),
@@ -426,7 +460,9 @@ fn strip_time(l: &str) -> &str {
 pub(crate) fn clean_log(raw: &str) -> Vec<(bool, String)> {
     // shortcut: a lone `\r` (CR-only progress output) is dropped, not split into lines; split on it if such logs
     // read as run-together lines.
-    raw.lines()
+    raw.strip_prefix('\u{feff}')
+        .unwrap_or(raw)
+        .lines()
         .map(|l| {
             let l = strip_ansi(l);
             let l = strip_time(&l);
@@ -441,22 +477,20 @@ pub(crate) fn clean_log(raw: &str) -> Vec<(bool, String)> {
             } else {
                 (false, l.to_owned())
             };
-            if let Some((at, _)) = text.char_indices().nth(LINE_MAX) {
-                text.truncate(at);
-                text.push('…');
-            }
+            cap(&mut text);
             (err, text)
         })
         .collect()
 }
 
 /// The error lines with their context (merged, `…` between the pieces, at most 300 lines, then how many error lines
-/// were left out and `rest`, the call that shows them), then the last 50 lines.
-pub(crate) fn excerpt(lines: &[(bool, String)], rest: &str) -> String {
+/// were left out and `call(line)`, the call that reads on from the first line not shown), then the last 50 lines.
+pub(crate) fn excerpt(lines: &[(bool, String)], call: impl Fn(u64) -> String) -> String {
     let tail = lines.len().saturating_sub(TAIL);
     let mut out: Vec<&str> = Vec::new();
-    // The first line before the tail not printed yet.
+    // The first line before the tail not printed yet, and where the first piece left out starts.
     let mut next = 0;
+    let mut stop = None;
     let mut shown = 0;
     for (i, _) in lines[..tail].iter().enumerate().filter(|(_, (e, _))| *e) {
         let from = i.saturating_sub(CONTEXT).max(next);
@@ -465,6 +499,7 @@ pub(crate) fn excerpt(lines: &[(bool, String)], rest: &str) -> String {
             continue;
         }
         if shown + (to - from) > EXCERPT_MAX {
+            stop = Some(from);
             break;
         }
         if from > next && !out.is_empty() {
@@ -475,21 +510,23 @@ pub(crate) fn excerpt(lines: &[(bool, String)], rest: &str) -> String {
         next = to;
     }
     let left = lines[next..tail].iter().filter(|(e, _)| *e).count();
-    let note = more(&format!("{left} more error lines: {rest}"));
-    if left > 0 {
-        out.push(&note);
-    }
+    let note = stop.map(|from| format!("… {left} more error lines: {}", call(from as u64 + 1)));
+    out.extend(note.as_deref());
     out.push("--- last 50 lines ---");
     out.extend(lines[tail..].iter().map(|(_, l)| l.as_str()));
     out.join("\n")
 }
 
-/// The steps whose logs to show: `step`'s, else the failed ones; and a note for each failed job with no failed step.
+/// The steps to show, and the failed-job notes with their job's name.
+type Targets<'a> = (Vec<&'a TimelineRecord>, Vec<(String, String)>);
+
+/// The steps whose logs to show: `step`'s, else the failed ones; and a note (and the job's name) for each failed
+/// job with no failed step.
 fn targets<'a>(
     recs: &'a [TimelineRecord],
     step: Option<&str>,
     run: u32,
-) -> Result<(Vec<&'a TimelineRecord>, Vec<String>), ApiError> {
+) -> Result<Targets<'a>, ApiError> {
     let tasks = || recs.iter().filter(|r| kind(r) == "Task");
     if let Some(step) = step {
         let hits: Vec<_> = tasks()
@@ -502,6 +539,9 @@ fn targets<'a>(
                 name_list(&names)
             )));
         }
+        // Same-named steps (a matrix): the failed ones first.
+        let mut hits = hits;
+        hits.sort_by_key(|r| !failed(r));
         return Ok((hits, Vec::new()));
     }
     let hits: Vec<_> = tasks().filter(|r| failed(r)).collect();
@@ -515,7 +555,7 @@ fn targets<'a>(
             let issues: Vec<String> = job.issues.iter().map(issue).collect();
             let mut lines = vec![format!("{}: failed with no failed step", name(job))];
             lines.extend(issue_lines(&issues, &format!(": pipeline_view run={run}")));
-            notes.push(lines.join("\n"));
+            notes.push((lines.join("\n"), name(job).to_owned()));
         }
     }
     Ok((hits, notes))
@@ -526,19 +566,40 @@ fn page_call(run: u32, step: &str, start: u64) -> String {
     format!("pipeline_log run={run} step=\"{step}\" full=true start={start}")
 }
 
-/// One `full` page from line `start`: at most 2000 lines and 40,000 characters (the server may ignore the range
-/// it was asked for), then the call for the next page when the log goes on.
+/// The job a step runs in, by name.
+fn job_of<'a>(recs: &'a [TimelineRecord], step: &TimelineRecord) -> &'a str {
+    recs.iter()
+        .find(|j| kind(j) == "Job" && j.id.is_some() && j.id == step.parent_id)
+        .map_or("?", name)
+}
+
+/// One `full` page from line `start`: at most 2000 lines and `budget` characters, then the call for the next page
+/// when the log goes on. More than 2000 lines, or the whole log for a later page, means the server ignored the range
+/// it was asked for: the lines before `start` are skipped here.
 fn page(
     lines: &[(bool, String)],
     start: u32,
     total: Result<Option<i64>, &ApiError>,
+    budget: usize,
     next: impl Fn(u64) -> String,
 ) -> String {
+    let known = total.ok().flatten();
+    let whole = start > 1 && known.is_some_and(|n| usize::try_from(n) == Ok(lines.len()));
+    let lines = if lines.len() > PAGE as usize || whole {
+        &lines[(start as usize - 1).min(lines.len())..]
+    } else {
+        lines
+    };
+    if lines.is_empty()
+        && let Some(n) = known.filter(|n| i64::from(start) > *n)
+    {
+        return format!("no lines from {start}; the log has {n}");
+    }
     let mut out = Vec::new();
     let mut chars = 0;
     for (_, l) in lines.iter().take(PAGE as usize) {
         let n = l.chars().count() + 1;
-        if !out.is_empty() && chars + n > PAGE_CHARS {
+        if !out.is_empty() && chars + n > budget {
             break;
         }
         chars += n;
@@ -559,6 +620,96 @@ fn page(
     out.join("\n")
 }
 
+/// The reply's blocks, in order, while they fit in `PAGE_CHARS`; the ones after that are named by their calls.
+#[derive(Default)]
+struct Budget {
+    out: Vec<String>,
+    used: usize,
+    shown: bool,
+    /// Set once a block didn't fit whole: later blocks only get named.
+    spent: bool,
+    left: Vec<String>,
+}
+
+impl Budget {
+    /// Characters still free.
+    fn room(&self) -> usize {
+        PAGE_CHARS.saturating_sub(self.used)
+    }
+
+    /// A line that always shows, such as a header.
+    fn head(&mut self, text: String) {
+        self.used += text.chars().count() + 2;
+        self.out.push(text);
+    }
+
+    /// `text` if it fits; a first block too long is cut at a line, with `whole` (the call that reads it all).
+    /// `call` names it when it doesn't fit.
+    fn add(&mut self, mut text: String, call: String, whole: &str) {
+        let n = text.chars().count() + 2;
+        if self.spent || (self.shown && n > self.room()) {
+            self.spent = true;
+            self.left.push(call);
+            return;
+        }
+        if n > self.room() {
+            let room = self.room().saturating_sub(whole.chars().count() + 100);
+            let mut kept = 0;
+            let mut at = 0;
+            for l in text.split_inclusive('\n') {
+                kept += l.chars().count();
+                if kept > room {
+                    break;
+                }
+                at += l.len();
+            }
+            text.truncate(at);
+            let _ = write!(text, "… cut at the output limit: {whole}");
+            self.spent = true;
+        }
+        self.used += text.chars().count() + 2;
+        self.shown = true;
+        self.out.push(text);
+    }
+
+    fn finish(mut self) -> String {
+        if !self.left.is_empty() {
+            let mut seen = HashSet::new();
+            let calls: Vec<&str> = self
+                .left
+                .iter()
+                .filter(|c| seen.insert(c.as_str()))
+                .map(String::as_str)
+                .collect();
+            let line = format!("… output limit reached; not shown: {}", name_list(&calls));
+            self.out.push(line);
+        }
+        self.out.join("\n\n")
+    }
+}
+
+/// What a `full` call with several steps says first: which one it shows, and the others.
+fn full_head(recs: &[TimelineRecord], targets: &[&TimelineRecord]) -> String {
+    let first = targets[0];
+    if targets
+        .iter()
+        .all(|r| name(r).eq_ignore_ascii_case(name(first)))
+    {
+        return format!(
+            "{} steps named \"{}\"; showing job {}'s",
+            targets.len(),
+            name(first),
+            job_of(recs, first)
+        );
+    }
+    let others: Vec<&str> = targets[1..].iter().map(|r| name(r)).collect();
+    format!(
+        "showing {} only; also failed: {}; pass step to page through one",
+        name(first),
+        name_list(&others)
+    )
+}
+
 /// # Errors
 /// When the scope, the run, the step or the server fails.
 pub(crate) async fn pipeline_log(ctx: &Ctx, a: &LogArgs) -> Result<String, ApiError> {
@@ -575,15 +726,10 @@ pub(crate) async fn pipeline_log(ctx: &Ctx, a: &LogArgs) -> Result<String, ApiEr
     let full = a.full == Some(true);
     let start = a.start.unwrap_or(1).max(1);
     let end = start.saturating_add(PAGE - 1);
-    let mut out = Vec::new();
+    let mut out = Budget::default();
     // A full page is one step's: the others are named so the agent can pass their step.
     if full && targets.len() > 1 {
-        let others: Vec<&str> = targets[1..].iter().map(|r| name(r)).collect();
-        out.push(format!(
-            "showing {} only; also failed: {}; pass step to page through one",
-            name(targets[0]),
-            name_list(&others)
-        ));
+        out.head(full_head(&t.records, &targets));
         targets.truncate(1);
     }
     let counts = if full {
@@ -599,8 +745,16 @@ pub(crate) async fn pipeline_log(ctx: &Ctx, a: &LogArgs) -> Result<String, ApiEr
         Ok(Vec::new())
     };
     for r in targets {
+        let step = name(r);
+        let call = format!("pipeline_log run={run} step=\"{step}\"");
+        let whole = page_call(run, step, 1);
+        if out.spent {
+            out.add(String::new(), call, &whole);
+            continue;
+        }
+        let mut text = format!("{step}: {}", state(r));
         let Some(log) = &r.log else {
-            out.push(format!("{}: no log ({})", name(r), state(r)));
+            out.add(format!("{step}: no log ({})", state(r)), call, &whole);
             continue;
         };
         // The crate reads this answer as a JSON string; the log is plain text, so the raw body it is.
@@ -617,31 +771,33 @@ pub(crate) async fn pipeline_log(ctx: &Ctx, a: &LogArgs) -> Result<String, ApiEr
             })
             .await
             .map(|r| r.into_raw_response().into_body());
-        let mut text = format!("{}: {}", name(r), state(r));
         let lines = match raw {
             Err(e) => {
                 let _ = write!(text, "\nlog unavailable ({e})");
-                out.push(text);
+                out.add(text, call, &whole);
                 continue;
             }
             Ok(body) => clean_log(&String::from_utf8_lossy(&body)),
         };
-        let step = name(r);
         let body = if full {
             let total = counts.as_ref().map(|c| {
                 c.iter()
                     .find(|c| c.build_log_reference.id == log.id)
                     .and_then(|c| c.line_count)
             });
-            page(&lines, start, total, |n| page_call(run, step, n))
+            // Room for the header, the more line and the separators.
+            let room = out.room().saturating_sub(text.chars().count() + 300);
+            page(&lines, start, total, room, |n| page_call(run, step, n))
         } else {
-            excerpt(&lines, &page_call(run, step, 1))
+            excerpt(&lines, |n| page_call(run, step, n))
         };
         let _ = write!(text, "\n{body}");
-        out.push(text);
+        out.add(text, call, &whole);
     }
-    out.extend(notes);
-    Ok(out.join("\n\n"))
+    for (note, job) in notes {
+        out.add(note, format!("{job} (pipeline_view run={run})"), "");
+    }
+    Ok(out.finish())
 }
 
 /// # Errors
@@ -697,7 +853,10 @@ mod tests {
                    \u{9b}31mc1\u{9b}0m\n\
                    bell\x07 nul\0 tab\tok\n\
                    open \x1b]8;;https://y.example/ never closed\n\
-                   trailing esc\x1b";
+                   trailing esc\x1b\n\
+                   a\x1b]0;t\x1b[31mb\n\
+                   \x1bPq#0\x1b\\c \x1b_x\x1b\\d \x1b^y\x07e\n\
+                   \u{90}z\u{9c}f \u{9f}z\u{9c}g \u{9e}z\u{9c}h";
         let lines = clean_log(raw);
         let all: Vec<&str> = lines.iter().map(|(_, l)| l.as_str()).collect();
         assert_eq!(
@@ -717,6 +876,9 @@ mod tests {
                 "bell nul tab\tok",
                 "open ",
                 "trailing esc",
+                "ab",
+                "c d e",
+                "f g h",
             ]
         );
         let errors: Vec<usize> = (0..lines.len()).filter(|i| lines[*i].0).collect();
@@ -735,6 +897,8 @@ mod tests {
         ] {
             assert!(!joined.contains(noise), "{noise:?}");
         }
+        let bom = clean_log("\u{feff}2026-03-05T10:00:20.1234567Z first\r\nsecond");
+        assert_eq!(bom[0].1, "first");
         let long = clean_log(&"é".repeat(LINE_MAX + 5));
         assert_eq!(long[0].1.chars().count(), LINE_MAX + 1);
     }
@@ -754,23 +918,35 @@ mod tests {
         want.extend(range(143..150));
         want.push("--- last 50 lines ---".into());
         want.extend(range(150..200));
-        assert_eq!(excerpt(&lines, "x"), want.join("\n"));
+        assert_eq!(excerpt(&lines, |_| "x".into()), want.join("\n"));
         let short = vec![(true, "ERROR x".to_owned())];
-        assert_eq!(excerpt(&short, "x"), "--- last 50 lines ---\nERROR x");
+        assert_eq!(
+            excerpt(&short, |_| "x".into()),
+            "--- last 50 lines ---\nERROR x"
+        );
     }
 
     #[test]
     fn excerpt_caps_errors() {
         let lines: Vec<(bool, String)> = (0..5000).map(|i| (true, format!("ERROR {i}"))).collect();
-        let out = excerpt(&lines, "pipeline_log run=7 step=\"T\" full=true start=1");
+        let out = excerpt(&lines, |n| page_call(7, "T", n));
         let out: Vec<&str> = out.lines().collect();
         assert_eq!(out.len(), EXCERPT_MAX + 2 + TAIL, "{out:?}");
         assert_eq!(out[EXCERPT_MAX - 1], "ERROR 299");
         assert_eq!(
             out[EXCERPT_MAX],
-            "… more: 4650 more error lines: pipeline_log run=7 step=\"T\" full=true start=1"
+            "… 4650 more error lines: pipeline_log run=7 step=\"T\" full=true start=301"
         );
         assert_eq!(out[EXCERPT_MAX + 1], "--- last 50 lines ---");
+    }
+
+    fn page_at(
+        lines: &[(bool, String)],
+        start: u32,
+        total: Result<Option<i64>, &ApiError>,
+        next: impl Fn(u64) -> String,
+    ) -> String {
+        page(lines, start, total, PAGE_CHARS, next)
     }
 
     fn plain(n: usize, width: usize) -> Vec<(bool, String)> {
@@ -781,23 +957,38 @@ mod tests {
     fn page_cuts_at_lines_or_chars() {
         let next = |n| format!("next {n}");
         // The server ignored the range and sent 2500 short lines: 2000 shown.
-        let out = page(&plain(2500, 4), 1, Ok(None), next);
+        let out = page_at(&plain(2500, 4), 1, Ok(None), next);
         assert_eq!(out.lines().count(), PAGE as usize + 1);
         assert!(out.ends_with("\n… more: next 2001"), "{out}");
         // Ruling R8: 100-character lines stop at 40,000 characters (396 lines of 101 with the newline).
-        let out = page(&plain(2000, 100), 501, Ok(Some(2500)), next);
+        let out = page_at(&plain(2000, 100), 501, Ok(Some(2500)), next);
         assert_eq!(out.lines().count(), 397);
         assert!(out.ends_with("\n… more: next 897"), "{out}");
         assert!(out.chars().count() < PAGE_CHARS + 100);
         // All shown: more only when the line count says the log goes on.
         assert_eq!(
-            page(&plain(10, 4), 1, Ok(Some(10)), next).lines().count(),
+            page_at(&plain(10, 4), 1, Ok(Some(10)), next)
+                .lines()
+                .count(),
             10
         );
-        assert!(page(&plain(10, 4), 1, Ok(Some(11)), next).ends_with("… more: next 11"));
+        assert!(page_at(&plain(10, 4), 1, Ok(Some(11)), next).ends_with("… more: next 11"));
+        // Past the end, and a server that ignored the range (the whole log, or more than a page).
+        assert_eq!(
+            page_at(&[], 3000, Ok(Some(2500)), next),
+            "no lines from 3000; the log has 2500"
+        );
+        let out = page_at(&plain(2500, 4), 2001, Ok(Some(2500)), next);
+        assert_eq!(out.lines().count(), 500);
+        assert!(
+            out.starts_with("2000\n") && out.ends_with("\n2499"),
+            "{out}"
+        );
+        let out = page_at(&plain(100, 4), 51, Ok(Some(100)), next);
+        assert_eq!(out.lines().next(), Some("0050"));
         let e = ApiError::local("boom");
         assert!(
-            page(&plain(10, 4), 1, Err(&e), next)
+            page_at(&plain(10, 4), 1, Err(&e), next)
                 .ends_with("\n… line count unavailable (boom); if the log goes on: next 11")
         );
     }
@@ -820,11 +1011,58 @@ mod tests {
             kids.entry(r.parent_id.as_deref()).or_default().push(r);
         }
         let mut out = Vec::new();
-        tree(&kids, None, 0, 0, &mut out);
+        tree(&kids, None, 0, 0, &mut HashSet::new(), &mut out);
         assert!(out.len() < 20, "{out:?}");
         assert_eq!(out[0], "S:");
         assert!(out.contains(&"No id:".to_owned()), "{out:?}");
         assert!(!out.iter().any(|l| l.contains('P')), "{out:?}");
+    }
+
+    #[test]
+    fn tree_loop_does_not_fan_out() {
+        let mut recs = vec![serde_json::json!({"id": "s", "type": "Stage", "name": "root"})];
+        recs.extend((0..100).map(|i| {
+            serde_json::json!({"id": "s", "parentId": "s", "type": "Stage", "name": format!("s{i}")})
+        }));
+        let recs = records(serde_json::Value::Array(recs));
+        let mut kids: Children = HashMap::new();
+        for r in &recs {
+            kids.entry(r.parent_id.as_deref()).or_default().push(r);
+        }
+        let mut out = Vec::new();
+        tree(&kids, None, 0, 0, &mut HashSet::new(), &mut out);
+        assert_eq!(out.len(), 101);
+    }
+
+    #[test]
+    fn budget_names_what_is_left_out() {
+        let block = |c: char, n: usize| {
+            std::iter::repeat_n(format!("{c}"), n)
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        let mut b = Budget::default();
+        b.head("header".into());
+        b.add(block('a', 10000), "call a".into(), "whole a");
+        // 8 + 20,001 + 20,001 characters: `b` no longer fits, and nothing after it is shown.
+        b.add(block('b', 10000), "call b".into(), "whole b");
+        b.add(block('c', 1), "call c".into(), "whole c");
+        b.add(String::new(), "call c".into(), "whole c");
+        b.add(block('d', 1), "call d".into(), "whole d");
+        let out = b.finish();
+        assert!(out.chars().count() <= PAGE_CHARS, "{}", out.len());
+        assert!(out.starts_with("header\n\na\n"));
+        assert!(!out.contains("\nb") && !out.contains("\nc"));
+        assert!(out.ends_with("a\n\n… output limit reached; not shown: call b, call c, call d"));
+        // A first block too long for the budget is cut at a line and points at the whole log.
+        let mut b = Budget::default();
+        b.add(block('x', 30000), "call x".into(), "whole x");
+        b.add(block('y', 1), "call y".into(), "whole y");
+        let out = b.finish();
+        assert!(out.chars().count() <= PAGE_CHARS, "{}", out.len());
+        assert!(out.contains(
+            "x\n… cut at the output limit: whole x\n\n… output limit reached; not shown: call y"
+        ));
     }
 
     #[test]
@@ -837,7 +1075,7 @@ mod tests {
         ]));
         let (hits, notes) = targets(&recs, None, 7).unwrap();
         assert_eq!(hits.len(), 0);
-        let lines: Vec<&str> = notes[0].lines().collect();
+        let lines: Vec<&str> = notes[0].0.lines().collect();
         assert_eq!(lines.len(), 1 + ISSUES_MAX + 1);
         assert_eq!(lines[1], "  error e0 x");
         assert_eq!(lines[21], "  … 5 more issues: pipeline_view run=7");

@@ -201,13 +201,7 @@ fn repo_list_lines() {
 fn log_full_one_step_and_unknown_count() {
     let fx = Fixture::start();
     run_routes(&fx);
-    let mut timeline: Value = serde_json::from_slice(&fixture("timeline.json").body).unwrap();
-    for r in timeline["records"].as_array_mut().unwrap() {
-        if r["name"] == "Checkout" {
-            r["result"] = json!("failed");
-        }
-    }
-    fx.route(TIMELINE, vec![Resp::json(&timeline)]);
+    fx.route(TIMELINE, vec![Resp::json(&two_failed_steps())]);
     fx.route(
         &format!("{LOGS}/3"),
         vec![Resp::new(200, "text/plain", "cloning\r\n")],
@@ -233,4 +227,86 @@ fn log_full_one_step_and_unknown_count() {
         "{text}"
     );
     assert_eq!(queries(&fx, &format!("{LOGS}/4")).len(), 0, "{text}");
+}
+
+/// The fixture timeline with `Checkout` failed too.
+fn two_failed_steps() -> Value {
+    let mut timeline: Value = serde_json::from_slice(&fixture("timeline.json").body).unwrap();
+    for r in timeline["records"].as_array_mut().unwrap() {
+        if r["name"] == "Checkout" {
+            r["result"] = json!("failed");
+        }
+    }
+    timeline
+}
+
+#[test]
+fn log_budget_names_the_rest() {
+    let fx = Fixture::start();
+    run_routes(&fx);
+    fx.route(TIMELINE, vec![Resp::json(&two_failed_steps())]);
+    // 60 lines of 1000 characters: the tail alone is past the 40,000-character budget.
+    let big = format!("{}\r\n", "x".repeat(1000)).repeat(60);
+    fx.route(
+        &format!("{LOGS}/3"),
+        vec![Resp::new(200, "text/plain", big)],
+    );
+    let text = ok(&mut env(&fx), "pipeline_log", json!({"run": 77}));
+    assert!(text.chars().count() <= 40_000, "{}", text.len());
+    assert!(text.starts_with("Checkout: failed\n"), "{text}");
+    assert!(
+        text.contains(
+            "\n… cut at the output limit: pipeline_log run=77 step=\"Checkout\" full=true start=1\n"
+        ),
+        "{text}"
+    );
+    assert!(
+        text.ends_with(
+            "\n\n… output limit reached; not shown: pipeline_log run=77 step=\"Run tests\", Deploy (pipeline_view run=77)"
+        ),
+        "{text}"
+    );
+    assert_eq!(queries(&fx, &format!("{LOGS}/4")).len(), 0);
+}
+
+#[test]
+fn log_matrix_steps_failed_first() {
+    let fx = Fixture::start();
+    run_routes(&fx);
+    let log = |id: i32| json!({"id": id, "type": "Container", "url": format!("http://dev.example{LOGS}/{id}")});
+    let mut records = Vec::new();
+    for (i, (job, result)) in [
+        ("Linux", "succeeded"),
+        ("Windows", "failed"),
+        ("Mac", "failed"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let id = format!("j{i}");
+        records.push(json!({"id": id, "type": "Job", "name": job, "result": result, "order": i}));
+        records.push(
+            json!({"id": format!("t{i}"), "parentId": id, "type": "Task", "name": "Build",
+            "result": result, "order": 1, "log": log(11 + i32::try_from(i).unwrap())}),
+        );
+    }
+    fx.route(TIMELINE, vec![Resp::json(&json!({"records": records}))]);
+    fx.route(
+        &format!("{LOGS}/12"),
+        vec![Resp::new(200, "text/plain", "on windows\r\n")],
+    );
+    let text = ok(
+        &mut env(&fx),
+        "pipeline_log",
+        json!({"run": 77, "step": "build", "full": true}),
+    );
+    assert!(
+        text.starts_with(
+            "3 steps named \"Build\"; showing job Windows's\n\nBuild: failed\non windows"
+        ),
+        "{text}"
+    );
+    for id in [11, 13] {
+        assert_eq!(queries(&fx, &format!("{LOGS}/{id}")).len(), 0, "log {id}");
+    }
 }
