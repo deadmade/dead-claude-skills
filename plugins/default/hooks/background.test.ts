@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing';
 import type { On } from 'claude-code';
 
-import { PS_PATH, RESET, SET, SH_PATH, isNightCity } from './background';
+import { PS, PS_ENCODED, PS_PATH, RESET, SET, SH_PATH, isNightCity } from './background';
 
 const NIGHT = 'custom:dead-skills:night-city';
 
@@ -90,4 +90,9 @@ test('when sh finds no tty, PowerShell writes to the console instead', async ($,
     { argv0: SH_PATH, osc: SET },
     { argv0: PS_PATH, osc: SET },
   ]);
+});
+
+test('the PowerShell script is encoded as UTF-16LE base64, as -EncodedCommand expects', () => {
+  expect(atob(PS_ENCODED).replaceAll('\0', '')).toBe(PS);
+  expect(atob(PS_ENCODED).length).toBe(PS.length * 2);
 });
