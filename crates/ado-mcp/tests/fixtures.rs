@@ -47,6 +47,9 @@ const TABLE: &[(&str, Check)] = &[
     ("pr.json", fits::<git::models::GitPullRequest>),
     ("repo.json", fits::<git::models::GitRepository>),
     ("wi-batch.json", fits::<wit::models::WorkItemList>),
+    ("wi-comments.json", fits::<wit::models::CommentList>),
+    ("wi.json", fits::<wit::models::WorkItem>),
+    ("wiql.json", fits::<wit::models::WorkItemQueryResult>),
 ];
 
 /// Answers of the two hand-written calls, which have no crate model.

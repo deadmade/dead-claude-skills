@@ -36,7 +36,6 @@ pub fn more(call: &str) -> String {
     format!("… more: {call}")
 }
 
-#[allow(dead_code)] // wi_view uses it from Task 7
 /// Azure DevOps rich text as plain text: line breaks and list items kept, other tags dropped.
 pub fn html_to_text(html: &str) -> String {
     const ENTITIES: [(&str, char); 6] = [
@@ -48,6 +47,7 @@ pub fn html_to_text(html: &str) -> String {
         ("&nbsp;", ' '),
     ];
     let mut out = String::with_capacity(html.len());
+    let mut seen = vec![0; html.len()];
     let mut i = 0;
     while i < html.len() {
         let rest = &html[i..];
@@ -55,7 +55,10 @@ pub fn html_to_text(html: &str) -> String {
             // A tag starts with a letter, `/` or `!`; anything else (`1 < 2`) is text.
             let tagged =
                 inner.starts_with(|c: char| c.is_ascii_alphabetic() || c == '/' || c == '!');
-            if let Some(end) = tagged.then(|| tag_end(rest)).flatten() {
+            if let Some(end) = tagged
+                .then(|| tag_end(html.as_bytes(), i, &mut seen))
+                .flatten()
+            {
                 let (closing, body) = inner
                     .strip_prefix('/')
                     .map_or((false, inner), |b| (true, b));
@@ -74,7 +77,7 @@ pub fn html_to_text(html: &str) -> String {
                     }
                     _ => {}
                 }
-                i += end + 1;
+                i = end + 1;
                 continue;
             }
         }
@@ -97,15 +100,27 @@ pub fn html_to_text(html: &str) -> String {
     lines.join("\n").trim().to_string()
 }
 
-#[allow(dead_code)] // as html_to_text
-/// The index of the `>` that ends the tag `tag` opens with, skipping any inside quotes. `None` when it never closes.
-fn tag_end(tag: &str) -> Option<usize> {
-    let mut quote = None;
-    for (i, c) in tag.char_indices() {
-        match (quote, c) {
-            (None, '>') => return Some(i),
-            (None, '"' | '\'') => quote = Some(c),
-            (Some(q), _) if q == c => quote = None,
+/// The index of the `>` that ends the tag opening at `from`, skipping any inside quotes. `None` when it never closes.
+///
+/// `seen` holds the quote states earlier scans passed each byte in. A scan that reaches a byte in the same state
+/// ends as that one did, which failed (a tag that closes is skipped, never scanned again), so each byte is scanned
+/// at most three times and `<a<a<a…` stays linear.
+fn tag_end(html: &[u8], from: usize, seen: &mut [u8]) -> Option<usize> {
+    let mut quote = 0;
+    for (i, &b) in html.iter().enumerate().skip(from) {
+        let bit = match quote {
+            0 => 1,
+            b'"' => 2,
+            _ => 4,
+        };
+        if seen[i] & bit != 0 {
+            return None;
+        }
+        seen[i] |= bit;
+        match (quote, b) {
+            (0, b'>') => return Some(i),
+            (0, b'"' | b'\'') => quote = b,
+            (q, _) if q == b => quote = 0,
             _ => {}
         }
     }
@@ -176,6 +191,20 @@ mod tests {
             html_to_text("a<BR/>b<UL><LI>c</LI><LI>d</LI></UL>"),
             "a\nb\n- c\n- d"
         );
+    }
+
+    #[test]
+    fn html_to_text_unclosed_tags_are_linear() {
+        // Each `<` used to scan to the end for its `>`.
+        for unit in ["<a", "<a\""] {
+            let html = unit.repeat(100_000);
+            let t = std::time::Instant::now();
+            html_to_text(&html);
+            assert!(t.elapsed().as_millis() < 500, "{unit}: {:?}", t.elapsed());
+        }
+        assert_eq!(html_to_text("<a<a<a"), "<a<a<a");
+        // A tag after an unclosed quote still counts.
+        assert_eq!(html_to_text("<b \"x <p>ok</p>"), "<b \"x ok");
     }
 
     #[test]

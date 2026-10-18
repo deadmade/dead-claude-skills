@@ -1,0 +1,52 @@
+{
+  "totalCount": 8,
+  "count": 5,
+  "comments": [
+    {
+      "workItemId": 123,
+      "id": 8,
+      "version": 1,
+      "text": "<div>Seen it on <b>staging</b> too.</div>",
+      "createdBy": { "displayName": "Jane Roe", "id": "5e8f1a77-0c2b-4d39-8e6a-1b7c3d9f4a02" },
+      "createdDate": "2026-03-06T09:00:00.123Z",
+      "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/wit/workItems/123/comments/8"
+    },
+    {
+      "workItemId": 123,
+      "id": 7,
+      "version": 1,
+      "text": "Proxy logs attached.",
+      "createdBy": { "displayName": "Bob Builder", "id": "5e8f1a77-0c2b-4d39-8e6a-1b7c3d9f4a02" },
+      "createdDate": "2026-03-05T15:30:00Z",
+      "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/wit/workItems/123/comments/7"
+    },
+    {
+      "workItemId": 123,
+      "id": 6,
+      "version": 1,
+      "text": "<p>Can you retry?</p>",
+      "createdBy": { "displayName": "Alice Example", "id": "5e8f1a77-0c2b-4d39-8e6a-1b7c3d9f4a02" },
+      "createdDate": "2026-03-05T10:00:00Z",
+      "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/wit/workItems/123/comments/6"
+    },
+    {
+      "workItemId": 123,
+      "id": 5,
+      "version": 1,
+      "text": "Same on VPN.",
+      "createdBy": { "displayName": "Jane Roe", "id": "5e8f1a77-0c2b-4d39-8e6a-1b7c3d9f4a02" },
+      "createdDate": "2026-03-04T12:00:00Z",
+      "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/wit/workItems/123/comments/5"
+    },
+    {
+      "workItemId": 123,
+      "id": 4,
+      "version": 1,
+      "text": "Triaged.",
+      "createdBy": { "displayName": "Alice Example", "id": "5e8f1a77-0c2b-4d39-8e6a-1b7c3d9f4a02" },
+      "createdDate": "2026-03-04T08:00:00Z",
+      "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/wit/workItems/123/comments/4"
+    }
+  ],
+  "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/wit/workItems/123/comments"
+}

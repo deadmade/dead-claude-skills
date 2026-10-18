@@ -5,6 +5,7 @@ mod out;
 mod pr;
 mod remote;
 mod tools;
+mod wi;
 
 use rmcp::{ServiceExt, transport::stdio};
 

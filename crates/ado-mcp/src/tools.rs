@@ -14,6 +14,7 @@ use crate::api::ApiError;
 use crate::config::Config;
 use crate::ctx::{Ctx, seg};
 use crate::pr::{self, PrFilesArgs, PrListArgs, PrThreadsArgs, PrViewArgs};
+use crate::wi::{self, WiQueryArgs, WiViewArgs};
 
 /// The tools that change something on the server. Claude Code prompts on every call to these.
 pub(crate) const WRITES: [&str; 12] = [
@@ -162,6 +163,22 @@ impl Server {
     async fn pr_files(&self, Parameters(a): Parameters<PrFilesArgs>) -> CallToolResult {
         // The PR model is large; boxed, the tool's future stays small.
         reply(Box::pin(pr::pr_files(&self.ctx, &a)).await)
+    }
+
+    #[tool(
+        description = "Show a work item: type, state, title, assignee, area and iteration, parent, children, linked PRs, the description and acceptance criteria as plain text, and the last 5 comments.",
+        annotations(read_only_hint = true)
+    )]
+    async fn wi_view(&self, Parameters(a): Parameters<WiViewArgs>) -> CallToolResult {
+        reply(wi::wi_view(&self.ctx, &a).await)
+    }
+
+    #[tool(
+        description = "List work items, one line each (id, type, state, title, assignee), by filters (assigned `me` or a name, state, type, text in the title) or a raw WIQL query. Defaults to the project's items.",
+        annotations(read_only_hint = true)
+    )]
+    async fn wi_query(&self, Parameters(a): Parameters<WiQueryArgs>) -> CallToolResult {
+        reply(wi::wi_query(&self.ctx, &a).await)
     }
 }
 
