@@ -255,13 +255,13 @@ pub(crate) async fn resolve_pr(ctx: &Ctx, scope: &Scope, id: Option<u32>) -> Res
 struct Eval {
     #[serde(default)]
     status: String,
-    configuration: EvalConfig,
+    configuration: Option<EvalConfig>,
 }
 
 #[derive(Deserialize)]
 struct EvalConfig {
     #[serde(rename = "type")]
-    kind: EvalType,
+    kind: Option<EvalType>,
 }
 
 #[derive(Deserialize)]
@@ -280,13 +280,20 @@ async fn checks(ctx: &Ctx, s: &Scope, id: u32) -> Result<Vec<String>, ApiError> 
     Ok(evals
         .value
         .iter()
-        .map(|e| format!("{}: {}", e.configuration.kind.name, e.status))
+        .map(|e| {
+            let name = e.configuration.as_ref().and_then(|c| c.kind.as_ref());
+            format!(
+                "{}: {}",
+                name.map_or("policy", |t| t.name.as_str()),
+                e.status
+            )
+        })
         .collect())
 }
 
 #[derive(Deserialize)]
 struct WiRef {
-    id: String,
+    id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -303,7 +310,7 @@ async fn work_items(ctx: &Ctx, s: &Scope, id: u32) -> Result<Vec<String>, ApiErr
     let ids: Vec<u32> = refs
         .value
         .iter()
-        .filter_map(|r| r.id.parse().ok())
+        .filter_map(|r| r.id.as_deref()?.parse().ok())
         .collect();
     if ids.is_empty() {
         return Ok(vec![]);
@@ -412,11 +419,21 @@ fn section(out: &mut String, title: &str, lines: &[String]) {
     }
 }
 
+/// The scope and the PR, looked up once more when a cached repo id turns out stale.
+async fn find_pr(ctx: &Ctx, at: &Where, id: Option<u32>) -> Result<(Scope, Pr), ApiError> {
+    let first = at.scope(ctx).await?;
+    ctx.retry_stale(&first.key, || async {
+        let s = at.scope(ctx).await?;
+        let pr = resolve_pr(ctx, &s, id).await?;
+        Ok((s, pr))
+    })
+    .await
+}
+
 /// # Errors
 /// When the scope, the PR or the server fails.
 pub(crate) async fn pr_view(ctx: &Ctx, a: &PrViewArgs) -> Result<String, ApiError> {
-    let s = a.at.scope(ctx).await?;
-    let pr = resolve_pr(ctx, &s, a.id).await?;
+    let (s, pr) = find_pr(ctx, &a.at, a.id).await?;
     let (checks, items, run) = tokio::join!(
         checks(ctx, &s, pr.id),
         work_items(ctx, &s, pr.id),
@@ -432,9 +449,22 @@ pub(crate) async fn pr_view(ctx: &Ctx, a: &PrViewArgs) -> Result<String, ApiErro
         })
         .collect();
     section(&mut out, "reviewers:", &reviewers);
-    section(&mut out, "checks:", &checks?);
-    section(&mut out, "work items:", &items?);
-    let _ = write!(out, "\nlatest run: {}", run?);
+    for (title, lines) in [("checks:", checks), ("work items:", items)] {
+        match lines {
+            Ok(lines) => section(&mut out, title, &lines),
+            Err(e) => {
+                let _ = write!(out, "\n{title} unavailable ({e})");
+            }
+        }
+    }
+    match run {
+        Ok(run) => {
+            let _ = write!(out, "\nlatest run: {run}");
+        }
+        Err(e) => {
+            let _ = write!(out, "\nlatest run: unavailable ({e})");
+        }
+    }
     let desc = pr.description.as_deref().unwrap_or_default().trim();
     if !desc.is_empty() {
         let desc = if a.full == Some(true) {
@@ -538,8 +568,7 @@ fn thread_text(t: &Thread) -> String {
 /// # Errors
 /// When the scope, the PR or the server fails.
 pub(crate) async fn pr_threads(ctx: &Ctx, a: &PrThreadsArgs) -> Result<String, ApiError> {
-    let s = a.at.scope(ctx).await?;
-    let pr = resolve_pr(ctx, &s, a.id).await?;
+    let (s, pr) = find_pr(ctx, &a.at, a.id).await?;
     let all = a.all == Some(true);
     let limit = a.limit.unwrap_or(20).max(1);
     let path = format!("{}/{}/threads", prs_path(&s)?, pr.id);
@@ -578,7 +607,7 @@ pub(crate) async fn pr_threads(ctx: &Ctx, a: &PrThreadsArgs) -> Result<String, A
 
 #[derive(Deserialize)]
 struct Iteration {
-    id: u32,
+    id: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -602,13 +631,21 @@ struct ChangeItem {
     path: String,
 }
 
+/// Whether `name` is safe to paste into a shell command.
+fn plain_ref(name: &str) -> bool {
+    !name.is_empty()
+        && !name.starts_with('-')
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || "._/-".contains(c))
+}
+
 const MAX_FILES: usize = 2000;
 
 /// # Errors
 /// When the scope, the PR or the server fails.
 pub(crate) async fn pr_files(ctx: &Ctx, a: &PrFilesArgs) -> Result<String, ApiError> {
-    let s = a.at.scope(ctx).await?;
-    let pr = resolve_pr(ctx, &s, a.id).await?;
+    let (s, pr) = find_pr(ctx, &a.at, a.id).await?;
     let base = format!("{}/{}/iterations", prs_path(&s)?, pr.id);
     let last = ctx
         .api
@@ -616,7 +653,7 @@ pub(crate) async fn pr_files(ctx: &Ctx, a: &PrFilesArgs) -> Result<String, ApiEr
         .await?
         .value
         .iter()
-        .map(|i| i.id)
+        .filter_map(|i| i.id)
         .max()
         .ok_or_else(|| ApiError::local(format!("PR !{} has no iterations", pr.id)))?;
     let path = format!("{base}/{last}/changes");
@@ -625,9 +662,11 @@ pub(crate) async fn pr_files(ctx: &Ctx, a: &PrFilesArgs) -> Result<String, ApiEr
     loop {
         let q = [("$top", MAX_FILES.to_string()), ("$skip", skip.to_string())];
         let page: Changes = ctx.api.get(&path, &q, V71).await?;
+        let empty = page.entries.is_empty();
         files.extend(page.entries);
         skip = page.next_skip.unwrap_or(0);
-        if skip == 0 || files.len() >= MAX_FILES {
+        // An empty page with a `nextSkip` would repeat forever.
+        if skip == 0 || empty || files.len() >= MAX_FILES {
             break;
         }
     }
@@ -644,10 +683,16 @@ pub(crate) async fn pr_files(ctx: &Ctx, a: &PrFilesArgs) -> Result<String, ApiEr
             )
         })
         .collect();
-    if has_more {
+    // The names come from the server and a branch name may hold shell syntax: only plain ones go in a command.
+    let plain = [target, source].iter().all(|n| plain_ref(n));
+    if has_more && plain {
         lines.push(more(&format!("git diff {target}...{source} --stat")));
     }
-    lines.push(format!("diff: git diff {target}...{source}"));
+    lines.push(if plain {
+        format!("diff: git diff {target}...{source}")
+    } else {
+        "diff: run git diff between the target and source branches".into()
+    });
     Ok(lines.join("\n"))
 }
 
@@ -657,6 +702,14 @@ mod tests {
 
     fn thread(json: &Value) -> Thread {
         serde_json::from_value(json.clone()).unwrap()
+    }
+
+    #[test]
+    fn plain_refs() {
+        assert!(plain_ref("feature/login-retry_1.2"));
+        for bad in ["", "-x", "x;rm -rf ~", "a$b", "a`b`", "a|b", "a&b", "a b"] {
+            assert!(!plain_ref(bad), "{bad}");
+        }
     }
 
     #[test]

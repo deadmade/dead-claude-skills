@@ -362,3 +362,97 @@ fn files_follow_next_skip() {
     assert!(q[0].contains("$top=2000"), "{q:?}");
     assert!(q[1].contains("$skip=2"), "{q:?}");
 }
+
+#[test]
+fn view_tolerates_entries_without_configuration_or_id() {
+    let fx = Fixture::start();
+    view_routes(&fx);
+    let mut evals: Value =
+        serde_json::from_slice(&fixture("policy-evaluations.json").body).unwrap();
+    evals["value"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"status": "queued"}));
+    evals["value"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"status": "broken", "configuration": {"id": 9}}));
+    fx.route(POLICY, vec![Resp::json(&evals)]);
+    fx.route(
+        &format!("{PRS}/412/workitems"),
+        vec![Resp::json(&json!({"value": [{"url": "x"}, {"id": "77"}]}))],
+    );
+    let text = ok(&mut env(&fx), "pr_view", json!({"id": 412}));
+    assert!(
+        text.contains("Minimum number of reviewers: approved"),
+        "{text}"
+    );
+    assert!(
+        text.contains("policy: queued") && text.contains("policy: broken"),
+        "{text}"
+    );
+    assert!(text.contains("#77 Bug Active"), "{text}");
+}
+
+#[test]
+fn view_degrades_per_section() {
+    let fx = Fixture::start();
+    view_routes(&fx);
+    fx.route(BUILDS, vec![Resp::new(403, "text/plain", "no")]);
+    fx.route(POLICY, vec![Resp::new(500, "text/plain", "boom")]);
+    let text = ok(&mut env(&fx), "pr_view", json!({"id": 412}));
+    assert!(text.contains("J. Doe: approved (required)"), "{text}");
+    assert!(text.contains("checks: unavailable ("), "{text}");
+    assert!(
+        text.contains(
+            "latest run: unavailable (the PAT may not do this: it needs the Build scope)"
+        ),
+        "{text}"
+    );
+    assert!(text.contains("#77 Bug Active"), "{text}");
+    assert!(text.ends_with("Second paragraph."), "{text}");
+}
+
+#[test]
+fn files_keep_odd_ref_names_out_of_commands() {
+    let fx = Fixture::start();
+    let mut pr: Value = serde_json::from_slice(&fixture("pr.json").body).unwrap();
+    pr["sourceRefName"] = json!("refs/heads/x;rm -rf ~");
+    fx.route(&format!("{PRS}/412"), vec![Resp::json(&pr)]);
+    fx.route(
+        &format!("{PRS}/412/iterations"),
+        vec![Resp::json(&json!({"value": [{}, {"id": 1}]}))],
+    );
+    fx.route(
+        &format!("{PRS}/412/iterations/1/changes"),
+        vec![fixture("iteration-changes-p2.json")],
+    );
+    let text = ok(&mut env(&fx), "pr_files", json!({"id": 412}));
+    assert!(!text.contains("rm -rf"), "{text}");
+    assert!(
+        text.ends_with("diff: run git diff between the target and source branches"),
+        "{text}"
+    );
+}
+
+#[test]
+fn files_stop_on_an_empty_page() {
+    let fx = Fixture::start();
+    fx.route(&format!("{PRS}/412"), vec![fixture("pr.json")]);
+    fx.route(
+        &format!("{PRS}/412/iterations"),
+        vec![fixture("iterations.json")],
+    );
+    let changes = format!("{PRS}/412/iterations/2/changes");
+    // The last answer repeats for every further request.
+    fx.route(
+        &changes,
+        vec![Resp::json(&json!({"changeEntries": [], "nextSkip": 5}))],
+    );
+    let text = ok(&mut env(&fx), "pr_files", json!({"id": 412}));
+    assert_eq!(
+        text,
+        "… more: git diff main...feature/login-retry --stat\ndiff: git diff main...feature/login-retry"
+    );
+    assert_eq!(queries(&fx, &changes).len(), 1);
+}
