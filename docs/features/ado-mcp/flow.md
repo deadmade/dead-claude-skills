@@ -155,6 +155,12 @@ Settled in the chat before this flow started (the user's words in quotes):
   - With B, the PAT is a `sensitive` userConfig value, which Claude Code keeps in the platform's secure credential
     store (manifest-reference, "Where values are stored"). So the server needs no credential code of its own, and
     the earlier `ado auth login` and Credential Manager proposal is dropped.
+- **Our server replaces the npm one inside `mcp-azure`** ("yes, replace mcp-azure with ours", 2026-10-18;
+  recommended so the existing settings carry over).
+  - The plugin keeps its name and its userConfig keys (`ado_org_url`, `ado_pat`, `ado_default_project`,
+    `ado_api_version`), and gains `binPath`.
+  - `@tiberriver256/mcp-server-azure-devops` leaves the repo and THIRD_PARTY.md.
+  - Rejected: a new plugin alongside mcp-azure.
 - **Reusing azdocli** (the user asked, 2026-10-18): it is only a reference. Its code sits on the SDK the user ruled
   out, so nothing copies over as is. A function ported close to verbatim keeps its MIT notice and gets a
   THIRD_PARTY.md line _(my call)_.
