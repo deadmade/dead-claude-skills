@@ -81,6 +81,127 @@ MCP server.
   (guard and error lines unchanged); B, GET the build through the crate and PATCH the whole object back (two calls,
   and it writes back every field it read, so a change made in between could be overwritten). Recommended A.
   - Decision: 2026-10-18, A ("a is ok").
+- **D6, 2026-10-18: walkthrough gaps** (Phase 7, see Walkthrough).
+  - Goal with no code: goal 4's "lists default to 20 with a more line" isn't met by `repo_list` and `pipeline_view`'s
+    stage/job lines; only the 40,000-character reply cap (R11) bounds them. Options: A, give `repo_list` a `limit`
+    (default 20) and a more line, and leave `pipeline_view` as is (a run's stages and jobs are few); B, leave both to
+    the cap. Recommended A.
+  - Code with no goal: 12 extras, all added by reviews for robustness or safety (timeouts, headers, per-section
+    `unavailable`, unknown-status threads, the `git diff` hint, refusing link queries, the 20,000-line log window,
+    failed jobs without a failed step, one step per `full` page, three installer messages and `--clean` keeping
+    `pluginConfigs`). Recommended: keep them all.
+  - Decision: pending.
+
+## Walkthrough
+
+At HEAD 3fa1e1f. `src/` and `tests/` are under `crates/ado-mcp/`; `mcp-azure/` is `plugins/opt-in/mcp/mcp-azure/`;
+JS tests are named by their title's first words.
+
+| Goal | Plan task | Code | Test |
+| --- | --- | --- | --- |
+| 1 one stdio MCP server, `--version` | 1, 11 | src/main.rs:13-25; src/tools.rs:200-220,404-411 | tests/mcp.rs::version_flag, ::initialize_has_instructions |
+| 1 plugin keeps its name and userConfig keys | 13 | mcp-azure/.claude-plugin/plugin.json:2,10-29 | installer/core.test.mjs::"mcp-azure asks for its settings itself" |
+| 1 built (win x64, linux musl), released, version-synced, Nix | 1, 12 | .github/workflows/build-ado-mcp.yml:19-21,43-46; release.yml:77-81,106; scripts/check-repo.mjs:76; scripts/release.mjs:46; flake.nix:111-125 | installer/core.test.mjs::"web-mcp downloads its own archive"; check-repo (npm test); build-ado-mcp.yml `--version` step |
+| 1 crate `=0.39.1`, 7 features, `.endpoint()`/`.transport()` (D1) | 6a | Cargo.toml:20-21; src/api.rs:238-277 | tests/api.rs::sends_auth_version_and_suppress, ::root_hosted_collection |
+| 1 hand-written: `/vsts/info`, `connectionData`, `status=all` (D2), `pipeline_cancel` (D5) | 4, 6a, 10 | src/ctx.rs:207-211,258; src/pr.rs:183-201; src/pipeline.rs:855-866 | tests/ctx.rs::resolves_from_remote, ::me_cached_and_preview; tests/pr.rs::list_filters; tests/pipeline.rs::cancel_body |
+| 1 raw body where the crate falls short: threads, WI batch, log (D2, D3) | 6a, 7, 8 | src/pr.rs:347-355,501-510,574-586; src/wi.rs:308-312,367-377; src/pipeline.rs:753-770; src/api.rs:119-128,139-143 | tests/pr.rs::threads_hide_system_and_resolved, ::view_sections; tests/pipeline.rs::log_crlf_and_missing_log; src/api.rs::squeeze_cuts_double_slashes |
+| 2 reads carry no mark (read-only hint), writes the `_meta` mark | 1, 9, 11 | src/tools.rs:22-35,61-67,89 | tests/mcp.rs::tools_and_marks; smoke.md step 5 |
+| 2 pr_list: status (default active), creator, reviewer `me`, branches, limit | 6, 6a | src/pr.rs:154-245 | tests/pr.rs::list_one_line_each, ::list_filters, ::list_reviewer_by_name; tests/ctx.rs::user_unique_unknown_and_me |
+| 2 pr_view: no id, the current branch's PR | 6 | src/pr.rs:252-289,433-445 | tests/pr.rs::view_by_branch, ::view_no_active_pr_and_unknown_id |
+| 2 pr_view: head, reviewers and votes, checks, work items, latest run (merge ref, else source) | 6, 6a | src/pr.rs:132-150,291-420,449-497 | tests/pr.rs::view_sections, ::view_run_falls_back_to_source, ::view_no_run |
+| 2 pr_threads: no system threads or deleted comments; active and pending unless `all` (D2) | 6, 6a | src/pr.rs:512-520,587-602,619-623 | src/pr.rs::system_threads; tests/pr.rs::threads_hide_system_and_resolved |
+| 2 pr_threads: id, status, `file:line`, author, text | 6 | src/pr.rs:533-563 | tests/pr.rs::thread_location |
+| 2 pr_files: latest iteration, change type | 6, 6a | src/pr.rs:644-692 | tests/pr.rs::files_follow_next_skip, ::files_stop_on_an_empty_page; smoke.md step 4 |
+| 2 wi_view: type, title, state, assignee, area/iteration, parent, children, PRs | 7 | src/wi.rs:92-129,214-231 | tests/wi.rs::view_lines, ::view_unassigned_and_bare; src/wi.rs::last_ids |
+| 2 wi_view: description and acceptance criteria as text, last comments | 5, 7 | src/out.rs:63-152; src/wi.rs:131-165,177-213,232-255 | tests/wi.rs::view_lines, ::view_clips_text_not_markup, ::view_comments_in_the_items_project; src/out.rs::html_to_text_keeps_lists |
+| 2 wi_query: filters (`me`, state, type, title) or raw WIQL, one line each | 7 | src/wi.rs:259-289,316-395 | tests/wi.rs::query_filters_build_wiql, ::query_assigned_by_name, ::query_raw_wiql_passthrough, ::query_keeps_the_wiql_order |
+| 2 pipeline_runs: by pipeline, branch, PR, result | 8 | src/pipeline.rs:129-225 | tests/pipeline.rs::runs_by_pr_uses_merge_ref; tests/ctx.rs::pipeline_by_name |
+| 2 pipeline_view: stages and jobs, result, duration, issues | 8 | src/pipeline.rs:100-108,274-310,326-402 | tests/pipeline.rs::view_tree_skips_phase; src/pipeline.rs::tree_loop_does_not_fan_out, ::durations; smoke.md step 4 |
+| 2 pipeline_log: failed steps cleaned, errors ±5, last 50 (D3) | 8 | src/pipeline.rs:82-84,404-476,506 | src/pipeline.rs::clean_strips_noise, ::excerpt_context_and_tail; tests/pipeline.rs::log_crlf_and_missing_log; smoke.md step 4 |
+| 2 pipeline_log: `step`; `full` + `start`, 2000 lines or 39,000 chars (R8) | 8 | src/pipeline.rs:85-98,490-505,558-603,779-782 | src/pipeline.rs::page_cuts_at_lines_or_chars; tests/pipeline.rs::log_full_paged, ::log_matrix_steps_failed_first; smoke.md step 4 |
+| 2 pipeline_log: whole reply in budget, steps past it named (R9) | 8 | src/pipeline.rs:605-671,728-793 | src/pipeline.rs::budget_names_what_is_left_out; tests/pipeline.rs::log_budget_names_the_rest |
+| 2 repo_list | 8 | src/pipeline.rs:870-902 | tests/pipeline.rs::repo_list_lines |
+| 2 pr_create: source/target defaults, draft, reviewers, work items | 9 | src/pr.rs:808-892 | tests/pr.rs::create_defaults_and_reviewers |
+| 2 pr_update: title, description, abandon/reactivate, no draft (D4) | 9 | src/pr.rs:894-941 | tests/pr.rs::update_only_given_fields |
+| 2 pr_comment (`file:line`), pr_reply, pr_thread_status | 9 | src/pr.rs:943-1063 | tests/pr.rs::comment_anchor, ::comment_line_needs_file, ::reply_and_thread_status |
+| 2 pr_vote: five votes | 9 | src/pr.rs:1065-1097 | tests/pr.rs::vote_values |
+| 2 pr_complete: strategy, delete source, transition, auto; no bypass (D4) | 9 | src/pr.rs:1099-1142 | tests/pr.rs::complete_queued, ::complete_never_bypasses; smoke.md step 5 |
+| 2 wi_create: type, title, description, assignee, parent | 10 | src/wi.rs:418-460 | tests/wi.rs::create_json_patch, ::create_needs_type_and_title |
+| 2 wi_update: state, assignee, title, `fields` (R10: no project) | 10 | src/wi.rs:401-416,462-500 | tests/wi.rs::update_custom_field, ::update_refuses_bad_field_names; smoke.md step 5 |
+| 2 wi_comment | 10 | src/wi.rs:502-529 | tests/wi.rs::comment_preview_version |
+| 2 pipeline_run: name or id, branch, parameters | 10 | src/pipeline.rs:796-844 | tests/pipeline.rs::run_ref_and_params |
+| 2 pipeline_cancel (D5) | 10 | src/pipeline.rs:846-868 | tests/pipeline.rs::cancel_body |
+| 2 each write answers one line with the id | 9, 10 | src/pr.rs:891,940,997-1000,1020,1062,1096,1129-1141; src/wi.rs:459,499,528; src/pipeline.rs:838-843,867 | tests/pr.rs::create_defaults_and_reviewers, ::vote_values; tests/wi.rs::create_json_patch |
+| 3 instructions: under 4096, `git diff`, `branch` | 1 | src/tools.rs:37-48,407-411 | tests/mcp.rs::initialize_has_instructions |
+| 3 instructions: instead of curl, writes prompt, PR/WI/pipeline words | 1 | src/tools.rs:38-40,45-47 | none |
+| 4 plain text, id first, no URLs or GUIDs, dates, display names | 6, 7, 8 | src/pr.rs:124-150,399-401; src/wi.rs:103-112,141-147; src/pipeline.rs:200-214 | tests/pr.rs::list_one_line_each; tests/wi.rs::view_lines |
+| 4 lists show 20, a cut names the next call | 5–8 | src/out.rs:19-41,58-61; src/pr.rs:155,227-240; src/wi.rs:291-306,387-389; src/pipeline.rs:114-125,217-219 | tests/pr.rs::list_more_line, ::list_more_line_keeps_filters; tests/wi.rs::query_more_line; src/out.rs::cut_reports_more |
+| 4 long text cut with the exact call | 5, 6, 7 | src/out.rs:8-17; src/pr.rs:488-495,550-554; src/wi.rs:131-136 | src/out.rs::clip_names_the_rest; tests/pr.rs::view_clips_description, ::threads_full_and_scoped_calls |
+| 4 no colours or control; every reply capped at 40,000 at a line end (R11) | 5, final | src/out.rs:43-56,182-211; src/tools.rs:76-83 | src/out.rs::finish_strips_and_caps, ::finish_drops_a_half_cut_line; tests/pr.rs::view_strips_control_sequences, ::threads_reply_is_capped |
+| 5 project folder from `ADO_PROJECT_DIR`; remote and branch via `git` (R3) | 1, 2, 13 | mcp-azure/.mcp.json:9; src/config.rs:38-41; src/remote.rs:132-150 | src/remote.rs::branch_of_temp_repo; tests/ctx.rs::resolves_from_remote |
+| 5 `/vsts/info` once per remote, ids from it | 4 | src/ctx.rs:198-222 | tests/ctx.rs::resolves_from_remote, ::ctx_uses_ids_not_names |
+| 5 HTTPS and SSH remotes, SSH mapped at the collection (R4) | 2 | src/remote.rs:31-116 | src/remote.rs::https_same, ::ssh_with_tfs, ::ssh_without_tfs, ::scp_style |
+| 5 host and collection match before any request; other server names both (R4) | 2, 3, 6a | src/remote.rs:61-70,82-114; src/api.rs:144-146,354-362; src/ctx.rs:73-87 | src/remote.rs::other_host_refused, ::other_collection_refused, ::cannot_leave_the_collection; src/api.rs::guard_refuses_outside_org; tests/ctx.rs::other_server_sends_nothing |
+| 5 redirects not followed (PAT stays on the server) | 3 | src/api.rs:235-236 | none |
+| 5 `project`/`repo` override; default project outside an ADO clone (R7) | 4 | src/ctx.rs:109-134,198-229 | tests/ctx.rs::explicit_args_win, ::default_project_outside_clone, ::github_clone_uses_default_project |
+| 5 optional `branch` where the current branch is inferred | 4, 6, 9, 10 | src/ctx.rs:130-132; src/pr.rs:31-32; src/pipeline.rs:76-77,799-813 | tests/pr.rs::view_by_branch; tests/pipeline.rs::run_ref_and_params; smoke.md step 3 |
+| 6 one reqwest client per process | 3, 6a | src/api.rs:230-237,250 | none |
+| 6 a tool's requests concurrent; parallel calls concurrent | 1, 6, 7 | src/pr.rs:452-456; src/wi.rs:191-201; src/main.rs:13; Cargo.toml:14 | tests/pr.rs::view_concurrent; tests/wi.rs::view_concurrent; tests/ctx.rs::concurrent_scopes_all_ok |
+| 6 in-memory cache: `/vsts/info`, ids, `me`, pipeline ids | 4 | src/ctx.rs:58-71,136-148,254-261,322-358 | tests/ctx.rs::me_cached_and_preview, ::pipeline_by_name, ::concurrent_scopes_all_ok |
+| 6 an id that 404s is re-resolved once | 4, 6, 7, 8 | src/ctx.rs:231-248,311-316; src/pipeline.rs:181-186,831-835 | tests/ctx.rs::stale_id_retried_once; tests/pipeline.rs::runs_404_resolves_the_name_again; tests/wi.rs::query_retries_a_stale_project |
+| 6 live data never cached; no cache file, no daemon | 4 | src/ctx.rs:58-64 (all the cache holds) | none |
+| 7 Basic `:PAT`, PAT from sensitive `ado_pat` via `env` | 3, 13 | src/api.rs:221-225; mcp-azure/.claude-plugin/plugin.json:17-23; mcp-azure/.mcp.json:7 | tests/api.rs::sends_auth_version_and_suppress; installer/core.test.mjs::"mcp-azure asks for its settings itself" |
+| 7 PAT never printed or logged | 1, 3 | src/config.rs:6-7; src/api.rs:38-40,223 | tests/mcp.rs::errors_are_tool_errors_without_pat, ::missing_url_is_one_line; tests/api.rs::maps_401_without_secret |
+| 7 https only, http to loopback (R12) | final | src/config.rs:35-37,51-63 | src/config.rs::http_only_to_loopback; tests/mcp.rs::plain_http_url_is_refused |
+| 7 TLS: rustls, platform verifier, aws-lc-rs; untrusted-certificate line (R5) | 3, 6a | Cargo.toml:18-21; src/api.rs:447-473 | src/api.rs::certificate_errors_are_found_through_io_errors; smoke.md step 2 |
+| 7 401 (and HTML 203), 403 names the scope (R6), 404 names what | 3 | src/api.rs:34,69-76,483-495,524-533 | tests/api.rs::maps_401_without_secret, ::html_203_is_one_line, ::maps_403_scope; src/api.rs::tf_code_and_404_label |
+| 7 409/412: names the existing PR | 3, 9 | src/api.rs:497-516,535-543; src/pr.rs:869-887 | tests/pr.rs::create_conflict_names_pr; tests/api.rs::refused_line_carries_the_message |
+| 7 429: `Retry-After` once; no retry policy, no resend | 3, 6a | src/api.rs:186-200,260-261,284-314,402-414 | tests/api.rs::retry_after_once, ::second_429_gives_up, ::no_resend_on_dropped_connection; tests/pr.rs::write_sent_once_on_404 |
+| 7 unreadable answer names the field | 3, 6a | src/api.rs:64-67,105-107 | tests/api.rs::missing_field_names_it; smoke.md step 4 |
+| 7 other failures on one line: 5xx, unreachable, not JSON, config | 1, 3 | src/api.rs:431-453,475-481,534; src/config.rs:22-34 | tests/api.rs::server_error_line, ::unreachable_names_the_host, ::not_json_is_one_line |
+| 8 7.1: crate `7.1-preview`; `connectionData` `-preview.1`; hand-sent `7.1-preview`; `/vsts/info` none | 4, 6a, 10 | Cargo.toml:20; src/api.rs:28-31; src/ctx.rs:209,258; src/pr.rs:201; src/pipeline.rs:861 | tests/api.rs::sends_auth_version_and_suppress; tests/ctx.rs::me_cached_and_preview; tests/pipeline.rs::cancel_body |
+| 8 `ado_api_version` removed; a stale value ignored | 13 | mcp-azure/.claude-plugin/plugin.json:10-36; src/config.rs:20-48 | installer/core.test.mjs::"mcp-azure asks for its settings itself" |
+| 8 option comes back if the server needs 7.0 | 15 | smoke.md:30 | smoke.md step 2 |
+| 9 `binPath` (default `ado-mcp`), `.mcp.json` runs it as `ado` | 13 | mcp-azure/.claude-plugin/plugin.json:30-35; mcp-azure/.mcp.json:3-4 | installer/core.test.mjs::"web-mcp downloads its own archive"; smoke.md step 1 |
+| 9 README (tools, 4 scopes, setup), descriptions; THIRD_PARTY, CLAUDE.md, README | 13, 14 | mcp-azure/README.md:12-73; .claude-plugin/marketplace.json:56; CLAUDE.md:22,61-75; README.md:12 | none |
+| 9 `BIN_PLUGINS` mcp-azure → ado-mcp, crate folder by binary | 13 | installer/core.mjs:351-355; installer/install.mjs:367-377 | installer/core.test.mjs::"web-mcp downloads its own archive" |
+| 9 asks URL, hidden PAT, default project; Enter keeps a saved value | 13 | installer/core.mjs:357-384; installer/install.mjs:703-730; installer/ui.mjs:107-137 | installer/core.test.mjs::"configValues trims answers"; installer/ui.test.mjs::"secret returns the typed text", ::"line stops at the first Enter" |
+| 9 installs, downloads, one `configure --values-stdin` with `binPath`; PAT on stdin only | 13 | installer/install.mjs:366-406,731-741,760; installer/core.mjs:407-408 | installer/core.test.mjs::"configureArgs reads the values from stdin" |
+| 9 empty PAT or Claude Code < 2.1.285: handoff, no API-version line (R2) | 13 | installer/core.mjs:386-405; installer/install.mjs:472-476,698-731,795-799 | installer/core.test.mjs::"selfConfigure prompts", ::"configure needs Claude Code 2.1.285", ::"afterPrompts hands off" |
+| 9 mcp-github keeps the handoff | 13 | installer/core.mjs:358; installer/install.mjs:468-471 | installer/core.test.mjs::"mcp-azure asks for its settings itself" |
+| 10 unit tests: thread filter, log cleaning, cuts, HTML, remotes, error mapping | 2, 3, 5, 6, 8 | src/pr.rs:1165; src/pipeline.rs:909-1009; src/out.rs:232-316; src/remote.rs:156-296; src/api.rs:606-700 | are the tests (e.g. src/remote.rs::decodes_spaces_once) |
+| 10 fake server replaying fixtures that fit the crate's models | 1, 3, 6a | tests/common/mod.rs:93-205; tests/fixtures.rs:70 | tests/fixtures.rs::fixtures_fit_models |
+| 10 `cargo test` and clippy in CI on Linux and Windows | 1 | .github/workflows/ado-mcp.yml:19,35-39 | is the check |
+| 11 smoke: TLS through ESET, `vsts/info` on the remote | 15 | smoke.md:24-57 | smoke.md steps 2, 3 |
+| 11 smoke: each read, one of each write on scratch items | 15 | smoke.md:59-122 | smoke.md steps 4, 5 |
+| 11 smoke: minimal PAT; outputs pasted back, never JSON | 15 | smoke.md:6-7,124-129 | smoke.md step 6 |
+
+Goals with no code:
+
+- 4: `repo_list` and `pipeline_view`'s stage and job lines have no 20-item default or more line; only the R11 cap
+  of 40,000 characters bounds them.
+
+Code with no goal:
+
+- Request timeouts, 10 s to connect and 60 s per request, with the `ADO_TIMEOUT_MS` debug hook
+  (`src/api.rs:33,174-184,233-234`; plan review S9).
+- `User-Agent: ado-mcp/<version>` and `X-TFS-FedAuthRedirect: Suppress` on every request
+  (`src/api.rs:36,148,226-231`).
+- `pr_view` and `wi_view` print a failed section as `unavailable (…)` instead of failing
+  (`src/pr.rs:472-487`, `src/wi.rs:247-255`; Task 6 review).
+- `pr_threads` also shows threads of unknown status by default (`src/pr.rs:600`).
+- `pr_files` prints a `git diff target...source` line, only for shell-safe ref names (`src/pr.rs:631-638,693-706`).
+- `wi_query` refuses link queries (`src/wi.rs:342-348`).
+- `pipeline_log` by default reads at most a step's last 20,000 lines (`src/pipeline.rs:87-88,526-544,746-766`; final
+  security review).
+- `pipeline_log` reports a failed job with no failed step, with its issues (`src/pipeline.rs:506-522`).
+- `pipeline_log full=true` with several failed steps shows the first and names the others
+  (`src/pipeline.rs:673-693,713-717`).
+- Installer: an installed mcp-azure left without a required value keeps the others and gets a "not set" summary line
+  (`installer/core.mjs:393-399`); R2 covers only a new install.
+- Installer: the mcp-azure handoff note says to run the installer again (`installer/install.mjs:475`).
+- Installer: `--clean` keeps our plugins' `pluginConfigs`, every `binPath` included (`installer/core.mjs:237-240`;
+  Task 13 review).
 
 ## Skipped
 
