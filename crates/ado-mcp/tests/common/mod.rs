@@ -157,7 +157,13 @@ fn serve(conn: TcpStream, state: &Mutex<State>) {
             headers,
             body,
         });
-        match st.routes.get_mut(&path) {
+        // A route given without a query also answers that path with any query.
+        let key = if st.routes.contains_key(&path) {
+            path.clone()
+        } else {
+            path.split('?').next().unwrap_or_default().to_owned()
+        };
+        match st.routes.get_mut(&key) {
             Some(v) if v.len() > 1 => Some(v.remove(0)),
             Some(v) => v.first().cloned(),
             None => None,

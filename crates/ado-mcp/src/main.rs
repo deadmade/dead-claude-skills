@@ -1,3 +1,4 @@
+mod api;
 mod config;
 mod remote;
 mod tools;
@@ -15,7 +16,7 @@ async fn main() -> anyhow::Result<()> {
     let cfg = config::Config::from_env()?;
     // ring, not aws-lc-rs: no cmake or C toolchain needed to build.
     let _ = rustls::crypto::ring::default_provider().install_default();
-    tools::Server::new(Arc::new(cfg))
+    tools::Server::new(Arc::new(cfg))?
         .serve(stdio())
         .await?
         .waiting()

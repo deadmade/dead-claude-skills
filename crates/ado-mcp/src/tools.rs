@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
 use rmcp::handler::server::router::tool::ToolRouter;
-use rmcp::model::{Implementation, ServerCapabilities, ServerConfig};
-use rmcp::{ServerHandler, tool_handler, tool_router};
-use serde_json::json;
+use rmcp::model::{CallToolResult, ContentBlock, Implementation, ServerCapabilities, ServerConfig};
+use rmcp::{ServerHandler, tool, tool_handler, tool_router};
+use serde_json::{Value, json};
 
+use crate::api::{Api, V71};
 use crate::config::Config;
 
 /// The tools that change something on the server. Claude Code prompts on every call to these.
@@ -40,12 +41,15 @@ pub struct Server {
     // Read by the tools from Task 4 on.
     #[allow(dead_code)]
     cfg: Arc<Config>,
+    api: Api,
     router: ToolRouter<Self>,
 }
 
 impl Server {
-    #[must_use]
-    pub fn new(cfg: Arc<Config>) -> Self {
+    /// # Errors
+    /// When the HTTP client can't be built.
+    pub fn new(cfg: Arc<Config>) -> anyhow::Result<Self> {
+        let api = Api::new(&cfg)?;
         let mut router = Self::tool_router();
         for name in WRITES {
             if let Some(tool) = router.map.get_mut(name) {
@@ -54,12 +58,35 @@ impl Server {
                 tool.attr.meta = serde_json::from_value(meta).ok();
             }
         }
-        Self { cfg, router }
+        Ok(Self { cfg, api, router })
     }
 }
 
-#[tool_router(allow_empty)]
-impl Server {}
+fn error(msg: impl Into<String>) -> CallToolResult {
+    CallToolResult::error(vec![ContentBlock::text(msg)])
+}
+
+#[tool_router]
+impl Server {
+    // Temporary diagnostic; Task 11 removes it.
+    #[tool(
+        description = "Check that the Azure DevOps server answers and the PAT works; prints how many projects it listed.",
+        annotations(read_only_hint = true)
+    )]
+    async fn ping(&self) -> CallToolResult {
+        match self
+            .api
+            .get::<Value>("_apis/projects", &[("$top", "1".into())], V71)
+            .await
+        {
+            Ok(v) => CallToolResult::success(vec![ContentBlock::text(format!(
+                "projects: {}",
+                v["count"]
+            ))]),
+            Err(e) => error(e.to_string()),
+        }
+    }
+}
 
 #[tool_handler(router = self.router)]
 impl ServerHandler for Server {
