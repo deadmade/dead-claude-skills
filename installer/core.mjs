@@ -346,7 +346,7 @@ export function missingBinaries(platform, wanted, onPath) {
   });
 }
 
-// The binaries releases ship, built per platform by .github/workflows/build-{tui-review,web-mcp}.yml and attached to the
+// The binaries releases ship, built per platform by .github/workflows/build-{tui-review,web-mcp,ado-mcp}.yml and attached to the
 // vX.Y.Z release by release.yml. plugin: which plugin needs it; key: its userConfig key for the binary's path.
 export const BIN_PLUGINS = {
   'tui-review': { name: 'tui-review', key: 'binPath' },
@@ -412,7 +412,7 @@ const BIN_TARGETS = {
   'linux-x64': 'x86_64-unknown-linux-musl',
 };
 
-// The release archive of binary `name` ('tui-review' or 'web-mcp') at `version` for this machine, or undefined where none is built.
+// The release archive of binary `name` ('tui-review', 'web-mcp' or 'ado-mcp') at `version` for this machine, or undefined where none is built.
 export function binAsset(name, platform, arch, version) {
   const target = BIN_TARGETS[`${platform}-${arch}`];
   if (!target) return undefined;
