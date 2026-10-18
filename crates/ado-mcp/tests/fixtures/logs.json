@@ -1,0 +1,45 @@
+{
+  "count": 5,
+  "value": [
+    {
+      "lineCount": 40,
+      "createdOn": "2026-03-05T10:00:07Z",
+      "lastChangedOn": "2026-03-05T10:05:00Z",
+      "id": 2,
+      "type": "Container",
+      "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/build/builds/77/logs/2"
+    },
+    {
+      "lineCount": 25,
+      "createdOn": "2026-03-05T10:00:07Z",
+      "lastChangedOn": "2026-03-05T10:05:00Z",
+      "id": 3,
+      "type": "Container",
+      "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/build/builds/77/logs/3"
+    },
+    {
+      "lineCount": 2500,
+      "createdOn": "2026-03-05T10:00:07Z",
+      "lastChangedOn": "2026-03-05T10:05:00Z",
+      "id": 4,
+      "type": "Container",
+      "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/build/builds/77/logs/4"
+    },
+    {
+      "lineCount": 12,
+      "createdOn": "2026-03-05T10:00:07Z",
+      "lastChangedOn": "2026-03-05T10:05:00Z",
+      "id": 5,
+      "type": "Container",
+      "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/build/builds/77/logs/5"
+    },
+    {
+      "lineCount": 30,
+      "createdOn": "2026-03-05T10:00:07Z",
+      "lastChangedOn": "2026-03-05T10:05:00Z",
+      "id": 6,
+      "type": "Container",
+      "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/build/builds/77/logs/6"
+    }
+  ]
+}

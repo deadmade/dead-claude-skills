@@ -13,6 +13,7 @@ use serde::Deserialize;
 use crate::api::ApiError;
 use crate::config::Config;
 use crate::ctx::{Ctx, seg};
+use crate::pipeline::{self, LogArgs, ProjectArgs, RunArgs, RunsArgs};
 use crate::pr::{self, PrFilesArgs, PrListArgs, PrThreadsArgs, PrViewArgs};
 use crate::wi::{self, WiQueryArgs, WiViewArgs};
 
@@ -179,6 +180,38 @@ impl Server {
     )]
     async fn wi_query(&self, Parameters(a): Parameters<WiQueryArgs>) -> CallToolResult {
         reply(wi::wi_query(&self.ctx, &a).await)
+    }
+
+    #[tool(
+        description = "List recent pipeline runs, newest first, one line each (id, pipeline, branch, result, date, duration). Filter by pipeline (name or id), branch, PR or result.",
+        annotations(read_only_hint = true)
+    )]
+    async fn pipeline_runs(&self, Parameters(a): Parameters<RunsArgs>) -> CallToolResult {
+        reply(pipeline::pipeline_runs(&self.ctx, &a).await)
+    }
+
+    #[tool(
+        description = "Show a pipeline run's stages and jobs with result and duration, and its errors and warnings.",
+        annotations(read_only_hint = true)
+    )]
+    async fn pipeline_view(&self, Parameters(a): Parameters<RunArgs>) -> CallToolResult {
+        reply(pipeline::pipeline_view(&self.ctx, &a).await)
+    }
+
+    #[tool(
+        description = "Read a pipeline run's logs, cleaned: by default each failed step's error lines with 5 lines of context and its last 50 lines (and a failed job's issues when no step failed). step picks a step; full pages through the whole log, 2000 lines per call.",
+        annotations(read_only_hint = true)
+    )]
+    async fn pipeline_log(&self, Parameters(a): Parameters<LogArgs>) -> CallToolResult {
+        reply(pipeline::pipeline_log(&self.ctx, &a).await)
+    }
+
+    #[tool(
+        description = "List the project's repos, one line each, with their default branch.",
+        annotations(read_only_hint = true)
+    )]
+    async fn repo_list(&self, Parameters(a): Parameters<ProjectArgs>) -> CallToolResult {
+        reply(pipeline::repo_list(&self.ctx, &a).await)
     }
 }
 

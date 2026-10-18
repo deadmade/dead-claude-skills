@@ -17,6 +17,7 @@ type Check = fn(&[u8]) -> Result<(), String>;
 const TABLE: &[(&str, Check)] = &[
     ("builds-empty.json", fits::<build::models::BuildList>),
     ("builds-one.json", fits::<build::models::BuildList>),
+    ("builds.json", fits::<build::models::BuildList>),
     (
         "definitions.json",
         fits::<build::models::BuildDefinitionReferenceList>,
@@ -34,6 +35,7 @@ const TABLE: &[(&str, Check)] = &[
         "iterations.json",
         fits::<git::models::GitPullRequestIterationList>,
     ),
+    ("logs.json", fits::<build::models::BuildLogList>),
     (
         "policy-evaluations.json",
         fits::<policy::models::PolicyEvaluationRecordList>,
@@ -46,14 +48,16 @@ const TABLE: &[(&str, Check)] = &[
     ("pr-workitems.json", fits::<git::models::ResourceRefList>),
     ("pr.json", fits::<git::models::GitPullRequest>),
     ("repo.json", fits::<git::models::GitRepository>),
+    ("repos.json", fits::<git::models::GitRepositoryList>),
+    ("timeline.json", fits::<build::models::Timeline>),
     ("wi-batch.json", fits::<wit::models::WorkItemList>),
     ("wi-comments.json", fits::<wit::models::CommentList>),
     ("wi.json", fits::<wit::models::WorkItem>),
     ("wiql.json", fits::<wit::models::WorkItemQueryResult>),
 ];
 
-/// Answers of the two hand-written calls, which have no crate model.
-const HAND_WRITTEN: &[&str] = &["connection-data.json", "vsts-info.json"];
+/// Answers with no crate model: the two hand-written calls, and a log, which is plain text.
+const HAND_WRITTEN: &[&str] = &["connection-data.json", "vsts-info.json", "log.txt"];
 
 #[test]
 fn fixtures_fit_models() {

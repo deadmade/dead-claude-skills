@@ -108,7 +108,7 @@ fn repo_id(s: &Scope) -> Result<&str, ApiError> {
 }
 
 /// `refs/heads/{branch}`, unless it already is a ref.
-fn full_ref(branch: &str) -> String {
+pub(crate) fn full_ref(branch: &str) -> String {
     if branch.starts_with("refs/") {
         branch.to_owned()
     } else {
