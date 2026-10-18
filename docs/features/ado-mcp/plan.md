@@ -545,7 +545,7 @@ Phase → Job → Task, with one Task `skipped` and no log, and one Job `failed`
   - A TF401179 error looks up the active PR for that source and target, and returns
     `!{id} already exists for {source} → {target}` as a tool error.
   - → `created !{id} {source} → {target}{ (draft)}`.
-- `pr_update(ctx, &PrUpdateArgs { id, title, description, draft, status })`. `status` is abandoned or active, and
+- `pr_update(ctx, &PrUpdateArgs { id, title, description, status })` (no `draft`: D4). `status` is abandoned or active, and
   only the given fields are PATCHed. → `updated !{id}: {fields}`.
 - `pr_comment(ctx, &PrCommentArgs { id, text, file, line })`.
   - `file` and `line` must come together; otherwise `file and line go together`. `line` 0 → `line starts at 1`.
@@ -768,6 +768,8 @@ error lines, never raw JSON.
      text, not the JSON lines form. Also check whether a YAML run without stages prints a `__default` stage line.
    - `pipeline_log … full=true` on a log over 2000 lines, then the `start=` call it offers: the second page must
      start where the first stopped (a server that ignores `startLine` would repeat the opening lines).
+   - `pr_complete` without `auto` on a scratch PR (D4): it sends no `lastMergeSourceCommit`; paste back the line,
+     especially any error naming that field.
    - `pr_files` on a PR with a renamed file and, if one exists, a file whose encoding changed: the crate's
      change-type enum knows only some flag combinations.
 5. **Writes**, on scratch items only. Run each write tool once on a scratch branch, PR and work item.

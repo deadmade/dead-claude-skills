@@ -70,6 +70,10 @@ MCP server.
   uses to refuse completing a PR that moved). Recommended A.
   - Decision: 2026-10-18, B ("b"). Held until the Task 9 review says whether another crate call carries both fields,
     and flagged to the user: the server may require `lastMergeSourceCommit` to complete a PR at all.
+  - The review confirmed no crate call carries `isDraft` or `lastMergeSourceCommit`. Microsoft's 7.1 Update page
+    lists the updatable fields (status, title, description, completionOptions, mergeOptions, autoCompleteSetBy.id,
+    targetRefName), and neither is among them, so B follows the documented call. The smoke test checks a direct
+    `pr_complete`; if the server demands the commit, D4 comes back to the user.
 
 ## Skipped
 

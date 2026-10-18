@@ -81,7 +81,8 @@ downloaded when it runs. The user doesn't need a terminal tool: "goal is for cla
      `dontAsk` mode such calls are denied.
    - `pr_create`: title, description, source (default: current branch), target (default: the repo's default
      branch), draft, reviewers, linked work items.
-   - `pr_update`: title, description, draft ↔ published, abandon or reactivate.
+   - `pr_update`: title, description, abandon or reactivate. Not draft ↔ published: the 7.1 Update call doesn't list
+    `isDraft` as updatable, and the crate can't send it (flow.md, D4).
    - `pr_comment`: a new thread, optionally anchored to a `file:line`.
    - `pr_reply`: a reply on a thread.
    - `pr_thread_status`: set a thread's status, e.g. fixed, closed or won't fix.
