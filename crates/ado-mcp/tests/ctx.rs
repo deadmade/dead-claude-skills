@@ -163,6 +163,10 @@ fn explicit_args_win() {
         "{:?}",
         paths(&fx)
     );
+    // The project alone leaves the repo empty, even inside a clone.
+    let (err, text) = mcp.call("pr_list", json!({"project": "Other"}));
+    assert!(err);
+    assert!(text.starts_with("no repo: pass repo"), "{text}");
 }
 
 #[test]
