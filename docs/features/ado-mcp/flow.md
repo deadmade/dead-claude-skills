@@ -57,7 +57,7 @@ MCP server.
     (linked items can live in other projects) and the guard drops the empty segment.
   - Options: A, keep these three; B, replace `status=all` with three crate calls merged (worse ordering and paging).
     Recommended A.
-  - Decision: pending.
+  - Decision: 2026-10-18, A ("yes, keep them").
 
 ## Skipped
 
