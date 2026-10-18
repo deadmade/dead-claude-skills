@@ -114,6 +114,13 @@ test('line stops at the first Enter, so text pasted after it is not echoed', asy
   assert.equal(io.input.isRaw, false);
 });
 
+test('line is null when stdin closes before an answer', async () => {
+  const io = tty();
+  const done = line('Collection URL:', io);
+  io.input.end();
+  assert.equal(await done, null);
+});
+
 test('secret returns the typed text and never echoes it', async () => {
   const io = tty();
   const done = secret('Azure DevOps personal access token:', io);

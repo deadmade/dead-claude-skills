@@ -109,7 +109,10 @@ export async function confirm(message, initial = true, io = STD) {
 export function line(message, { input, output } = STD) {
   return new Promise((resolve) => {
     const rl = createInterface({ input, output, terminal: true });
+    let done = false;
     const end = (answer) => {
+      if (done) return;
+      done = true;
       rl.close();
       input.setRawMode?.(false);
       input.pause();
@@ -119,6 +122,8 @@ export function line(message, { input, output } = STD) {
       output.write('\n');
       end(null);
     });
+    // stdin closed before an answer (EOF, a closed pipe): treat it like ctrl-c instead of hanging.
+    rl.on('close', () => end(null));
     rl.question(`${message} `, end);
   });
 }
