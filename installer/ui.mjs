@@ -1,6 +1,7 @@
 // The installer's terminal I/O on Node's stdlib: interactive screens, a yes/no, a typed line and plain output.
 import { createInterface } from 'node:readline';
 import { createInterface as createLineInterface } from 'node:readline/promises';
+import { Writable } from 'node:stream';
 import { frame, paint, wrap } from './view.mjs';
 
 const STD = { input: process.stdin, output: process.stdout };
@@ -119,6 +120,14 @@ export async function line(message, { input, output } = STD) {
     input.setRawMode?.(false);
     input.pause();
   }
+}
+
+// A typed answer that is never shown: the prompt is written here and everything line() draws (echo, redraws) is dropped.
+export async function secret(message, io = STD) {
+  io.output.write(`${message} `);
+  const answer = await line('', { input: io.input, output: new Writable({ write: (_c, _e, cb) => cb() }) });
+  io.output.write('\n');
+  return answer;
 }
 
 // A framed note; long lines wrap so text the user copies stays whole.

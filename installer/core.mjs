@@ -347,7 +347,43 @@ export function missingBinaries(platform, wanted, onPath) {
 export const BIN_PLUGINS = {
   'tui-review': { name: 'tui-review', key: 'binPath' },
   'web-mcp': { name: 'web-mcp', key: 'binPath' },
+  'mcp-azure': { name: 'ado-mcp', key: 'binPath' },
 };
+
+// Plugins whose settings, token included, the installer asks for and saves itself instead of handing them off.
+export const SELF_CONFIGURED = ['mcp-azure'];
+
+// What to ask for a self-configured plugin, in manifest order; binKey is set by applyBin, not asked.
+// configuredKeys: the option names `claude plugin configure <id> --json` lists as `configured`.
+export const configPrompts = (userConfig, binKey, configuredKeys) =>
+  Object.entries(userConfig)
+    .filter(([key]) => key !== binKey)
+    .map(([key, c]) => ({
+      key,
+      title: c.title,
+      description: c.description,
+      secret: c.sensitive === true,
+      required: c.required === true,
+      saved: configuredKeys.includes(key),
+    }));
+
+// The values to save (an empty answer keeps a saved value) and the required keys still without one.
+export function configValues(prompts, answers) {
+  const values = {};
+  const missing = [];
+  for (const p of prompts) {
+    const v = (answers[p.key] ?? '').trim();
+    if (v) values[p.key] = v;
+    else if (p.required && !p.saved) missing.push(p.key);
+  }
+  return { values, missing };
+}
+
+export const selfConfigure = ({ installed, configuredKeys, requiredKeys }) =>
+  installed && requiredKeys.every((k) => configuredKeys.includes(k)) ? 'skip' : 'prompt';
+
+// The values go over stdin as JSON, never as arguments: the token must not show up in a process list.
+export const configureArgs = (id) => ['plugin', 'configure', id, '--values-stdin'];
 // Windows and Linux x64 only: no macOS or ARM builds.
 const BIN_TARGETS = {
   'win32-x64': 'x86_64-pc-windows-msvc',

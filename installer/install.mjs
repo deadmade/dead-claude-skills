@@ -24,10 +24,14 @@ import {
   OFFICIAL,
   TOGGLES,
   BIN_PLUGINS,
+  SELF_CONFIGURED,
   binAction,
   binAsset,
   bundleIds,
   categorize,
+  configPrompts,
+  configValues,
+  configureArgs,
   cswapCurrent,
   cswapDownload,
   dcgCommand,
@@ -58,6 +62,7 @@ import {
   planPlugins,
   resetSettings,
   safeArg,
+  selfConfigure,
   settingsChange,
   settingsText,
   sha256Of,
@@ -69,7 +74,7 @@ import {
   withDependencies,
 } from './core.mjs';
 import { backup, clearTargets, writeAtomic, writeSearxng } from './files.mjs';
-import { confirm, line, log, note, progress, screen } from './ui.mjs';
+import { confirm, line, log, note, progress, screen, secret } from './ui.mjs';
 import { changeList, initial, move, paint, render } from './view.mjs';
 
 const PKG = join(import.meta.dirname, '..');
@@ -355,8 +360,8 @@ async function downloadBin(name, asset, bin) {
 }
 
 // A plugin that needs its binary: one on PATH is used as is; otherwise the release for this version goes to
-// ~/.claude/bin and the plugin's userConfig key points at it.
-async function applyBin(pluginName, plugin) {
+// ~/.claude/bin and the plugin's userConfig key points at it. extra: the plugin's other settings, saved in the same call.
+async function applyBin(pluginName, plugin, extra = {}) {
   const { name, key } = BIN_PLUGINS[pluginName];
   const version = VERSION;
   const asset = binAsset(name, process.platform, process.arch, version);
@@ -367,20 +372,31 @@ async function applyBin(pluginName, plugin) {
     version,
     supported: asset !== undefined,
   });
-  const build = `build it with \`cargo build --release\` in crates/${pluginName === 'web-mcp' ? 'web-mcp' : 'tui-review'} and set its path with /plugin configure ${pluginName}`;
-  if (action === 'skip') return done.push(`${name}: using the one on PATH`);
+  const build = `build it with \`cargo build --release\` in crates/${name} and set its path with /plugin configure ${pluginName}`;
+  if (action === 'skip') done.push(`${name}: using the one on PATH`);
   if (action === 'unsupported')
-    return failures.push(`${name}: no release build for ${process.platform}-${process.arch}; ${build}`);
+    failures.push(`${name}: no release build for ${process.platform}-${process.arch}; ${build}`);
+  let ours = action === 'configure';
   if (action === 'download') {
     const r = await progress(`Downloading ${name} ${version}`, async () => {
       await downloadBin(name, asset, bin);
       return { ok: true };
     });
-    if (!r.ok) return failures.push(`${name} ${version}: ${r.err}; ${build}`);
-    done.push(`installed ${name} ${version} to ${bin}`);
+    if (r.ok) done.push(`installed ${name} ${version} to ${bin}`);
+    else failures.push(`${name} ${version}: ${r.err}; ${build}`);
+    ours = r.ok;
   }
-  const r = await claude(JSON.stringify({ [key]: bin }), 'plugin', 'configure', plugin, '--values-stdin');
-  if (r.ok) done.push(`${pluginName}: ${key} is ${bin}`);
+  // Without a binary of ours, the other settings are still saved.
+  const values = ours ? { ...extra, [key]: bin } : extra;
+  const saving = Object.keys(extra);
+  if (!Object.keys(values).length) return;
+  const r = await claude(JSON.stringify(values), ...configureArgs(plugin));
+  if (r.ok) {
+    if (values[key]) done.push(`${pluginName}: ${key} is ${bin}`);
+    if (saving.length) done.push(`${pluginName}: saved ${saving.join(', ')}`);
+  } else if (saving.length)
+    // r.err is left out: the CLI's error could quote what it read on stdin, the token included.
+    failures.push(`${pluginName}: could not save its settings; run /plugin configure ${plugin} in Claude Code`);
   else
     failures.push(
       `${pluginName}: could not set ${key} (${r.err}); set it to ${bin} with /plugin configure ${pluginName}`,
@@ -452,9 +468,9 @@ const HANDOFF = {
     'with the repository permissions Claude should have.',
   ],
   'mcp-azure': [
-    'Needs the collection URL (e.g. https://tfs.company/tfs/DefaultCollection), a PAT with Code (Read),',
-    'Work Items (Read & Write), Build (Read), Wiki (Read), the REST API version (2022 → 7.0, 2020 → 6.0,',
-    '2019 → 5.0) and optionally a default project.',
+    'Needs the collection URL (e.g. https://tfs.company/tfs/DefaultCollection), a PAT with Code (Read & Write),',
+    'Work Items (Read & Write), Build (Read & Execute), Project and Team (Read), and optionally a default project.',
+    'Then run this installer again: it downloads the ado-mcp binary.',
   ],
 };
 
@@ -516,7 +532,9 @@ const rows = Array.isArray(plugins) ? plugins : (plugins.installed ?? []);
 const manifest = readJson(join(PKG, '.claude-plugin', 'marketplace.json'));
 const bundle = readJson(join(PKG, manifestPath(manifest, BUNDLE)));
 const opts = optIns(manifest, bundle);
+const selfConfigured = (id) => SELF_CONFIGURED.includes(nameOf(id));
 const tokenPlugins = opts.filter((id) => {
+  if (selfConfigured(id)) return false;
   const path = manifestPath(manifest, id);
   return needsToken((path && tryJson(join(PKG, path))) || {});
 });
@@ -569,6 +587,7 @@ function option(key) {
   const name = nameOf(key);
   const notes = [
     tokenPlugins.includes(key) && 'token entered in Claude Code',
+    selfConfigured(key) && 'asks for the token',
     key.endsWith(`@${OFFICIAL}`) && `from ${OFFICIAL}`,
     deps[key] && `brings ${deps[key].length} plugins`,
     ...Object.keys(deps)
@@ -669,11 +688,40 @@ for (const name of foreignMarkets)
   await run(`Removing marketplace ${name}`, `removed marketplace ${name}`, 'plugin', 'marketplace', 'remove', name);
 
 // INCLUDED plugins have no row: only a chosen plugin's dependencies select them.
-const selected = withDependencies(
+const wantedIds = withDependencies(
   [BUNDLE_ID, ...opts.filter((id) => on(id) && !INCLUDED.includes(nameOf(id)))],
   (id) => deps[id],
   opts,
 );
+// Self-configured plugins ask for their settings now; a new one left without a required value (an empty token) is
+// not installed and gets the handoff note instead.
+const selfValues = {};
+const selfHandoff = [];
+for (const id of wantedIds.filter(selfConfigured)) {
+  const installed = installedIds.includes(id);
+  const shown = installed ? await claude(undefined, 'plugin', 'configure', id, '--json') : undefined;
+  let configuredKeys = [];
+  try {
+    if (shown?.ok) configuredKeys = JSON.parse(shown.out).configured ?? [];
+  } catch {
+    /* an older Claude Code: everything is asked again */
+  }
+  const userConfig = tryJson(join(PKG, manifestPath(manifest, id)))?.userConfig ?? {};
+  const requiredKeys = Object.keys(userConfig).filter((k) => userConfig[k].required === true);
+  if (selfConfigure({ installed, configuredKeys, requiredKeys }) === 'skip') continue;
+  log('info', `${nameOf(id)} settings:`);
+  const prompts = configPrompts(userConfig, BIN_PLUGINS[nameOf(id)].key, configuredKeys);
+  const answers = {};
+  for (const p of prompts) {
+    log('info', `  ${p.description}`);
+    const message = `${p.title}${p.saved ? ' (saved, Enter keeps)' : ''}:`;
+    answers[p.key] = must(await (p.secret ? secret(message) : line(message)));
+  }
+  const { values, missing } = configValues(prompts, answers);
+  if (missing.length && !installed) selfHandoff.push(id);
+  else selfValues[id] = values;
+}
+const selected = wantedIds.filter((id) => !selfHandoff.includes(id));
 const plan = planPlugins(
   selected,
   installedIds.filter((id) => [BUNDLE_ID, ...opts].includes(id)),
@@ -702,6 +750,7 @@ if (plan.uninstall.length || data.retired.length || dupes.length || foreign.leng
   await run('Pruning unused dependencies', 'pruned unused dependencies', 'plugin', 'prune', '-y');
 if (selected.includes(TUI_REVIEW)) await applyBin('tui-review', TUI_REVIEW);
 if (selected.includes(WEB_MCP)) await applyBin('web-mcp', WEB_MCP);
+for (const id of selected.filter(selfConfigured)) await applyBin(nameOf(id), id, selfValues[id]);
 
 const webBuiltinsOff = webBuiltinsDecision({
   toggle: selected.includes(WEB_MCP) && on('web-builtins-off'),
@@ -736,7 +785,7 @@ note('Summary', [
   `marketplace autoUpdate (known_marketplaces.json): ${autoUpdate ?? 'not set'}`,
   ...(clean ? [`restore the backup: cp -a ${backupDir}/. ${CONFIG}/`] : []),
 ]);
-for (const id of plan.handoff) {
+for (const id of [...plan.handoff, ...selfHandoff]) {
   note(`${nameOf(id)}: run this in Claude Code, it asks for the token`, [
     `/plugin install ${id}`,
     ...(HANDOFF[nameOf(id)] ?? []),

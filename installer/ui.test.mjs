@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PassThrough } from 'node:stream';
-import { confirm, line, progress, screen } from './ui.mjs';
+import { confirm, line, progress, screen, secret } from './ui.mjs';
 
 const tty = () => {
   const input = Object.assign(new PassThrough(), {
@@ -102,6 +102,16 @@ test('line returns the typed text, ctrl-c is null', async () => {
   done = line('Type "clean" to continue:', io);
   io.input.write('\x03');
   assert.equal(await done, null);
+  assert.equal(io.input.isRaw, false);
+});
+
+test('secret returns the typed text and never echoes it', async () => {
+  const io = tty();
+  const done = secret('Azure DevOps personal access token:', io);
+  io.input.write('hunter3\x7f2\r');
+  assert.equal(await done, 'hunter2');
+  assert.ok(io.written().includes('Azure DevOps personal access token:'));
+  assert.ok(!/hunter|\*/.test(io.written()), 'nothing of the secret is shown');
   assert.equal(io.input.isRaw, false);
 });
 
