@@ -1,13 +1,4 @@
-mod api;
-mod config;
-mod ctx;
-mod out;
-mod pipeline;
-mod pr;
-mod remote;
-mod tools;
-mod wi;
-
+use ado_mcp::{Config, Server};
 use rmcp::{ServiceExt, transport::stdio};
 
 #[tokio::main]
@@ -16,11 +7,7 @@ async fn main() -> anyhow::Result<()> {
         println!("ado-mcp {}", env!("CARGO_PKG_VERSION"));
         return Ok(());
     }
-    let cfg = config::Config::from_env()?;
-    tools::Server::new(cfg)?
-        .serve(stdio())
-        .await?
-        .waiting()
-        .await?;
+    let cfg = Config::from_env()?;
+    Server::new(cfg)?.serve(stdio()).await?.waiting().await?;
     Ok(())
 }
