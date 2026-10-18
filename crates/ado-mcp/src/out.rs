@@ -3,16 +3,6 @@
 /// How much of a work item description or comment a view shows before pointing at the full call.
 pub const DESC_MAX: usize = 4000;
 
-/// The `YYYY-MM-DD` of an ISO timestamp, or `?` when there is none.
-#[allow(dead_code)] // wi_view uses it from Task 7
-pub fn date(iso: &str) -> String {
-    if iso.is_empty() {
-        "?".into()
-    } else {
-        iso.chars().take(10).collect()
-    }
-}
-
 /// `text` cut to `max` characters, with a trailer naming the call that fetches the rest.
 pub fn clip(text: &str, max: usize, rest: &str) -> String {
     match text.char_indices().nth(max) {
@@ -196,11 +186,11 @@ mod tests {
     #[test]
     fn html_to_text_unclosed_tags_are_linear() {
         // Each `<` used to scan to the end for its `>`.
-        for unit in ["<a", "<a\""] {
-            let html = unit.repeat(100_000);
+        let quoted = "<a".repeat(100_000) + "'>";
+        for html in ["<a".repeat(100_000), "<a\"".repeat(100_000), quoted] {
             let t = std::time::Instant::now();
             html_to_text(&html);
-            assert!(t.elapsed().as_millis() < 500, "{unit}: {:?}", t.elapsed());
+            assert!(t.elapsed().as_millis() < 500, "{:?}", t.elapsed());
         }
         assert_eq!(html_to_text("<a<a<a"), "<a<a<a");
         // A tag after an unclosed quote still counts.
@@ -229,11 +219,5 @@ mod tests {
     fn ref_name_strips_heads() {
         assert_eq!(ref_name("refs/heads/feature/x"), "feature/x");
         assert_eq!(ref_name("main"), "main");
-    }
-
-    #[test]
-    fn date_short() {
-        assert_eq!(date("2026-03-04T10:11:12.5Z"), "2026-03-04");
-        assert_eq!(date(""), "?");
     }
 }

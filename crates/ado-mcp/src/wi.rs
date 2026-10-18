@@ -1,10 +1,11 @@
 //! The work item read tools: `wi_view` and `wi_query`.
 
+use std::collections::HashMap;
 use std::fmt::Write as _;
 
 use azure_devops_rust_api::wit::models::{
     CommentList, CommentSortOrder, Wiql, WorkItem, WorkItemBatchGetRequest, WorkItemExpand,
-    work_item_batch_get_request::ErrorPolicy,
+    work_item_batch_get_request::ErrorPolicy, work_item_query_result::QueryResultType,
 };
 use rmcp::schemars::{self, JsonSchema};
 use serde::Deserialize;
@@ -13,6 +14,7 @@ use serde_json::Value;
 use crate::api::ApiError;
 use crate::ctx::{Ctx, given, seg};
 use crate::out::{DESC_MAX, clip, cut, html_to_text, more};
+use crate::pr::unexpected;
 
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "schemars")]
@@ -129,15 +131,7 @@ pub(crate) async fn wi_view(ctx: &Ctx, a: &WiViewArgs) -> Result<String, ApiErro
     let full = a.full == Some(true);
     let scope = ctx.scope(a.project.as_deref(), None, None).await?;
     let (api, proj) = (&ctx.api, seg(&scope.project_id));
-    let (got, notes) = tokio::join!(
-        // No project: an id is unique in the collection. The guard cuts the `//` this leaves.
-        api.az(|| {
-            api.wit
-                .work_items_client()
-                .get_work_item(&api.org, num, "")
-                .expand(WorkItemExpand::Relations)
-                .into_future()
-        }),
+    let comments_in = |proj: String| async move {
         api.az(|| {
             api.wit
                 .comments_client()
@@ -146,8 +140,31 @@ pub(crate) async fn wi_view(ctx: &Ctx, a: &WiViewArgs) -> Result<String, ApiErro
                 .order(CommentSortOrder::Desc)
                 .into_future()
         })
+        .await
+    };
+    let (got, mut notes) = tokio::join!(
+        // No project: an id is unique in the collection. The guard cuts the `//` this leaves.
+        api.az(|| {
+            api.wit
+                .work_items_client()
+                .get_work_item(&api.org, num, "")
+                .expand(WorkItemExpand::Relations)
+                .into_future()
+        }),
+        comments_in(proj)
     );
     let item = got.map_err(|e| e.with_what(&format!("work item #{id}")))?;
+    // The comments path needs the item's own project, which only the item names.
+    let home = item
+        .fields
+        .get("System.TeamProject")
+        .and_then(Value::as_str);
+    if let (Err(e), Some(home)) = (&notes, home)
+        && e.status == Some(404)
+        && home != scope.project
+    {
+        notes = comments_in(seg(home)).await;
+    }
     let mut out = head(&item);
     let _ = write!(
         out,
@@ -218,6 +235,7 @@ fn build_wiql(a: &WiQueryArgs) -> String {
     if let Some(t) = given(a.title.as_deref()) {
         let _ = write!(q, " AND [System.Title] CONTAINS {}", lit(t));
     }
+    q.push_str(" ORDER BY [System.ChangedDate] DESC");
     q
 }
 
@@ -259,22 +277,38 @@ pub(crate) async fn wi_query(ctx: &Ctx, a: &WiQueryArgs) -> Result<String, ApiEr
     let limit = a.limit.unwrap_or(20).max(1);
     let top = i32::try_from(limit.saturating_add(1)).unwrap_or(i32::MAX);
     let wiql = given(a.wiql.as_deref()).map_or_else(|| build_wiql(a), str::to_owned);
-    let s = ctx.scope(a.project.as_deref(), None, None).await?;
-    let (api, proj) = (&ctx.api, seg(&s.project_id));
     let body = Wiql { query: Some(wiql) };
-    // No team: the guard cuts the `//` this leaves.
-    let found = api
-        .az(|| {
-            api.wit
-                .wiql_client()
-                .query_by_wiql(&api.org, body.clone(), &proj, "")
-                .top(top)
-                .into_future()
+    let api = &ctx.api;
+    let first = ctx.scope(a.project.as_deref(), None, None).await?;
+    let (proj, found) = ctx
+        .retry_stale(&first.key, || async {
+            let proj = seg(&ctx
+                .scope(a.project.as_deref(), None, None)
+                .await?
+                .project_id);
+            // No team: the guard cuts the `//` this leaves.
+            let found = api
+                .az(|| {
+                    api.wit
+                        .wiql_client()
+                        .query_by_wiql(&api.org, body.clone(), &proj, "")
+                        .top(top)
+                        .into_future()
+                })
+                .await?;
+            Ok((proj, found))
         })
         .await?;
+    if found.query_result_type == Some(QueryResultType::WorkItemLink)
+        || !found.work_item_relations.is_empty()
+    {
+        return Err(ApiError::local(
+            "link queries are not supported; use FROM WorkItems",
+        ));
+    }
     let ids: Vec<i32> = found.work_items.iter().filter_map(|r| r.id).collect();
     let (ids, has_more) = cut(ids, limit);
-    let mut lines = Vec::new();
+    let mut items = Vec::new();
     for chunk in ids.chunks(200) {
         let req = WorkItemBatchGetRequest {
             ids: chunk.to_vec(),
@@ -300,16 +334,16 @@ pub(crate) async fn wi_query(ctx: &Ctx, a: &WiQueryArgs) -> Result<String, ApiEr
             .await?
             .into_raw_response()
             .into_body();
-        let batch: Batch = serde_json::from_slice(&raw)
-            .map_err(|e| ApiError::local(format!("unexpected answer from the server: {e}")))?;
-        lines.extend(
-            batch
-                .value
-                .iter()
-                .flatten()
-                .map(|w| format!("{}  {}", head(w), assignee(w))),
-        );
+        let batch: Batch = serde_json::from_slice(&raw).map_err(|e| unexpected(&e))?;
+        items.extend(batch.value.into_iter().flatten());
     }
+    // The batch needn't answer in the order asked; the query's order is the one that counts.
+    let rank: HashMap<i32, usize> = ids.iter().enumerate().map(|(i, id)| (*id, i)).collect();
+    items.sort_by_key(|w| rank.get(&w.id).copied());
+    let mut lines: Vec<String> = items
+        .iter()
+        .map(|w| format!("{}  {}", head(w), assignee(w)))
+        .collect();
     if has_more {
         lines.push(more(&next_call(a, limit)));
     }

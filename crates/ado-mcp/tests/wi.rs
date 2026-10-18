@@ -138,7 +138,7 @@ fn view_unassigned_and_bare() {
 fn view_clips_text_not_markup() {
     let fx = Fixture::start();
     let mut wi: Value = serde_json::from_slice(&fixture("wi.json").body).unwrap();
-    // 3000 characters of text in 9000 of markup: under the cut once it is text.
+    // 3000 characters of text in 24000 of markup: under the cut once it is text.
     wi["fields"]["System.Description"] = json!("<b>x</b>".repeat(1000) + &"<i>y</i>".repeat(2000));
     wi["fields"]["Microsoft.VSTS.Common.AcceptanceCriteria"] =
         json!("<p>".to_owned() + &"z".repeat(5000));
@@ -174,6 +174,8 @@ fn view_not_found_and_comments_degrade() {
     assert_eq!(text, "not found: work item #9");
     let text = ok(&mut mcp, "wi_view", json!({"id": 123}));
     assert!(text.contains("\ncomments: unavailable ("), "{text}");
+    // Same project as the scope: no second try.
+    assert_eq!(requests(&fx, COMMENTS).len(), 1);
 }
 
 #[test]
@@ -211,7 +213,8 @@ fn query_filters_build_wiql() {
         wiql,
         "SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = @project \
          AND [System.AssignedTo] = @Me AND [System.State] = 'Active' \
-         AND [System.WorkItemType] = 'Bug' AND [System.Title] CONTAINS 'O''Brien'"
+         AND [System.WorkItemType] = 'Bug' AND [System.Title] CONTAINS 'O''Brien' \
+         ORDER BY [System.ChangedDate] DESC"
     );
     assert!(queries(&fx, WIQL)[0].contains("$top=21"));
     let b = &bodies(&fx, BATCH)[0];
@@ -241,7 +244,9 @@ fn query_assigned_by_name() {
     );
     let wiql = bodies(&fx, WIQL)[0]["query"].as_str().unwrap().to_owned();
     assert!(
-        wiql.ends_with("AND [System.AssignedTo] = 'Jane O''Roe'"),
+        wiql.ends_with(
+            "AND [System.AssignedTo] = 'Jane O''Roe' ORDER BY [System.ChangedDate] DESC"
+        ),
         "{wiql}"
     );
 }
@@ -302,4 +307,67 @@ fn query_none() {
     let text = ok(&mut env(&fx), "wi_query", json!({}));
     assert_eq!(text, "no work items");
     assert!(requests(&fx, BATCH).is_empty());
+}
+
+#[test]
+fn query_keeps_the_wiql_order() {
+    let fx = Fixture::start();
+    fx.route(WIQL, vec![fixture("wiql.json")]);
+    let mut shuffled = three();
+    shuffled["value"].as_array_mut().unwrap().reverse();
+    fx.route(BATCH, vec![Resp::json(&shuffled)]);
+    let text = ok(&mut env(&fx), "wi_query", json!({}));
+    let ids: Vec<&str> = text.lines().map(|l| l.split(' ').next().unwrap()).collect();
+    assert_eq!(ids, ["#123", "#124", "#125"], "{text}");
+}
+
+#[test]
+fn query_retries_a_stale_project() {
+    let fx = Fixture::start();
+    fx.route(
+        WIQL,
+        vec![Resp::new(404, "text/plain", "gone"), fixture("wiql.json")],
+    );
+    fx.route(BATCH, vec![Resp::json(&three())]);
+    let text = ok(&mut env(&fx), "wi_query", json!({}));
+    assert_eq!(text.lines().count(), 3, "{text}");
+    assert_eq!(fx.hits(INFO), 2);
+    assert_eq!(requests(&fx, WIQL).len(), 2);
+}
+
+#[test]
+fn query_refuses_link_queries() {
+    let fx = Fixture::start();
+    fx.route(
+        WIQL,
+        vec![Resp::json(&json!({
+            "queryResultType": "workItemLink",
+            "workItemRelations": [{"rel": null, "source": null, "target": {"id": 123}}]
+        }))],
+    );
+    let (err, text) = env(&fx).call(
+        "wi_query",
+        json!({"wiql": "SELECT [System.Id] FROM WorkItemLinks"}),
+    );
+    assert!(err);
+    assert_eq!(text, "link queries are not supported; use FROM WorkItems");
+    assert!(requests(&fx, BATCH).is_empty());
+}
+
+#[test]
+fn view_comments_in_the_items_project() {
+    let fx = Fixture::start();
+    let mut wi: Value = serde_json::from_slice(&fixture("wi.json").body).unwrap();
+    wi["fields"]["System.TeamProject"] = json!("Other Proj");
+    fx.route(WI123, vec![Resp::json(&wi)]);
+    fx.route(COMMENTS, vec![Resp::new(404, "text/plain", "gone")]);
+    let other = "/tfs/Coll/Other%20Proj/_apis/wit/workItems/123/comments";
+    fx.route(other, vec![fixture("wi-comments.json")]);
+    let text = ok(&mut env(&fx), "wi_view", json!({"id": 123}));
+    assert!(
+        text.contains("\ncomments:\n  2026-03-06 Jane Roe:"),
+        "{text}"
+    );
+    assert_eq!(requests(&fx, COMMENTS).len(), 1);
+    assert_eq!(requests(&fx, other).len(), 1);
 }

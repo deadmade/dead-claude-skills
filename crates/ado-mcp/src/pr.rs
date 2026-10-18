@@ -545,7 +545,7 @@ fn thread_text(t: &CommentThread) -> String {
     out
 }
 
-fn unexpected(e: &serde_json::Error) -> ApiError {
+pub(crate) fn unexpected(e: &serde_json::Error) -> ApiError {
     ApiError::local(format!("unexpected answer from the server: {e}"))
 }
 
