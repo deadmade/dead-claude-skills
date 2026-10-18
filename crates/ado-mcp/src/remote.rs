@@ -33,49 +33,87 @@ pub(crate) fn decode_path(s: &str) -> String {
 pub(crate) fn https_remote(remote: &str, org_url: &Url) -> Result<String, String> {
     const NOT_ADO: &str = "not an Azure DevOps remote: pass project and repo";
     let remote = remote.trim();
-    let (host, path) = if remote.contains("://") {
+    // `port` is only compared for https; an ssh port is not the web port.
+    let (host, port, path, is_https) = if remote.contains("://") {
         let u = Url::parse(remote).map_err(|_| NOT_ADO.to_string())?;
         if !matches!(u.scheme(), "https" | "ssh") {
             return Err(NOT_ADO.into());
         }
+        let https = u.scheme() == "https";
         (
             u.host_str().unwrap_or_default().to_string(),
+            u.port_or_known_default().filter(|_| https),
             u.path().to_string(),
+            https,
         )
     } else {
         // scp-style `user@host:path`
         let (left, path) = remote.split_once(':').ok_or(NOT_ADO)?;
         (
             left.rsplit('@').next().unwrap_or(left).to_ascii_lowercase(),
+            None,
             format!("/{path}"),
+            false,
         )
     };
     if !path.contains("/_git/") {
         return Err(NOT_ADO.into());
     }
     let org_host = org_url.host_str().unwrap_or_default();
-    if !host.eq_ignore_ascii_case(org_host) {
+    let org_port = org_url.port_or_known_default();
+    if !host.eq_ignore_ascii_case(org_host) || port.is_some_and(|p| Some(p) != org_port) {
+        let at = |h: &str, p: Option<u16>| p.map_or_else(|| h.to_string(), |p| format!("{h}:{p}"));
         return Err(format!(
-            "this repo is on {host}, but mcp-azure is set up for {org_host}"
+            "this repo is on {}, but mcp-azure is set up for {}",
+            at(&host, port),
+            at(org_host, port.and(org_port))
         ));
     }
-    let collection = org_url
+    // Decode first, then refuse anything that could steer the URL out of the collection.
+    let segs: Vec<String> = path[1..].split('/').map(decode_path).collect();
+    if segs.iter().any(|s| {
+        s.is_empty()
+            || s == "."
+            || s == ".."
+            || s.contains(['\\', ':', '/'])
+            || s.contains(char::is_control)
+    }) {
+        return Err("not an Azure DevOps remote: unsupported characters in the path".into());
+    }
+    let org_segs: Vec<String> = org_url
         .path_segments()
-        .and_then(|mut s| s.rfind(|s| !s.is_empty()))
+        .map(|s| s.filter(|s| !s.is_empty()).map(decode_path).collect())
         .unwrap_or_default();
-    let segs: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
-    let Some(at) = segs
-        .iter()
-        .position(|s| decode_path(s).eq_ignore_ascii_case(&decode_path(collection)))
-    else {
-        return Err(format!(
-            "this repo is not in collection {collection} that mcp-azure is set up for"
-        ));
+    let Some((collection, prefix)) = org_segs.split_last() else {
+        return Err("mcp-azure is set up without a collection in its URL".into());
     };
-    org_url
-        .join(&segs[at + 1..].join("/"))
-        .map(String::from)
-        .map_err(|e| e.to_string())
+    // The collection sits right after the virtual directory (`tfs`); ssh paths may omit it.
+    let same = |a: &[String], b: &[String]| {
+        a.len() == b.len() && a.iter().zip(b).all(|(x, y)| x.eq_ignore_ascii_case(y))
+    };
+    let n = prefix.len();
+    let start = [n, 0]
+        .into_iter()
+        .take(if is_https { 1 } else { 2 })
+        .find(|&k| {
+            segs.get(k)
+                .is_some_and(|c| c.eq_ignore_ascii_case(collection))
+                && (k == 0 || same(&segs[..k], prefix))
+        })
+        .ok_or_else(|| {
+            format!("this repo is not in collection {collection} that mcp-azure is set up for")
+        })?;
+    let mut out = org_url.clone();
+    out.set_query(None);
+    out.set_fragment(None);
+    out.path_segments_mut()
+        .map_err(|()| NOT_ADO.to_string())?
+        .pop_if_empty()
+        .extend(&segs[start + 1..]);
+    if out.origin() != org_url.origin() || !out.path().starts_with(org_url.path()) {
+        return Err(NOT_ADO.into());
+    }
+    Ok(out.into())
 }
 
 fn git(dir: &Path, args: &[&str]) -> Option<String> {
@@ -160,6 +198,54 @@ mod tests {
     fn other_collection_refused() {
         let e = https_remote("https://srv/tfs/CollB/P/_git/R", &org()).unwrap_err();
         assert!(e.contains("collection Coll "), "{e}");
+    }
+
+    #[test]
+    fn cannot_leave_the_collection() {
+        for r in [
+            r"git@srv:Coll/\/evil.com/_git/R",
+            r"ssh://srv/Coll/\/evil.com/_git/R",
+            "git@srv:Coll/../CollB/P/_git/R",
+            "git@srv:Coll/%2e%2e/CollB/P/_git/R",
+            "git@srv:Coll/a:b/_git/R",
+            "git@srv:Coll/a%2Fb/_git/R",
+            "git@srv:Coll//evil.com/_git/R",
+            "https://srv/tfs/Coll//evil.com/_git/R",
+        ] {
+            assert!(https_remote(r, &org()).is_err(), "{r}");
+        }
+    }
+
+    #[test]
+    fn ok_results_stay_under_org() {
+        for r in [
+            SAME,
+            "ssh://srv/Coll/Proj/_git/Repo",
+            "git@srv:Coll/My%20Proj/_git/Repo",
+            "https://srv/tfs/coll/%C3%9Cbergabe/_git/R",
+        ] {
+            let o = org();
+            assert!(https_remote(r, &o).unwrap().starts_with(o.as_str()), "{r}");
+        }
+        assert_eq!(
+            https_remote("https://srv/tfs/Coll/My%20Proj/_git/R", &org()).unwrap(),
+            "https://srv/tfs/Coll/My%20Proj/_git/R"
+        );
+    }
+
+    #[test]
+    fn collection_must_follow_the_prefix() {
+        assert!(https_remote("https://srv/tfs/Other/Coll/_git/R", &org()).is_err());
+        assert!(https_remote("ssh://srv:22/x/Coll/Proj/_git/Repo", &org()).is_err());
+        assert!(https_remote("https://srv/Coll/Proj/_git/Repo", &org()).is_err());
+        assert!(https_remote("ssh://srv:22/Coll/Proj/_git/Repo", &org()).is_ok());
+    }
+
+    #[test]
+    fn other_https_port_refused() {
+        let e = https_remote("https://srv:9999/tfs/Coll/P/_git/R", &org()).unwrap_err();
+        assert!(e.contains("srv:9999"), "{e}");
+        assert!(https_remote("https://srv:443/tfs/Coll/P/_git/R", &org()).is_ok());
     }
 
     #[test]
