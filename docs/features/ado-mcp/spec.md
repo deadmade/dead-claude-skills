@@ -173,7 +173,7 @@ downloaded when it runs. The user doesn't need a terminal tool: "goal is for cla
    - The server's key in `.mcp.json` becomes `ado` (was `azure-devops-server`) _(my call: it is part of every tool's
      permission name, so it is fixed now and never renamed)_.
    - The plugin gets a README listing the tools, the PAT scopes (Code Read & Write, Work Items Read & Write, Build
-     Read & Execute) and how to set it up. The marketplace and plugin descriptions say what it is now.
+     Read & Execute, Project and Team Read) and how to set it up. The marketplace and plugin descriptions say what it is now.
    - Installer: `BIN_PLUGINS` maps `mcp-azure` → binary `ado-mcp`. The plugin and binary names now differ, so
      `install.mjs:370` uses the binary's crate folder.
    - **The installer installs and configures mcp-azure itself** (grill Q10). It no longer hands it off.
