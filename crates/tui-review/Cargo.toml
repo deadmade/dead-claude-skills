@@ -9,7 +9,7 @@ publish = false
 
 [dependencies]
 anyhow = "1.0.104"
-gix = { version = "0.87", default-features = false, features = ["revision", "blob-diff", "max-performance-safe", "sha1"] }
+gix = { version = "0.89", default-features = false, features = ["revision", "blob-diff", "max-performance-safe", "sha1"] }
 imara-diff = "0.2"
 rayon = "1.12"
 tree-sitter = "0.27"
