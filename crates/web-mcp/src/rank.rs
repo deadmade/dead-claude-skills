@@ -197,6 +197,14 @@ fn newer(a: &str, b: &str) -> bool {
     }
 }
 
+/// Windows won't replace meta.json while another handle has it open (any reader's 500 ms watcher, a
+/// reload, a virus scanner), so a commit can fail with "Access is denied" until that handle closes.
+fn refused_by_windows(e: &anyhow::Error) -> bool {
+    cfg!(windows)
+        && matches!(e.downcast_ref::<TantivyError>(),
+            Some(TantivyError::IoError(io)) if io.kind() == std::io::ErrorKind::PermissionDenied)
+}
+
 fn hash(d: &PassageDoc) -> String {
     let mut h = Sha256::new();
     h.update(d.url.as_bytes());
@@ -270,21 +278,31 @@ impl Writer {
 
     /// Adds the passages not yet indexed and commits, with `open` or a newly locked writer; returns
     /// the writer, whose merges may still be running. On failure the batch is discarded and the
-    /// writer's merges finish before its lock is released.
+    /// writer's merges finish before its lock is released; a batch Windows refused is retried with a
+    /// fresh writer for up to 5 s.
     fn commit<'a>(
         &self,
-        open: Option<IndexWriter>,
+        mut open: Option<IndexWriter>,
         docs: impl Iterator<Item = &'a PassageDoc>,
     ) -> anyhow::Result<IndexWriter> {
-        let mut writer = match open {
-            Some(w) => w,
-            None => self.lock()?,
-        };
-        match self.add_and_commit(&mut writer, docs) {
-            Ok(()) => Ok(writer),
-            Err(e) => {
-                let _ = writer.wait_merging_threads();
-                Err(e)
+        let docs: Vec<_> = docs.collect();
+        let start = Instant::now();
+        let mut wait = Duration::from_millis(10);
+        loop {
+            let mut writer = match open.take() {
+                Some(w) => w,
+                None => self.lock()?,
+            };
+            match self.add_and_commit(&mut writer, docs.iter().copied()) {
+                Ok(()) => return Ok(writer),
+                Err(e) => {
+                    let _ = writer.wait_merging_threads();
+                    if !refused_by_windows(&e) || start.elapsed() >= LOCK_WAIT {
+                        return Err(e);
+                    }
+                    std::thread::sleep(wait);
+                    wait = (wait * 2).min(Duration::from_millis(250));
+                }
             }
         }
     }
@@ -598,6 +616,16 @@ mod tests {
         let (a, b) = (run("alpha", "bravo"), run("bravo", "alpha"));
         a.join().unwrap();
         b.join().unwrap();
+    }
+
+    #[test]
+    fn only_windows_access_denied_is_retried() {
+        let io = |kind| anyhow::Error::from(TantivyError::from(std::io::Error::from(kind)));
+        assert_eq!(
+            refused_by_windows(&io(std::io::ErrorKind::PermissionDenied)),
+            cfg!(windows)
+        );
+        assert!(!refused_by_windows(&io(std::io::ErrorKind::NotFound)));
     }
 
     #[test]
