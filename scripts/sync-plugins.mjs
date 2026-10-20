@@ -6,8 +6,8 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ROOT, fail, git } from './sync-lib.mjs';
 
-// The newest stable tag in `git ls-remote --tags` output and its commit, or undefined when there is none.
-export function newestTag(lsRemote) {
+// Every stable vX.Y.Z tag in `git ls-remote --tags` output with its commit (peeled for annotated tags), oldest first.
+export function stableTags(lsRemote) {
   const tags = new Map();
   for (const line of lsRemote.split('\n')) {
     const m = /^([0-9a-f]{40})\trefs\/tags\/(v(\d+)\.(\d+)\.(\d+))(\^\{\})?$/.exec(line);
@@ -18,9 +18,11 @@ export function newestTag(lsRemote) {
     tags.set(tag, entry);
   }
   const cmp = ({ version: a }, { version: b }) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
-  const best = [...tags.values()].sort(cmp).at(-1);
-  return best && { tag: best.tag, sha: best.sha };
+  return [...tags.values()].sort(cmp).map(({ tag, sha }) => ({ tag, sha }));
 }
+
+// The newest stable tag and its commit, or undefined when there is none.
+export const newestTag = (lsRemote) => stableTags(lsRemote).at(-1);
 
 // `text` with the entry for https://github.com/<repo>.git pinned to tag/sha, and the ref it had; undefined when that
 // entry has no url/ref/sha lines.
