@@ -10,6 +10,25 @@ export function writeAtomic(file, text) {
   renameSync(tmp, file);
 }
 
+// Renames staged to target. Windows can rename a running exe but not replace it, so there an existing target is moved
+// aside first and put back if the rename fails; the aside copy of one still running is left beside it.
+export function replaceFile(staged, target, win = process.platform === 'win32') {
+  const old = `${target}.old-${process.pid}`;
+  const aside = win && existsSync(target);
+  if (aside) renameSync(target, old);
+  try {
+    renameSync(staged, target);
+  } catch (e) {
+    if (aside) renameSync(old, target);
+    throw e;
+  }
+  try {
+    rmSync(old, { force: true });
+  } catch {
+    /* still running: left beside it */
+  }
+}
+
 // Copies every clean target that exists; any failure throws before the caller deletes anything.
 export function backup(config, dir) {
   for (const t of [...CLEAN_TARGETS, 'settings.json']) {

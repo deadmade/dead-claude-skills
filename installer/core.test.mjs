@@ -12,6 +12,8 @@ import {
   missingBinaries,
   agentBrowserAction,
   agentBrowserAsset,
+  agentBrowserPin,
+  AGENT_BROWSER_FILES,
   agentBrowserVersion,
   SECRET_DENIES,
   isSandboxOn,
@@ -653,14 +655,55 @@ test('agent-browser: install when missing, upgrade when older, keep when equal o
   assert.equal(agentBrowserVersion('nope'), undefined);
 });
 
+const [WIN_HASH, LINUX_HASH] = ['a'.repeat(64), 'b'.repeat(64)];
+const abPin = { upstream: '0.39.1', sha256: { 'win32-x64': WIN_HASH, 'linux-x64': LINUX_HASH } };
+
 test('agent-browser: the pinned upstream binary, only with a pinned hash', () => {
-  const pin = JSON.parse(readFileSync(new URL('./agent-browser.json', import.meta.url), 'utf8'));
-  const linux = agentBrowserAsset('linux', 'x64', pin);
-  assert.equal(linux.url, `https://github.com/vercel-labs/agent-browser/releases/download/v${pin.upstream}/agent-browser-linux-musl-x64`);
-  assert.equal(linux.digest, pin.sha256['linux-x64']);
-  assert.equal(agentBrowserAsset('win32', 'x64', pin).exe, 'agent-browser.exe');
-  assert.equal(agentBrowserAsset('darwin', 'arm64', pin), undefined);
-  assert.equal(agentBrowserAsset('linux', 'x64', { ...pin, sha256: {} }), undefined);
-  assert.equal(agentBrowserAsset('linux', 'x64', { ...pin, upstream: '1.0; rm' }), undefined);
+  const dl = 'https://github.com/vercel-labs/agent-browser/releases/download/v0.39.1';
+  assert.deepEqual(agentBrowserAsset('win32', 'x64', abPin), {
+    file: 'agent-browser-win32-x64.exe',
+    url: `${dl}/agent-browser-win32-x64.exe`,
+    digest: WIN_HASH,
+    raw: true,
+    exe: 'agent-browser.exe',
+  });
+  assert.deepEqual(agentBrowserAsset('linux', 'x64', abPin), {
+    file: 'agent-browser-linux-musl-x64',
+    url: `${dl}/agent-browser-linux-musl-x64`,
+    digest: LINUX_HASH,
+    raw: true,
+    exe: 'agent-browser',
+  });
+  assert.equal(agentBrowserAsset('darwin', 'arm64', abPin), undefined);
+  assert.equal(agentBrowserAsset('linux', 'x64', { ...abPin, sha256: {} }), undefined);
+  // createHash's hex is lowercase, so an uppercase pin could never match.
+  assert.equal(agentBrowserAsset('linux', 'x64', { ...abPin, sha256: { 'linux-x64': 'B'.repeat(64) } }), undefined);
+  assert.equal(agentBrowserAsset('linux', 'x64', { ...abPin, upstream: '1.0; rm' }), undefined);
+  // The shipped pin has a usable build for every file the sync pins.
+  const shipped = JSON.parse(readFileSync(new URL('./agent-browser.json', import.meta.url), 'utf8'));
+  for (const key of Object.keys(AGENT_BROWSER_FILES)) assert.ok(agentBrowserAsset(...key.split('-'), shipped), key);
   assert.ok(!missingBinaries('linux', ['web-mcp'], () => false).some((r) => r.binary === 'agent-browser'));
+});
+
+test('agent-browser: the sync pins a release, refusing a downgrade or a replaced asset', () => {
+  const asset = (name, hash) => ({ name, digest: `sha256:${hash}` });
+  const release = (tag, win = WIN_HASH) => ({
+    tag_name: tag,
+    assets: [
+      asset('agent-browser-win32-x64.exe', win),
+      asset('agent-browser-linux-x64', 'c'.repeat(64)), // glibc build: not the one pinned
+      asset('agent-browser-linux-musl-x64', LINUX_HASH),
+    ],
+  });
+  assert.deepEqual(agentBrowserPin(release('v0.39.1'), abPin), abPin);
+  assert.deepEqual(agentBrowserPin(release('v0.40.0', 'd'.repeat(64)), abPin), {
+    upstream: '0.40.0',
+    sha256: { 'win32-x64': 'd'.repeat(64), 'linux-x64': LINUX_HASH },
+  });
+  assert.deepEqual(agentBrowserPin(release('v0.39.1'), { upstream: '0.39.1' }), abPin);
+  assert.ok(agentBrowserAsset('linux', 'x64', agentBrowserPin(release('v0.40.0'), abPin)));
+  assert.throws(() => agentBrowserPin(release('v0.39.1', 'd'.repeat(64)), abPin), /changed upstream/);
+  assert.throws(() => agentBrowserPin(release('v0.38.0'), abPin), /older than the pinned 0\.39\.1/);
+  assert.throws(() => agentBrowserPin(release('v0.40.0-beta.1'), abPin), /unexpected tag/);
+  assert.throws(() => agentBrowserPin({ tag_name: 'v0.40.0', assets: [] }, abPin), /no sha256 digest/);
 });

@@ -491,6 +491,24 @@ export function agentBrowserAsset(platform, arch, pin) {
   return { file, url, digest, raw: true, exe: platform === 'win32' ? 'agent-browser.exe' : 'agent-browser' };
 }
 
+// The pin (installer/agent-browser.json) for a GitHub release of agent-browser, for sync-agent-browser.yml. Throws on
+// an unexpected tag, a missing digest, an older version than `current`'s, or a new digest for `current`'s version:
+// an asset replaced upstream is what the pinned hash exists to catch, so it fails the sync instead of opening a PR.
+export function agentBrowserPin(release, current) {
+  const upstream = /^v(\d+\.\d+\.\d+)$/.exec(release.tag_name ?? '')?.[1];
+  if (!upstream) throw new Error(`unexpected tag ${release.tag_name}`);
+  if (newer(current?.upstream, upstream)) throw new Error(`${upstream} is older than the pinned ${current.upstream}`);
+  const sha256 = {};
+  for (const [key, file] of Object.entries(AGENT_BROWSER_FILES)) {
+    const digest = /^sha256:([0-9a-f]{64})$/.exec(release.assets?.find((a) => a.name === file)?.digest ?? '')?.[1];
+    if (!digest) throw new Error(`no sha256 digest for ${file}`);
+    const was = current?.upstream === upstream && current.sha256?.[key];
+    if (was && was !== digest) throw new Error(`${file} ${upstream} changed upstream: sha256 ${was} is now ${digest}`);
+    sha256[key] = digest;
+  }
+  return { upstream, sha256 };
+}
+
 // `agent-browser --version` may print a name prefix ("agent-browser 0.39.1"); undefined when no version is in it.
 export const agentBrowserVersion = (out) => /(\d+\.\d+\.\d+)/.exec(out ?? '')?.[1];
 

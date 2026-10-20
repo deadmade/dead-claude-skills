@@ -69,7 +69,7 @@ import {
   idOf,
   withDependencies,
 } from './core.mjs';
-import { backup, clearTargets, writeAtomic, writeSearxng } from './files.mjs';
+import { backup, clearTargets, replaceFile, writeAtomic, writeSearxng } from './files.mjs';
 import { confirm, line, log, note, progress, screen } from './ui.mjs';
 import { changeList, initial, move, paint, render } from './view.mjs';
 
@@ -295,7 +295,7 @@ async function fetchOk(url) {
   return res;
 }
 
-// Downloads the release archive, checks it against its .sha256, and puts the binary at `bin` in one rename.
+// Downloads the release archive, checks it against its .sha256, and puts the binary at `bin` (replaceFile).
 // asset.digest: a pinned checksum instead of the .sha256 file; asset.raw: the download is the binary itself.
 async function downloadBin(name, asset, bin) {
   const [archive, want] = await Promise.all([
@@ -306,9 +306,9 @@ async function downloadBin(name, asset, bin) {
         .then(sha256Of),
   ]);
   const bytes = Buffer.from(archive);
-  if (want !== createHash('sha256').update(bytes).digest('hex'))
-    throw new Error(`${asset.file}: checksum mismatch`);
+  if (want !== createHash('sha256').update(bytes).digest('hex')) throw new Error(`${asset.file}: checksum mismatch`);
   const tmp = mkdtempSync(join(tmpdir(), `${name}-`));
+  const staged = `${bin}.tmp-${process.pid}`;
   try {
     const file = join(tmp, asset.file);
     writeFileSync(file, bytes);
@@ -319,20 +319,13 @@ async function downloadBin(name, asset, bin) {
         throw new Error(`could not unpack ${asset.file}: ${(r.stderr || r.error?.message || '').trim()}`);
     }
     mkdirSync(BIN_DIR, { recursive: true });
-    const staged = `${bin}.tmp-${process.pid}`;
     cpSync(asset.raw ? file : join(tmp, asset.exe), staged);
     chmodSync(staged, 0o755);
-    // Windows can rename a running exe (agent-browser's daemon, a live web-mcp) but not replace it: move it aside first.
-    const old = `${bin}.old-${process.pid}`;
-    if (WIN && existsSync(bin)) renameSync(bin, old);
-    renameSync(staged, bin);
-    try {
-      rmSync(old, { force: true });
-    } catch {
-      /* still running: left beside it */
-    }
+    // bin may be running: agent-browser's daemon, a live web-mcp.
+    replaceFile(staged, bin, WIN);
   } finally {
     rmSync(tmp, { recursive: true, force: true });
+    rmSync(staged, { force: true });
   }
 }
 
@@ -383,8 +376,7 @@ async function applyAgentBrowser() {
   const theirs = onPath('agent-browser') ? versionOf('agent-browser', WIN) : undefined;
   if (theirs && agentBrowserAction({ installed: theirs, pinned }) === 'skip') return;
   const asset = agentBrowserAsset(process.platform, process.arch, pin);
-  if (!asset)
-    return failures.push(`agent-browser: no pinned ${pinned} build for ${process.platform}-${process.arch}`);
+  if (!asset) return failures.push(`agent-browser: no pinned ${pinned} build for ${process.platform}-${process.arch}`);
   const bin = join(BIN_DIR, asset.exe);
   const installed = versionOf(bin, false);
   const action = agentBrowserAction({ installed, pinned });
@@ -409,7 +401,10 @@ async function applyAgentBrowser() {
   }
   const r = await claude(JSON.stringify({ agentBrowserPath: bin }), 'plugin', 'configure', WEB_MCP, '--values-stdin');
   if (r.ok) done.push(`web-mcp: agentBrowserPath is ${bin}`);
-  else failures.push(`web-mcp: could not set agentBrowserPath (${r.err}); set it to ${bin} with /plugin configure web-mcp`);
+  else
+    failures.push(
+      `web-mcp: could not set agentBrowserPath (${r.err}); set it to ${bin} with /plugin configure web-mcp`,
+    );
 }
 
 // SearXNG in Docker for web-mcp's search. True when it answers JSON on 127.0.0.1:8888 within 30 s. Every failure is a

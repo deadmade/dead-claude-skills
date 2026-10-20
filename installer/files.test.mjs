@@ -7,12 +7,14 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
+  rmSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { backup, clearTargets, writeSearxng } from './files.mjs';
+import { backup, clearTargets, replaceFile, writeSearxng } from './files.mjs';
 
 // A config dir with a skill, settings.json, a symlinked rules dir (home-manager) and a file clean never touches.
 function config() {
@@ -61,4 +63,22 @@ test('searxng settings are written once, the first secret stays', () => {
   assert.equal(writeSearxng(dir, 'secret_key: "x"\n', 'one'), true);
   assert.equal(writeSearxng(dir, 'secret_key: "x"\n', 'two'), false);
   assert.equal(readFileSync(join(dir, 'settings.yml'), 'utf8'), 'secret_key: "one"\n');
+});
+
+test('replaceFile replaces or creates the target, and puts the old one back when the rename fails', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'dcs-replace-'));
+  const [target, staged] = [join(dir, 'tool.exe'), join(dir, 'staged')];
+  for (const win of [false, true]) {
+    writeFileSync(target, 'old');
+    writeFileSync(staged, 'new');
+    replaceFile(staged, target, win);
+    assert.equal(readFileSync(target, 'utf8'), 'new');
+    assert.throws(() => replaceFile(join(dir, 'missing'), target, win));
+    assert.equal(readFileSync(target, 'utf8'), 'new');
+  }
+  rmSync(target);
+  writeFileSync(staged, 'first');
+  replaceFile(staged, target, true);
+  assert.equal(readFileSync(target, 'utf8'), 'first');
+  assert.deepEqual(readdirSync(dir), ['tool.exe']);
 });
