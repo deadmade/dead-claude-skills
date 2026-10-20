@@ -1,5 +1,5 @@
 ---
-phase: finish
+phase: done
 flow: feature
 slug: ponytail-v5
 ---
