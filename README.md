@@ -17,8 +17,7 @@ passive lookups and a browser with an archive of everything it pulled.
 
 The opt-in [flows](plugins/flows/README.md) plugin ties the rest together: conductor skills (`/feature-flow`,
 `/fix-flow`, `/test-audit`, `/doc-audit`, `/verify`, `/learn` and more) that run the other plugins' skills in order,
-with approval gates and a state file to resume from; a band above the prompt shows the current run's phase, gates and
-deviations (`1` resumes it from an idle prompt). Picking flows installs every plugin its conductors use.
+with approval gates and a state file to resume from. Picking flows installs every plugin its conductors use.
 
     npx --allow-git=root github:deadmade/dead-claude-skills#semver:*
 

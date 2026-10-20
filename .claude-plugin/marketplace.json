@@ -13,7 +13,7 @@
   "plugins": [
     {
       "name": "dead-skills",
-      "description": "Default bundle: global instructions, the Night City theme and mod (spinner words, status-line reactions, Onibi dropping by), desktop notifications, Context7, and the core plugins of this marketplace as dependencies.",
+      "description": "Default bundle: global instructions, the Night City theme and mod (spinner words, status-line reactions), desktop notifications, Context7, and the core plugins of this marketplace as dependencies.",
       "source": "./plugins/default",
       "category": "productivity"
     },
@@ -110,7 +110,7 @@
     },
     {
       "name": "flows",
-      "description": "Conductor skills that run the rest of the marketplace in order, with approval gates and resumable state: /feature-flow, /research-flow, /implement, /fix-flow and /upgrade build; /test-audit, /doc-audit and /harden check a branch or the whole repo; /verify proves a branch is ready for a PR; /understand teaches a codebase; /learn saves what a flow taught. A band above the prompt shows the current run's phase, gates and deviations; 1 resumes it from an idle prompt. Installs every plugin its conductors use. Opt-in.",
+      "description": "Conductor skills that run the rest of the marketplace in order, with approval gates and resumable state: /feature-flow, /research-flow, /implement, /fix-flow and /upgrade build; /test-audit, /doc-audit and /harden check a branch or the whole repo; /verify proves a branch is ready for a PR; /understand teaches a codebase; /learn saves what a flow taught. Installs every plugin its conductors use. Opt-in.",
       "source": "./plugins/flows",
       "category": "development"
     },
