@@ -20,10 +20,12 @@ export function tempDir() {
   return dir;
 }
 
-// Shallow, blobless, sparse clone of `url` into a temp dir, checked out to `patterns`. Returns the clone dir.
-export function sparseClone(url, patterns, { noCone = false } = {}) {
+// Blobless, sparse clone of `url` into a temp dir, checked out to `patterns`: the default branch at depth 1, or `ref`
+// (a branch or tag); `depth: 0` keeps the whole history. Returns the clone dir.
+export function sparseClone(url, patterns, { noCone = false, ref, depth = 1 } = {}) {
   const dir = join(tempDir(), 'up');
-  git('clone', '--quiet', '--depth', '1', '--filter=blob:none', '--sparse', url, dir);
+  const opts = [...(depth ? ['--depth', String(depth)] : []), ...(ref ? ['--branch', ref] : [])];
+  git('clone', '--quiet', ...opts, '--filter=blob:none', '--sparse', url, dir);
   git('-C', dir, 'sparse-checkout', 'set', ...(noCone ? ['--no-cone'] : []), ...patterns);
   return dir;
 }

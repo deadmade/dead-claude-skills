@@ -8,6 +8,7 @@ excludes = [
   "plugins/shared/pstack-picks/**",
   "plugins/shared/tob-picks/**",
   "plugins/shared/graphify/**",
+  "plugins/shared/ponytail/**",
   "plugins/opt-in/implementation/*-skills/library/**",
   "plugins/opt-in/implementation/*-skills/skills/**",
   "plugins/opt-in/implementation/*-skills/LICENSE",
