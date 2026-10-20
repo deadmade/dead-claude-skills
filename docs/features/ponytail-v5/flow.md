@@ -1,5 +1,5 @@
 ---
-phase: execute
+phase: finish
 flow: feature
 slug: ponytail-v5
 ---
@@ -112,5 +112,22 @@ markers are still there. Not checked: the background auto-update path (same vers
 
 ## Walkthrough
 
-| spec goal | plan task | file:line | test |
-| --------- | --------- | --------- | ---- |
+| spec goal                                  | plan task | file:line                                                                                                                    | test                                                                                        |
+| ------------------------------------------ | --------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| 1 vendored unchanged                       | 2         | `scripts/sync-ponytail.mjs:138` (copy), `plugins/shared/ponytail/`                                                           | `diff -r` vs upstream v5.3.2 (only `version` differs); `unknownParts`, `missingParts` tests |
+| 2 local marketplace entry                  | 2         | `.claude-plugin/marketplace.json:32-36`                                                                                      | `npm test` (check-repo, `claude plugin validate`)                                           |
+| 3 sync script + weekly workflow, tags only | 2, 3      | `scripts/sync-ponytail.mjs`, `scripts/sync-lib.mjs:25`, `scripts/sync-plugins.mjs:10`, `.github/workflows/sync-ponytail.yml` | `stableTags`, `tagRange` tests; second run "unchanged"                                      |
+| 4 release notes in the PR                  | 3         | `scripts/sync-ponytail.mjs:62`                                                                                               | `releaseNotes` tests; dry run from v5.1.0                                                   |
+| 5 migration on next update                 | 4         | none (Claude Code's own update)                                                                                              | Task 4 check above                                                                          |
+| 6 our bands off                            | 1         | `plugins/default/hooks/register.tsx`, `plugins/flows/`                                                                       | `turn ends leave the band above the prompt to other mods`                                   |
+| 7 docs true                                | 1, 5      | `README.md`, `plugins/default/README.md`, `THIRD_PARTY.md`, `CLAUDE.md`                                                      | final review                                                                                |
+| 8 ADR                                      | 5         | `docs/adr/0002-vendor-ponytail.md`                                                                                           | final review                                                                                |
+
+## Final review
+
+Fresh reviewer on the whole branch: no Critical. Fixed in `7e67e3f`: upstream issue links go through
+redirect.github.com (no backlinks on upstream issues); everything the copy needs is checked, and the release notes
+built, before the vendored folder is deleted; ADR 0002 and CLAUDE.md wording. Deferred minors: a new upstream
+`hooks/hooks.json` would load without failing the sync; mentions inside code spans get backticked; a single note over
+60k characters isn't cut; a re-sync of the same tag has a near-empty body; the installer's Updates screen never lists
+the ponytail move (Claude Code's update does it); the skipped `commands/` folder is checked by name only.
