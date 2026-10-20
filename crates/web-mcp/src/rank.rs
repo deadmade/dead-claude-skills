@@ -9,8 +9,8 @@ use std::time::{Duration, Instant};
 use anyhow::{Context as _, anyhow};
 use sha2::{Digest, Sha256};
 use tantivy::collector::TopDocs;
-use tantivy::directory::MmapDirectory;
 use tantivy::directory::error::LockError;
+use tantivy::directory::{Directory as _, META_LOCK, MmapDirectory};
 use tantivy::merge_policy::LogMergePolicy;
 use tantivy::query::QueryParser;
 use tantivy::schema::{Field, STORED, STRING, Schema, TEXT, Value as _};
@@ -86,7 +86,13 @@ impl Index {
             fetched: b.add_text_field("fetched", STORED),
             hash: b.add_text_field("hash", STRING | STORED),
         };
-        let index = tantivy::Index::open_or_create(MmapDirectory::open(&dir)?, b.build())?;
+        // Two processes opening a new `.web/` would both create the index, the second replacing the first's
+        // meta.json (on Windows refused while that is open: "Access is denied"). tantivy's meta lock makes one
+        // wait; it is released before the reader is built, since reloads take it.
+        let mmap = MmapDirectory::open(&dir)?;
+        let creating = mmap.acquire_lock(&META_LOCK)?;
+        let index = tantivy::Index::open_or_create(mmap, b.build())?;
+        drop(creating);
         // OnCommitWithDelay watches meta.json, so other processes' commits show up too.
         let reader = index
             .reader_builder()
@@ -198,7 +204,7 @@ fn newer(a: &str, b: &str) -> bool {
 }
 
 /// Windows won't replace meta.json while another handle has it open (any reader's 500 ms watcher, a
-/// reload, a virus scanner), so a commit can fail with "Access is denied" until that handle closes.
+/// reload), so a commit can fail with "Access is denied" until that handle closes.
 fn refused_by_windows(e: &anyhow::Error) -> bool {
     cfg!(windows)
         && matches!(e.downcast_ref::<TantivyError>(),
@@ -279,7 +285,7 @@ impl Writer {
     /// Adds the passages not yet indexed and commits, with `open` or a newly locked writer; returns
     /// the writer, whose merges may still be running. On failure the batch is discarded and the
     /// writer's merges finish before its lock is released; a batch Windows refused is retried with a
-    /// fresh writer for up to 5 s.
+    /// fresh writer until 5 s have passed.
     fn commit<'a>(
         &self,
         mut open: Option<IndexWriter>,
