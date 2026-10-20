@@ -111,6 +111,14 @@ pr-review-toolkit agents (Apache License 2.0, Copyright Anthropic, PBC; `LICENSE
 `description:` rewritten, and [mattpocock/skills](https://github.com/mattpocock/skills)'s engineering code-review
 skill (MIT License, Copyright Matt Pocock; `LICENSE-MIT`), unmodified apart from a source comment.
 
+## ponytail
+
+`plugins/shared/ponytail/` is vendored from [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) (MIT
+License, Copyright (c) 2026 DietrichGebert; full text in `LICENSE`): the Claude Code plugin's `.claude-plugin/plugin.json`,
+`hooks/` (without the other hosts' hook configs) and `skills/`, at upstream's newest stable release. It is synced by
+`scripts/sync-ponytail.mjs` (weekly via GitHub Actions); the only local change is `plugin.json`'s `version`. The synced
+upstream commit is in `UPSTREAM`.
+
 ## Night City (dead-skills)
 
 The palette of `plugins/default/themes/night-city.json` is derived from the Cyberpunk Neon theme
@@ -119,7 +127,7 @@ License, Copyright its authors), with changed and added colors. Nothing is vendo
 
 ## Re-listed plugins
 
-The marketplace entries for superpowers and ponytail only point at their upstream repositories, pinned to a release
-commit; no code is vendored here. Anthropic's plugins (code-review, claude-code-setup, claude-md-management, security-guidance,
+The marketplace entry for superpowers only points at its upstream repository, pinned to a release commit; no code is
+vendored here. Anthropic's plugins (code-review, claude-code-setup, claude-md-management, security-guidance,
 claude-security, skill-creator, hookify and the LSPs) aren't listed here at all: they install from Anthropic's
 `claude-plugins-official` marketplace. Each is covered by its own upstream license.

@@ -99,6 +99,15 @@ Round 1 (2026-10-20), three reviewers (correctness, fit, simpler); 3 blocking, 6
   lines; second run after commit) and consider (csharp's workflow inputs; "(no changes)"; body cap; upstream likely
   has no GitHub releases, so subjects are the usual path): all yes.
 
+## Task 4: migration check (2026-10-20, Claude Code 2.1.304)
+
+Scratch `CLAUDE_CONFIG_DIR`, a local marketplace listing ponytail as the upstream url at v5.3.2:
+`claude plugin install` → 5.3.2; `claude plugin configure --values-stdin` set `ledger: false`; marker files in
+`plugins/data/`. The entry switched to a copy of `plugins/shared/ponytail` (0.4.0), `claude plugin marketplace update`,
+then `claude plugin update ponytail@t4m --json` → `"updateOutcome":"updated","oldVersion":"5.3.2","newVersion":"0.4.0"`.
+Afterwards `plugin list` shows 0.4.0, `pluginConfigs["ponytail@t4m"].options.ledger` is still `false`, the data
+markers are still there. Not checked: the background auto-update path (same version rule per the docs).
+
 ## Deviations
 
 ## Walkthrough

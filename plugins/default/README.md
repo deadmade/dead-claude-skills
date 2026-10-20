@@ -11,6 +11,14 @@ The default bundle, on every machine:
 
   /plugin install dead-skills@dead-claude-skills
 
+ponytail (vendored in `plugins/shared/ponytail/` from its upstream release, unchanged) does more than set a prompt
+style: it adds its rules at session start together with a short map of the codebase, and to every subagent; it draws a
+band above the prompt with the task's cost, agent time, reuse and tests, with buttons for its review, audit and board
+(Claude Code 2.1.290 or later; not in cloud sessions, `claude -p` or VS Code; `/ponytail band off` hides it); and after
+every turn it writes the task's row to a local board in `~/.config/ponytail/band/` (its `ledger` setting; nothing
+leaves the machine unless its webhook is set). Installs from before 0.5.0 run upstream's 5.x and switch to the vendored
+copy on their next plugin update.
+
 Night City, Context7 and the notifications were plugins of their own (night-city, mcp-basic, notify) until 0.3.0; the installer removes those and keeps Night City picked in `/theme`.
 
 ## Night City

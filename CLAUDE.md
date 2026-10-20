@@ -54,6 +54,9 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   feature) showed embeddings don't help, so none ship. `browser` drives the npm CLI `agent-browser`, pinned in
   `installer/agent-browser.json` (bumped by `sync-agent-browser.yml`). Test-only hooks: `WEB_MCP_TEST_PUBLIC_IP`
   (debug builds or the `test-hooks` feature) treats a comma-separated list of IPs as public; `WEB_MCP_FALLBACK_MS` shortens the fetch browser fallback's deadline, `WEB_MCP_PAPERS_MS` each paper source's (8 s), `WEB_MCP_LOOKUP_MS` each lookup source's.
+- `plugins/shared/ponytail/`: vendored unchanged from upstream's newest stable release (`scripts/sync-ponytail.mjs`,
+  ADR 0002): skills, SessionStart/SubagentStart/UserPromptSubmit hooks and its band mod. The sync PR carries upstream's
+  release notes, and the sync fails on a `plugin.json` component or default folder it doesn't know.
 - `plugins/opt-in/md-pane/`: a mod. Pure path logic in `hooks/paths.ts`; `register.tsx` redraws replies that name an existing
   `.md` file as its own `Markdown` (only a plugin-drawn `Markdown` with `onLinkPress` receives plain link clicks, and
   only in the fullscreen terminal) and shows the clicked file in a pane, refreshed by a 1 s stat while open.
@@ -71,18 +74,19 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   Neon's and Timescale's Postgres skills from two upstreams (`sync-postgres.mjs`), so each skill folder carries its
   own LICENSE, NOTICE and UPSTREAM instead of one set at the plugin root.
 - `scripts/`: `check-repo.mjs` (marketplace/bundle/version consistency), `release.mjs`, `sync-*.mjs` (vendoring),
-  `sync-plugins.mjs` (re-pins url-sourced plugins), `draw-mascot.mjs` (Onibi, Night City's pixel-art mascot, also notify's `icon.png`).
+  `sync-plugins.mjs` (re-pins url-sourced plugins), `sync-ponytail.mjs` (vendors ponytail, writes the PR's release notes), `draw-mascot.mjs` (Onibi, Night City's pixel-art mascot, also notify's `icon.png`).
 
-The url-sourced marketplace entries superpowers and ponytail are pinned by `ref` (release tag) and `sha` (its commit);
-`sync-plugins.yml` opens a PR per plugin when upstream tags a newer `vX.Y.Z`. The installer reads the version from
-the `ref`, so it must match upstream's `plugin.json`. Atlassian is deliberately unpinned.
+The url-sourced marketplace entry superpowers is pinned by `ref` (release tag) and `sha` (its commit); `sync-plugins.yml`
+opens a PR when upstream tags a newer `vX.Y.Z`. The installer reads the version from the `ref`, so it must match
+upstream's `plugin.json`. Atlassian is deliberately unpinned.
 
 ## Vendored content: don't edit
 
 These are copied from upstream by `scripts/sync-*.mjs` (weekly workflows open the PRs) and overwritten on every
 sync: `plugins/opt-in/hallmark/`, `plugins/shared/paper-lookup/skills/`, `plugins/shared/graphify/skills/`, `plugins/shared/mattpocock-picks/`, `plugins/shared/pstack-picks/`,
 `plugins/shared/tob-picks/` (CC BY-SA 4.0), `plugins/opt-in/implementation/*-skills/{library,skills}/`, `plugins/opt-in/implementation/*-skills/LICENSE` and `UPSTREAM` (their `plugin.json` and `evals/` are hand-written), `plugins/opt-in/implementation/postgres/skills/` (their `plugin.json` is hand-written), `plugins/shared/self-review/agents/`,
-`plugins/shared/self-review/skills/self-review/references/upstream/`. To change them, change the sync script's transform.
+`plugins/shared/self-review/skills/self-review/references/upstream/`, `plugins/shared/ponytail/` (its `plugin.json` version is
+set by the sync and bumped by `release.mjs`). To change them, change the sync script's transform.
 When what's vendored or its license changes, update THIRD_PARTY.md.
 
 ## Versions and releases
