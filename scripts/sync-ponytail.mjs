@@ -47,9 +47,13 @@ export function tagRange(tags, oldSha, newTag) {
   };
 }
 
-// Upstream text pasted into our PR: its #123 would link to our issues and its @name would ping from our repo.
+// Upstream text pasted into our PR: its #123 would link to our issues, a link to upstream would put this PR on that
+// issue's timeline (redirect.github.com doesn't, as in Renovate's PRs), and its @name would ping from our repo.
 const inert = (text) =>
-  text.replace(/(^|[^\w/&`])#(\d+)\b/g, `$1${REPO}#$2`).replace(/(^|[^\w/`])@([\w-]+)/g, '$1`@$2`');
+  text
+    .replaceAll('https://github.com/', 'https://redirect.github.com/')
+    .replace(/(^|[^\w/&`[])#(\d+)\b/g, `$1[#$2](https://redirect.github.com/${REPO}/issues/$2)`)
+    .replace(/(^|[^\w/`])@([\w-]+)/g, '$1`@$2`');
 
 const LIMIT = 60_000; // GitHub refuses PR bodies over 65,536 characters
 
@@ -68,6 +72,12 @@ export function releaseNotes(entries, compare) {
     cut = `\n_The older releases are cut to fit the PR body; ${compare ?? 'see upstream'}._\n`;
   }
   return sections.join('\n') + cut + tail;
+}
+
+// What the copy needs from the clone `up` and the clone lacks, so nothing is deleted before the sync knows it can finish.
+export function missingParts(up, manifest) {
+  const needed = ['hooks', ...hookFiles(manifest.hooks), ...(manifest.types ? [manifest.types] : [])];
+  return [...needed, 'skills/ponytail/SKILL.md', 'LICENSE'].filter((f) => !existsSync(join(up, f)));
 }
 
 // The hook config files plugin.json names (a path, or a list of paths and inline objects).
@@ -98,26 +108,11 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const manifestPath = join(up, '.claude-plugin', 'plugin.json');
   if (!existsSync(manifestPath)) fail('upstream .claude-plugin/plugin.json not found');
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-  for (const f of hookFiles(manifest.hooks))
-    if (!existsSync(join(up, f))) fail(`plugin.json names ${f}, which upstream doesn't have`);
-  if (!existsSync(join(up, 'skills', 'ponytail', 'SKILL.md'))) fail('upstream skills/ponytail/SKILL.md not found');
+  const missing = missingParts(up, manifest);
+  if (missing.length) fail(`upstream lacks what the copy needs: ${missing.join(', ')}`);
   const unknown = unknownParts(manifest, git('-C', up, 'ls-tree', '--name-only', 'HEAD').split('\n'));
   if (unknown.length)
     fail(`upstream has parts this sync doesn't handle: ${unknown.join(', ')}; decide, then update KEYS/SKIPPED`);
-
-  rmSync(dest, { recursive: true, force: true });
-  mkdirSync(join(dest, '.claude-plugin'), { recursive: true });
-  const { version } = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
-  writeFileSync(join(dest, '.claude-plugin', 'plugin.json'), JSON.stringify({ ...manifest, version }, null, 2) + '\n');
-  cpSync(join(up, 'hooks'), join(dest, 'hooks'), {
-    recursive: true,
-    filter: (src) => !OTHER_HOSTS.some((f) => src === join(up, 'hooks', f)),
-  });
-  for (const name of git('-C', up, 'ls-tree', '--name-only', 'HEAD', 'skills/').split('\n')) {
-    if (existsSync(join(up, name, 'SKILL.md'))) cpSync(join(up, name), join(dest, name), { recursive: true });
-  }
-  cpSync(join(up, 'LICENSE'), join(dest, 'LICENSE'));
-  if (oldSha) writeFileSync(upstreamFile, oldSha + '\n'); // so finish() sees only real changes
 
   const notesOf = (tag) => {
     try {
@@ -140,6 +135,20 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
       .filter(Boolean),
   }));
   const compare = range.old && `https://github.com/${REPO}/compare/${range.old}...${latest.tag}`;
+  rmSync(dest, { recursive: true, force: true });
+  mkdirSync(join(dest, '.claude-plugin'), { recursive: true });
+  const { version } = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
+  writeFileSync(join(dest, '.claude-plugin', 'plugin.json'), JSON.stringify({ ...manifest, version }, null, 2) + '\n');
+  cpSync(join(up, 'hooks'), join(dest, 'hooks'), {
+    recursive: true,
+    filter: (src) => !OTHER_HOSTS.some((f) => src === join(up, 'hooks', f)),
+  });
+  for (const name of git('-C', up, 'ls-tree', '--name-only', 'HEAD', 'skills/').split('\n')) {
+    if (existsSync(join(up, name, 'SKILL.md'))) cpSync(join(up, name), join(dest, name), { recursive: true });
+  }
+  cpSync(join(up, 'LICENSE'), join(dest, 'LICENSE'));
+  if (oldSha) writeFileSync(upstreamFile, oldSha + '\n'); // so finish() sees only real changes
+
   if (process.env.PR_BODY_FILE) writeFileSync(process.env.PR_BODY_FILE, releaseNotes(entries, compare));
   finish('ponytail', latest.sha, upstreamFile, dest);
   if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `tag=${latest.tag}\nsha=${latest.sha}\n`);

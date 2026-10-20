@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { releaseNotes, tagRange, unknownParts } from './sync-ponytail.mjs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { missingParts, releaseNotes, tagRange, unknownParts } from './sync-ponytail.mjs';
 
 const manifest = {
   name: 'ponytail',
@@ -76,10 +79,20 @@ test('releaseNotes says so when a tag has neither notes nor commits', () => {
   assert.match(releaseNotes([{ tag: 'v5.3.1', body: null, subjects: [] }]), /## v5\.3\.1[^\n]*\n\n\(no changes\)\n/);
 });
 
-test("releaseNotes points upstream's issue numbers at upstream and keeps mentions inert", () => {
-  const out = releaseNotes([{ tag: 'v5.3.2', body: 'thanks @someone (#1152), see #7', subjects: [] }]);
-  assert.match(out, /`@someone` \(DietrichGebert\/ponytail#1152\), see DietrichGebert\/ponytail#7/);
-  assert.doesNotMatch(out, /cc @deadmade[\s\S]*`@deadmade`/);
+test("releaseNotes links upstream's issues without cross-referencing them and keeps mentions inert", () => {
+  const out = releaseNotes([
+    {
+      tag: 'v5.3.2',
+      body: 'thanks @someone (#1152), see https://github.com/DietrichGebert/ponytail/pull/7',
+      subjects: [],
+    },
+  ]);
+  assert.match(
+    out,
+    /`@someone` \(\[#1152\]\(https:\/\/redirect\.github\.com\/DietrichGebert\/ponytail\/issues\/1152\)\)/,
+  );
+  assert.match(out, /see https:\/\/redirect\.github\.com\/DietrichGebert\/ponytail\/pull\/7/);
+  assert.doesNotMatch(out, /DietrichGebert\/ponytail#|https:\/\/github\.com\/DietrichGebert\/ponytail\/pull/);
 });
 
 test('releaseNotes stays under the PR body limit, cutting older releases first', () => {
@@ -92,4 +105,17 @@ test('releaseNotes stays under the PR body limit, cutting older releases first',
   assert.match(out, /## v5\.3\.2/);
   assert.doesNotMatch(out, /## v5\.3\.0/);
   assert.match(out, new RegExp(`older releases are cut[^\\n]*${COMPARE}`));
+});
+
+test('missingParts names every file the copy needs that the clone lacks', () => {
+  const up = mkdtempSync(join(tmpdir(), 'pt-'));
+  mkdirSync(join(up, 'hooks', 'band'), { recursive: true });
+  writeFileSync(join(up, 'hooks', 'claude-band.json'), '{}');
+  const manifest = { hooks: ['./hooks/claude-band.json', './hooks/gone.json'], types: './hooks/band/types.d.ts' };
+  assert.deepEqual(missingParts(up, manifest), [
+    './hooks/gone.json',
+    './hooks/band/types.d.ts',
+    'skills/ponytail/SKILL.md',
+    'LICENSE',
+  ]);
 });

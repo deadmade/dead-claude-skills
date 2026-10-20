@@ -9,7 +9,7 @@ ponytail runs, so agents working here had to guess or read whatever copy their m
 `plugins/shared/ponytail/` unchanged, except for `plugin.json`'s `version`, which becomes ours. Each sync PR is the real
 diff, with upstream's release notes (or, without any, its commit subjects) in the PR body. ADR 0001 vendors to keep the
 listing small and to drop parts; this one vendors so the code that runs can be read here and every upstream change is
-reviewed as a diff. Nothing is dropped or changed.
+reviewed as a diff. Nothing Claude Code loads is dropped or changed; the other hosts' adapters are left out.
 
 It costs:
 
