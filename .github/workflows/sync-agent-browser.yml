@@ -21,15 +21,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh api repos/vercel-labs/agent-browser/releases/latest > "$RUNNER_TEMP/release.json"
+          # An open sync PR's pin counts too: a version it pins can be replaced upstream before it merges.
+          if git fetch --depth=1 origin sync/agent-browser 2>/dev/null; then
+            git show FETCH_HEAD:installer/agent-browser.json > "$RUNNER_TEMP/open.json"
+          fi
           node --input-type=module -e '
-            import { readFileSync, writeFileSync, appendFileSync } from "node:fs";
+            import { existsSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
             import { agentBrowserPin } from "./installer/core.mjs";
             const file = "installer/agent-browser.json";
             const read = (f) => JSON.parse(readFileSync(f, "utf8"));
-            const pin = agentBrowserPin(read(process.argv[1]), read(file));
+            const pins = [file, process.argv[2]].filter(existsSync).map(read);
+            const [pin] = pins.map((current) => agentBrowserPin(read(process.argv[1]), current));
             writeFileSync(file, JSON.stringify(pin, null, 2) + "\n");
             appendFileSync(process.env.GITHUB_OUTPUT, `tag=${pin.upstream}\n`);
-          ' "$RUNNER_TEMP/release.json"
+          ' "$RUNNER_TEMP/release.json" "$RUNNER_TEMP/open.json"
 
       - name: Open pull request
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1

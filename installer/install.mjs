@@ -10,7 +10,6 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
-  renameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -246,15 +245,12 @@ async function applyCswap(on) {
       if (got !== want) throw new Error(`checksum mismatch (got ${got}, want ${want}), nothing written`);
       mkdirSync(dl.dir, { recursive: true });
       const tmp = `${dl.exe}.tmp-${process.pid}`;
-      writeFileSync(tmp, bytes);
-      // A running cswap.exe (the plugin polls it) can be renamed but not replaced: move it aside first.
-      const old = `${dl.exe}.old-${process.pid}`;
-      if (existsSync(dl.exe)) renameSync(dl.exe, old);
-      renameSync(tmp, dl.exe);
       try {
-        rmSync(old, { force: true });
-      } catch {
-        /* still running: left beside it */
+        writeFileSync(tmp, bytes);
+        // cswap.exe may be running: the plugin polls it.
+        replaceFile(tmp, dl.exe, WIN);
+      } finally {
+        rmSync(tmp, { force: true });
       }
       return { ok: true };
     });

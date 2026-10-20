@@ -73,6 +73,7 @@ test('replaceFile replaces or creates the target, and puts the old one back when
     writeFileSync(staged, 'new');
     replaceFile(staged, target, win);
     assert.equal(readFileSync(target, 'utf8'), 'new');
+    assert.deepEqual(readdirSync(dir), ['tool.exe']);
     assert.throws(() => replaceFile(join(dir, 'missing'), target, win));
     assert.equal(readFileSync(target, 'utf8'), 'new');
   }
