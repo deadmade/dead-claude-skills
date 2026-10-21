@@ -9,7 +9,7 @@ phase: done
 
 lets fix these issus
 
-(The "Fix before PR" findings 1–4 of the self-review of PR #51, `fix/agent-browser-binary` ← main.)
+(The "Fix before PR" findings 1–4 of the self-review of `fix/agent-browser-binary` ← main, now PR #68.)
 
 ## Artifacts
 
