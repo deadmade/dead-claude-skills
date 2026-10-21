@@ -1,22 +1,12 @@
 {
   "name": "dead-skills",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Default bundle: global instructions, the Night City theme and mod, desktop notifications, Context7, plus the core plugins of the dead-claude-skills marketplace as dependencies.",
   "author": {
     "name": "deadmade",
     "url": "https://github.com/deadmade"
   },
   "repository": "https://github.com/deadmade/dead-claude-skills",
-  "types": "./types/index.d.ts",
-  "userConfig": {
-    "onibi": {
-      "type": "string",
-      "title": "Onibi",
-      "description": "How often Onibi drops by above the prompt: sometimes (about one turn in five, at most every three minutes), always (every turn) or off.",
-      "default": "sometimes",
-      "options": ["sometimes", "always", "off"]
-    }
-  },
   "dependencies": [
     "code-review@claude-plugins-official",
     "claude-code-setup@claude-plugins-official",

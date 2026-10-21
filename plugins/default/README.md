@@ -11,6 +11,14 @@ The default bundle, on every machine:
 
   /plugin install dead-skills@dead-claude-skills
 
+ponytail (vendored in `plugins/shared/ponytail/` from its upstream release, unchanged) does more than set a prompt
+style: it adds its rules at session start together with a short map of the codebase, and to every subagent; it draws a
+band above the prompt with the task's cost, agent time, reuse and tests, with buttons for its review, audit and board
+(Claude Code 2.1.290 or later; not in cloud sessions, `claude -p` or VS Code; `/ponytail band off` hides it); and after
+every turn it writes the task's row to a local board in `~/.config/ponytail/band/` (its `ledger` setting; nothing
+leaves the machine unless its webhook is set). Installs from before 0.5.0 run upstream's 5.x and switch to the vendored
+copy on their next plugin update.
+
 Night City, Context7 and the notifications were plugins of their own (night-city, mcp-basic, notify) until 0.3.0; the installer removes those and keeps Night City picked in `/theme`.
 
 ## Night City
@@ -30,10 +38,6 @@ Beyond the theme:
 - Night City spinner words and turn-end verbs ("Jacked out for 3s").
 - Short status-line reactions: `▚▞ FLATLINE ▞▚` once per turn on a failing tool, `◢◤ JACKED OUT ◢◤` when a main turn
   ends.
-- Onibi drops by: after about one main turn in five (never more than once every three minutes) she pops up above the
-  prompt for six seconds with a one-liner ("good work, choom.", "what are you even doing?"), a sorrier one after a
-  failing tool, an impatient one after a turn over two minutes. The `Onibi` setting in `/config` makes her come
-  `always` (every turn) or turns her `off`.
 - A Night City ccstatusline config: Powerline segments with slanted edges in the theme's colours, icons, context as tokens
   and percent, the cost in eddies (`€$1.23`) and a ナイトシティ sign fading pink to teal. It needs a Nerd Font in the terminal. The installer writes it with the ccstatusline toggle
   and replaces the stock config earlier versions wrote.

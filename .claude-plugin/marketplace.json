@@ -3,7 +3,7 @@
   "name": "dead-claude-skills",
   "description": "deadmade's personal Claude Code setup: own skills plus the third-party plugins used on every machine.",
   "metadata": {
-    "version": "0.4.0"
+    "version": "0.5.0"
   },
   "owner": {
     "name": "deadmade",
@@ -13,7 +13,7 @@
   "plugins": [
     {
       "name": "dead-skills",
-      "description": "Default bundle: global instructions, the Night City theme and mod (spinner words, status-line reactions, Onibi dropping by), desktop notifications, Context7, and the core plugins of this marketplace as dependencies.",
+      "description": "Default bundle: global instructions, the Night City theme and mod (spinner words, status-line reactions), desktop notifications, Context7, and the core plugins of this marketplace as dependencies.",
       "source": "./plugins/default",
       "category": "productivity"
     },
@@ -31,12 +31,7 @@
     {
       "name": "ponytail",
       "description": "Forces the laziest solution that works. YAGNI, stdlib first, one line over fifty.",
-      "source": {
-        "source": "url",
-        "url": "https://github.com/DietrichGebert/ponytail.git",
-        "ref": "v5.1.0",
-        "sha": "9cc65d03aa2da1db7121b912d03596409ee340b8"
-      },
+      "source": "./plugins/shared/ponytail",
       "category": "productivity"
     },
     {
@@ -110,7 +105,7 @@
     },
     {
       "name": "flows",
-      "description": "Conductor skills that run the rest of the marketplace in order, with approval gates and resumable state: /feature-flow, /research-flow, /implement, /fix-flow and /upgrade build; /test-audit, /doc-audit and /harden check a branch or the whole repo; /verify proves a branch is ready for a PR; /understand teaches a codebase; /learn saves what a flow taught. A band above the prompt shows the current run's phase, gates and deviations; 1 resumes it from an idle prompt. Installs every plugin its conductors use. Opt-in.",
+      "description": "Conductor skills that run the rest of the marketplace in order, with approval gates and resumable state: /feature-flow, /research-flow, /implement, /fix-flow and /upgrade build; /test-audit, /doc-audit and /harden check a branch or the whole repo; /verify proves a branch is ready for a PR; /understand teaches a codebase; /learn saves what a flow taught. Installs every plugin its conductors use. Opt-in.",
       "source": "./plugins/flows",
       "category": "development"
     },
