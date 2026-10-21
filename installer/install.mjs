@@ -62,6 +62,7 @@ import {
   settingsChange,
   settingsText,
   sha256Of,
+  sha256Matches,
   shippedVersions,
   stripDefaults,
   unavailable,
@@ -299,7 +300,7 @@ async function downloadBin(name, asset, bin) {
         .then(sha256Of),
   ]);
   const bytes = Buffer.from(archive);
-  if (want !== createHash('sha256').update(bytes).digest('hex')) throw new Error(`${asset.file}: checksum mismatch`);
+  if (!sha256Matches(bytes, want)) throw new Error(`${asset.file}: checksum mismatch`);
   const tmp = mkdtempSync(join(tmpdir(), `${name}-`));
   try {
     const file = join(tmp, asset.file);
@@ -355,8 +356,8 @@ async function applyBin(pluginName, plugin) {
 }
 
 // web-mcp's `browser` tool drives agent-browser. A current one on PATH is used as is; otherwise upstream's release
-// binary for the version pinned in installer/agent-browser.json goes to ~/.claude/bin. Either way web-mcp's
-// agentBrowserPath names the one in use. Asks before a download; every failure is a summary line.
+// binary for the version pinned in installer/agent-browser.json goes to ~/.claude/bin. Either way its browser is
+// installed and web-mcp's agentBrowserPath names it. Asks before a download; every failure is a summary line.
 async function applyAgentBrowser() {
   const pin = readJson(join(PKG, 'installer', 'agent-browser.json'));
   const pinned = pin.upstream;
@@ -374,7 +375,7 @@ async function applyAgentBrowser() {
     ours,
     pinned,
   });
-  if (plan.use === 'path') return configureAgentBrowser('agent-browser');
+  if (plan.use === 'path') return useAgentBrowser('agent-browser', false, WIN);
   if (!asset)
     return failures.push(
       AGENT_BROWSER_FILES[key]
@@ -397,16 +398,17 @@ async function applyAgentBrowser() {
     if (!r.ok) return failures.push(`agent-browser ${pinned}: ${r.err}`);
     done.push(`agent-browser: ${plan.download === 'install' ? 'installed' : 'upgraded to'} ${pinned} at ${bin}`);
   }
-  // Every run, so a browser download that failed before is retried.
-  const args = deps ? ['install', '--with-deps'] : ['install'];
-  log('info', `Running agent-browser ${args.join(' ')}`);
-  const run = spawnSync(bin, args, { stdio: 'inherit' });
-  if (run.status !== 0)
-    failures.push(`agent-browser: \`${bin} ${args.join(' ')}\` failed (${run.error?.code ?? `exit ${run.status}`})`);
-  await configureAgentBrowser(bin);
+  await useAgentBrowser(bin, deps, false);
 }
 
-async function configureAgentBrowser(path) {
+// Runs `agent-browser install` (the browser download) on the copy in use, every run, so a download that failed before
+// is retried, then points web-mcp's agentBrowserPath at it. shell: npm's .cmd shim on Windows.
+async function useAgentBrowser(path, deps, shell) {
+  const args = deps ? ['install', '--with-deps'] : ['install'];
+  log('info', `Running agent-browser ${args.join(' ')}`);
+  const run = spawnSync(path, args, { stdio: 'inherit', shell });
+  if (run.status !== 0)
+    failures.push(`agent-browser: \`${path} ${args.join(' ')}\` failed (${run.error?.code ?? `exit ${run.status}`})`);
   const r = await claude(JSON.stringify({ agentBrowserPath: path }), 'plugin', 'configure', WEB_MCP, '--values-stdin');
   if (r.ok) done.push(`web-mcp: agentBrowserPath is ${path}`);
   else

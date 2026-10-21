@@ -1,4 +1,6 @@
 // Pure decisions for the installer; install.mjs does all I/O.
+import { createHash } from 'node:crypto';
+
 export const MARKETPLACE = 'dead-claude-skills';
 export const BUNDLE = 'dead-skills';
 // Anthropic's own plugins come straight from their marketplace: ours may not reuse their names.
@@ -358,6 +360,9 @@ export function binAsset(name, platform, arch, version) {
 
 // The checksum a `sha256sum` line starts with, lowercased; undefined when the text is not one.
 export const sha256Of = (text) => /^[0-9a-f]{64}(?=\s|$)/i.exec(text.trim())?.[0].toLowerCase();
+
+// Whether bytes hash to want, a lowercase hex sha256 (sha256Of's or a pinned one); never true without want.
+export const sha256Matches = (bytes, want) => !!want && createHash('sha256').update(bytes).digest('hex') === want;
 
 // What to do about a binary: `skip` (one on PATH is the user's own), `configure` (ours is current, point the plugin at
 // it), `download` (none, or an older one), or `unsupported` (no build for this machine).

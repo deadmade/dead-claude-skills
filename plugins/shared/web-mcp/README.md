@@ -60,10 +60,10 @@ or set its path with `/plugin configure web-mcp`.
 - **agent-browser** (for `browser` and `fetch`'s fallback): a current one on PATH is used as is. Otherwise the
   installer keeps its own copy in `~/.claude/bin`: upstream's release binary for the version pinned in
   `installer/agent-browser.json` (checked against the sha256 pinned there; `sync-agent-browser.yml` bumps both weekly),
-  downloaded when missing or older, then `agent-browser install` for the browser on every run, so a failed browser
-  download is retried (on Linux a download also offers `--with-deps`, which runs sudo). Either way `agentBrowserPath`
-  names the one in use. No Node or npm needed. Without it, `browser` and the fallback fail with
-  an install hint; plain `fetch` and `search` still work.
+  downloaded when missing or older (on Linux a download also offers `--with-deps`, which runs sudo). Either way it runs
+  `agent-browser install` for the browser on every run, so a failed browser download is retried, and `agentBrowserPath`
+  names the one in use. No Node or npm needed. Without it, `browser` and the fallback fail with an install hint; plain
+  `fetch` and `search` still work.
 
 ## Configuration
 

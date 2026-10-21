@@ -32,7 +32,11 @@ export function replaceBin(staged, bin, aside) {
       // The swap's error stays the one reported; the next sweep would delete old, so say where it is.
       e.message += `; the old binary is at ${old} (${r.code}), rename it back to ${bin}`;
     } finally {
-      rmSync(staged, { force: true });
+      try {
+        rmSync(staged, { force: true });
+      } catch {
+        /* a leftover staged copy; the swap's error is the one to report */
+      }
     }
     throw e;
   }

@@ -36,6 +36,7 @@ import {
   BIN_PLUGINS,
   binAsset,
   sha256Of,
+  sha256Matches,
   binAction,
   CATEGORIES,
   TOGGLES,
@@ -413,6 +414,11 @@ test('tui-review checksum lines and what to do about tui-review', () => {
   assert.equal(sha256Of(`${hex}`), hex.toLowerCase());
   assert.equal(sha256Of('Not Found'), undefined);
   assert.equal(sha256Of(`${hex}ff  x`), undefined);
+  // sha256('abc'), the FIPS 180-2 test vector.
+  const abc = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';
+  assert.ok(sha256Matches(Buffer.from('abc'), abc));
+  assert.ok(!sha256Matches(Buffer.from('abd'), abc));
+  assert.ok(!sha256Matches(Buffer.from('abc'), undefined));
   const at = (o) => binAction({ onPath: false, installed: undefined, version: '0.2.0', supported: true, ...o });
   assert.equal(at({ onPath: true }), 'skip');
   assert.equal(at({ installed: '0.2.0' }), 'configure');
