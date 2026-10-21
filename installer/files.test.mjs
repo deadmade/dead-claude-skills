@@ -93,3 +93,18 @@ test('replaceBin: a first install, the in-place swap (Linux), and a sweep that k
   assert.throws(() => replaceBin(`${bin}.gone`, bin, false));
   assert.equal(readFileSync(bin, 'utf8'), 'v2');
 });
+
+test('replaceBin: a failed swap reports its own error, not the cleanup of the staged copy', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'dcs-bin-'));
+  const bin = join(dir, 'tool');
+  writeFileSync(bin, 'v1');
+  // A non-empty directory can't be renamed onto a file, and a plain rmSync of it throws too.
+  const staged = join(dir, 'staged');
+  mkdirSync(staged);
+  writeFileSync(join(staged, 'x'), '');
+  assert.throws(
+    () => replaceBin(staged, bin, false),
+    (e) => e.syscall === 'rename',
+  );
+  assert.equal(readFileSync(bin, 'utf8'), 'v1');
+});

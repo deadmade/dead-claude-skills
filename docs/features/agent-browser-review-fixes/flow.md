@@ -12,7 +12,7 @@ Fix the "Fix before PR" findings (1–4) from the self-review of `fix/agent-brow
 
 ## Artifacts
 
-- Branch `fix/agent-browser-binary`, commit e564369.
+- Branch `fix/agent-browser-binary`, commit e564369; the fixes in 8a1cfcf.
 
 ## Gates
 
@@ -35,7 +35,7 @@ Reproduction is by reading: each finding is visible in the code, none needs a ru
 - 6: `agentBrowserAsset` returns undefined for both an unsupported platform and a bad pin.
 - 7: the early return for a current PATH copy leaves a stale `agentBrowserPath` pointing at ~/.claude/bin.
 - 8: `crates/web-mcp/src/browser.rs:56` still says `npm install -g`, asserted by `tests/browser.rs:159`.
-- 9: this branch doesn't touch `.web/index` (`rank::Index::open`); the finding belongs to another change.
+- 9: `.web/index` (`rank::Index::open`): not on this branch at the time; 17cd70a and e4b3139 later fixed it here.
 
 ## Fix
 
