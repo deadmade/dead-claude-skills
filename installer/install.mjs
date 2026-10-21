@@ -10,7 +10,6 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
-  renameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -46,8 +45,9 @@ import {
   isShipped,
   marketplaceArg,
   missingBinaries,
-  agentBrowserAction,
   agentBrowserAsset,
+  agentBrowserPlan,
+  AGENT_BROWSER_FILES,
   agentBrowserVersion,
   nameOf,
   manifestPath,
@@ -69,7 +69,7 @@ import {
   idOf,
   withDependencies,
 } from './core.mjs';
-import { backup, clearTargets, writeAtomic, writeSearxng } from './files.mjs';
+import { backup, clearTargets, replaceBin, writeAtomic, writeSearxng } from './files.mjs';
 import { confirm, line, log, note, progress, screen } from './ui.mjs';
 import { changeList, initial, move, paint, render } from './view.mjs';
 
@@ -247,15 +247,8 @@ async function applyCswap(on) {
       mkdirSync(dl.dir, { recursive: true });
       const tmp = `${dl.exe}.tmp-${process.pid}`;
       writeFileSync(tmp, bytes);
-      // A running cswap.exe (the plugin polls it) can be renamed but not replaced: move it aside first.
-      const old = `${dl.exe}.old-${process.pid}`;
-      if (existsSync(dl.exe)) renameSync(dl.exe, old);
-      renameSync(tmp, dl.exe);
-      try {
-        rmSync(old, { force: true });
-      } catch {
-        /* still running: left beside it */
-      }
+      // A running cswap.exe (the plugin polls it) can be renamed but not replaced.
+      replaceBin(tmp, dl.exe, true);
       return { ok: true };
     });
     if (!r.ok) return failures.push(`cswap download failed: ${r.err}`);
@@ -295,8 +288,8 @@ async function fetchOk(url) {
   return res;
 }
 
-// Downloads the release archive, checks it against its .sha256, and puts the binary at `bin` in one rename.
-// asset.digest: a pinned checksum instead of the .sha256 file; asset.raw: the download is the binary itself.
+// Downloads the release asset, checks its sha256, and moves the binary to bin (on Windows the old one is renamed aside
+// first). asset.digest: a pinned checksum instead of the .sha256 file; asset.raw: the download is the binary itself.
 async function downloadBin(name, asset, bin) {
   const [archive, want] = await Promise.all([
     fetchOk(asset.url).then((r) => r.arrayBuffer()),
@@ -306,8 +299,7 @@ async function downloadBin(name, asset, bin) {
         .then(sha256Of),
   ]);
   const bytes = Buffer.from(archive);
-  if (want !== createHash('sha256').update(bytes).digest('hex'))
-    throw new Error(`${asset.file}: checksum mismatch`);
+  if (want !== createHash('sha256').update(bytes).digest('hex')) throw new Error(`${asset.file}: checksum mismatch`);
   const tmp = mkdtempSync(join(tmpdir(), `${name}-`));
   try {
     const file = join(tmp, asset.file);
@@ -322,15 +314,8 @@ async function downloadBin(name, asset, bin) {
     const staged = `${bin}.tmp-${process.pid}`;
     cpSync(asset.raw ? file : join(tmp, asset.exe), staged);
     chmodSync(staged, 0o755);
-    // Windows can rename a running exe (agent-browser's daemon, a live web-mcp) but not replace it: move it aside first.
-    const old = `${bin}.old-${process.pid}`;
-    if (WIN && existsSync(bin)) renameSync(bin, old);
-    renameSync(staged, bin);
-    try {
-      rmSync(old, { force: true });
-    } catch {
-      /* still running: left beside it */
-    }
+    // Windows can rename a running exe (agent-browser's daemon, a live web-mcp) but not replace it.
+    replaceBin(staged, bin, WIN);
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
@@ -370,29 +355,39 @@ async function applyBin(pluginName, plugin) {
 }
 
 // web-mcp's `browser` tool drives agent-browser. A current one on PATH is used as is; otherwise upstream's release
-// binary for the version pinned in installer/agent-browser.json goes to ~/.claude/bin and web-mcp's agentBrowserPath
-// points at it. Asks first; every failure is a summary line. Linux's --with-deps runs sudo, so it has its own prompt.
+// binary for the version pinned in installer/agent-browser.json goes to ~/.claude/bin. Either way web-mcp's
+// agentBrowserPath names the one in use. Asks before a download; every failure is a summary line.
 async function applyAgentBrowser() {
   const pin = readJson(join(PKG, 'installer', 'agent-browser.json'));
   const pinned = pin.upstream;
+  const key = `${process.platform}-${process.arch}`;
   // npm's .cmd shim on Windows needs a shell; our own binary doesn't.
   const versionOf = (bin, shell) => {
     const r = spawnSync(bin, ['--version'], { encoding: 'utf8', shell });
     return r.status === 0 ? agentBrowserVersion(r.stdout) : undefined;
   };
-  const theirs = onPath('agent-browser') ? versionOf('agent-browser', WIN) : undefined;
-  if (theirs && agentBrowserAction({ installed: theirs, pinned }) === 'skip') return;
   const asset = agentBrowserAsset(process.platform, process.arch, pin);
+  const bin = asset && join(BIN_DIR, asset.exe);
+  const ours = bin && versionOf(bin, false);
+  const plan = agentBrowserPlan({
+    theirs: onPath('agent-browser') ? versionOf('agent-browser', WIN) : undefined,
+    ours,
+    pinned,
+  });
+  if (plan.use === 'path') return configureAgentBrowser('agent-browser');
   if (!asset)
-    return failures.push(`agent-browser: no pinned ${pinned} build for ${process.platform}-${process.arch}`);
-  const bin = join(BIN_DIR, asset.exe);
-  const installed = versionOf(bin, false);
-  const action = agentBrowserAction({ installed, pinned });
-  if (action !== 'skip') {
-    const what = action === 'install' ? 'Download' : `Upgrade ${installed} to`;
+    return failures.push(
+      AGENT_BROWSER_FILES[key]
+        ? `agent-browser: bad pin in installer/agent-browser.json (${JSON.stringify(pin)})`
+        : `agent-browser: no upstream build for ${key}`,
+    );
+  // --with-deps runs sudo, so it is offered only with a download, behind its own prompt (default no).
+  let deps = false;
+  if (plan.download !== 'skip') {
+    const what = plan.download === 'install' ? 'Download' : `Upgrade ${ours} to`;
     if (!(await ask(`${what} agent-browser ${pinned} (upstream's release binary) to ${bin}, then its browser?`, true)))
       return done.push('agent-browser: install skipped by you');
-    const deps =
+    deps =
       process.platform === 'linux' &&
       (await ask('Also install the browser system packages (agent-browser install --with-deps, runs sudo)?', false));
     const r = await progress(`Downloading agent-browser ${pinned}`, async () => {
@@ -400,16 +395,24 @@ async function applyAgentBrowser() {
       return { ok: true };
     });
     if (!r.ok) return failures.push(`agent-browser ${pinned}: ${r.err}`);
-    done.push(`agent-browser: ${action === 'install' ? 'installed' : 'upgraded to'} ${pinned} at ${bin}`);
-    const args = deps ? ['install', '--with-deps'] : ['install'];
-    log('info', `Running agent-browser ${args.join(' ')}`);
-    const run = spawnSync(bin, args, { stdio: 'inherit' });
-    if (run.status !== 0)
-      failures.push(`agent-browser: \`${bin} ${args.join(' ')}\` failed (${run.error?.code ?? `exit ${run.status}`})`);
+    done.push(`agent-browser: ${plan.download === 'install' ? 'installed' : 'upgraded to'} ${pinned} at ${bin}`);
   }
-  const r = await claude(JSON.stringify({ agentBrowserPath: bin }), 'plugin', 'configure', WEB_MCP, '--values-stdin');
-  if (r.ok) done.push(`web-mcp: agentBrowserPath is ${bin}`);
-  else failures.push(`web-mcp: could not set agentBrowserPath (${r.err}); set it to ${bin} with /plugin configure web-mcp`);
+  // Every run, so a browser download that failed before is retried.
+  const args = deps ? ['install', '--with-deps'] : ['install'];
+  log('info', `Running agent-browser ${args.join(' ')}`);
+  const run = spawnSync(bin, args, { stdio: 'inherit' });
+  if (run.status !== 0)
+    failures.push(`agent-browser: \`${bin} ${args.join(' ')}\` failed (${run.error?.code ?? `exit ${run.status}`})`);
+  await configureAgentBrowser(bin);
+}
+
+async function configureAgentBrowser(path) {
+  const r = await claude(JSON.stringify({ agentBrowserPath: path }), 'plugin', 'configure', WEB_MCP, '--values-stdin');
+  if (r.ok) done.push(`web-mcp: agentBrowserPath is ${path}`);
+  else
+    failures.push(
+      `web-mcp: could not set agentBrowserPath (${r.err}); set it to ${path} with /plugin configure web-mcp`,
+    );
 }
 
 // SearXNG in Docker for web-mcp's search. True when it answers JSON on 127.0.0.1:8888 within 30 s. Every failure is a

@@ -57,10 +57,12 @@ or set its path with `/plugin configure web-mcp`.
   `~/.claude/searxng/settings.yml`, which turns on the JSON format and searches Bing and Yahoo (SearXNG's default engines
   CAPTCHA or rate-limit a scraper). Without Docker it prints what to run. If you
   accept the `web-builtins-off` toggle, WebSearch and WebFetch are denied, but only when SearXNG answers.
-- **agent-browser** (for `browser` and `fetch`'s fallback): unless a current one is on PATH, the installer downloads
-  upstream's release binary for the version pinned in `installer/agent-browser.json` (checked against the sha256
-  pinned there; `sync-agent-browser.yml` bumps both weekly) to `~/.claude/bin`, points `agentBrowserPath` at it and
-  runs `agent-browser install` for the browser. No Node or npm needed. Without it, `browser` and the fallback fail with
+- **agent-browser** (for `browser` and `fetch`'s fallback): a current one on PATH is used as is. Otherwise the
+  installer keeps its own copy in `~/.claude/bin`: upstream's release binary for the version pinned in
+  `installer/agent-browser.json` (checked against the sha256 pinned there; `sync-agent-browser.yml` bumps both weekly),
+  downloaded when missing or older, then `agent-browser install` for the browser on every run, so a failed browser
+  download is retried (on Linux a download also offers `--with-deps`, which runs sudo). Either way `agentBrowserPath`
+  names the one in use. No Node or npm needed. Without it, `browser` and the fallback fail with
   an install hint; plain `fetch` and `search` still work.
 
 ## Configuration

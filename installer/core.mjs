@@ -475,6 +475,13 @@ const newer = (a, b) => {
 export const agentBrowserAction = ({ installed, pinned }) =>
   !installed ? 'install' : installed === pinned || newer(installed, pinned) ? 'skip' : 'upgrade';
 
+// Which agent-browser web-mcp runs: a current one on PATH as is, else ours in ~/.claude/bin, downloaded when missing
+// or older than the pin.
+export const agentBrowserPlan = ({ theirs, ours, pinned }) =>
+  theirs && agentBrowserAction({ installed: theirs, pinned }) === 'skip'
+    ? { use: 'path' }
+    : { use: 'ours', download: agentBrowserAction({ installed: ours, pinned }) };
+
 // agent-browser's own release binaries (statically linked musl on Linux, so NixOS runs it), keyed like BIN_TARGETS.
 export const AGENT_BROWSER_FILES = {
   'win32-x64': 'agent-browser-win32-x64.exe',

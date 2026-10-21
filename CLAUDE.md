@@ -55,9 +55,11 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
 - `plugins/shared/web-mcp/`: a stdio MCP server (Rust, `crates/web-mcp/`) with `search`, `fetch`, `browser` and `lookup`, built for Windows and Linux
   x64 only, like tui-review's binary (`build-web-mcp.yml`, `BIN_TARGETS` in `core.mjs`; no macOS or ARM builds); the installer downloads it and sets `binPath`. Everything it pulls lands in
   `$CLAUDE_PROJECT_DIR/.web/` before Claude sees it. Ranking is BM25 only: the H4 experiment (`examples/h4.rs`, `h4`
-  feature) showed embeddings don't help, so none ship. `browser` drives `agent-browser` (upstream's Rust CLI, a binary-only crate),
-  pinned with its release binaries' sha256 in `installer/agent-browser.json` (bumped by `sync-agent-browser.yml`); the
-  installer downloads it like web-mcp and sets `agentBrowserPath`. Test-only hooks: `WEB_MCP_TEST_PUBLIC_IP`
+  feature) showed embeddings don't help, so none ship. `browser` drives `agent-browser` (upstream's Rust CLI), pinned with its
+  release binaries' sha256 in `installer/agent-browser.json` (bumped by `sync-agent-browser.yml`, which imports
+  `AGENT_BROWSER_FILES` from `core.mjs`). Unless a current one is on PATH, the installer keeps its own copy in
+  `~/.claude/bin` (upstream's raw binary, checked against the pinned hash, downloaded when missing or older than the
+  pin); either way it sets `agentBrowserPath` to the one in use (`agentBrowserPlan` in `core.mjs`). Test-only hooks: `WEB_MCP_TEST_PUBLIC_IP`
   (debug builds or the `test-hooks` feature) treats a comma-separated list of IPs as public; `WEB_MCP_FALLBACK_MS` shortens the fetch browser fallback's deadline, `WEB_MCP_PAPERS_MS` each paper source's (8 s), `WEB_MCP_LOOKUP_MS` each lookup source's.
 - `plugins/opt-in/md-pane/`: a mod. Pure path logic in `hooks/paths.ts`; `register.tsx` redraws replies that name an existing
   `.md` file as its own `Markdown` (only a plugin-drawn `Markdown` with `onLinkPress` receives plain link clicks, and

@@ -53,7 +53,7 @@ impl fmt::Display for BrowserError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Missing => f.write_str(
-                "agent-browser is not installed. Install it with the web-mcp installer, or `npm install -g agent-browser && agent-browser install`.",
+                "agent-browser is not installed. Install it with the web-mcp installer, or put agent-browser on PATH (https://github.com/vercel-labs/agent-browser/releases) and run `agent-browser install`.",
             ),
             Self::Failed(m) => f.write_str(m),
         }
