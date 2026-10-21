@@ -25,12 +25,13 @@ SKILL.md with the Read tool, and follow it. When a skill names another skill, re
 | binlog-generation | Generate MSBuild binary logs (binlogs) for build diagnostics and analysis. | `${CLAUDE_PLUGIN_ROOT}/library/binlog-generation/SKILL.md` |
 | build-parallelism | Analyze an MSBuild solution, solution filter, or Build.proj that schedules multiple project files. | `${CLAUDE_PLUGIN_ROOT}/library/build-parallelism/SKILL.md` |
 | build-perf-baseline | Establish MSBuild/.NET build performance baselines before optimizing. | `${CLAUDE_PLUGIN_ROOT}/library/build-perf-baseline/SKILL.md` |
-| build-perf-diagnostics | Diagnose MSBuild build performance bottlenecks using binary log analysis. | `${CLAUDE_PLUGIN_ROOT}/library/build-perf-diagnostics/SKILL.md` |
+| build-perf-diagnostics | Diagnose MSBuild bottlenecks from binlog timelines and Target/Task Performance Summaries after build-perf-baseline establishes measurements. | `${CLAUDE_PLUGIN_ROOT}/library/build-perf-diagnostics/SKILL.md` |
 | check-bin-obj-clash | Detects MSBuild projects with conflicting OutputPath or IntermediateOutputPath. | `${CLAUDE_PLUGIN_ROOT}/library/check-bin-obj-clash/SKILL.md` |
 | convert-to-cpm | Convert .NET projects and solutions (.sln, .slnx) to NuGet Central Package Management (CPM) using Directory.Packages.props. | `${CLAUDE_PLUGIN_ROOT}/library/convert-to-cpm/SKILL.md` |
 | copy-to-output-directory | Choosing an MSBuild CopyToOutputDirectory / CopyToPublishDirectory mode: Never, PreserveNewest, Always, and IfDifferent (MSBuild 17.13+), plus $(SkipUnchangedFilesOnCopyAlways). | `${CLAUDE_PLUGIN_ROOT}/library/copy-to-output-directory/SKILL.md` |
 | directory-build-organization | USE ONLY for (1) two or more projects with repeated MSBuild policy, targets, or package versions, or (2) an existing Directory.Build.props/targets/rsp hierarchy with an import, placement, or layering… | `${CLAUDE_PLUGIN_ROOT}/library/directory-build-organization/SKILL.md` |
 | dotnet-aot-compat | Make .NET projects compatible with Native AOT and trimming by systematically resolving IL trim/AOT analyzer warnings. | `${CLAUDE_PLUGIN_ROOT}/library/dotnet-aot-compat/SKILL.md` |
+| eliminate-redundant-restores | Remove repeated NuGet restores from multi-step .NET builds safely. | `${CLAUDE_PLUGIN_ROOT}/library/eliminate-redundant-restores/SKILL.md` |
 | eval-performance | Guide for diagnosing and improving MSBuild project evaluation performance. | `${CLAUDE_PLUGIN_ROOT}/library/eval-performance/SKILL.md` |
 | extension-points | Own MSBuild import and hook discovery. | `${CLAUDE_PLUGIN_ROOT}/library/extension-points/SKILL.md` |
 | including-generated-files | Own MSBuild generated-artifact integration. | `${CLAUDE_PLUGIN_ROOT}/library/including-generated-files/SKILL.md` |
