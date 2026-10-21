@@ -1,6 +1,6 @@
 // The installer's file writes and the clean slate's backup and delete, split out of install.mjs so they can be tested.
-import { cpSync, existsSync, lstatSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import { CLEAN_TARGETS, searxngSettings } from './core.mjs';
 
 export function writeAtomic(file, text) {
@@ -8,6 +8,39 @@ export function writeAtomic(file, text) {
   const tmp = `${file}.tmp-${process.pid}`;
   writeFileSync(tmp, text);
   renameSync(tmp, file);
+}
+
+// Moves staged to bin. aside (Windows): a running exe can be renamed but not replaced, so the old one is moved to
+// bin.old-<pid> first, put back if the swap fails, and deleted when it no longer runs (a later call sweeps it).
+export function replaceBin(staged, bin, aside) {
+  const old = `${bin}.old-${process.pid}`;
+  for (const f of readdirSync(dirname(bin)))
+    if (f.startsWith(`${basename(bin)}.old-`))
+      try {
+        rmSync(join(dirname(bin), f), { force: true });
+      } catch {
+        /* still running */
+      }
+  const moved = aside && existsSync(bin);
+  if (moved) renameSync(bin, old);
+  try {
+    renameSync(staged, bin);
+  } catch (e) {
+    try {
+      if (moved) renameSync(old, bin);
+    } catch (r) {
+      // The swap's error stays the one reported; the next sweep would delete old, so say where it is.
+      e.message += `; the old binary is at ${old} (${r.code}), rename it back to ${bin}`;
+    } finally {
+      rmSync(staged, { force: true });
+    }
+    throw e;
+  }
+  try {
+    rmSync(old, { force: true });
+  } catch {
+    /* still running: the next call sweeps it */
+  }
 }
 
 // Copies every clean target that exists; any failure throws before the caller deletes anything.

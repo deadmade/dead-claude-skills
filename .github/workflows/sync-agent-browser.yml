@@ -17,11 +17,24 @@ jobs:
 
       - name: Pin the newest agent-browser release
         id: pin
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          tag=$(npm view agent-browser version)
-          echo "$tag" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'
-          jq --arg t "$tag" '.upstream = $t' installer/agent-browser.json > agent-browser.json.tmp && mv agent-browser.json.tmp installer/agent-browser.json
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          gh api repos/vercel-labs/agent-browser/releases/latest > "$RUNNER_TEMP/release.json"
+          node --input-type=module -e '
+            import { readFileSync, writeFileSync, appendFileSync } from "node:fs";
+            import { AGENT_BROWSER_FILES } from "./installer/core.mjs";
+            const release = JSON.parse(readFileSync(process.argv[1], "utf8"));
+            const tag = /^v(\d+\.\d+\.\d+)$/.exec(release.tag_name)?.[1];
+            if (!tag) throw new Error(`unexpected tag ${release.tag_name}`);
+            const sha256 = Object.fromEntries(Object.entries(AGENT_BROWSER_FILES).map(([key, file]) => {
+              const digest = /^sha256:([0-9a-f]{64})$/.exec(release.assets.find((a) => a.name === file)?.digest ?? "")?.[1];
+              if (!digest) throw new Error(`no sha256 digest for ${file}`);
+              return [key, digest];
+            }));
+            writeFileSync("installer/agent-browser.json", JSON.stringify({ upstream: tag, sha256 }, null, 2) + "\n");
+            appendFileSync(process.env.GITHUB_OUTPUT, `tag=${tag}\n`);
+          ' "$RUNNER_TEMP/release.json"
 
       - name: Open pull request
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
@@ -31,8 +44,8 @@ jobs:
           commit-message: 'Pin agent-browser to ${{ steps.pin.outputs.tag }}'
           title: 'Pin agent-browser to ${{ steps.pin.outputs.tag }}'
           body: |
-            Bumps installer/agent-browser.json to https://www.npmjs.com/package/agent-browser/v/${{ steps.pin.outputs.tag }}.
-            The installer installs this version for web-mcp users.
+            Bumps installer/agent-browser.json to https://github.com/vercel-labs/agent-browser/releases/tag/v${{ steps.pin.outputs.tag }}
+            and pins its Windows and Linux binaries' sha256. The installer downloads this version for web-mcp users.
 
             cc @deadmade
           add-paths: installer/agent-browser.json

@@ -57,14 +57,18 @@ or set its path with `/plugin configure web-mcp`.
   `~/.claude/searxng/settings.yml`, which turns on the JSON format and searches Bing and Yahoo (SearXNG's default engines
   CAPTCHA or rate-limit a scraper). Without Docker it prints what to run. If you
   accept the `web-builtins-off` toggle, WebSearch and WebFetch are denied, but only when SearXNG answers.
-- **agent-browser** (for `browser` and `fetch`'s fallback): the installer offers to install the version pinned in
-  `installer/agent-browser.json`, which `sync-agent-browser.yml` bumps weekly. Without it, `browser` and the fallback
-  fail with an install hint; plain `fetch` and `search` still work.
+- **agent-browser** (for `browser` and `fetch`'s fallback): a current one on PATH is used as is. Otherwise the
+  installer keeps its own copy in `~/.claude/bin`: upstream's release binary for the version pinned in
+  `installer/agent-browser.json` (checked against the sha256 pinned there; `sync-agent-browser.yml` bumps both weekly),
+  downloaded when missing or older, then `agent-browser install` for the browser on every run, so a failed browser
+  download is retried (on Linux a download also offers `--with-deps`, which runs sudo). Either way `agentBrowserPath`
+  names the one in use. No Node or npm needed. Without it, `browser` and the fallback fail with
+  an install hint; plain `fetch` and `search` still work.
 
 ## Configuration
 
 Environment variables, set in `.mcp.json`: `CLAUDE_PROJECT_DIR` (where `.web/` lives), `WEB_MCP_SEARXNG_URL` (default
-`http://127.0.0.1:8888`) and `WEB_MCP_AGENT_BROWSER` (default `agent-browser`). `WEB_MCP_ARXIV_URL`,
+`http://127.0.0.1:8888`) and `WEB_MCP_AGENT_BROWSER` (the `agentBrowserPath` userConfig, default `agent-browser`). `WEB_MCP_ARXIV_URL`,
 `WEB_MCP_OPENALEX_URL` and `WEB_MCP_CROSSREF_URL` repoint the paper APIs (for tests). The lookup sources are repointed by `WEB_MCP_DOH_URL`, `WEB_MCP_RDAP_URL`, `WEB_MCP_CRTSH_URL`,
 `WEB_MCP_CDX_URL`, `WEB_MCP_WAYBACK_URL`, `WEB_MCP_INTERNETDB_URL`, `WEB_MCP_OSV_URL`, `WEB_MCP_NVD_URL`,
 `WEB_MCP_EPSS_URL` and `WEB_MCP_KEV_URL`; `WEB_MCP_LOOKUP_MS` shortens every lookup source's deadline (test-only).

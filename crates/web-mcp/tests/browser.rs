@@ -155,10 +155,7 @@ fn missing_binary_explains_install() {
     let (mut mcp, _) = start("/nonexistent/agent-browser");
     let r = mcp.call("browser", json!({"action": "snapshot", "session": "s"}));
     assert!(is_error(&r));
-    assert!(
-        text(&r).contains("npm install -g agent-browser && agent-browser install"),
-        "{r}"
-    );
+    assert!(text(&r).contains("put agent-browser on PATH"), "{r}");
 }
 
 #[test]

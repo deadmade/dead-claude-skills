@@ -323,13 +323,6 @@ const BINARIES = [
   ['socat', 'sandbox', 'nix: socat', 'WSL2 only'],
   ['ccstatusline', 'ccstatusline', 'nix: ccstatusline', 'npm i -g ccstatusline'],
   ['docker', 'web-mcp', 'nix: docker', 'winget install -e --id Docker.DockerDesktop'],
-  ['npm', 'web-mcp', 'nix: nodejs', 'winget install -e --id OpenJS.NodeJS.LTS'],
-  [
-    'agent-browser',
-    'web-mcp',
-    'npm i -g agent-browser && agent-browser install',
-    'npm i -g agent-browser && agent-browser install',
-  ],
   ['cswap', 'cswap', 'uv tool install claude-swap', 'rerun this installer (cswap.exe download)'],
 ];
 
@@ -481,6 +474,29 @@ const newer = (a, b) => {
 // installed: version from `agent-browser --version` or undefined; pinned: installer/agent-browser.json. A newer one stays.
 export const agentBrowserAction = ({ installed, pinned }) =>
   !installed ? 'install' : installed === pinned || newer(installed, pinned) ? 'skip' : 'upgrade';
+
+// Which agent-browser web-mcp runs: a current one on PATH as is, else ours in ~/.claude/bin, downloaded when missing
+// or older than the pin.
+export const agentBrowserPlan = ({ theirs, ours, pinned }) =>
+  theirs && agentBrowserAction({ installed: theirs, pinned }) === 'skip'
+    ? { use: 'path' }
+    : { use: 'ours', download: agentBrowserAction({ installed: ours, pinned }) };
+
+// agent-browser's own release binaries (statically linked musl on Linux, so NixOS runs it), keyed like BIN_TARGETS.
+export const AGENT_BROWSER_FILES = {
+  'win32-x64': 'agent-browser-win32-x64.exe',
+  'linux-x64': 'agent-browser-linux-musl-x64',
+};
+
+// The upstream binary for pin (installer/agent-browser.json) on this machine, checked against the pin's sha256, or
+// undefined where there is no build or no pinned hash.
+export function agentBrowserAsset(platform, arch, pin) {
+  const key = `${platform}-${arch}`;
+  const [file, digest] = [AGENT_BROWSER_FILES[key], pin.sha256?.[key]];
+  if (!file || !semver(pin.upstream) || !/^[0-9a-f]{64}$/.test(digest ?? '')) return undefined;
+  const url = `https://github.com/vercel-labs/agent-browser/releases/download/v${pin.upstream}/${file}`;
+  return { file, url, digest, raw: true, exe: platform === 'win32' ? 'agent-browser.exe' : 'agent-browser' };
+}
 
 // `agent-browser --version` may print a name prefix ("agent-browser 0.39.1"); undefined when no version is in it.
 export const agentBrowserVersion = (out) => /(\d+\.\d+\.\d+)/.exec(out ?? '')?.[1];

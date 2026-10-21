@@ -11,6 +11,8 @@ import {
   safeArg,
   missingBinaries,
   agentBrowserAction,
+  agentBrowserAsset,
+  agentBrowserPlan,
   agentBrowserVersion,
   SECRET_DENIES,
   isSandboxOn,
@@ -650,4 +652,34 @@ test('agent-browser: install when missing, upgrade when older, keep when equal o
   assert.equal(agentBrowserAction({ installed: '0.40.0', pinned }), 'skip');
   assert.equal(agentBrowserVersion('agent-browser 0.39.1\n'), '0.39.1');
   assert.equal(agentBrowserVersion('nope'), undefined);
+});
+
+test('agent-browser: the pinned upstream binary, only with a pinned hash', () => {
+  const pin = JSON.parse(readFileSync(new URL('./agent-browser.json', import.meta.url), 'utf8'));
+  const linux = agentBrowserAsset('linux', 'x64', pin);
+  assert.equal(
+    linux.url,
+    `https://github.com/vercel-labs/agent-browser/releases/download/v${pin.upstream}/agent-browser-linux-musl-x64`,
+  );
+  assert.equal(linux.digest, pin.sha256['linux-x64']);
+  assert.equal(agentBrowserAsset('win32', 'x64', pin).exe, 'agent-browser.exe');
+  assert.equal(agentBrowserAsset('darwin', 'arm64', pin), undefined);
+  assert.equal(agentBrowserAsset('linux', 'x64', { ...pin, sha256: {} }), undefined);
+  assert.equal(agentBrowserAsset('linux', 'x64', { ...pin, upstream: '1.0; rm' }), undefined);
+  assert.ok(!missingBinaries('linux', ['web-mcp'], () => false).some((r) => r.binary === 'agent-browser'));
+});
+
+test('agent-browser plan: a current PATH copy wins, else ours, downloaded only when missing or older', () => {
+  const pinned = '0.39.1';
+  assert.deepEqual(agentBrowserPlan({ theirs: '0.39.1', ours: undefined, pinned }), { use: 'path' });
+  assert.deepEqual(agentBrowserPlan({ theirs: '0.40.0', ours: '0.38.0', pinned }), { use: 'path' });
+  assert.deepEqual(agentBrowserPlan({ theirs: '0.38.0', ours: '0.39.1', pinned }), { use: 'ours', download: 'skip' });
+  assert.deepEqual(agentBrowserPlan({ theirs: undefined, ours: undefined, pinned }), {
+    use: 'ours',
+    download: 'install',
+  });
+  assert.deepEqual(agentBrowserPlan({ theirs: undefined, ours: '0.38.0', pinned }), {
+    use: 'ours',
+    download: 'upgrade',
+  });
 });
