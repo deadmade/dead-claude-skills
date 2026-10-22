@@ -13,16 +13,16 @@ waits for you, and my global rules. Everything else is opt-in: language
 servers, language and database skills (rust, csharp, postgres), integrations (GitHub, Azure, Atlassian), skill packs
 like hallmark, paper-lookup, self-review, graphify and the mattpocock/pstack/Trail of Bits picks, and tools such as
 [tui-review](plugins/shared/tui-review/README.md), [md-pane](plugins/opt-in/md-pane/README.md) for reading the `.md` files
-Claude names in a pane beside the chat, cswap for multi-account switching, [web-mcp](plugins/shared/web-mcp/README.md) for web search, page fetching,
+Claude names in a pane beside the chat, [web-mcp](plugins/shared/web-mcp/README.md) for web search, page fetching,
 passive lookups and a browser with an archive of everything it pulled.
 
 The opt-in [flows](plugins/flows/README.md) plugin ties the rest together: conductor skills (`/feature-flow`,
 `/fix-flow`, `/test-audit`, `/doc-audit`, `/verify`, `/learn` and more) that run the other plugins' skills in order,
 with approval gates and a state file to resume from. Picking flows installs every plugin its conductors use.
 
-    npx --allow-git=root github:deadmade/dead-claude-skills#semver:*
+    npx --allow-remote=root https://github.com/deadmade/dead-claude-skills/releases/latest/download/installer.tgz
 
-The installer (Node standard library only) shows one page per category where you pick what to install, remove or
+The installer (Node standard library only, written in TypeScript and attached to each release built to JS) shows one page per category where you pick what to install, remove or
 update, then applies only the changes. It pins the marketplace to its own release so plugins match the installer, and
 it always denies Claude reading `.env` files and credential dirs and keeps session transcripts (Claude Code deletes them after 30 days unless `cleanupPeriodDays` is set). Optional toggles add ccstatusline, the Bash sandbox
 and dcg; the danger zone can strip all foreign plugins or reset `~/.claude` to a clean slate (after a backup). Without
@@ -30,4 +30,5 @@ the installer, `/plugin marketplace add deadmade/dead-claude-skills` and `/plugi
 work too, but track main.
 
 Everything ships as one version, cut with `npm run release -- patch` and `git push --follow-tags origin main`; the
-tag builds the binaries and publishes the GitHub release the installer downloads from.
+tag builds the installer and the binaries and publishes the GitHub release they're downloaded from. From a checkout,
+`npm ci` once, then `node installer/install.ts` runs the installer (Node 26 or newer) and `npm run typecheck` checks it.

@@ -25,7 +25,7 @@ jobs:
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version: 26
 
       - name: Claude Code, for plugin validate and plugin test
         run: npm install -g @anthropic-ai/claude-code
@@ -33,9 +33,27 @@ jobs:
       - name: Repo checks and installer tests
         run: npm test
 
-      - name: cswap mod tests
-        working-directory: plugins/opt-in/cswap
-        run: claude plugin test .
+      - name: Installer typecheck
+        run: |
+          npm ci
+          npm run typecheck
+
+      # The installer as npx gets it: built, packed with its assets and without tests, and run through npx without a
+      # terminal, which it refuses only after every module has loaded.
+      - name: Installer package
+        run: |
+          npm pack
+          tar -tzf dead-claude-skills-*.tgz > packed.txt
+          grep -qx package/installer/install.js packed.txt
+          grep -qx package/installer/assets/agent-browser.json packed.txt
+          grep -qx package/installer/system/proc.js packed.txt
+          ! grep -q '\.test\.js$' packed.txt
+          set +e
+          out=$(npx --yes ./dead-claude-skills-*.tgz < /dev/null 2>&1)
+          code=$?
+          set -e
+          echo "$out"
+          [ "$code" = 1 ] && grep -q 'Run this in a terminal' <<< "$out"
 
       - name: dead-skills mod tests
         working-directory: plugins/default

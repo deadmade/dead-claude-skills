@@ -13,7 +13,8 @@ reviewed as a diff. Nothing Claude Code loads is dropped or changed; the other h
 
 It costs:
 
-- **Our version number.** ponytail ships as our version, like every local plugin. Installs from before the switch
+- **Our version number** (superseded by ADR 0003: ponytail carries upstream's number again, still vendored here).
+  ponytail ships as our version, like every local plugin. Installs from before the switch
   carry upstream's 5.x; Claude Code's update replaces a plugin whenever the version differs, so they move to the
   vendored copy on their next update, settings and data kept (checked on 2.1.304, `docs/features/ponytail-v5/flow.md`).
 - **Upstream fixes ship with our releases.** That was already true of the pin.

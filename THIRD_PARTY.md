@@ -95,13 +95,6 @@ unmodified. `plugins/shared/graphify/hooks/hooks.json` reproduces the hooks upst
 separately installed `graphifyy` CLI. Synced by `scripts/sync-graphify.mjs` (weekly via GitHub Actions); the
 synced upstream commit is in `plugins/shared/graphify/UPSTREAM`.
 
-## claude-swap (cswap)
-
-`plugins/opt-in/cswap/` is a front end for [realiti4/claude-swap](https://github.com/realiti4/claude-swap) (MIT License,
-Copyright (c) Onur Cetinkol); it runs the `cswap` binary and vendors none of its code.
-`.github/workflows/build-cswap.yml` compiles the upstream tag pinned in `installer/cswap.json` with Nuitka;
-`release.yml` attaches the result as `cswap.exe` to each `vX.Y.Z` release, and `sync-cswap.yml` bumps the pin weekly.
-
 ## self-review
 
 `plugins/shared/self-review/` vendors review passes from two upstreams, synced by `scripts/sync-self-review.mjs` (weekly via

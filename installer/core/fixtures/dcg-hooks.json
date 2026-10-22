@@ -1,0 +1,45 @@
+{
+  "_source": "The PreToolUse entry dcg's own installers write into settings.json. linux: install.sh, copied from a real ~/.claude/settings.json (2026-10-22). windows: install.ps1's Configure-ClaudeHook (upstream main, 2026-10-22): a PowerShell call of the single-quoted path, '' escaping a quote.",
+  "linux": {
+    "hooks": {
+      "PreToolUse": [
+        {
+          "matcher": "Bash|PowerShell",
+          "hooks": [{ "type": "command", "command": "/home/me/.local/bin/dcg" }]
+        }
+      ]
+    }
+  },
+  "windows": {
+    "hooks": {
+      "PreToolUse": [
+        {
+          "matcher": "Bash|PowerShell|Monitor",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "& 'C:\\Users\\me\\.local\\bin\\dcg.exe'",
+              "shell": "powershell"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "windows-quote-in-path": {
+    "hooks": {
+      "PreToolUse": [
+        {
+          "matcher": "Bash|PowerShell|Monitor",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "& 'C:\\Users\\O''Brien\\.local\\bin\\dcg.exe'",
+              "shell": "powershell"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -42,6 +42,16 @@ A plugin for one database engine. It can combine vendored skills with an MCP
 server.
 _Avoid_: DB pack, language plugin
 
+**Release**:
+One tagged `vX.Y.Z` cut of the whole repository: the installer, the marketplace and the binaries that machines get
+together. Its number is the repo's, not any plugin's.
+_Avoid_: version (alone), plugin release
+
+**Plugin version**:
+A plugin's own number, which moves only when that plugin changes. Vendored plugins synced from an upstream release
+carry upstream's number.
+_Avoid_: release version
+
 ## web-mcp
 
 **Archive**:
