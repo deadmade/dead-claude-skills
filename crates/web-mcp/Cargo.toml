@@ -8,9 +8,9 @@ license = "MIT"
 publish = false
 
 [dependencies]
-rmcp = { version = "=3.5.1", features = ["server", "transport-io", "macros"] }
+rmcp = { version = "=3.6.0", features = ["server", "transport-io", "macros"] }
 jiff = "0.2"
-sha2 = "0.10"
+sha2 = "0.11"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std", "fs", "sync", "io-util", "time", "net", "process"] }
@@ -27,7 +27,7 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 futures = { version = "0.3", default-features = false, features = ["std"] }
 base64 = "0.23"
 # Without zstd: no C toolchain needed to build.
-tantivy = { version = "=0.26.2", default-features = false, features = ["mmap", "lz4-compression"] }
+tantivy = { version = "=0.27.0", default-features = false, features = ["mmap", "lz4-compression"] }
 model2vec-rs = { version = "0.3.0", optional = true }
 
 [dev-dependencies]

@@ -60,7 +60,7 @@ pub fn resolve(repo: &gix::Repository, given: Option<&str>) -> Result<Range> {
         None => detect(repo, head, head_branch.as_deref())?,
     };
     let merge_base =
-        repo.merge_base(base, head).with_context(|| format!("{base_name} and {head_name} share no history"))?.detach();
+        repo.merge_base(base, head)?.with_context(|| format!("{base_name} and {head_name} share no history"))?.detach();
     // Only a given base that works is saved: a bad one would fail every later run instead of falling back to detection.
     if let (Some(given), Some(branch)) = (given, &head_branch) {
         remember(repo, branch, given)?;
@@ -121,7 +121,7 @@ fn detect(repo: &gix::Repository, head: ObjectId, head_branch: Option<&str>) -> 
     let mut merge_bases: HashMap<ObjectId, Option<ObjectId>> = HashMap::new();
     let mut ranked = |c| {
         let rank = rank(c, head, &near, &mut merge_bases, |tip| {
-            repo.merge_base_with_graph(tip, head, &mut graph).ok().map(gix::Id::detach)
+            repo.merge_base_with_graph(tip, head, &mut graph).ok().flatten().map(gix::Id::detach)
         });
         rank.map(|rank| (rank, c))
     };
