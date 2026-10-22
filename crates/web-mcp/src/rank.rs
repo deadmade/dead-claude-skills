@@ -1,6 +1,7 @@
 //! The archive's BM25 passage index at `.web/index/`, shared by every web-mcp process in the project.
 
 use std::collections::{HashMap, HashSet};
+use std::fmt::Write as _;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -216,7 +217,12 @@ fn hash(d: &PassageDoc) -> String {
     h.update(d.url.as_bytes());
     h.update([0]); // so no URL/text split of the same bytes collides
     h.update(d.text.as_bytes());
-    format!("{:x}", h.finalize())
+    h.finalize()
+        .iter()
+        .fold(String::with_capacity(64), |mut s, b| {
+            let _ = write!(s, "{b:02x}");
+            s
+        })
 }
 
 /// Merges stop at segments of `MAX_MERGE_DOCS` passages, so the biggest merge (about eight such

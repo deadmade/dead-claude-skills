@@ -398,7 +398,12 @@ impl Inner {
 }
 
 fn sha(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
+    Sha256::digest(bytes)
+        .iter()
+        .fold(String::with_capacity(64), |mut s, b| {
+            let _ = write!(s, "{b:02x}");
+            s
+        })
 }
 
 fn short_hash(s: &str) -> String {
@@ -522,6 +527,15 @@ mod tests {
         assert!(listed_public(list, "127.0.0.3".parse().unwrap()));
         assert!(!listed_public(list, "127.0.0.4".parse().unwrap()));
         assert!(!listed_public(None, "127.0.0.2".parse().unwrap()));
+    }
+
+    // index.jsonl keeps these hashes, so a sha2 upgrade must not change their spelling.
+    #[test]
+    fn sha_is_lowercase_hex() {
+        assert_eq!(
+            sha(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
     }
 
     fn u(s: &str) -> Url {
