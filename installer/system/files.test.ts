@@ -97,9 +97,11 @@ test('replaceBin: a first install, the in-place swap (Linux), and a sweep that k
 
 test('replaceBin: a failed swap reports its own error, not the cleanup of the staged copy', () => {
   const dir = mkdtempSync(join(tmpdir(), 'dcs-bin-'));
+  // A non-empty directory can't be renamed onto another non-empty one on Linux or Windows (onto a file, Windows
+  // allows it), and a plain rmSync of it throws too.
   const bin = join(dir, 'tool');
-  writeFileSync(bin, 'v1');
-  // A non-empty directory can't be renamed onto a file, and a plain rmSync of it throws too.
+  mkdirSync(bin);
+  writeFileSync(join(bin, 'v1'), 'v1');
   const staged = join(dir, 'staged');
   mkdirSync(staged);
   writeFileSync(join(staged, 'x'), '');
@@ -107,7 +109,7 @@ test('replaceBin: a failed swap reports its own error, not the cleanup of the st
     () => replaceBin(staged, bin, false),
     (e: NodeJS.ErrnoException) => e.syscall === 'rename',
   );
-  assert.equal(readFileSync(bin, 'utf8'), 'v1');
+  assert.equal(readFileSync(join(bin, 'v1'), 'utf8'), 'v1');
 });
 
 // Windows: a PowerShell child holds file open with no sharing for ms, as Defender does with a fresh exe or an editor
