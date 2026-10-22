@@ -135,7 +135,7 @@ one. self-review and postgres combine two upstreams; hallmark, cursor/plugins an
     plugins get reinstalled and which settings the user will have to enter again (user's decision). Settings the
     installer owns (`binPath`, `agentBrowserPath`) it sets again itself.
   - The reinstall must keep the `auto` dependency markers `prune` relies on.
-- cswap.exe stays tied to `installer/cswap.json`'s upstream pin, as today. Bumping that pin is not a cswap plugin
+- cswap.exe stays tied to `installer/assets/cswap.json`'s upstream pin, as today. Bumping that pin is not a cswap plugin
   change.
 
 ### Docs
@@ -173,4 +173,4 @@ These must describe the new scheme:
 - **Running the installer from a `main` checkout** instead of a release tag downloads the binaries again on every run,
   because `main`'s plugin numbers can be ahead of the release's binaries.
 - **Content outside a plugin's paths that changes its behaviour** gets no bump. One example is
-  `installer/ccstatusline-night-city.json`. The safety net only watches the plugin's folder (plus the crate).
+  `installer/assets/ccstatusline-night-city.json`. The safety net only watches the plugin's folder (plus the crate).

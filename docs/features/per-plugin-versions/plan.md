@@ -9,7 +9,8 @@ a plugin changed since the last release without a bump.
 **Architecture:**
 
 - A new `scripts/versions.mjs` holds the version rules: pure functions plus three small git readers.
-- It imports `LAST_SHARED`, `semver`, `newer` and `BIN_PLUGINS` from `installer/core.mjs`, so each fact lives in one
+- It imports `LAST_SHARED`, `semver` and `newer` from `installer/core/release.ts` and `BIN_PLUGINS` from
+  `installer/core/binaries.ts`, so each fact lives in one
   place. Scripts already import from the installer, as `sync-agent-browser.yml` does.
 - `check-repo.mjs`, `release.mjs` and `sync-lib.mjs` use it.
 - The installer gets two changes:
@@ -37,7 +38,7 @@ a plugin changed since the last release without a bump.
   is ours: the syncs never copy it, apart from ponytail's.
 - ponytail is `5.3.2`. Its `UPSTREAM` sha `16352ac…` is upstream's tag `v5.3.2` (checked with `git ls-remote`).
 - `crates/tui-review` and `crates/web-mcp` carry their plugin's version, in `Cargo.toml` and in their own
-  `Cargo.lock` entry. The plugin → crate map is `BIN_PLUGINS` (`installer/core.mjs`): crate dir
+  `Cargo.lock` entry. The plugin → crate map is `BIN_PLUGINS` (`installer/core/binaries.ts`): crate dir
   `crates/${BIN_PLUGINS[name].name}`.
 - Exempt from the bump check:
   - a plugin that didn't exist at the baseline tag;
@@ -99,7 +100,7 @@ config.
 **Files:**
 
 - Create: `scripts/versions.mjs`, `scripts/versions.test.mjs`
-- Modify: `installer/core.mjs`
+- Modify: `installer/core/release.ts`, `installer/core/binaries.ts`
   - export the existing `semver` and `newer` (~471-476);
   - add `export const LAST_SHARED = '0.5.0'` with a one-line comment: the last release where every plugin shared the
     repo's number (ADR 0003).
@@ -216,7 +217,7 @@ test('git readers against a throwaway repo', () => {
 - [ ] **Step 2: Run the tests and check they fail**
   - Run: `node --test scripts/versions.test.mjs`
   - Expected: FAIL, because `versions.mjs` does not exist.
-- [ ] **Step 3: Implement `scripts/versions.mjs` and the `core.mjs` exports**
+- [ ] **Step 3: Implement `scripts/versions.mjs` and the `installer/core/` exports**
   - Messages:
     - `${dir}/.claude-plugin/plugin.json: changed since ${tag} but still ${now}: bump its version`
     - `${dir}/.claude-plugin/plugin.json: ${now} is lower than ${then} at ${tag}`
@@ -226,7 +227,7 @@ test('git readers against a throwaway repo', () => {
   - Run: `npm test`
   - Expected: PASS. The existing `core.test.mjs` is unaffected by the new exports.
 - [ ] **Step 5: Commit**
-  - Run: `git add scripts/versions.mjs scripts/versions.test.mjs installer/core.mjs flake.nix`
+  - Run: `git add scripts/versions.mjs scripts/versions.test.mjs installer/core/release.ts installer/core/binaries.ts flake.nix`
   - Message: `git commit -m "Add the version rules the per-plugin bump check is built from."`
 
 ### Task 3: Renumber every plugin and both crates, and turn on the bump check
@@ -238,7 +239,7 @@ while still at 0.5.0, so the check alone would fail, and the pre-commit hook wou
 
 - Modify: every `plugins/**/.claude-plugin/plugin.json` (20 files, listed in Global Constraints), plus
   `crates/{tui-review,web-mcp}/Cargo.toml` and `Cargo.lock`.
-- Modify: `installer/core.test.mjs:406-409`.
+- Modify: `installer/core/binaries.test.ts` (the test that tui-review's crate matches the release).
 - Modify: `scripts/check-repo.mjs`: header comment (1-3); replace the "one version" block (63-82).
 - Modify: `.github/workflows/test.yml`: the checkout gets `with: fetch-depth: 0`.
 - Modify: `.github/dependabot.yml`: the cargo entry gets `versioning-strategy: lockfile-only`. GitHub's options
@@ -248,7 +249,7 @@ while still at 0.5.0, so the check alone would fail, and the pre-commit hook wou
 **Interfaces:**
 
 - Consumes: `isVersion`, `bumpProblem`, `baselineTag`, `changedSince`, `versionAt` (Task 2); `BIN_PLUGINS`,
-  `manifestPath` (`installer/core.mjs`).
+  `manifestPath` (`installer/core/plugins.ts`).
 
 - [ ] **Step 1: Change the core.test test to the new rule (failing after Step 2's plugin edits)**
 
@@ -264,7 +265,7 @@ test('each binary plugin ships the version its crate builds', () => {
 
 - [ ] **Step 2: Set the versions**
   - ponytail: `5.3.2`. Every other `plugin.json`: `0.1.0`.
-  - Run `node --test installer/core.test.mjs`. Expected: FAIL on tui-review (crate 0.5.0, plugin 0.1.0).
+  - Run `node --test installer/core/binaries.test.ts`. Expected: FAIL on tui-review (crate 0.5.0, plugin 0.1.0).
   - Then set both `Cargo.toml` files and each crate's own `Cargo.lock` entry to `0.1.0`, with the regexes
     `release.mjs` uses today.
   - Hand edits, or a one-off `node -e` using `setVersion`. Don't add a script for this.
@@ -300,13 +301,13 @@ version`.
 
 **Files:**
 
-- Modify: `installer/core.mjs` (`outdated`, ~522)
-- Modify: `installer/install.mjs:327-345` (`applyBin`)
-- Test: `installer/core.test.mjs:508-529`
+- Modify: `installer/core/plugins.ts` (`outdated`)
+- Modify: `installer/steps/binaries.ts` (`applyBin`)
+- Test: `installer/core/plugins.test.ts` (the `outdated` tests)
 
 **Interfaces:**
 
-- Consumes: `LAST_SHARED`, `newer` (Task 2); `shipped` (`install.mjs:613`, `{ name: version }`).
+- Consumes: `LAST_SHARED`, `newer` (Task 2); `shipped` (`installer/install.ts`, `{ name: version }`).
 - `outdated(rows, shipped)` keeps its signature.
 
 - [ ] **Step 1: Update the outdated test (failing)**
@@ -317,7 +318,7 @@ version`.
   - Keep cswap (0.1.0 → 0.1.1) and graphify (sha → 0.1.1) as they are.
   - Rename the test to `…, never downgrading past the shared era`.
 - [ ] **Step 2: Run it and check it fails**
-  - Run: `node --test installer/core.test.mjs`
+  - Run: `node --test installer/core/plugins.test.ts`
   - Expected: FAIL on the md-pane entry.
 - [ ] **Step 3: Change `outdated`**
   - An install stays when `version === to`, or when `newer(version, to) && newer(version, LAST_SHARED)`.
