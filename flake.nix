@@ -43,7 +43,7 @@
         runtimeInputs = [pkgs.nodejs];
         text = ''
           node --test --experimental-test-coverage --test-coverage-include='installer/**' \
-            --test-coverage-exclude='installer/**/*.test.ts' --test-coverage-lines=78 'installer/**/*.test.ts'
+            --test-coverage-exclude='installer/**/*.test.ts' --test-coverage-lines=79 'installer/**/*.test.ts'
           exec node --test 'scripts/*.test.mjs' 'plugins/default/hooks/*.test.mjs'
         '';
       };
