@@ -86,7 +86,7 @@ export const CATEGORIES: Page[] = [
     id: 'tools',
     title: 'Tools',
     blurb: 'Plugins that bring their own binary or pane.',
-    keys: ['graphify', 'cswap', 'tui-review', 'web-mcp', 'web-builtins-off', 'md-pane'],
+    keys: ['graphify', 'tui-review', 'web-mcp', 'web-builtins-off', 'md-pane'],
   },
   {
     id: 'system',
@@ -134,7 +134,6 @@ export function unavailable(key: string, platform: string, arch: string, version
   const name = nameOf(key);
   if (platform === 'win32' && name === 'sandbox') return 'needs WSL2';
   if (platform === 'win32' && name === 'nix-lsp') return 'nixd is not available on Windows';
-  if (platform !== 'win32' && name === 'cswap') return 'releases ship cswap.exe for Windows only';
   if (name === 'web-builtins-off') return unavailable(`web-mcp@${MARKETPLACE}`, platform, arch, version);
   const bin = BIN_PLUGINS[name];
   if (bin && !binAsset(bin.name, platform, arch, version)) return `no ${bin.name} build for ${platform}-${arch}`;

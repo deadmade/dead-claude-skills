@@ -19,7 +19,7 @@ export function pinMarketplace(settings: Settings, version: string) {
   return out;
 }
 
-// Release assets: the binaries, cswap.exe and the installer, attached to each vX.Y.Z by release.yml.
+// Release assets: the binaries and the installer, attached to each vX.Y.Z by release.yml.
 export const RELEASES = `https://github.com/${REPO}/releases/download`;
 // The installer itself, built to JS and attached to every release by release.yml. npx caches by URL, so the README's
 // latest/ link keeps running the first installer it fetched: each run hands over to a newer release (newerInstaller).

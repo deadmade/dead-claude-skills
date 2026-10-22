@@ -54,7 +54,6 @@ import { applyAgentBrowser } from './steps/agent-browser.ts';
 import { TUI_REVIEW, WEB_MCP, applyBin } from './steps/binaries.ts';
 import { applyCcstatusline } from './steps/ccstatusline.ts';
 import { confirmClean } from './steps/clean.ts';
-import { applyCswap } from './steps/cswap.ts';
 import { applyDcg } from './steps/dcg.ts';
 import { addMarketplaces, applyPlugins, listed, removeForeign } from './steps/plugins.ts';
 import { applySearxng } from './steps/searxng.ts';
@@ -278,7 +277,6 @@ const autoUpdate = tryJson(join(CONFIG, 'plugins', 'known_marketplaces.json'))?.
 await applyCcstatusline(current.ccstatusline, on('ccstatusline'));
 await applyDcg(current.dcg, on('dcg'));
 if (selected.includes(WEB_MCP)) await applyAgentBrowser();
-await applyCswap(selected.some((id) => nameOf(id) === 'cswap'));
 if (clean) done.push(...clearTargets(CONFIG));
 // The global instructions moved into a dead-skills SessionStart hook; the old file would duplicate them.
 remove(RULES, RULES);

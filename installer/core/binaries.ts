@@ -1,4 +1,4 @@
-// The binaries the installer downloads or points plugins at: tui-review, web-mcp, agent-browser and cswap.exe.
+// The binaries the installer downloads or points plugins at: tui-review, web-mcp and agent-browser.
 import { createHash } from 'node:crypto';
 import { BUNDLE } from './plugins.ts';
 import { RELEASES, newer, semver } from './release.ts';
@@ -7,27 +7,6 @@ import { RELEASES, newer, semver } from './release.ts';
 export interface AgentBrowserPin {
   upstream?: string;
   sha256?: Record<string, string>;
-}
-
-// cswap.exe: claude-swap built by .github/workflows/build-cswap.yml and attached to this repo's release
-// v<package.json version> by release.yml. Windows only: the option is hidden elsewhere unless already installed.
-export function cswapDownload(platform: string, env: NodeJS.ProcessEnv, release: string) {
-  if (platform !== 'win32' || !env.LOCALAPPDATA) return null;
-  const dir = `${env.LOCALAPPDATA}\\Programs\\cswap`;
-  const url = `${RELEASES}/v${release}/cswap.exe`;
-  return { url, sha256Url: `${url}.sha256`, dir, exe: `${dir}\\cswap.exe` };
-}
-
-// `cswap --version` prints "cswap 0.26.0"; the pin is the upstream tag "v0.26.0".
-export const cswapCurrent = (versionOutput: string, version: string) =>
-  versionOutput.trim() === `cswap ${version.replace(/^v/, '')}`;
-
-// The user PATH with dir appended, or null when it's already there (Windows paths: case and trailing \ ignored).
-export function pathWith(userPath: string | undefined, dir: string) {
-  const norm = (p: string) => p.trim().replace(/\\+$/, '').toLowerCase();
-  const parts = (userPath ?? '').split(';').filter((p) => p.trim());
-  if (parts.some((p) => norm(p) === norm(dir))) return null;
-  return [...parts, dir].join(';');
 }
 
 // [binary, needed for (plugin name), NixOS command, Windows command]
@@ -50,7 +29,6 @@ const BINARIES = [
   ['socat', 'sandbox', 'nix: socat', 'WSL2 only'],
   ['ccstatusline', 'ccstatusline', 'nix: ccstatusline', 'npm i -g ccstatusline'],
   ['docker', 'web-mcp', 'nix: docker', 'winget install -e --id Docker.DockerDesktop'],
-  ['cswap', 'cswap', 'uv tool install claude-swap', 'rerun this installer (cswap.exe download)'],
 ];
 
 // wanted: plugin names (plus 'ccstatusline' when that toggle is on). onPath(binary) -> bool.

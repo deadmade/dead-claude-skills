@@ -11,7 +11,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
 - `installer/`: TypeScript, by layer. `install.ts` is the entry point and only runs the flow (read state, screens, steps,
   summary); `context.ts` holds the shared paths, version and summary lines; `core/` the pure decisions by topic
   (`settings`, `plugins`, `binaries`, `options`, `release`); `system/` everything that touches the OS (file writes and
-  clean-slate backup/delete, processes, downloads, the Windows user PATH); `steps/` one file per thing the installer
+  clean-slate backup/delete, processes, downloads); `steps/` one file per thing the installer
   applies; `ui/` the screens; `assets/` the shipped configs and pins. No runtime npm dependencies: Node's standard library
   only (`typescript` and `@types/node` are devDependencies, for `npm run typecheck` and the build). New logic goes into
   `core/` or `system/` with a test next to it, not into `install.ts` or a step. Programs start through `system/proc.ts`
@@ -75,8 +75,6 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
 - `plugins/opt-in/md-pane/`: a mod. Pure path logic in `hooks/paths.ts`; `register.tsx` redraws replies that name an existing
   `.md` file as its own `Markdown` (only a plugin-drawn `Markdown` with `onLinkPress` receives plain link clicks, and
   only in the fullscreen terminal) and shows the clicked file in a pane, refreshed by a 1 s stat while open.
-- `plugins/opt-in/cswap/`: a mod wrapping the external `claude-swap` CLI, whose release tag is pinned in `installer/assets/cswap.json`
-  (bumped by `sync-cswap.yml`).
 - Notifications (`plugins/default/`, formerly the notify plugin): `hooks.json` entries (Stop, Notification, PreToolUse
   on AskUserQuestion) running one stdlib Node script, `hooks/notify.mjs`, async. Logic and tests in `hooks/lib.mjs`; Linux
   talks D-Bus via `busctl`, Windows runs an inline PowerShell WinRT toast, focus comes from tmux. The installer always
@@ -113,7 +111,7 @@ plugin's `.claude-plugin/plugin.json`, both crates' `Cargo.toml`/`Cargo.lock` an
     npm run release -- patch      # on main, clean tree; bumps, runs npm test, commits and tags
     git push --follow-tags origin main
 
-The `v*` tag runs `release.yml`, which packs the installer (`installer.tgz`), builds tui-review, web-mcp and cswap.exe and
+The `v*` tag runs `release.yml`, which packs the installer (`installer.tgz`), builds tui-review and web-mcp and
 publishes the GitHub release npx and the installer download from. Removing a plugin from the marketplace is enough to retire it: the installer uninstalls installed
 plugins of ours that the manifest no longer lists.
 
@@ -122,8 +120,7 @@ plugins of ours that the manifest no longer lists.
 - `npm test`: repo checks plus all `installer/**/*.test.ts`, `scripts/*.test.mjs` and `plugins/default/hooks/*.test.mjs`
   (`claude plugin validate` is skipped when `claude` isn't on PATH). The installer tests run with a line-coverage floor
   (`--test-coverage-lines` in `package.json` and `flake.nix`; raise it, never lower it), and `installer/modules.test.ts`
-  loads every module so none hides from it. `system/` tests use the real OS: Windows-only cases skip elsewhere, the
-  registry one runs on CI only. Parsers of what other tools write test against captured output in `core/fixtures/`,
+  loads every module so none hides from it. `system/` tests use the real OS: Windows-only cases skip elsewhere. Parsers of what other tools write test against captured output in `core/fixtures/`,
   not shapes we assume. A test for a bug not fixed yet is marked `todo`, so it shows failing without blocking.
 - `npm ci` once, then `npm run typecheck`: `tsc --noEmit` over `installer/` (sources and tests, strict).
 - tui-review: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/tui-review`.
@@ -131,7 +128,7 @@ plugins of ours that the manifest no longer lists.
 - tui-review mod tests need a generated fixture first, from `crates/tui-review`:
   `cargo run --release -- gen --out <dir> && node ../../plugins/shared/tui-review/tests/make-fixture.mjs <dir>`, then `claude plugin test .` in
   `plugins/shared/tui-review`.
-- mod tests: `claude plugin test .` in `plugins/opt-in/cswap`, `plugins/default` and `plugins/opt-in/md-pane`.
+- mod tests: `claude plugin test .` in `plugins/default` and `plugins/opt-in/md-pane`.
   `tsc -p .` there needs the engine's typings in `.claude-plugin/types/` (gitignored; the engine
   writes them when it loads the mod).
 - `nix develop` (or direnv) gives the toolchain and installs the pre-commit hooks (treefmt, merge conflicts, JSON,
@@ -139,6 +136,6 @@ plugins of ours that the manifest no longer lists.
   started in a subfolder, its hook setup treats that folder as the repo and uninstalls the pre-commit hook.
 - `nix fmt` formats everything per `treefmt.toml` (alejandra, prettier for js/ts/json/md/yaml, rustfmt).
 
-CI: `test.yml` (npm test, the installer typecheck and the cswap, dead-skills and md-pane mod tests, Linux and Windows) on every PR and push to main; `tui-review.yml` on
-PRs touching tui-review; `web-mcp.yml` on PRs touching web-mcp; `build-tui-review.yml`/`build-web-mcp.yml`/`build-cswap.yml` on PRs touching the workflow (or the cswap pin) and from `release.yml`; `sync-*.yml`
+CI: `test.yml` (npm test, the installer typecheck and the dead-skills and md-pane mod tests, Linux and Windows) on every PR and push to main; `tui-review.yml` on
+PRs touching tui-review; `web-mcp.yml` on PRs touching web-mcp; `build-tui-review.yml`/`build-web-mcp.yml` on PRs touching the workflow and from `release.yml`; `sync-*.yml`
 weekly.

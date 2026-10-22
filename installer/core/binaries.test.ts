@@ -7,9 +7,6 @@ import {
   agentBrowserAsset,
   agentBrowserPlan,
   agentBrowserVersion,
-  cswapDownload,
-  cswapCurrent,
-  pathWith,
   BIN_PLUGINS,
   binAsset,
   sha256Of,
@@ -41,36 +38,6 @@ test('sandbox needs bubblewrap and socat', () => {
     ['bwrap', 'socat'],
   );
   assert.match(rows[0].command, /home\.packages: bubblewrap/);
-});
-
-test('cswap.exe download: Windows only, release asset of this version under LOCALAPPDATA', () => {
-  const dl = cswapDownload('win32', { LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' }, '1.2.3')!;
-  assert.equal(dl.url, 'https://github.com/deadmade/dead-claude-skills/releases/download/v1.2.3/cswap.exe');
-  assert.equal(dl.sha256Url, `${dl.url}.sha256`);
-  assert.equal(dl.exe, 'C:\\Users\\me\\AppData\\Local\\Programs\\cswap\\cswap.exe');
-  assert.equal(cswapDownload('linux', { LOCALAPPDATA: '/x' }, '1.2.3'), null);
-  assert.equal(cswapDownload('win32', {}, '1.2.3'), null);
-});
-
-test('cswap pin matches --version output and is a stable tag', () => {
-  assert.equal(cswapCurrent('cswap 0.26.0\r\n', 'v0.26.0'), true);
-  assert.equal(cswapCurrent('cswap 0.25.0', 'v0.26.0'), false);
-  assert.match(json('installer/assets/cswap.json').upstream, /^v\d+\.\d+\.\d+$/);
-});
-
-test('user PATH gains the cswap folder once', () => {
-  const dir = 'C:\\Users\\me\\AppData\\Local\\Programs\\cswap';
-  assert.equal(pathWith('C:\\a;C:\\b', dir), `C:\\a;C:\\b;${dir}`);
-  assert.equal(pathWith(`C:\\a;${dir.toUpperCase()}\\`, dir), null);
-  assert.equal(pathWith('', dir), dir);
-  assert.equal(pathWith(undefined, dir), dir);
-});
-
-test('cswap missing on Linux points at uv', () => {
-  assert.deepEqual(
-    missingBinaries('linux', ['cswap'], () => false),
-    [{ binary: 'cswap', command: 'uv tool install claude-swap' }],
-  );
 });
 
 test('tui-review downloads the release archive built for this machine', () => {

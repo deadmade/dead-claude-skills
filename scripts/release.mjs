@@ -1,6 +1,6 @@
 // Cuts a release: one version for package.json (and its lock), the marketplace, every local plugin and both crates,
 // committed and tagged vX.Y.Z on main. Pushing the tag runs .github/workflows/release.yml, which
-// builds the installer, cswap.exe, tui-review and web-mcp and publishes the GitHub release. Claude Code only offers plugin
+// builds the installer, tui-review and web-mcp and publishes the GitHub release. Claude Code only offers plugin
 // updates when this version changes.
 // Usage: npm run release -- patch|minor|major|X.Y.Z
 import { spawnSync } from 'node:child_process';
