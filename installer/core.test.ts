@@ -27,6 +27,7 @@ import {
   resetSettings,
   CLEAN_TARGETS,
   marketplaceArg,
+  installerUrl,
   pinMarketplace,
   settingsChange,
   settingsText,
@@ -54,11 +55,15 @@ import {
   idOf,
   withDependencies,
   BUNDLE,
-} from './core.mjs';
+  type Marketplace,
+  type PluginJson,
+  type Settings,
+} from './core.ts';
 
-const json = (p) => JSON.parse(readFileSync(new URL(`../${p}`, import.meta.url), 'utf8'));
-const marketplace = json('.claude-plugin/marketplace.json');
-const bundle = json(manifestPath(marketplace, BUNDLE));
+const V = { version: '1.0.0' };
+const json = (p: string) => JSON.parse(readFileSync(new URL(`../${p}`, import.meta.url), 'utf8'));
+const marketplace: Marketplace = json('.claude-plugin/marketplace.json');
+const bundle: PluginJson & { dependencies: string[] } = json(manifestPath(marketplace, BUNDLE)!);
 const M = 'dead-claude-skills';
 const O = 'claude-plugins-official';
 
@@ -132,47 +137,52 @@ test('merge adds owned keys and keeps foreign ones', () => {
     { statusLine: true, version: '1.2.3' },
   );
   assert.equal(out.model, 'x');
-  assert.deepEqual(out.permissions.allow, ['Bash(ls)', 'Read(~/.claude/plugins/**)']);
-  assert.equal(out.extraKnownMarketplaces[M].autoUpdate, true);
-  assert.equal(out.extraKnownMarketplaces[M].source.ref, 'v1.2.3');
-  assert.match(out.statusLine.command, /ccstatusline/);
+  assert.deepEqual(out.permissions!.allow, ['Bash(ls)', 'Read(~/.claude/plugins/**)']);
+  assert.equal(out.extraKnownMarketplaces![M].autoUpdate, true);
+  assert.equal(out.extraKnownMarketplaces![M].source!.ref, 'v1.2.3');
+  assert.match(out.statusLine!.command!, /ccstatusline/);
   assert.equal(out.cleanupPeriodDays, 36500);
-  assert.equal(mergeSettings({ cleanupPeriodDays: 7 }, {}).cleanupPeriodDays, 7);
+  assert.equal(mergeSettings({ cleanupPeriodDays: 7 }, V).cleanupPeriodDays, 7);
 });
 
 test('the marketplace is pinned to the installer version', () => {
   assert.equal(marketplaceArg('1.2.3'), 'deadmade/dead-claude-skills@v1.2.3');
+  assert.equal(
+    installerUrl('1.2.3'),
+    'https://github.com/deadmade/dead-claude-skills/releases/download/v1.2.3/installer.tgz',
+  );
   const pinned = { source: 'github', repo: 'deadmade/dead-claude-skills', ref: 'v1.2.3' };
-  const before = {
+  const before: Settings = {
     model: 'x',
     extraKnownMarketplaces: {
       [M]: { source: { source: 'github', repo: 'deadmade/dead-claude-skills' }, autoUpdate: true },
     },
   };
   const out = pinMarketplace(before, '1.2.3');
-  assert.deepEqual(out.extraKnownMarketplaces[M], { source: pinned, autoUpdate: true });
+  assert.deepEqual(out.extraKnownMarketplaces![M], { source: pinned, autoUpdate: true });
   assert.equal(out.model, 'x');
-  assert.equal(before.extraKnownMarketplaces[M].source.ref, undefined);
+  assert.equal(before.extraKnownMarketplaces![M].source!.ref, undefined);
   // Unchanged settings come back as the same object, so nothing is written.
   assert.equal(pinMarketplace(out, '1.2.3'), out);
-  assert.equal(pinMarketplace(out, '1.2.4').extraKnownMarketplaces[M].source.ref, 'v1.2.4');
+  assert.equal(pinMarketplace(out, '1.2.4').extraKnownMarketplaces![M].source!.ref, 'v1.2.4');
   // No entry yet: the add writes it.
   const none = { model: 'x' };
   assert.equal(pinMarketplace(none, '1.2.3'), none);
 });
 
 test('merge is idempotent', () => {
-  const once = mergeSettings({}, { statusLine: true });
-  assert.deepEqual(mergeSettings(once, { statusLine: true }), once);
+  const once = mergeSettings({}, { ...V, statusLine: true });
+  assert.deepEqual(mergeSettings(once, { ...V, statusLine: true }), once);
 });
 
 test('statusLine off removes ours, keeps a foreign one', () => {
   assert.equal(
-    mergeSettings({ statusLine: { type: 'command', command: 'ccstatusline' } }, { statusLine: false }).statusLine,
+    mergeSettings({ ...V, statusLine: { type: 'command', command: 'ccstatusline' } }, { ...V, statusLine: false })
+      .statusLine,
     undefined,
   );
   const foreign = { type: 'command', command: 'my-line.sh' };
-  assert.deepEqual(mergeSettings({ statusLine: foreign }, { statusLine: false }).statusLine, foreign);
+  assert.deepEqual(mergeSettings({ ...V, statusLine: foreign }, { ...V, statusLine: false }).statusLine, foreign);
 });
 
 test('safeArg rejects shell metacharacters', () => {
@@ -195,17 +205,17 @@ test('missing binaries per OS', () => {
 });
 
 test('secret denies are added once and keep existing ones', () => {
-  const out = mergeSettings({ permissions: { deny: ['Bash(sudo:*)', 'Read(~/.ssh/**)'] } }, {});
-  assert.deepEqual(out.permissions.deny, [
+  const out = mergeSettings({ permissions: { deny: ['Bash(sudo:*)', 'Read(~/.ssh/**)'] } }, V);
+  assert.deepEqual(out.permissions!.deny, [
     'Bash(sudo:*)',
     'Read(~/.ssh/**)',
     ...SECRET_DENIES.filter((d) => d !== 'Read(~/.ssh/**)'),
   ]);
-  assert.deepEqual(mergeSettings(out, {}), out);
+  assert.deepEqual(mergeSettings(out, V), out);
 });
 
 test('sandbox on merges our keys, off removes only ours', () => {
-  const on = mergeSettings({ sandbox: { excludedCommands: ['docker'] } }, { sandbox: true });
+  const on = mergeSettings({ ...V, sandbox: { excludedCommands: ['docker'] } }, { ...V, sandbox: true });
   assert.deepEqual(on.sandbox, {
     excludedCommands: ['docker'],
     enabled: true,
@@ -213,14 +223,14 @@ test('sandbox on merges our keys, off removes only ours', () => {
     allowUnsandboxedCommands: false,
   });
   assert.ok(isSandboxOn(on));
-  assert.deepEqual(mergeSettings(on, { sandbox: true }), on);
-  assert.deepEqual(mergeSettings(on, { sandbox: false }).sandbox, { excludedCommands: ['docker'] });
-  assert.equal(mergeSettings(mergeSettings({}, { sandbox: true }), { sandbox: false }).sandbox, undefined);
+  assert.deepEqual(mergeSettings(on, { ...V, sandbox: true }), on);
+  assert.deepEqual(mergeSettings(on, { ...V, sandbox: false }).sandbox, { excludedCommands: ['docker'] });
+  assert.equal(mergeSettings(mergeSettings({}, { ...V, sandbox: true }), { ...V, sandbox: false }).sandbox, undefined);
   assert.ok(!isSandboxOn({}));
 });
 
 test('dcg hook detection', () => {
-  const hook = (command) => ({
+  const hook = (command: string) => ({
     hooks: { PreToolUse: [{ matcher: 'Bash|PowerShell', hooks: [{ type: 'command', command }] }] },
   });
   assert.ok(hasDcgHook(hook('/home/me/.local/bin/dcg')));
@@ -232,8 +242,8 @@ test('dcg hook detection', () => {
 test('dcg runs its own installer per OS', () => {
   const [win, winArgs] = dcgCommand('win32', 'install');
   assert.equal(win, 'powershell');
-  assert.match(winArgs.at(-1), /install\.ps1'\)\)\) -EasyMode -Verify$/);
-  assert.match(dcgCommand('win32', 'uninstall')[1].at(-1), /uninstall\.ps1/);
+  assert.match(winArgs.at(-1)!, /install\.ps1'\)\)\) -EasyMode -Verify$/);
+  assert.match(dcgCommand('win32', 'uninstall')[1].at(-1)!, /uninstall\.ps1/);
   const [sh, shArgs] = dcgCommand('linux', 'install');
   assert.equal(sh, 'bash');
   assert.match(shArgs[1], /^set -o pipefail; curl /);
@@ -266,7 +276,7 @@ test('retired plugins are ours but no longer in the marketplace', () => {
 });
 
 test('strip disables defaults, keeps foreign keys, drops other marketplaces', () => {
-  const before = {
+  const before: Settings = {
     model: 'x',
     env: { FOO: '1' },
     enabledPlugins: { 'a@b': true },
@@ -276,17 +286,17 @@ test('strip disables defaults, keeps foreign keys, drops other marketplaces', ()
   assert.ok(isStripped(out) && !isStripped(before));
   assert.equal(out.model, 'x');
   assert.deepEqual(out.env, { FOO: '1' });
-  assert.equal(out.enabledPlugins['a@b'], true);
-  assert.equal(out.enabledPlugins['agents-md@builtin'], false);
-  assert.deepEqual(Object.keys(out.extraKnownMarketplaces), [M, O]);
+  assert.equal(out.enabledPlugins!['a@b'], true);
+  assert.equal(out.enabledPlugins!['agents-md@builtin'], false);
+  assert.deepEqual(Object.keys(out.extraKnownMarketplaces!), [M, O]);
   assert.deepEqual(stripDefaults(out), out);
-  assert.equal(before.enabledPlugins['agents-md@builtin'], undefined);
+  assert.equal(before.enabledPlugins!['agents-md@builtin'], undefined);
 });
 
 test('reset keeps only our settings plus the dcg hook while dcg stays on', () => {
   const dcgEntry = { matcher: 'Bash|PowerShell', hooks: [{ type: 'command', command: '/home/me/.local/bin/dcg' }] };
   const other = { matcher: 'Edit', hooks: [{ type: 'command', command: 'fmt.sh' }] };
-  const before = {
+  const before: Settings = {
     model: 'x',
     permissions: { allow: ['Bash(ls)'] },
     hooks: { PreToolUse: [other, dcgEntry], Stop: [other] },
@@ -296,24 +306,24 @@ test('reset keeps only our settings plus the dcg hook while dcg stays on', () =>
       other: {},
     },
   };
-  const out = resetSettings(before, { statusLine: true, sandbox: false, dcg: true });
+  const out = resetSettings(before, { ...V, statusLine: true, sandbox: false, dcg: true });
   assert.equal(out.model, undefined);
-  assert.deepEqual(out.permissions.allow, ['Read(~/.claude/plugins/**)']);
+  assert.deepEqual(out.permissions!.allow, ['Read(~/.claude/plugins/**)']);
   assert.deepEqual(out.hooks, { PreToolUse: [dcgEntry] });
-  assert.equal(out.enabledPlugins[`dead-skills@${M}`], true);
-  assert.equal(out.enabledPlugins[`code-review@${O}`], true);
-  assert.deepEqual(Object.keys(out.extraKnownMarketplaces), [M, O]);
-  assert.equal(out.enabledPlugins['x@other'], undefined);
+  assert.equal(out.enabledPlugins![`dead-skills@${M}`], true);
+  assert.equal(out.enabledPlugins![`code-review@${O}`], true);
+  assert.deepEqual(Object.keys(out.extraKnownMarketplaces!), [M, O]);
+  assert.equal(out.enabledPlugins!['x@other'], undefined);
   assert.ok(isStripped(out));
-  assert.equal(resetSettings(before, { dcg: false }).hooks, undefined);
-  assert.deepEqual(resetSettings(out, { statusLine: true, sandbox: false, dcg: true }), out);
+  assert.equal(resetSettings(before, { ...V, dcg: false }).hooks, undefined);
+  assert.deepEqual(resetSettings(out, { ...V, statusLine: true, sandbox: false, dcg: true }), out);
 });
 
 test('settings changes: invalid JSON is never written, unchanged is null, line endings are kept', () => {
-  const add = (s) => ({ ...s, a: 1 });
+  const add = (s: Settings) => ({ ...s, a: 1 });
   assert.equal(settingsChange('{"model": "x",}', add), undefined);
   assert.equal(settingsChange('{"a": 1}', add), null);
-  const crlf = settingsChange('{\r\n  "model": "x"\r\n}\r\n', add);
+  const crlf = settingsChange('{\r\n  "model": "x"\r\n}\r\n', add)!;
   assert.deepEqual(crlf.changed, ['a']);
   assert.equal(crlf.text, '{\r\n  "model": "x",\r\n  "a": 1\r\n}\r\n');
   assert.equal(settingsText('{}', { a: 1 }), '{\n  "a": 1\n}\n');
@@ -326,7 +336,7 @@ test('clean never targets credentials, plugins or project memory', () => {
 });
 
 test('cswap.exe download: Windows only, release asset of this version under LOCALAPPDATA', () => {
-  const dl = cswapDownload('win32', { LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' }, '1.2.3');
+  const dl = cswapDownload('win32', { LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' }, '1.2.3')!;
   assert.equal(dl.url, 'https://github.com/deadmade/dead-claude-skills/releases/download/v1.2.3/cswap.exe');
   assert.equal(dl.sha256Url, `${dl.url}.sha256`);
   assert.equal(dl.exe, 'C:\\Users\\me\\AppData\\Local\\Programs\\cswap\\cswap.exe');
@@ -356,14 +366,14 @@ test('cswap missing on Linux points at uv', () => {
 });
 
 test('tui-review downloads the release archive built for this machine', () => {
-  const win = binAsset('tui-review', 'win32', 'x64', '1.2.3');
+  const win = binAsset('tui-review', 'win32', 'x64', '1.2.3')!;
   assert.equal(
     win.url,
     'https://github.com/deadmade/dead-claude-skills/releases/download/v1.2.3/tui-review-x86_64-pc-windows-msvc.zip',
   );
   assert.equal(win.sha256, `${win.url}.sha256`);
   assert.equal(win.exe, 'tui-review.exe');
-  assert.equal(binAsset('tui-review', 'linux', 'x64', '1.0.0').file, 'tui-review-x86_64-unknown-linux-musl.tar.gz');
+  assert.equal(binAsset('tui-review', 'linux', 'x64', '1.0.0')!.file, 'tui-review-x86_64-unknown-linux-musl.tar.gz');
   for (const [platform, arch] of [
     ['linux', 'arm64'],
     ['darwin', 'arm64'],
@@ -382,7 +392,7 @@ test('web-mcp downloads its own archive, and each plugin is configured under its
   for (const [k, target] of Object.entries(t)) {
     const [platform, arch] = k.split('-');
     for (const name of ['tui-review', 'web-mcp']) {
-      const a = binAsset(name, platform, arch, '1.2.3');
+      const a = binAsset(name, platform, arch, '1.2.3')!;
       assert.equal(a.file, `${name}-${target}.${platform === 'win32' ? 'zip' : 'tar.gz'}`);
       assert.equal(a.exe, name + (platform === 'win32' ? '.exe' : ''));
     }
@@ -390,22 +400,25 @@ test('web-mcp downloads its own archive, and each plugin is configured under its
   assert.equal(binAsset('web-mcp', 'linux', 'ia32', '1.0.0'), undefined);
   assert.deepEqual(BIN_PLUGINS['tui-review'], { name: 'tui-review', key: 'binPath' });
   assert.deepEqual(BIN_PLUGINS['web-mcp'], { name: 'web-mcp', key: 'binPath' });
-  const dirs = { 'tui-review': 'plugins/shared/tui-review', 'web-mcp': 'plugins/shared/web-mcp' };
+  const dirs: Record<string, string> = {
+    'tui-review': 'plugins/shared/tui-review',
+    'web-mcp': 'plugins/shared/web-mcp',
+  };
   for (const [plugin, { key }] of Object.entries(BIN_PLUGINS))
     assert.ok(json(`${dirs[plugin]}/.claude-plugin/plugin.json`).userConfig[key], `${plugin} has userConfig ${key}`);
-  assert.match(unavailable('web-mcp', 'linux', 'ia32', '1.0.0'), /no web-mcp build for linux-ia32/);
+  assert.match(unavailable('web-mcp', 'linux', 'ia32', '1.0.0')!, /no web-mcp build for linux-ia32/);
   assert.equal(unavailable('web-mcp', 'linux', 'x64', '1.0.0'), undefined);
-  assert.match(unavailable('web-mcp', 'darwin', 'arm64', '1.0.0'), /no web-mcp build for darwin-arm64/);
+  assert.match(unavailable('web-mcp', 'darwin', 'arm64', '1.0.0')!, /no web-mcp build for darwin-arm64/);
 });
 
-test('install.mjs finds plugin folders through the marketplace, never by a literal plugins/ path', () => {
-  const src = readFileSync(new URL('./install.mjs', import.meta.url), 'utf8');
+test('install.ts finds plugin folders through the marketplace, never by a literal plugins/ path', () => {
+  const src = readFileSync(new URL('./install.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(src, /join\(PKG, 'plugins'/);
 });
 
 test('tui-review versions match the release the installer fetches', () => {
   const cargo = readFileSync(new URL('../crates/tui-review/Cargo.toml', import.meta.url), 'utf8');
-  assert.equal(/^version = "(.+)"/m.exec(cargo)[1], json('package.json').version);
+  assert.equal(/^version = "(.+)"/m.exec(cargo)![1], json('package.json').version);
 });
 
 test('tui-review checksum lines and what to do about tui-review', () => {
@@ -419,7 +432,8 @@ test('tui-review checksum lines and what to do about tui-review', () => {
   assert.ok(sha256Matches(Buffer.from('abc'), abc));
   assert.ok(!sha256Matches(Buffer.from('abd'), abc));
   assert.ok(!sha256Matches(Buffer.from('abc'), undefined));
-  const at = (o) => binAction({ onPath: false, installed: undefined, version: '0.2.0', supported: true, ...o });
+  const at = (o: { onPath?: boolean; installed?: string; supported?: boolean }) =>
+    binAction({ onPath: false, installed: undefined, version: '0.2.0', supported: true, ...o });
   assert.equal(at({ onPath: true }), 'skip');
   assert.equal(at({ installed: '0.2.0' }), 'configure');
   assert.equal(at({ installed: '0.1.0' }), 'download');
@@ -438,7 +452,7 @@ test('every opt-in and toggle is on exactly one page, except the INCLUDED ones o
 });
 
 test('withDependencies adds opt-in dependencies transitively, once, and nothing for unselected plugins', () => {
-  const deps = { a: ['b', 'bundled'], b: ['c', 'a'], x: ['y'] };
+  const deps: Record<string, string[]> = { a: ['b', 'bundled'], b: ['c', 'a'], x: ['y'] };
   const opts = ['a', 'b', 'c', 'x', 'y'];
   assert.deepEqual(
     withDependencies(['a'], (id) => deps[id], opts),
@@ -471,7 +485,7 @@ test('an uncategorized plugin lands in Other, empty pages are dropped', () => {
 });
 
 test('the language servers page is Languages and lists the language skills', () => {
-  const lang = CATEGORIES.find((c) => c.id === 'lsp');
+  const lang = CATEGORIES.find((c) => c.id === 'lsp')!;
   assert.equal(lang.title, 'Languages');
   for (const k of ['csharp-skills', 'rust-skills', 'csharp-lsp', 'rust-analyzer-lsp']) assert.ok(lang.keys.includes(k));
 });
@@ -485,7 +499,7 @@ test('the Databases page follows Languages and lists postgres', () => {
 });
 
 test('categorize keeps bulk:false on danger', () => {
-  assert.equal(categorize(['strip-defaults', 'clean']).find((c) => c.id === 'danger').bulk, false);
+  assert.equal(categorize(['strip-defaults', 'clean']).find((c) => c.id === 'danger')!.bulk, false);
 });
 
 test('options hidden per platform', () => {
@@ -560,7 +574,7 @@ test('manifestPath finds a local plugin manifest, null for url sources and unkno
   assert.equal(manifestPath(m, 'nope@dead-claude-skills'), null);
 });
 
-const shippedText = (f) => readFileSync(new URL(f, import.meta.url), 'utf8');
+const shippedText = (f: string) => readFileSync(new URL(f, import.meta.url), 'utf8');
 
 test('isShipped matches shipped configs up to whitespace, not customized ones', () => {
   const stock = shippedText('./ccstatusline.json');
@@ -576,9 +590,9 @@ test('isShipped matches shipped configs up to whitespace, not customized ones', 
 // Night City adds icons, a context bar and a sign, but shows every stock value, in the same order (git changes split
 // into insertions and deletions).
 test('Night City ccstatusline keeps the stock widgets in order', () => {
-  const split = { 'git-insertions': 'git-changes', 'git-deletions': null };
-  const types = (f) =>
-    JSON.parse(shippedText(f)).lines.map((l) =>
+  const split: Record<string, string | null> = { 'git-insertions': 'git-changes', 'git-deletions': null };
+  const types = (f: string): string[][] =>
+    JSON.parse(shippedText(f)).lines.map((l: { type: string }[]) =>
       l.map((w) => (w.type in split ? split[w.type] : w.type)).filter((t) => t !== null),
     );
   const nc = types('./ccstatusline-night-city.json');
@@ -591,19 +605,19 @@ test('Night City ccstatusline keeps the stock widgets in order', () => {
 });
 
 test('Night City settings are always on, next to other env, and leave the theme alone', () => {
-  const out = mergeSettings({ env: { FOO: 'x' }, theme: 'dark' }, {});
+  const out = mergeSettings({ env: { FOO: 'x' }, theme: 'dark' }, V);
   assert.deepEqual(out.env, { FOO: 'x', CLAUDE_CODE_TMUX_TRUECOLOR: '1' });
   assert.equal(out.syntaxHighlightingDisabled, true);
   assert.equal(out.theme, 'dark');
 });
 
 test('Night City picked while it was its own plugin stays picked now that dead-skills ships it', () => {
-  assert.equal(mergeSettings({ theme: 'custom:night-city:night-city' }, {}).theme, 'custom:dead-skills:night-city');
+  assert.equal(mergeSettings({ theme: 'custom:night-city:night-city' }, V).theme, 'custom:dead-skills:night-city');
 });
 
 test('the built-in notification is always off, since dead-skills raises its own', () => {
-  assert.equal(mergeSettings({}, {}).preferredNotifChannel, 'notifications_disabled');
-  assert.equal(mergeSettings({ preferredNotifChannel: 'kitty' }, {}).preferredNotifChannel, 'notifications_disabled');
+  assert.equal(mergeSettings({}, V).preferredNotifChannel, 'notifications_disabled');
+  assert.equal(mergeSettings({ preferredNotifChannel: 'kitty' }, V).preferredNotifChannel, 'notifications_disabled');
 });
 
 test('searxng binds loopback, mounts the config dir and takes the secret', () => {
@@ -622,15 +636,16 @@ test('searxng binds loopback, mounts the config dir and takes the secret', () =>
 });
 
 test('web builtins: tri-state merge keeps other denies, toggle reads deny', () => {
-  const base = { permissions: { deny: ['Bash(sudo:*)'] } };
-  const off = mergeSettings(base, { webBuiltinsOff: true });
-  assert.ok(['Bash(sudo:*)', 'WebFetch', 'WebSearch'].every((d) => off.permissions.deny.includes(d)));
+  const base: Settings = { permissions: { deny: ['Bash(sudo:*)'] } };
+  const off = mergeSettings(base, { ...V, webBuiltinsOff: true });
+  assert.ok(['Bash(sudo:*)', 'WebFetch', 'WebSearch'].every((d) => off.permissions!.deny!.includes(d)));
   assert.ok(isWebBuiltinsOff(off));
-  assert.deepEqual(mergeSettings(off, { webBuiltinsOff: true }), off);
-  assert.deepEqual(mergeSettings(off, {}).permissions.deny, off.permissions.deny);
-  const back = mergeSettings(off, { webBuiltinsOff: false });
-  assert.ok(!back.permissions.deny.includes('WebFetch') && !back.permissions.deny.includes('WebSearch'));
-  assert.ok(back.permissions.deny.includes('Bash(sudo:*)'));
+  assert.deepEqual(mergeSettings(off, { ...V, webBuiltinsOff: true }), off);
+  assert.deepEqual(mergeSettings(off, V).permissions!.deny, off.permissions!.deny);
+  const back = mergeSettings(off, { ...V, webBuiltinsOff: false });
+  const denied = back.permissions!.deny!;
+  assert.ok(!denied.includes('WebFetch') && !denied.includes('WebSearch'));
+  assert.ok(denied.includes('Bash(sudo:*)'));
   assert.ok(!isWebBuiltinsOff(back));
   assert.ok(!isWebBuiltinsOff({ permissions: { deny: ['WebFetch'] } }));
   assert.ok(TOGGLES.includes('web-builtins-off') && HINTS['web-builtins-off']);
@@ -662,13 +677,13 @@ test('agent-browser: install when missing, upgrade when older, keep when equal o
 
 test('agent-browser: the pinned upstream binary, only with a pinned hash', () => {
   const pin = JSON.parse(readFileSync(new URL('./agent-browser.json', import.meta.url), 'utf8'));
-  const linux = agentBrowserAsset('linux', 'x64', pin);
+  const linux = agentBrowserAsset('linux', 'x64', pin)!;
   assert.equal(
     linux.url,
     `https://github.com/vercel-labs/agent-browser/releases/download/v${pin.upstream}/agent-browser-linux-musl-x64`,
   );
   assert.equal(linux.digest, pin.sha256['linux-x64']);
-  assert.equal(agentBrowserAsset('win32', 'x64', pin).exe, 'agent-browser.exe');
+  assert.equal(agentBrowserAsset('win32', 'x64', pin)!.exe, 'agent-browser.exe');
   assert.equal(agentBrowserAsset('darwin', 'arm64', pin), undefined);
   assert.equal(agentBrowserAsset('linux', 'x64', { ...pin, sha256: {} }), undefined);
   assert.equal(agentBrowserAsset('linux', 'x64', { ...pin, upstream: '1.0; rm' }), undefined);

@@ -8,10 +8,16 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
 
 ## Layout
 
-- `installer/`: `install.mjs` is the entry point and does all prompting and I/O; `core.mjs` holds the pure decisions
-  (settings merges, plugin plans, platform rules); `files.mjs` the file writes and clean-slate backup/delete;
-  `view.mjs`/`ui.mjs` the screens. No npm dependencies: Node's standard library only. New logic goes into
-  `core.mjs` or `files.mjs` with a test, not into `install.mjs`.
+- `installer/`: TypeScript. `install.ts` is the entry point and does all prompting and I/O; `core.ts` holds the pure
+  decisions (settings merges, plugin plans, platform rules); `files.ts` the file writes and clean-slate backup/delete;
+  `view.ts`/`ui.ts` the screens. No runtime npm dependencies: Node's standard library only (`typescript` and
+  `@types/node` are devDependencies, for `npm run typecheck` and the build). New logic goes into `core.ts` or `files.ts`
+  with a test, not into `install.ts`. Node runs the `.ts` files as they are (type stripping, Node 22.18+), so only
+  erasable syntax: no `enum`, `namespace` or parameter properties (`erasableSyntaxOnly`), and imports name the `.ts`
+  file. Node won't strip types under `node_modules`, so npx can't run them: `release.yml` packs the installer
+  (`npm pack`, whose `prepack` runs `tsc` and writes `installer/*.js`, gitignored) as `installer.tgz` on the release, and
+  users run `npx <release>/download/vX.Y.Z/installer.tgz`. The URL names the version on purpose: npx caches by URL, so a
+  `latest/download` link would keep running the first installer it fetched. `release.mjs` bumps it in README.md.
 - `plugins/` is grouped by how a plugin gets installed: `default/` (the bundle, dead-skills, on every machine),
   `flows` (the conductors), both plain plugins at the top, then `shared/` (what flows pulls in) and `opt-in/` (extras
   nothing else depends on; `opt-in/mcp/` holds the MCP configs, `opt-in/implementation/` the language, database and LSP
@@ -45,18 +51,18 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   Conductors call each other by reading the callee's SKILL.md (`/fix-flow` → `/verify` → `/doc-audit branch`). Each
   conductor's `uses.json` lists what it runs; `scripts/flows-uses.mjs` generates flows' `dependencies` and the README
   tree from them, and check-repo fails when a listed skill is gone or the generated parts are stale. The installer
-  hides `INCLUDED` plugins (`installer/core.mjs`): they arrive only as flows' dependencies (`withDependencies`).
+  hides `INCLUDED` plugins (`installer/core.ts`): they arrive only as flows' dependencies (`withDependencies`).
 - `plugins/shared/tui-review/`: a Claude Code mod (TypeScript, `hooks/`) driving the Rust binary `tui-review` (`crates/tui-review/`). The two
   share a binary cache format (`crates/tui-review/src/format.rs` ↔ `hooks/chunks.ts`) and a stdout line protocol; change both sides
   together.
 - `plugins/shared/web-mcp/`: a stdio MCP server (Rust, `crates/web-mcp/`) with `search`, `fetch`, `browser` and `lookup`, built for Windows and Linux
-  x64 only, like tui-review's binary (`build-web-mcp.yml`, `BIN_TARGETS` in `core.mjs`; no macOS or ARM builds); the installer downloads it and sets `binPath`. Everything it pulls lands in
+  x64 only, like tui-review's binary (`build-web-mcp.yml`, `BIN_TARGETS` in `core.ts`; no macOS or ARM builds); the installer downloads it and sets `binPath`. Everything it pulls lands in
   `$CLAUDE_PROJECT_DIR/.web/` before Claude sees it. Ranking is BM25 only: the H4 experiment (`examples/h4.rs`, `h4`
   feature) showed embeddings don't help, so none ship. `browser` drives `agent-browser` (upstream's Rust CLI), pinned with its
   release binaries' sha256 in `installer/agent-browser.json` (bumped by `sync-agent-browser.yml`, which imports
-  `AGENT_BROWSER_FILES` from `core.mjs`). Unless a current one is on PATH, the installer keeps its own copy in
+  `AGENT_BROWSER_FILES` from `core.ts`). Unless a current one is on PATH, the installer keeps its own copy in
   `~/.claude/bin` (upstream's raw binary, checked against the pinned hash, downloaded when missing or older than the
-  pin); either way it sets `agentBrowserPath` to the one in use (`agentBrowserPlan` in `core.mjs`). Test-only hooks: `WEB_MCP_TEST_PUBLIC_IP`
+  pin); either way it sets `agentBrowserPath` to the one in use (`agentBrowserPlan` in `core.ts`). Test-only hooks: `WEB_MCP_TEST_PUBLIC_IP`
   (debug builds or the `test-hooks` feature) treats a comma-separated list of IPs as public; `WEB_MCP_FALLBACK_MS` shortens the fetch browser fallback's deadline, `WEB_MCP_PAPERS_MS` each paper source's (8 s), `WEB_MCP_LOOKUP_MS` each lookup source's.
 - `plugins/shared/ponytail/`: vendored unchanged from upstream's newest stable release (`scripts/sync-ponytail.mjs`,
   ADR 0002): skills, SessionStart/SubagentStart/UserPromptSubmit hooks and its band mod. The sync PR carries upstream's
@@ -95,20 +101,22 @@ When what's vendored or its license changes, update THIRD_PARTY.md.
 
 ## Versions and releases
 
-Everything ships as one version: `package.json`, the marketplace's `metadata.version`, every plugin's `.claude-plugin/plugin.json`
-and both crates' `Cargo.toml`/`Cargo.lock`. `check-repo.mjs` fails on drift. Never bump by hand:
+Everything ships as one version: `package.json` and `package-lock.json`, the marketplace's `metadata.version`, every
+plugin's `.claude-plugin/plugin.json`, both crates' `Cargo.toml`/`Cargo.lock` and the installer URL in README.md.
+`check-repo.mjs` fails on drift. Never bump by hand:
 
     npm run release -- patch      # on main, clean tree; bumps, runs npm test, commits and tags
     git push --follow-tags origin main
 
-The `v*` tag runs `release.yml`, which builds tui-review, web-mcp and cswap.exe and publishes the GitHub release the installer
-downloads from. Removing a plugin from the marketplace is enough to retire it: the installer uninstalls installed
+The `v*` tag runs `release.yml`, which packs the installer (`installer.tgz`), builds tui-review, web-mcp and cswap.exe and
+publishes the GitHub release npx and the installer download from. Removing a plugin from the marketplace is enough to retire it: the installer uninstalls installed
 plugins of ours that the manifest no longer lists.
 
 ## Checks
 
-- `npm test`: repo checks plus all `installer/*.test.mjs`, `scripts/*.test.mjs` and `plugins/default/hooks/*.test.mjs` (`claude plugin validate` is skipped when `claude` isn't
+- `npm test`: repo checks plus all `installer/*.test.ts`, `scripts/*.test.mjs` and `plugins/default/hooks/*.test.mjs` (`claude plugin validate` is skipped when `claude` isn't
   on PATH).
+- `npm ci` once, then `npm run typecheck`: `tsc --noEmit` over `installer/` (sources and tests, strict).
 - tui-review: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/tui-review`.
 - web-mcp: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/web-mcp`.
 - tui-review mod tests need a generated fixture first, from `crates/tui-review`:
@@ -122,6 +130,6 @@ plugins of ours that the manifest no longer lists.
   started in a subfolder, its hook setup treats that folder as the repo and uninstalls the pre-commit hook.
 - `nix fmt` formats everything per `treefmt.toml` (alejandra, prettier for js/ts/json/md/yaml, rustfmt).
 
-CI: `test.yml` (npm test and the cswap, dead-skills and md-pane mod tests, Linux and Windows) on every PR and push to main; `tui-review.yml` on
+CI: `test.yml` (npm test, the installer typecheck and the cswap, dead-skills and md-pane mod tests, Linux and Windows) on every PR and push to main; `tui-review.yml` on
 PRs touching tui-review; `web-mcp.yml` on PRs touching web-mcp; `build-tui-review.yml`/`build-web-mcp.yml`/`build-cswap.yml` on PRs touching the workflow (or the cswap pin) and from `release.yml`; `sync-*.yml`
 weekly.

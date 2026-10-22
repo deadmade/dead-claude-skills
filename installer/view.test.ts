@@ -1,8 +1,9 @@
+import type { Data, State } from './view.ts';
 process.env.FORCE_COLOR = '1';
 const { test } = await import('node:test');
-const { default: assert } = await import('node:assert/strict');
+const assert: typeof import('node:assert/strict') = (await import('node:assert/strict')).default;
 const { stripVTControlCharacters: plain } = await import('node:util');
-const { changeList, frame, initial, move, paint, render, wrap } = await import('./view.mjs');
+const { changeList, frame, initial, move, paint, render, wrap } = await import('./view.ts');
 
 const M = 'dead-claude-skills';
 const azure = `mcp-azure@${M}`;
@@ -24,7 +25,7 @@ const pages = [
 ];
 const current = { [azure]: false, [github]: false, [atlassian]: true, sandbox: true, ccstatusline: false };
 const chosen = { ...current };
-const data = {
+const data: Data = {
   version: '0.1.1',
   platform: 'linux-x64',
   pages,
@@ -37,10 +38,10 @@ const data = {
   core: 'dead-skills + 7, always installed',
   hidden: [{ key: `nix-lsp@${M}`, why: 'nixd is not available' }],
 };
-const press = (s, ...keys) => keys.reduce((st, k) => move(st, k, data), s);
+const press = (s: State, ...keys: string[]) => keys.reduce((st, k) => move(st, k, data), s);
 
 test('changeList groups changes and drops updates of removed plugins', () => {
-  const s = { ...initial(chosen), chosen: { ...chosen, [azure]: true, [atlassian]: false, ccstatusline: true } };
+  const s: State = { ...initial(chosen), chosen: { ...chosen, [azure]: true, [atlassian]: false, ccstatusline: true } };
   const r = changeList(s, data);
   assert.deepEqual(
     [r.install, r.remove, r.on, r.off, r.danger, r.update],
@@ -98,7 +99,7 @@ test('updates rows toggle skip; removing the plugin hides the Updates row', () =
   const s = press(initial(chosen), 'down', 'down', 'return', 'down', 'return');
   assert.equal(s.screen, 'updates');
   assert.equal(s.skip[atlassian], true);
-  const removed = { ...initial(chosen), chosen: { ...chosen, [atlassian]: false } };
+  const removed: State = { ...initial(chosen), chosen: { ...chosen, [atlassian]: false } };
   // pages, then Apply, then Quit: no Updates row.
   assert.equal(press(removed, 'up').cursor, 3);
 });
@@ -130,10 +131,10 @@ test('frame cuts long lines and stays one under the width; wrap never cuts', () 
   assert.deepEqual(wrap('one two three four', 9), ['one two', 'three', 'four']);
 });
 
-const text = (s, d = data, size = { columns: 80, rows: 30 }) => render(s, d, size).map(plain).join('\n');
+const text = (s: State, d = data, size = { columns: 80, rows: 30 }) => render(s, d, size).map(plain).join('\n');
 
 test('start shows kept, pending + and −, toggles and the Apply count', () => {
-  const s = { ...initial(chosen), chosen: { ...chosen, [azure]: true, [atlassian]: false } };
+  const s: State = { ...initial(chosen), chosen: { ...chosen, [azure]: true, [atlassian]: false } };
   const out = text(s);
   assert.match(out, /Integrations\s+\+ mcp-azure {2}− atlassian/);
   assert.match(out, /System\s+sandbox on, status line off/);
@@ -144,7 +145,7 @@ test('start shows kept, pending + and −, toggles and the Apply count', () => {
 
 test('start lists updates; idle start reads Nothing to change and so does the review', () => {
   assert.match(text(initial(chosen)), /↑ 1 updates?/);
-  const idle = { ...initial(chosen), skip: { [atlassian]: true } };
+  const idle: State = { ...initial(chosen), skip: { [atlassian]: true } };
   assert.match(text(idle), /Nothing to change/);
   assert.match(text({ ...idle, screen: 'review' }), /Nothing to change\./);
 });
@@ -158,7 +159,7 @@ test('empty categories read none', () => {
 });
 
 test('category states are words', () => {
-  const s = {
+  const s: State = {
     ...initial(chosen),
     screen: 'category',
     page: 0,
@@ -177,19 +178,19 @@ test('category states are words', () => {
 });
 
 test('category shows the focused item description, none on ← Back', () => {
-  const s = { ...initial(chosen), screen: 'category', page: 0, cursor: 1 };
+  const s: State = { ...initial(chosen), screen: 'category', page: 0, cursor: 1 };
   assert.match(text(s), /About mcp-azure\./);
   assert.doesNotMatch(text({ ...s, cursor: 0 }), /About/);
 });
 
 test('updates screen shows from → to and skip', () => {
-  const s = { ...initial(chosen), screen: 'updates' };
+  const s: State = { ...initial(chosen), screen: 'updates' };
   assert.match(text(s), /atlassian\s+0\.1\.0 → 0\.1\.1\s+will update/);
   assert.match(text({ ...s, skip: { [atlassian]: true } }), /atlassian\s+0\.1\.0 → 0\.1\.1\s+skip/);
 });
 
 test('review lists only non-empty groups, token note and platform', () => {
-  const s = {
+  const s: State = {
     ...initial(chosen),
     screen: 'review',
     chosen: { ...chosen, [azure]: true, [github]: true, [atlassian]: false },
@@ -206,7 +207,7 @@ test('review lists only non-empty groups, token note and platform', () => {
 
 test('every line fits narrow terminals', () => {
   for (const columns of [20, 40]) {
-    for (const screen of ['start', 'category', 'updates', 'review']) {
+    for (const screen of ['start', 'category', 'updates', 'review'] as const) {
       const lines = render({ ...initial(chosen), screen, chosen: { ...chosen, [azure]: true } }, data, {
         columns,
         rows: 30,
@@ -235,13 +236,17 @@ test('every screen fits short, narrow terminals', () => {
     describe: () => ({ label: 'p', detail: long }),
     pages: [{ id: 'workflow', title: 'Workflows & skills', blurb: long, keys }, ...pages],
   };
-  const many = { ...initial({}), chosen: Object.fromEntries(keys.map((k) => [k, true])) };
+  const many: State = { ...initial({}), chosen: Object.fromEntries(keys.map((k) => [k, true])) };
   for (const [columns, rows] of [
     [30, 12],
     [20, 12],
     [80, 10],
   ]) {
-    for (const s of [{ ...many, screen: 'category', cursor: 7 }, { ...many, screen: 'review' }, many]) {
+    for (const s of [
+      { ...many, screen: 'category', cursor: 7 },
+      { ...many, screen: 'review' },
+      many,
+    ] satisfies State[]) {
       const lines = render(s, d, { columns, rows });
       assert.ok(
         lines.length <= rows,
@@ -250,13 +255,13 @@ test('every screen fits short, narrow terminals', () => {
     }
   }
   const review = render({ ...many, screen: 'review' }, d, { columns: 80, rows: 10 }).map(plain);
-  assert.match(review.at(-1), /Apply 9 changes/);
+  assert.match(review.at(-1)!, /Apply 9 changes/);
   assert.ok(review.some((l) => /… \d+ more/.test(l)));
 });
 
 test('review lists what strip-defaults sweeps away and counts it', () => {
   const d = { ...data, sweep: [`foreign@other`, 'marketplace other'] };
-  const s = { ...initial({ ...chosen, 'strip-defaults': true }), screen: 'review' };
+  const s: State = { ...initial({ ...chosen, 'strip-defaults': true }), screen: 'review' };
   const out = text(s, d);
   assert.match(out, /Remove\s+foreign@other/);
   assert.match(out, /marketplace other/);
@@ -266,13 +271,13 @@ test('review lists what strip-defaults sweeps away and counts it', () => {
 
 test('review always lists retired plugins for removal and counts them', () => {
   const d = { ...data, retired: ['dev-feature@dead-claude-skills'] };
-  const s = { ...initial({ ...chosen }), screen: 'review' };
+  const s: State = { ...initial({ ...chosen }), screen: 'review' };
   assert.match(text(s, d), /Remove\s+dev-feature/);
   assert.equal(changeList(s, d).count, 2); // retired + the atlassian update
 });
 
 test('paint uses Night City on 24-bit terminals and styleText elsewhere', () => {
-  const tty = (depth) => ({ hasColors: (n) => n <= 2 ** depth });
+  const tty = (depth: number) => ({ hasColors: (n: number) => n <= 2 ** depth });
   assert.equal(paint(['bold', 'magenta'], 'x', tty(24)), '\x1b[38;2;240;139;180m\x1b[1mx\x1b[22m\x1b[39m');
   assert.equal(paint('green', 'x', tty(4)), '\x1b[32mx\x1b[39m');
   assert.equal(paint('green', 'x', {}), '\x1b[32mx\x1b[39m');

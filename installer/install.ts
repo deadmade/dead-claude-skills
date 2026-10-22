@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Interactive installer for the dead-claude-skills marketplace. Decisions live in core.mjs.
+// Interactive installer for the dead-claude-skills marketplace. Decisions live in core.ts.
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import {
@@ -16,6 +16,11 @@ import {
 import { homedir, tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import {
+  type AgentBrowserPin,
+  type Marketplace,
+  type PluginJson,
+  type PluginRow,
+  type Toggles,
   BUNDLE,
   CLEAN_TARGETS,
   HINTS,
@@ -43,6 +48,7 @@ import {
   isStripped,
   mergeSettings,
   isShipped,
+  type Settings,
   marketplaceArg,
   missingBinaries,
   agentBrowserAsset,
@@ -67,12 +73,13 @@ import {
   stripDefaults,
   unavailable,
   INCLUDED,
+  installerUrl,
   idOf,
   withDependencies,
-} from './core.mjs';
-import { backup, clearTargets, replaceBin, writeAtomic, writeSearxng } from './files.mjs';
-import { confirm, line, log, note, progress, screen } from './ui.mjs';
-import { changeList, initial, move, paint, render } from './view.mjs';
+} from './core.ts';
+import { backup, clearTargets, replaceBin, writeAtomic, writeSearxng } from './files.ts';
+import { confirm, line, log, note, progress, screen } from './ui.ts';
+import { type Data, changeList, initial, move, paint, render } from './view.ts';
 
 const PKG = join(import.meta.dirname, '..');
 const CONFIG = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude');
@@ -83,39 +90,41 @@ const CCSL = join(homedir(), '.config', 'ccstatusline', 'settings.json');
 const WIN = process.platform === 'win32';
 const FLAGS = process.argv.slice(2);
 
-const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'));
-const tryJson = (file) => {
+// shortcut: JSON is trusted to have the shape its caller declares, as our own files and Claude Code's do.
+const readJson = (file: string) => JSON.parse(readFileSync(file, 'utf8'));
+const tryJson = <T = any>(file: string): T | undefined => {
   try {
     return readJson(file);
   } catch {
     return undefined;
   }
 };
-const VERSION = readJson(join(PKG, 'package.json')).version;
-const failures = [];
-const done = [];
+const VERSION: string = readJson(join(PKG, 'package.json')).version;
+const failures: string[] = [];
+const done: string[] = [];
 
 if (!process.stdin.isTTY || !process.stdout.isTTY) {
-  console.error('Run this in a terminal: npx --allow-git=root github:deadmade/dead-claude-skills#semver:*');
+  console.error(`Run this in a terminal: npx ${installerUrl(VERSION)}`);
   process.exit(1);
 }
 
 // --- terminal UI ------------------------------------------------------------------------------------------------
-const red = (s) => paint('red', s);
-const green = (s) => paint('green', s);
+const red = (s: string) => paint('red', s);
+const green = (s: string) => paint('green', s);
 
 // The answer of a prompt; ctrl-c (null) ends the installer.
-function must(answer) {
+function must<T>(answer: T | null): T {
   if (answer !== null) return answer;
   log('error', done.length ? 'Stopped. What ran so far is kept.' : 'Cancelled before installing anything.');
   process.exit(130);
 }
 
-const ask = async (message, initialValue) => must(await confirm(message, initialValue));
+const ask = async (message: string, initialValue: boolean) => must(await confirm(message, initialValue));
 
 // --- claude CLI -------------------------------------------------------------------------------------------------
 // input: what the command reads on stdin, or undefined.
-function claude(input, ...args) {
+type Result = { ok: boolean; out: string; err: string };
+function claude(input: string | undefined, ...args: string[]) {
   args.forEach(safeArg);
   // Windows: one string through the shell so both claude.cmd and claude.exe resolve; args are safeArg-checked.
   const child = WIN ? spawn(['claude', ...args].join(' '), { shell: true }) : spawn('claude', args);
@@ -128,8 +137,8 @@ function claude(input, ...args) {
     err += d;
   });
   child.stdin.on('error', () => {}).end(input);
-  return new Promise((resolve) => {
-    child.on('error', (e) => {
+  return new Promise<Result>((resolve) => {
+    child.on('error', (e: NodeJS.ErrnoException) => {
       log('error', `Can't run claude (${e.code}). Install Claude Code and make sure it's on PATH.`);
       process.exit(1);
     });
@@ -137,26 +146,30 @@ function claude(input, ...args) {
   });
 }
 
-const record = (label, r) => {
+const record = (label: string, r: { ok: boolean; err?: string }) => {
   (r.ok ? done : failures).push(r.ok ? label : `${label}: ${r.err}`);
   return r.ok;
 };
 
 // One claude command on its own progress line. doing: shown while it runs; label: what the summary says.
-const run = async (doing, label, ...args) => record(label, await progress(doing, () => claude(undefined, ...args)));
+const run = async (doing: string, label: string, ...args: string[]) =>
+  record(label, await progress(doing, () => claude(undefined, ...args)));
 
 // --- files ------------------------------------------------------------------------------------------------------
-const remove = (file, label) => {
+const remove = (file: string, label: string) => {
   if (!existsSync(file)) return;
   rmSync(file);
   done.push(`deleted ${label}`);
 };
 
 // strip: add the default-disabling keys. reset: clean slate, replace instead of merge.
-async function applySettings(toggles, { strip, reset }) {
-  const build = (s) =>
+async function applySettings(
+  toggles: Toggles & { dcg: boolean },
+  { strip, reset }: { strip: boolean; reset: boolean },
+) {
+  const build = (s: Settings) =>
     reset ? resetSettings(s, toggles) : strip ? stripDefaults(mergeSettings(s, toggles)) : mergeSettings(s, toggles);
-  const snippet = (title) => note(title, JSON.stringify(build({}), null, 2).split('\n'));
+  const snippet = (title: string) => note(title, JSON.stringify(build({}), null, 2).split('\n'));
   if (existsSync(SETTINGS) && lstatSync(SETTINGS).isSymbolicLink()) {
     failures.push(`${SETTINGS} is a symlink; merge these keys where it's managed (printed above)`);
     return snippet(`${SETTINGS} is a symlink, not writing it. Merge these keys where it's managed`);
@@ -169,7 +182,8 @@ async function applySettings(toggles, { strip, reset }) {
   }
   if (!change) return;
   const { before, after, changed } = change;
-  const lines = (sign, k, v) => `${k}: ${JSON.stringify(v, null, 2)}`.split('\n').map((l) => `${sign} ${l}`);
+  const lines = (sign: string, k: string, v: unknown) =>
+    `${k}: ${JSON.stringify(v, null, 2)}`.split('\n').map((l) => `${sign} ${l}`);
   const diff = changed.flatMap((k) => [
     ...(k in before ? lines('-', k, before[k]).map(red) : []),
     ...(k in after ? lines('+', k, after[k]).map(green) : []),
@@ -182,9 +196,9 @@ async function applySettings(toggles, { strip, reset }) {
 
 // Off only deletes the config when this installer's status line was on: the toggle also reads off for a ccstatusline
 // set up some other way, whose config isn't ours to delete.
-async function applyCcstatusline(was, on) {
+async function applyCcstatusline(was: boolean, on: boolean) {
   if (!on) return was ? remove(CCSL, CCSL) : undefined;
-  const shippedFile = (f) => readFileSync(join(PKG, 'installer', f), 'utf8');
+  const shippedFile = (f: string) => readFileSync(join(PKG, 'installer', f), 'utf8');
   const shipped = shippedFile('ccstatusline-night-city.json');
   if (!existsSync(CCSL)) {
     writeAtomic(CCSL, shipped);
@@ -202,7 +216,7 @@ async function applyCcstatusline(was, on) {
   } else if (current) done.push(`kept your ${CCSL}`);
 }
 
-async function applyDcg(was, on) {
+async function applyDcg(was: boolean, on: boolean) {
   if (was === on) return;
   const action = on ? 'install' : 'uninstall';
   if (
@@ -216,13 +230,13 @@ async function applyDcg(was, on) {
   log('info', `Running dcg's ${action}er`);
   const [bin, args] = dcgCommand(process.platform, action);
   const r = spawnSync(bin, args, { stdio: 'inherit' });
-  if (r.status !== 0) return failures.push(`dcg ${action} failed (${r.error?.code ?? `exit ${r.status}`})`);
+  if (r.status !== 0) return failures.push(`dcg ${action} failed (${errCode(r.error) ?? `exit ${r.status}`})`);
   done.push(`dcg: ${action}ed`);
   if (on && !WIN && !onPath('dcg')) log('warn', 'dcg is not on PATH: add ~/.local/bin (NixOS: home.sessionPath).');
 }
 
 // Windows: download cswap.exe from this version's release (checked against its .sha256), put its folder on PATH.
-async function applyCswap(on) {
+async function applyCswap(on: boolean) {
   const version = readJson(join(PKG, 'installer', 'cswap.json')).upstream;
   const dl = cswapDownload(process.platform, process.env, VERSION);
   if (!on || !dl) return;
@@ -232,7 +246,7 @@ async function applyCswap(on) {
       return done.push('cswap: download skipped by you');
     }
     const r = await progress(`Downloading cswap.exe ${version}`, async () => {
-      const get = async (url) => {
+      const get = async (url: string) => {
         const res = await fetch(url);
         if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
         return res;
@@ -257,7 +271,7 @@ async function applyCswap(on) {
   }
   if (!process.env.PATH?.toLowerCase().includes(dl.dir.toLowerCase()))
     process.env.PATH = `${process.env.PATH};${dl.dir}`;
-  const ps = (cmd, env) =>
+  const ps = (cmd: string, env?: NodeJS.ProcessEnv) =>
     spawnSync('powershell', ['-NoProfile', '-Command', cmd], { encoding: 'utf8', env: { ...process.env, ...env } });
   const read = ps("[Environment]::GetEnvironmentVariable('Path', 'User')");
   // Without the current PATH, writing would replace it with only this folder.
@@ -276,13 +290,13 @@ const WEB_MCP = `web-mcp@${MARKETPLACE}`;
 const BIN_DIR = join(CONFIG, 'bin');
 
 // The version a binary reports (`<name> <version>`), or undefined when there is none or it does not run.
-function binVersionAt(name, path) {
+function binVersionAt(name: string, path: string) {
   if (!existsSync(path)) return undefined;
   const r = spawnSync(path, ['--version'], { encoding: 'utf8' });
   return new RegExp(`^${name} (\\S+)`).exec(r.stdout ?? '')?.[1];
 }
 
-async function fetchOk(url) {
+async function fetchOk(url: string) {
   const res = await fetch(url);
   if (res.status === 404) throw new Error(`no release at ${url} yet`);
   if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${url}`);
@@ -291,11 +305,12 @@ async function fetchOk(url) {
 
 // Downloads the release asset, checks its sha256, and moves the binary to bin (on Windows the old one is renamed aside
 // first). asset.digest: a pinned checksum instead of the .sha256 file; asset.raw: the download is the binary itself.
-async function downloadBin(name, asset, bin) {
+type Asset = { file: string; url: string; exe: string; sha256?: string; digest?: string; raw?: boolean };
+async function downloadBin(name: string, asset: Asset, bin: string) {
   const [archive, want] = await Promise.all([
     fetchOk(asset.url).then((r) => r.arrayBuffer()),
     asset.digest ??
-      fetchOk(asset.sha256)
+      fetchOk(asset.sha256!)
         .then((r) => r.text())
         .then(sha256Of),
   ]);
@@ -324,7 +339,7 @@ async function downloadBin(name, asset, bin) {
 
 // A plugin that needs its binary: one on PATH is used as is; otherwise the release for this version goes to
 // ~/.claude/bin and the plugin's userConfig key points at it.
-async function applyBin(pluginName, plugin) {
+async function applyBin(pluginName: string, plugin: string) {
   const { name, key } = BIN_PLUGINS[pluginName];
   const version = VERSION;
   const asset = binAsset(name, process.platform, process.arch, version);
@@ -341,7 +356,7 @@ async function applyBin(pluginName, plugin) {
     return failures.push(`${name}: no release build for ${process.platform}-${process.arch}; ${build}`);
   if (action === 'download') {
     const r = await progress(`Downloading ${name} ${version}`, async () => {
-      await downloadBin(name, asset, bin);
+      await downloadBin(name, asset!, bin);
       return { ok: true };
     });
     if (!r.ok) return failures.push(`${name} ${version}: ${r.err}; ${build}`);
@@ -359,11 +374,11 @@ async function applyBin(pluginName, plugin) {
 // binary for the version pinned in installer/agent-browser.json goes to ~/.claude/bin. Either way its browser is
 // installed and web-mcp's agentBrowserPath names it. Asks before a download; every failure is a summary line.
 async function applyAgentBrowser() {
-  const pin = readJson(join(PKG, 'installer', 'agent-browser.json'));
-  const pinned = pin.upstream;
+  const pin: AgentBrowserPin = readJson(join(PKG, 'installer', 'agent-browser.json'));
+  const pinned = pin.upstream ?? '';
   const key = `${process.platform}-${process.arch}`;
   // npm's .cmd shim on Windows needs a shell; our own binary doesn't.
-  const versionOf = (bin, shell) => {
+  const versionOf = (bin: string, shell: boolean) => {
     const r = spawnSync(bin, ['--version'], { encoding: 'utf8', shell });
     return r.status === 0 ? agentBrowserVersion(r.stdout) : undefined;
   };
@@ -392,23 +407,25 @@ async function applyAgentBrowser() {
       process.platform === 'linux' &&
       (await ask('Also install the browser system packages (agent-browser install --with-deps, runs sudo)?', false));
     const r = await progress(`Downloading agent-browser ${pinned}`, async () => {
-      await downloadBin('agent-browser', asset, bin);
+      await downloadBin('agent-browser', asset, bin!);
       return { ok: true };
     });
     if (!r.ok) return failures.push(`agent-browser ${pinned}: ${r.err}`);
     done.push(`agent-browser: ${plan.download === 'install' ? 'installed' : 'upgraded to'} ${pinned} at ${bin}`);
   }
-  await useAgentBrowser(bin, deps, false);
+  await useAgentBrowser(bin!, deps, false);
 }
 
 // Runs `agent-browser install` (the browser download) on the copy in use, every run, so a download that failed before
 // is retried, then points web-mcp's agentBrowserPath at it. shell: npm's .cmd shim on Windows.
-async function useAgentBrowser(path, deps, shell) {
+async function useAgentBrowser(path: string, deps: boolean, shell: boolean) {
   const args = deps ? ['install', '--with-deps'] : ['install'];
   log('info', `Running agent-browser ${args.join(' ')}`);
   const run = spawnSync(path, args, { stdio: 'inherit', shell });
   if (run.status !== 0)
-    failures.push(`agent-browser: \`${path} ${args.join(' ')}\` failed (${run.error?.code ?? `exit ${run.status}`})`);
+    failures.push(
+      `agent-browser: \`${path} ${args.join(' ')}\` failed (${errCode(run.error) ?? `exit ${run.status}`})`,
+    );
   const r = await claude(JSON.stringify({ agentBrowserPath: path }), 'plugin', 'configure', WEB_MCP, '--values-stdin');
   if (r.ok) done.push(`web-mcp: agentBrowserPath is ${path}`);
   else
@@ -419,14 +436,14 @@ async function useAgentBrowser(path, deps, shell) {
 
 // SearXNG in Docker for web-mcp's search. True when it answers JSON on 127.0.0.1:8888 within 30 s. Every failure is a
 // summary line, never a crash. An existing settings.yml is kept so the running container's secret stays valid.
-async function applySearxng(denied) {
+async function applySearxng(denied: boolean) {
   if (!onPath('docker')) {
     failures.push(
       `SearXNG: docker not found; write ${join(SEARXNG, 'settings.yml')} (see installer/searxng.yml) and run: docker ${searxngRun(SEARXNG).join(' ')}`,
     );
     return false;
   }
-  const docker = (...args) => spawnSync('docker', args, { encoding: 'utf8' });
+  const docker = (...args: string[]) => spawnSync('docker', args, { encoding: 'utf8' });
   try {
     if (
       writeSearxng(
@@ -441,7 +458,7 @@ async function applySearxng(denied) {
     const r = exists ? docker('start', 'searxng') : docker(...searxngRun(SEARXNG));
     if (r.status !== 0) {
       failures.push(
-        `SearXNG: docker ${exists ? 'start' : 'run'} failed (${r.error?.code ?? (r.stderr || `exit ${r.status}`).trim()})`,
+        `SearXNG: docker ${exists ? 'start' : 'run'} failed (${errCode(r.error) ?? (r.stderr || `exit ${r.status}`).trim()})`,
       );
       return false;
     }
@@ -470,13 +487,15 @@ async function applySearxng(denied) {
   return healthy.ok;
 }
 
-function onPath(bin) {
+function onPath(bin: string) {
   const exts = WIN ? (process.env.PATHEXT || '.EXE;.CMD;.BAT').split(';') : [''];
   return (process.env.PATH || '').split(delimiter).some((d) => exts.some((e) => existsSync(join(d, bin + e))));
 }
 
 // --- run --------------------------------------------------------------------------------------------------------
-const HANDOFF = {
+const errCode = (e: Error | undefined) => (e as NodeJS.ErrnoException | undefined)?.code;
+
+const HANDOFF: Record<string, string[]> = {
   'mcp-github': [
     'Needs a fine-grained PAT: https://github.com/settings/personal-access-tokens/new',
     'with the repository permissions Claude should have.',
@@ -504,7 +523,7 @@ function pinSettingsEntry() {
 log('info', `${paint(['bold', 'magenta'], 'dead-claude-skills')} v${VERSION}`);
 
 // A failed list would read as "nothing installed": stop instead of planning from it.
-function listed(what, r) {
+function listed(what: string, r: { ok: boolean; out?: string; err?: string }) {
   try {
     if (r.ok) return JSON.parse(r.out || '[]');
   } catch {
@@ -514,7 +533,10 @@ function listed(what, r) {
   process.exit(1);
 }
 
-const marketplaces = listed('marketplaces', await claude(undefined, 'plugin', 'marketplace', 'list', '--json'));
+const marketplaces: { name: string }[] = listed(
+  'marketplaces',
+  await claude(undefined, 'plugin', 'marketplace', 'list', '--json'),
+);
 const unpinned = pinSettingsEntry();
 // Adding again also moves an existing checkout to this installer's tag.
 const market = await progress(`Adding the ${MARKETPLACE} marketplace at v${VERSION}`, () =>
@@ -537,14 +559,14 @@ if (!marketplaces.some((m) => m.name === OFFICIAL)) {
     `anthropics/${OFFICIAL}`,
   );
 }
-const plugins = listed(
+const plugins: PluginRow[] | { installed?: PluginRow[] } = listed(
   'installed plugins',
   await progress('Reading installed plugins', () => claude(undefined, 'plugin', 'list', '--json')),
 );
 const rows = Array.isArray(plugins) ? plugins : (plugins.installed ?? []);
 
-const manifest = readJson(join(PKG, '.claude-plugin', 'marketplace.json'));
-const bundle = readJson(join(PKG, manifestPath(manifest, BUNDLE)));
+const manifest: Marketplace = readJson(join(PKG, '.claude-plugin', 'marketplace.json'));
+const bundle: PluginJson & { dependencies: string[] } = readJson(join(PKG, manifestPath(manifest, BUNDLE)!));
 const opts = optIns(manifest, bundle);
 const tokenPlugins = opts.filter((id) => {
   const path = manifestPath(manifest, id);
@@ -553,20 +575,20 @@ const tokenPlugins = opts.filter((id) => {
 const BUNDLE_ID = `${BUNDLE}@${MARKETPLACE}`;
 const FLOWS = `flows@${MARKETPLACE}`;
 // Each opt-in's dependencies that are opt-ins too; bundle plugins are installed anyway.
-const depsOf = (id) => {
+const depsOf = (id: string): string[] => {
   const path = manifestPath(manifest, id);
-  return ((path && tryJson(join(PKG, path))?.dependencies) || []).map(idOf).filter((d) => opts.includes(d));
+  return ((path && tryJson<PluginJson>(join(PKG, path))?.dependencies) || []).map(idOf).filter((d) => opts.includes(d));
 };
-const deps = Object.fromEntries(opts.map((id) => [id, depsOf(id)]).filter(([, d]) => d.length));
+const deps = Object.fromEntries(opts.map((id) => [id, depsOf(id)] as const).filter(([, d]) => d.length));
 const managed = [...bundleIds(bundle), ...opts];
 
 const installedIds = rows.map((pl) => pl.id);
 // By name, so a plugin that moved marketplaces stays selected; its old copy is removed as a duplicate.
-const has = (id) => installedIds.some((i) => nameOf(i) === nameOf(id));
+const has = (id: string) => installedIds.some((i) => nameOf(i) === nameOf(id));
 const settingsNow = tryJson(SETTINGS) ?? {};
 
 // What each option is right now, and what the pages start from.
-const current = {
+const current: Record<string, boolean> = {
   ...Object.fromEntries(opts.map((id) => [id, has(id)])),
   ccstatusline: isOurStatusLine(settingsNow.statusLine),
   sandbox: isSandboxOn(settingsNow),
@@ -575,7 +597,7 @@ const current = {
   clean: false,
   'web-builtins-off': isWebBuiltinsOff(settingsNow),
 };
-const chosen = {
+const chosen: Record<string, boolean> = {
   ...current,
   'strip-defaults': FLAGS.includes('--strip-defaults') || current['strip-defaults'],
   clean: FLAGS.includes('--clean'),
@@ -595,7 +617,7 @@ const hidden = [...opts, ...TOGGLES]
 const pages = categorize([...opts, ...TOGGLES].filter((k) => !hidden.some((h) => h.key === k)));
 
 const describe = Object.fromEntries(manifest.plugins.map((pl) => [pl.name, pl.description.split(/(?<=\.)\s/)[0]]));
-function option(key) {
+function option(key: string) {
   const name = nameOf(key);
   const notes = [
     tokenPlugins.includes(key) && 'token entered in Claude Code',
@@ -614,13 +636,19 @@ const shipped = shippedVersions(
   manifest.plugins,
   (src) => tryJson(join(PKG, src, '.claude-plugin', 'plugin.json'))?.version,
 );
-const rowOf = (key) => rows.find((r) => nameOf(r.id) === nameOf(key));
-const data = {
+const retired = retiredPlugins(installedIds, managed);
+const rowOf = (key: string) => rows.find((r) => nameOf(r.id) === nameOf(key));
+const data: Data = {
   version: VERSION,
   platform: `${process.platform}-${process.arch}`,
   pages,
   current,
-  versions: Object.fromEntries(opts.flatMap((k) => (rowOf(k)?.version ? [[k, rowOf(k).version]] : []))),
+  versions: Object.fromEntries(
+    opts.flatMap((k) => {
+      const v = rowOf(k)?.version;
+      return v ? [[k, v]] : [];
+    }),
+  ),
   disabled: Object.fromEntries(opts.flatMap((k) => (rowOf(k)?.enabled === false ? [[k, true]] : []))),
   tokens: tokenPlugins,
   deps,
@@ -628,7 +656,7 @@ const data = {
   updates: outdated(rows, shipped),
   core: `${BUNDLE} + ${bundle.dependencies.length}, always installed`,
   hidden,
-  retired: retiredPlugins(installedIds, managed),
+  retired,
   // What strip-defaults / clean remove on top of the choices, so the review shows it.
   sweep: [
     ...new Set([...foreignPlugins(installedIds, managed), ...duplicates(installedIds, managed)]),
@@ -651,10 +679,10 @@ for (;;) {
   process.exit(0);
 }
 Object.assign(chosen, state.chosen);
-const on = (k) => chosen[k];
+const on = (k: string) => chosen[k];
 
 let clean = on('clean');
-let backupDir;
+let backupDir: string | undefined;
 if (clean) {
   backupDir = `${CONFIG}.dead-backup-${new Date().toISOString().replace(/[:.]/g, '-')}`;
   note('Clean slate', [
@@ -672,7 +700,7 @@ if (clean) {
   if (!clean) done.push('clean slate: skipped by you');
   else {
     try {
-      backup(CONFIG, backupDir);
+      backup(CONFIG, backupDir!);
     } catch (e) {
       log('error', `Backup failed, nothing was deleted: ${e.message}`);
       process.exit(1);
@@ -710,13 +738,14 @@ const plan = planPlugins(
   tokenPlugins,
 );
 // Opt-ins that were once bundle dependencies are still marked auto and would be pruned; installing clears that.
-const installedJson = tryJson(join(CONFIG, 'plugins', 'installed_plugins.json'))?.plugins ?? {};
+const installedJson: Record<string, { auto?: boolean }[]> =
+  tryJson(join(CONFIG, 'plugins', 'installed_plugins.json'))?.plugins ?? {};
 plan.install.push(...selected.filter((id) => opts.includes(id) && installedJson[id]?.some((e) => e.auto)));
 for (const id of plan.install)
   await run(`Installing ${nameOf(id)}`, `installed ${id}`, 'plugin', 'install', id, '--scope', 'user', '--json');
 for (const id of plan.uninstall)
   await run(`Uninstalling ${nameOf(id)}`, `uninstalled ${id}`, 'plugin', 'uninstall', id, '--json');
-for (const id of data.retired)
+for (const id of retired)
   await run(`Uninstalling ${nameOf(id)}`, `uninstalled ${id} (retired)`, 'plugin', 'uninstall', id, '--json');
 for (const u of changeList(state, data).update) {
   await run(
@@ -728,7 +757,7 @@ for (const u of changeList(state, data).update) {
     '--json',
   );
 }
-if (plan.uninstall.length || data.retired.length || dupes.length || foreign.length)
+if (plan.uninstall.length || retired.length || dupes.length || foreign.length)
   await run('Pruning unused dependencies', 'pruned unused dependencies', 'plugin', 'prune', '-y');
 if (selected.includes(TUI_REVIEW)) await applyBin('tui-review', TUI_REVIEW);
 if (selected.includes(WEB_MCP)) await applyBin('web-mcp', WEB_MCP);

@@ -1,9 +1,14 @@
 // The installer's terminal I/O on Node's stdlib: interactive screens, a yes/no, a typed line and plain output.
 import { createInterface } from 'node:readline';
 import { createInterface as createLineInterface } from 'node:readline/promises';
-import { frame, paint, wrap } from './view.mjs';
+import { frame, paint, wrap } from './view.ts';
 
-const STD = { input: process.stdin, output: process.stdout };
+// What the prompts use of stdin and stdout, so tests can hand them streams of their own.
+type IO = {
+  input: NodeJS.ReadableStream & { setRawMode?(raw: boolean): unknown };
+  output: NodeJS.WritableStream & { columns?: number; rows?: number };
+};
+const STD: IO = { input: process.stdin, output: process.stdout };
 const HIDE = '\x1b[?25l';
 const SHOW = '\x1b[?25h';
 
@@ -16,7 +21,7 @@ process.on('exit', restore);
 for (const [sig, n] of [
   ['SIGTERM', 15],
   ['SIGHUP', 1],
-]) {
+] as const) {
   process.on(sig, () => {
     restore();
     process.exit(128 + n);
@@ -25,7 +30,14 @@ for (const [sig, n] of [
 
 // Runs one screen until move() returns a state with a result. render(state, { columns, rows }) -> lines.
 // ctrl-c resolves the state with result 'quit'.
-export function screen(state, { move, render }, { input, output } = STD) {
+export function screen<S extends { result?: string }>(
+  state: S,
+  {
+    move,
+    render,
+  }: { move: (s: S, key: string) => S; render: (s: S, size: { columns: number; rows: number }) => string[] },
+  { input, output }: IO = STD,
+): Promise<S> {
   return new Promise((resolve, reject) => {
     // No output: keys aren't echoed over the frame. The interface sets up keypress events with a 50 ms esc timeout.
     const rl = createInterface({ input, escapeCodeTimeout: 50, terminal: true });
@@ -43,7 +55,7 @@ export function screen(state, { move, render }, { input, output } = STD) {
       output.write(`${drawn ? `\r${drawn > 1 ? `\x1b[${drawn - 1}A` : ''}\x1b[J` : ''}${lines.join('\n')}`);
       drawn = lines.length;
     };
-    const finish = (err, value) => {
+    const finish = (err: Error | null, value?: S) => {
       if (over) return;
       over = true;
       clearTimeout(settle);
@@ -54,14 +66,14 @@ export function screen(state, { move, render }, { input, output } = STD) {
       input.pause();
       output.write(`${SHOW}\n`);
       if (err) reject(err);
-      else resolve(value);
+      else resolve(value!);
     };
-    function onKey(_, key = {}) {
+    function onKey(_: string, key: { ctrl?: boolean; name?: string } = {}) {
       if (over) return;
       try {
-        if (key.ctrl && key.name === 'c') return finish(null, { ...s, result: 'quit' });
+        if (key.ctrl && key.name === 'c') return finish(null, { ...s, result: 'quit' } as S);
         if (!ready) return;
-        let name = key.name;
+        let name = key.name ?? '';
         // \r\n arrives as return + enter: one press.
         const skip = name === 'enter' && afterReturn;
         afterReturn = name === 'return';
@@ -74,7 +86,7 @@ export function screen(state, { move, render }, { input, output } = STD) {
         finish(e);
       }
     }
-    rl.on('SIGINT', () => finish(null, { ...s, result: 'quit' }));
+    rl.on('SIGINT', () => finish(null, { ...s, result: 'quit' } as S));
     input.on('keypress', onKey);
     output.on('resize', draw);
     input.setRawMode?.(true);
@@ -85,8 +97,8 @@ export function screen(state, { move, render }, { input, output } = STD) {
 }
 
 // Yes / No on one line: ←/→ to switch, y/n to pick, enter to confirm. null on ctrl-c.
-export async function confirm(message, initial = true, io = STD) {
-  const s = await screen(
+export async function confirm(message: string, initial = true, io = STD) {
+  const s = await screen<{ yes: boolean; result?: 'done' | 'quit' }>(
     { yes: initial },
     {
       move: (st, k) => {
@@ -95,7 +107,7 @@ export async function confirm(message, initial = true, io = STD) {
         return k === 'return' ? { ...st, result: 'done' } : st;
       },
       render: (st) => {
-        const choice = (label, on) => (on ? paint(['bold', 'inverse'], ` ${label} `) : ` ${label} `);
+        const choice = (label: string, on: boolean) => (on ? paint(['bold', 'inverse'], ` ${label} `) : ` ${label} `);
         return [`${message}  ${choice('Yes', st.yes)} / ${choice('No', !st.yes)}`];
       },
     },
@@ -105,7 +117,7 @@ export async function confirm(message, initial = true, io = STD) {
 }
 
 // A typed answer in line mode; null on ctrl-c.
-export async function line(message, { input, output } = STD) {
+export async function line(message: string, { input, output } = STD) {
   const rl = createLineInterface({ input, output, terminal: true });
   const ac = new AbortController();
   rl.on('SIGINT', () => ac.abort());
@@ -122,7 +134,7 @@ export async function line(message, { input, output } = STD) {
 }
 
 // A framed note; long lines wrap so text the user copies stays whole.
-export function note(title, lines) {
+export function note(title: string, lines: string[]) {
   const columns = process.stdout.columns ?? 80;
   const inner = Math.max(columns - 1, 8) - 4;
   process.stdout.write(
@@ -135,9 +147,9 @@ export function note(title, lines) {
 }
 
 // One line per step: label …, then done or failed (with the reason on the next line). fn resolves { ok, err } or throws.
-export async function progress(label, fn) {
+export async function progress<R extends { ok: boolean; err?: string }>(label: string, fn: () => Promise<R>) {
   process.stdout.write(`${label} … `);
-  let r;
+  let r: R | { ok: false; err: string };
   try {
     r = await fn();
   } catch (e) {
@@ -149,7 +161,7 @@ export async function progress(label, fn) {
   return r;
 }
 
-export function log(kind, text) {
+export function log(kind: 'info' | 'warn' | 'error', text: string) {
   const out = kind === 'warn' ? paint('yellow', text) : kind === 'error' ? paint('red', `✗ ${text}`) : text;
   process.stdout.write(`${out}\n`);
 }

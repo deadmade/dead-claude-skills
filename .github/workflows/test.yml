@@ -33,6 +33,11 @@ jobs:
       - name: Repo checks and installer tests
         run: npm test
 
+      - name: Installer typecheck
+        run: |
+          npm ci
+          npm run typecheck
+
       - name: cswap mod tests
         working-directory: plugins/opt-in/cswap
         run: claude plugin test .

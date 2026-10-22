@@ -12,7 +12,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { backup, clearTargets, replaceBin, writeSearxng } from './files.mjs';
+import { backup, clearTargets, replaceBin, writeSearxng } from './files.ts';
 
 // A config dir with a skill, settings.json, a symlinked rules dir (home-manager) and a file clean never touches.
 function config() {
@@ -104,7 +104,7 @@ test('replaceBin: a failed swap reports its own error, not the cleanup of the st
   writeFileSync(join(staged, 'x'), '');
   assert.throws(
     () => replaceBin(staged, bin, false),
-    (e) => e.syscall === 'rename',
+    (e: NodeJS.ErrnoException) => e.syscall === 'rename',
   );
   assert.equal(readFileSync(bin, 'utf8'), 'v1');
 });

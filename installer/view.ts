@@ -1,8 +1,49 @@
-// The installer's screens as pure functions: state + data in, next state or lines to draw out. ui.mjs runs them.
+// The installer's screens as pure functions: state + data in, next state or lines to draw out. ui.ts runs them.
 import { stripVTControlCharacters, styleText } from 'node:util';
-import { HINTS, TOGGLES, nameOf, withDependencies } from './core.mjs';
+import { HINTS, TOGGLES, nameOf, withDependencies, type Page } from './core.ts';
 
-const width = (s) => stripVTControlCharacters(s).length;
+type Style = Parameters<typeof styleText>[0];
+type Color = Exclude<Style, unknown[]>;
+type Size = { columns: number; rows: number };
+
+// The installer's choices: the screen it shows, where the cursor is, and what is ticked.
+export interface State {
+  screen: 'start' | 'category' | 'updates' | 'review';
+  cursor: number;
+  page: number;
+  chosen: Record<string, boolean>;
+  skip: Record<string, boolean>;
+  result?: 'apply' | 'quit' | 'ask-quit';
+}
+export interface Update {
+  id: string;
+  from?: string;
+  to: string;
+}
+// What install.ts found on this machine: everything the screens show besides the choices.
+export interface Data {
+  version: string;
+  platform: string;
+  pages: Page[];
+  current: Record<string, boolean>;
+  versions: Record<string, string>;
+  disabled: Record<string, boolean>;
+  tokens: string[];
+  deps?: Record<string, string[]>;
+  describe: (key: string) => { label: string; detail: string };
+  updates: Update[];
+  core: string;
+  hidden: { key: string; why?: string }[];
+  retired?: string[];
+  sweep?: string[];
+}
+type Row =
+  | { kind: 'page'; i: number }
+  | { kind: 'updates' | 'apply' | 'quit' | 'back' }
+  | { kind: 'item'; key: string }
+  | ({ kind: 'update' } & Update);
+
+const width = (s: string) => stripVTControlCharacters(s).length;
 
 // The named colours in Night City's palette (plugins/default/themes/night-city.json).
 const NIGHT_CITY = {
@@ -17,9 +58,9 @@ const NIGHT_CITY = {
 
 // styleText with its named colours in Night City where the terminal has 24-bit colour; elsewhere (16 colours,
 // NO_COLOR, a pipe) styleText decides.
-export function paint(format, text, stream = process.stdout) {
+export function paint(format: Style, text: string, stream: { hasColors?(depth: number): boolean } = process.stdout) {
   const all = [format].flat();
-  const color = all.find((f) => f in NIGHT_CITY);
+  const color = all.find((f): f is keyof typeof NIGHT_CITY => f in NIGHT_CITY);
   if (!color || !stream.hasColors?.(2 ** 24)) return styleText(format, text);
   const rest = all.filter((f) => f !== color);
   return `\x1b[38;2;${NIGHT_CITY[color].join(';')}m${rest.length ? styleText(rest, text) : text}\x1b[39m`;
@@ -28,12 +69,16 @@ const DANGER = ['strip-defaults', 'clean'];
 
 // A rounded box columns - 1 wide (a full-width line makes some terminals wrap). Lines wider than the inside are cut
 // to their plain text plus …; text the user must copy goes through wrap() first.
-export function frame(title, lines, { columns, color = 'magenta' }) {
+export function frame(
+  title: string,
+  lines: string[],
+  { columns, color = 'magenta' }: { columns: number; color?: Style },
+) {
   const w = Math.max(columns - 1, 8);
   const inner = w - 4;
-  const border = (s) => paint(color, s);
+  const border = (s: string) => paint(color, s);
   const t = width(title) > w - 6 ? `${stripVTControlCharacters(title).slice(0, w - 7)}…` : title;
-  const fit = (l) => (width(l) > inner ? `${stripVTControlCharacters(l).slice(0, inner - 1)}…` : l);
+  const fit = (l: string) => (width(l) > inner ? `${stripVTControlCharacters(l).slice(0, inner - 1)}…` : l);
   return [
     `${border('╭─')} ${t} ${border(`${'─'.repeat(w - 5 - width(t))}╮`)}`,
     ...lines.map(fit).map((l) => `${border('│')} ${l}${' '.repeat(inner - width(l))} ${border('│')}`),
@@ -42,9 +87,9 @@ export function frame(title, lines, { columns, color = 'magenta' }) {
 }
 
 // Word-wraps text to width; words longer than width are broken, never cut. A line that fits keeps its color.
-export function wrap(text, w) {
+export function wrap(text: string, w: number) {
   if (width(text) <= w) return [text];
-  const out = [];
+  const out: string[] = [];
   let line = '';
   for (let word of stripVTControlCharacters(text).split(' ')) {
     while (word.length > w) {
@@ -64,20 +109,26 @@ export function wrap(text, w) {
   return out;
 }
 
-export const initial = (chosen) => ({ screen: 'start', cursor: 0, page: 0, chosen, skip: {} });
+export const initial = (chosen: Record<string, boolean>): State => ({
+  screen: 'start',
+  cursor: 0,
+  page: 0,
+  chosen,
+  skip: {},
+});
 
 // Updates of plugins that stay installed (bundle plugins aren't on any page and always do); skipped ones included,
 // so the Updates screen can untick them.
-const liveUpdates = (s, data) => {
+const liveUpdates = (s: State, data: Data) => {
   const keys = data.pages.flatMap((p) => p.keys);
   return data.updates.filter((u) => !keys.includes(u.id) || s.chosen[u.id]);
 };
 
-export function changeList(s, data) {
+export function changeList(s: State, data: Data) {
   const keys = data.pages.flatMap((p) => p.keys);
-  const diff = (k) => !!s.chosen[k] !== !!data.current[k];
-  const plugin = (k) => !TOGGLES.includes(k);
-  const toggle = (k) => TOGGLES.includes(k) && !DANGER.includes(k);
+  const diff = (k: string) => !!s.chosen[k] !== !!data.current[k];
+  const plugin = (k: string) => !TOGGLES.includes(k);
+  const toggle = (k: string) => TOGGLES.includes(k) && !DANGER.includes(k);
   // data.deps: { id: dependency ids }. Dependencies of a chosen plugin are installed whatever their own row says.
   const deps = data.deps ?? {};
   const all = [...new Set([...keys.filter(plugin), ...Object.keys(deps), ...Object.values(deps).flat()])];
@@ -109,33 +160,38 @@ export function changeList(s, data) {
 }
 
 // The rows the cursor walks on each screen.
-export function rowsOf(s, data) {
+export function rowsOf(s: State, data: Data): Row[] {
   if (s.screen === 'start') {
     return [
-      ...data.pages.map((p, i) => ({ kind: 'page', i })),
-      ...(liveUpdates(s, data).length ? [{ kind: 'updates' }] : []),
+      ...data.pages.map((_, i) => ({ kind: 'page' as const, i })),
+      ...(liveUpdates(s, data).length ? [{ kind: 'updates' as const }] : []),
       { kind: 'apply' },
       { kind: 'quit' },
     ];
   }
   if (s.screen === 'category')
-    return [{ kind: 'back' }, ...data.pages[s.page].keys.map((key) => ({ kind: 'item', key }))];
-  if (s.screen === 'updates') return [{ kind: 'back' }, ...liveUpdates(s, data).map((u) => ({ kind: 'update', ...u }))];
+    return [{ kind: 'back' }, ...data.pages[s.page].keys.map((key) => ({ kind: 'item' as const, key }))];
+  if (s.screen === 'updates')
+    return [{ kind: 'back' }, ...liveUpdates(s, data).map((u) => ({ kind: 'update' as const, ...u }))];
   return [{ kind: 'apply' }, { kind: 'back' }, { kind: 'quit' }];
 }
 
-const toStart = (s, data, kind, i) => {
-  const cursor = rowsOf({ ...s, screen: 'start' }, data).findIndex(
-    (r) => r.kind === kind && (i === undefined || r.i === i),
-  );
+// The start screen's row of that kind (and page i).
+const isRow = (r: Row | undefined, kind: Row['kind'], i?: number) =>
+  r?.kind === kind && (i === undefined || (r.kind === 'page' && r.i === i));
+
+const toStart = (s: State, data: Data, kind: Row['kind'], i?: number): State => {
+  const cursor = rowsOf({ ...s, screen: 'start' }, data).findIndex((r) => isRow(r, kind, i));
   return { ...s, screen: 'start', cursor: Math.max(cursor, 0) };
 };
 
 // key: a keypress name. Sets result ('apply' | 'quit' | 'ask-quit') when the screen should end.
-export function move(s, key, data) {
+export function move(s: State, key: string, data: Data): State {
   const rows = rowsOf(s, data);
   const n = rows.length;
-  const step = { up: -1, down: 1, ...(s.screen === 'review' && { left: -1, right: 1 }) }[key];
+  const step = ({ up: -1, down: 1, ...(s.screen === 'review' && { left: -1, right: 1 }) } as Record<string, number>)[
+    key
+  ];
   if (step) return { ...s, cursor: (s.cursor + step + n) % n };
   const back = s.screen === 'updates' ? toStart(s, data, 'updates') : toStart(s, data, 'page', s.page);
   if (key === 'escape') {
@@ -146,7 +202,7 @@ export function move(s, key, data) {
   const row = rows[s.cursor];
   if (s.screen === 'review') {
     if (row.kind === 'back') return toStart(s, data, 'apply');
-    return { ...s, result: row.kind };
+    return row.kind === 'apply' || row.kind === 'quit' ? { ...s, result: row.kind } : s;
   }
   switch (row.kind) {
     case 'page':
@@ -168,7 +224,7 @@ export function move(s, key, data) {
   }
 }
 
-const COLORS = {
+const COLORS: Record<string, Color> = {
   workflow: 'cyan',
   lsp: 'yellow',
   mcp: 'blue',
@@ -177,15 +233,15 @@ const COLORS = {
   danger: 'red',
   other: 'white',
 };
-const LABELS = { ccstatusline: 'status line' };
-const pad = (s, n) => s + ' '.repeat(Math.max(0, n - width(s)));
-const pointer = (on) => (on ? paint(['bold', 'magenta'], '❯') : ' ');
+const LABELS: Record<string, string> = { ccstatusline: 'status line' };
+const pad = (s: string, n: number) => s + ' '.repeat(Math.max(0, n - width(s)));
+const pointer = (on: boolean) => (on ? paint(['bold', 'magenta'], '❯') : ' ');
 // Lines outside the frame obey the same width rule as the frame.
-const fitLine = (l, columns) =>
+const fitLine = (l: string, columns: number) =>
   width(l) > columns - 1 ? `${stripVTControlCharacters(l).slice(0, Math.max(columns - 2, 0))}…` : l;
 
 // What the start screen says a page holds after the pending changes.
-function pageValue(page, s, data) {
+function pageValue(page: Page, s: State, data: Data) {
   const parts = page.keys.flatMap((k) => {
     const [want, has] = [!!s.chosen[k], !!data.current[k]];
     if (page.id === 'danger') return want ? [paint('red', nameOf(k))] : [];
@@ -203,7 +259,7 @@ function pageValue(page, s, data) {
 }
 
 // The state word for one item on a category screen.
-function stateOf(k, s, data) {
+function stateOf(k: string, s: State, data: Data) {
   const [want, has] = [!!s.chosen[k], !!data.current[k]];
   if (TOGGLES.includes(k)) {
     if (want !== has) return paint(['bold', want ? 'green' : 'red'], want ? 'will turn on' : 'will turn off');
@@ -219,24 +275,25 @@ function stateOf(k, s, data) {
 }
 
 // A window of `size` rows around the cursor.
-function scroll(lines, cursor, size) {
+function scroll(lines: string[], cursor: number, size: number) {
   if (lines.length <= size) return lines;
   const start = Math.min(Math.max(0, cursor - size + 1), lines.length - size);
   return lines.slice(start, start + size);
 }
 
 // At most n lines; a cut ends in …. For the wrapped blurb and description.
-const cap = (lines, n) =>
+const cap = (lines: string[], n: number) =>
   lines.length <= n ? lines : [...lines.slice(0, n - 1), `${stripVTControlCharacters(lines[n - 1])}…`].slice(0, n);
 // At most n lines, the rest summed up as "… N more". For the review's groups.
-const more = (lines, n) =>
+const more = (lines: string[], n: number) =>
   lines.length <= n
     ? lines
     : [...lines.slice(0, Math.max(n - 1, 0)), `… ${lines.length - Math.max(n - 1, 0)} more`].slice(0, Math.max(n, 1));
 
-function startScreen(s, data, { columns, rows: height }) {
+function startScreen(s: State, data: Data, { columns, rows: height }: Size) {
   const rows = rowsOf(s, data);
-  const at = (kind, i) => rows[s.cursor]?.kind === kind && (i === undefined || rows[s.cursor].i === i);
+  const focused = rows[s.cursor];
+  const at = (kind: Row['kind'], i?: number) => isRow(focused, kind, i);
   const titleW = Math.max(...data.pages.map((p) => width(p.title)));
   const ups = changeList(s, data);
   const body = [
@@ -254,7 +311,7 @@ function startScreen(s, data, { columns, rows: height }) {
   ];
   const apply = ups.count ? paint(['bold', 'green', 'inverse'], ` Apply ${ups.count} changes `) : 'Nothing to change';
   // Frame top and bottom plus the two lines under it; the body scrolls around the focused row.
-  const focus = at('updates') ? body.length - 1 : 1 + (rows[s.cursor]?.i ?? 0);
+  const focus = at('updates') ? body.length - 1 : 1 + (focused?.kind === 'page' ? focused.i : 0);
   return [
     ...frame(
       `${paint(['bold', 'magenta'], 'dead-claude-skills')} ${data.version}`,
@@ -266,15 +323,20 @@ function startScreen(s, data, { columns, rows: height }) {
   ];
 }
 
-function listScreen(s, data, { columns, rows: height }) {
+function listScreen(s: State, data: Data, { columns, rows: height }: Size) {
   const inner = Math.max(columns - 1, 8) - 4;
   const list = rowsOf(s, data);
   const page = data.pages[s.page];
   const updates = s.screen === 'updates';
-  const labelW = Math.max(6, ...list.filter((r) => r.kind !== 'back').map((r) => width(nameOf(r.key ?? r.id))));
+  const labelW = Math.max(
+    6,
+    ...list
+      .flatMap((r) => (r.kind === 'item' ? [r.key] : r.kind === 'update' ? [r.id] : []))
+      .map((k) => width(nameOf(k))),
+  );
   const lines = list.map((r, i) => {
     const p = pointer(i === s.cursor);
-    if (r.kind === 'back') return `${p} ← Back`;
+    if (r.kind !== 'item' && r.kind !== 'update') return `${p} ← Back`;
     if (r.kind === 'update') {
       const what = s.skip[r.id] ? 'skip' : paint('yellow', 'will update');
       return `${p} ${pad(nameOf(r.id), labelW)}  ${r.from} → ${r.to}  ${what}`;
@@ -300,19 +362,21 @@ function listScreen(s, data, { columns, rows: height }) {
   return [...frame(title, [...head, ...scroll(lines, s.cursor, size), ...tail], { columns }), hint];
 }
 
-function reviewScreen(s, data, { columns, rows: height }) {
+function reviewScreen(s: State, data: Data, { columns, rows: height }: Size) {
   const inner = Math.max(columns - 1, 8) - 4;
   const c = changeList(s, data);
-  const name = (k) => `${nameOf(k)}${data.tokens.includes(k) ? ' (finish in Claude Code)' : ''}`;
+  const name = (k: string) => `${nameOf(k)}${data.tokens.includes(k) ? ' (finish in Claude Code)' : ''}`;
   const nameW = Math.max(0, ...c.update.map((u) => width(nameOf(u.id))));
-  const groups = [
-    ['Install', 'green', c.install.map(name)],
-    ['Remove', 'red', [...c.remove.map(name), ...c.retired.map(name), ...c.sweep]],
-    ['Update', 'yellow', c.update.map((u) => `${pad(nameOf(u.id), nameW)}  ${u.from} → ${u.to}`)],
-    ['Turn on', 'green', c.on.map((k) => LABELS[k] ?? k)],
-    ['Turn off', 'red', c.off.map((k) => LABELS[k] ?? k)],
-    ['Danger', ['bold', 'red'], c.danger.map((k) => `${k}: ${HINTS[k]}`)],
-  ].filter(([, , items]) => items.length);
+  const groups = (
+    [
+      ['Install', 'green', c.install.map(name)],
+      ['Remove', 'red', [...c.remove.map(name), ...c.retired.map(name), ...c.sweep]],
+      ['Update', 'yellow', c.update.map((u) => `${pad(nameOf(u.id), nameW)}  ${u.from} → ${u.to}`)],
+      ['Turn on', 'green', c.on.map((k) => LABELS[k] ?? k)],
+      ['Turn off', 'red', c.off.map((k) => LABELS[k] ?? k)],
+      ['Danger', ['bold', 'red'], c.danger.map((k) => `${k}: ${HINTS[k]}`)],
+    ] satisfies [string, Style, string[]][]
+  ).filter(([, , items]) => items.length);
   const body = groups.length
     ? groups.flatMap(([label, color, items]) =>
         items.flatMap((item, i) =>
@@ -347,7 +411,7 @@ function reviewScreen(s, data, { columns, rows: height }) {
 }
 
 // The lines for state's screen, each at most columns - 1 wide.
-export function render(s, data, { columns, rows }) {
+export function render(s: State, data: Data, { columns, rows }: Size) {
   const size = { columns, rows };
   const lines =
     s.screen === 'start'

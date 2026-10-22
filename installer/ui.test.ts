@@ -1,13 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PassThrough } from 'node:stream';
-import { confirm, line, progress, screen } from './ui.mjs';
+import { confirm, line, progress, screen } from './ui.ts';
 
 const tty = () => {
   const input = Object.assign(new PassThrough(), {
     isTTY: true,
     isRaw: false,
-    setRawMode(v) {
+    setRawMode(v: boolean) {
       this.isRaw = v;
       return this;
     },
@@ -21,9 +21,11 @@ const tty = () => {
 };
 // screen() drops keys from its first 50 ms (type-ahead from a running step).
 const settle = () => new Promise((r) => setTimeout(r, 60));
+type Counter = { n: number; result?: string };
 const counter = {
-  move: (s, k) => (k === 'down' ? { ...s, n: s.n + 1 } : k === 'return' ? { ...s, result: 'apply' } : s),
-  render: (s) => [`n=${s.n}`],
+  move: (s: Counter, k: string): Counter =>
+    k === 'down' ? { ...s, n: s.n + 1 } : k === 'return' ? { ...s, result: 'apply' } : s,
+  render: (s: Counter) => [`n=${s.n}`],
 };
 
 test('screen resolves on enter and restores the terminal', async () => {
@@ -79,7 +81,7 @@ test('a throwing move still restores the terminal', async () => {
 });
 
 test('confirm takes y/n and enter, ctrl-c is null', async () => {
-  const ask = async (keys, initial) => {
+  const ask = async (keys: string, initial: boolean) => {
     const io = tty();
     const done = confirm('Write?', initial, io);
     await settle();

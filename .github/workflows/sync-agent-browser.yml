@@ -15,6 +15,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # Imports installer/core.ts, so it needs a Node that strips types.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
       - name: Pin the newest agent-browser release
         id: pin
         env:
@@ -23,7 +28,7 @@ jobs:
           gh api repos/vercel-labs/agent-browser/releases/latest > "$RUNNER_TEMP/release.json"
           node --input-type=module -e '
             import { readFileSync, writeFileSync, appendFileSync } from "node:fs";
-            import { AGENT_BROWSER_FILES } from "./installer/core.mjs";
+            import { AGENT_BROWSER_FILES } from "./installer/core.ts";
             const release = JSON.parse(readFileSync(process.argv[1], "utf8"));
             const tag = /^v(\d+\.\d+\.\d+)$/.exec(release.tag_name)?.[1];
             if (!tag) throw new Error(`unexpected tag ${release.tag_name}`);

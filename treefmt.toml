@@ -17,6 +17,8 @@ excludes = [
   "plugins/shared/self-review/agents/**",
   "plugins/shared/self-review/skills/self-review/references/upstream/**",
   ".pre-commit-config.yaml",
+  # npm writes it.
+  "package-lock.json",
 ]
 
 [formatter.alejandra]

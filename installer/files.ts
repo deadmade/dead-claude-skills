@@ -1,9 +1,9 @@
-// The installer's file writes and the clean slate's backup and delete, split out of install.mjs so they can be tested.
+// The installer's file writes and the clean slate's backup and delete, split out of install.ts so they can be tested.
 import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
-import { CLEAN_TARGETS, searxngSettings } from './core.mjs';
+import { CLEAN_TARGETS, searxngSettings } from './core.ts';
 
-export function writeAtomic(file, text) {
+export function writeAtomic(file: string, text: string | Buffer) {
   mkdirSync(dirname(file), { recursive: true });
   const tmp = `${file}.tmp-${process.pid}`;
   writeFileSync(tmp, text);
@@ -12,7 +12,7 @@ export function writeAtomic(file, text) {
 
 // Moves staged to bin. aside (Windows): a running exe can be renamed but not replaced, so the old one is moved to
 // bin.old-<pid> first, put back if the swap fails, and deleted when it no longer runs (a later call sweeps it).
-export function replaceBin(staged, bin, aside) {
+export function replaceBin(staged: string, bin: string, aside: boolean) {
   const old = `${bin}.old-${process.pid}`;
   for (const f of readdirSync(dirname(bin)))
     if (f.startsWith(`${basename(bin)}.old-`))
@@ -48,7 +48,7 @@ export function replaceBin(staged, bin, aside) {
 }
 
 // Copies every clean target that exists; any failure throws before the caller deletes anything.
-export function backup(config, dir) {
+export function backup(config: string, dir: string) {
   for (const t of [...CLEAN_TARGETS, 'settings.json']) {
     const src = join(config, t);
     if (existsSync(src)) cpSync(src, join(dir, t), { recursive: true, verbatimSymlinks: true });
@@ -56,8 +56,8 @@ export function backup(config, dir) {
 }
 
 // Deletes the clean targets under config and returns what happened to each, for the summary.
-export function clearTargets(config) {
-  const out = [];
+export function clearTargets(config: string) {
+  const out: string[] = [];
   for (const t of CLEAN_TARGETS) {
     const path = join(config, t);
     if (!existsSync(path)) continue;
@@ -74,7 +74,7 @@ export function clearTargets(config) {
 
 // Writes SearXNG's settings.yml with this secret unless one exists: the container already uses that file's secret.
 // Returns whether it wrote.
-export function writeSearxng(dir, template, secret) {
+export function writeSearxng(dir: string, template: string, secret: string) {
   const file = join(dir, 'settings.yml');
   if (existsSync(file)) return false;
   writeAtomic(file, searxngSettings(template, secret));

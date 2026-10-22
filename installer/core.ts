@@ -1,5 +1,66 @@
-// Pure decisions for the installer; install.mjs does all I/O.
+// Pure decisions for the installer; install.ts does all I/O.
 import { createHash } from 'node:crypto';
+
+// settings.json: the keys the installer reads or writes; every other key passes through untouched.
+export interface Settings {
+  permissions?: { allow?: string[]; deny?: string[]; [key: string]: unknown };
+  sandbox?: Record<string, unknown>;
+  statusLine?: { command?: string; [key: string]: unknown };
+  hooks?: { PreToolUse?: HookEntry[]; [key: string]: unknown };
+  extraKnownMarketplaces?: Record<
+    string,
+    { source?: Record<string, unknown>; autoUpdate?: boolean; [key: string]: unknown }
+  >;
+  enabledPlugins?: Record<string, boolean>;
+  env?: Record<string, string>;
+  theme?: string;
+  cleanupPeriodDays?: number;
+  [key: string]: unknown;
+}
+interface HookEntry {
+  hooks?: { command?: string }[];
+}
+// .claude-plugin/marketplace.json and a plugin's .claude-plugin/plugin.json, as far as the installer reads them.
+export interface MarketplacePlugin {
+  name: string;
+  description: string;
+  source: string | { ref?: string; [key: string]: unknown };
+}
+export interface Marketplace {
+  plugins: MarketplacePlugin[];
+}
+// What the pure decisions read of a marketplace entry.
+type PluginEntry = Pick<MarketplacePlugin, 'name' | 'source'>;
+export interface PluginJson {
+  version?: string;
+  dependencies?: string[];
+  userConfig?: Record<string, { sensitive?: boolean }>;
+}
+// A row of `claude plugin list --json`.
+export interface PluginRow {
+  id: string;
+  version?: string;
+  enabled?: boolean;
+}
+// installer/agent-browser.json.
+export interface AgentBrowserPin {
+  upstream?: string;
+  sha256?: Record<string, string>;
+}
+// statusLine and sandbox: missing reads as off.
+export interface Toggles {
+  statusLine?: boolean;
+  sandbox?: boolean;
+  version: string;
+  webBuiltinsOff?: boolean;
+}
+export interface Page {
+  id: string;
+  title: string;
+  blurb: string;
+  keys: string[];
+  bulk?: boolean;
+}
 
 export const MARKETPLACE = 'dead-claude-skills';
 export const BUNDLE = 'dead-skills';
@@ -40,10 +101,10 @@ export const SECRET_DENIES = [
 const SANDBOX = { enabled: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: false };
 const DCG = 'https://raw.githubusercontent.com/Dicklesworthstone/destructive_command_guard/main';
 
-export const nameOf = (id) => id.split('@')[0];
+export const nameOf = (id: string) => id.split('@')[0];
 
 // Repo-relative manifest path of a marketplace plugin with a local (string) source; null for url sources and unknown names.
-export function manifestPath(manifest, id) {
+export function manifestPath(manifest: { plugins: PluginEntry[] }, id: string) {
   const source = manifest.plugins.find((p) => p.name === nameOf(id))?.source;
   return typeof source === 'string' ? `${source.replace(/^\.\//, '')}/.claude-plugin/plugin.json` : null;
 }
@@ -51,33 +112,34 @@ export function manifestPath(manifest, id) {
 // Our marketplace at the release tag of the installer that runs, so the plugins always match it: updating means
 // running a newer installer. As `claude plugin marketplace add` takes it, and as its settings entry.
 const REPO = 'deadmade/dead-claude-skills';
-export const marketplaceArg = (version) => `${REPO}@v${version}`;
-const marketplaceSource = (version) => ({ source: 'github', repo: REPO, ref: `v${version}` });
+export const marketplaceArg = (version: string) => `${REPO}@v${version}`;
+const marketplaceSource = (version: string) => ({ source: 'github', repo: REPO, ref: `v${version}` });
 
 // Claude Code refuses to add a marketplace whose source differs from its extraKnownMarketplaces entry, so the entry
 // is pinned before the add; the add then moves the checkout to the tag and keeps its plugins. Unchanged otherwise.
-export function pinMarketplace(settings, version) {
+export function pinMarketplace(settings: Settings, version: string) {
   const entry = settings?.extraKnownMarketplaces?.[MARKETPLACE];
   if (!entry || JSON.stringify(entry.source) === JSON.stringify(marketplaceSource(version))) return settings;
   const out = structuredClone(settings);
-  out.extraKnownMarketplaces[MARKETPLACE].source = marketplaceSource(version);
+  out.extraKnownMarketplaces![MARKETPLACE].source = marketplaceSource(version);
   return out;
 }
-const marketOf = (id) => id.split('@')[1];
+const marketOf = (id: string) => id.split('@')[1];
 // Bare dependency names resolve against our marketplace, like Claude Code does.
-export const idOf = (dep) => (dep.includes('@') ? dep : `${dep}@${MARKETPLACE}`);
+export const idOf = (dep: string) => (dep.includes('@') ? dep : `${dep}@${MARKETPLACE}`);
 
-export const bundleIds = (bundle) => [idOf(BUNDLE), ...bundle.dependencies.map(idOf)];
+export const bundleIds = (bundle: { dependencies: string[] }) => [idOf(BUNDLE), ...bundle.dependencies.map(idOf)];
 
-export const optIns = (marketplace, bundle) => [
+export const optIns = (marketplace: { plugins: PluginEntry[] }, bundle: { dependencies: string[] }) => [
   ...marketplace.plugins.map((p) => idOf(p.name)).filter((id) => !bundleIds(bundle).includes(id)),
   ...OFFICIAL_OPT_INS.map((n) => `${n}@${OFFICIAL}`),
 ];
 
-export const needsToken = (pluginJson) => Object.values(pluginJson.userConfig ?? {}).some((c) => c.sensitive === true);
+export const needsToken = (pluginJson: PluginJson) =>
+  Object.values(pluginJson.userConfig ?? {}).some((c) => c.sensitive === true);
 
 // All plugin ids. installedIds: installed bundle and opt-ins only.
-export function planPlugins(selected, installedIds, tokenPlugins) {
+export function planPlugins(selected: string[], installedIds: string[], tokenPlugins: string[]) {
   const missing = selected.filter((id) => !installedIds.includes(id));
   return {
     install: missing.filter((id) => !tokenPlugins.includes(id)),
@@ -90,7 +152,7 @@ export function planPlugins(selected, installedIds, tokenPlugins) {
 export const INCLUDED = ['mattpocock-picks', 'pstack-picks', 'tob-picks', 'self-review', 'paper-lookup'];
 
 // selected plus the opt-ins among their dependencies, transitively. depsOf(id): a plugin's dependency ids, if any.
-export function withDependencies(selected, depsOf, opts) {
+export function withDependencies(selected: string[], depsOf: (id: string) => string[] | undefined, opts: string[]) {
   const out = [...selected];
   for (let i = 0; i < out.length; i++)
     for (const d of depsOf(out[i]) ?? []) if (opts.includes(d) && !out.includes(d)) out.push(d);
@@ -98,20 +160,21 @@ export function withDependencies(selected, depsOf, opts) {
 }
 
 // A plugin we manage, installed from a marketplace we don't take it from (it'd load twice).
-export const duplicates = (installedIds, managedIds) =>
+export const duplicates = (installedIds: string[], managedIds: string[]) =>
   installedIds.filter((id) => !managedIds.includes(id) && managedIds.some((m) => nameOf(m) === nameOf(id)));
 
-export const isOurStatusLine = (s) => typeof s?.command === 'string' && s.command.includes('ccstatusline');
+export const isOurStatusLine = (s: Settings['statusLine']) =>
+  typeof s?.command === 'string' && s.command.includes('ccstatusline');
 
-export const isSandboxOn = (s) => s?.sandbox?.enabled === true;
+export const isSandboxOn = (s: Settings) => s?.sandbox?.enabled === true;
 
-export const hasDcgHook = (s) =>
+export const hasDcgHook = (s: Settings) =>
   (s?.hooks?.PreToolUse ?? []).some((e) => e?.hooks?.some((h) => /dcg(\.exe)?"?$/i.test(h?.command ?? '')));
 
 const KEEP_SESSIONS_DAYS = 36500;
 
 // True when text is JSON equal to any shipped config text (whitespace-insensitive).
-export const isShipped = (text, shippedTexts) => {
+export const isShipped = (text: string, shippedTexts: string[]) => {
   try {
     const cur = JSON.stringify(JSON.parse(text));
     return shippedTexts.some((s) => JSON.stringify(JSON.parse(s)) === cur);
@@ -121,11 +184,11 @@ export const isShipped = (text, shippedTexts) => {
 };
 
 const WEB_BUILTINS = ['WebFetch', 'WebSearch'];
-export const isWebBuiltinsOff = (s) => WEB_BUILTINS.every((d) => s?.permissions?.deny?.includes(d));
+export const isWebBuiltinsOff = (s: Settings) => WEB_BUILTINS.every((d) => s?.permissions?.deny?.includes(d));
 
 // The SearXNG container web-mcp searches through, bound to loopback only; configDir holds settings.yml.
 // shortcut: unpinned latest tag, pin when an upgrade breaks the JSON API.
-export const searxngRun = (configDir) => [
+export const searxngRun = (configDir: string) => [
   'run',
   '-d',
   '--name',
@@ -139,16 +202,26 @@ export const searxngRun = (configDir) => [
   'docker.io/searxng/searxng:latest',
 ];
 
-export const searxngSettings = (template, secret) => template.replace(/^(\s*secret_key:).*$/m, `$1 "${secret}"`);
+export const searxngSettings = (template: string, secret: string) =>
+  template.replace(/^(\s*secret_key:).*$/m, `$1 "${secret}"`);
 
 // The built-in web tools' new state: true deny them, false allow them again, undefined leave them.
 // toggle: the choice; was: it was on before; healthy: SearXNG answered JSON; installed: web-mcp was installed before
 // this run (only then can the denies be ours; someone who never had web-mcp keeps theirs).
 // Only an explicit on to off allows them again: a down SearXNG must not undo denies that are already there.
-export const webBuiltinsDecision = ({ toggle, was, healthy, installed }) =>
-  toggle ? healthy || undefined : was && installed ? false : undefined;
+export const webBuiltinsDecision = ({
+  toggle,
+  was,
+  healthy,
+  installed,
+}: {
+  toggle: boolean;
+  was: boolean;
+  healthy: boolean;
+  installed?: boolean;
+}) => (toggle ? healthy || undefined : was && installed ? false : undefined);
 
-export function mergeSettings(settings, { statusLine, sandbox, version, webBuiltinsOff }) {
+export function mergeSettings(settings: Settings, { statusLine, sandbox, version, webBuiltinsOff }: Toggles) {
   const out = structuredClone(settings);
   // Night City ships with the bundle. Claude Code colours code in a fixed Monokai a theme can't change; off, diffs take
   // Night City's own diff colours.
@@ -207,52 +280,52 @@ export const CLEAN_TARGETS = [
 ];
 
 // Everything not from our marketplace, except the official plugins we use.
-export const foreignPlugins = (installedIds, managedIds) =>
+export const foreignPlugins = (installedIds: string[], managedIds: string[]) =>
   installedIds.filter((id) => marketOf(id) !== MARKETPLACE && !managedIds.includes(id));
 
 // Ours but gone from the marketplace (dev-feature): nothing can update them, so every run removes them.
-export const retiredPlugins = (installedIds, managedIds) =>
+export const retiredPlugins = (installedIds: string[], managedIds: string[]) =>
   installedIds.filter((id) => marketOf(id) === MARKETPLACE && !managedIds.includes(id));
 
-export const foreignMarketplaces = (names) => names.filter((n) => n !== MARKETPLACE && n !== OFFICIAL);
+export const foreignMarketplaces = (names: string[]) => names.filter((n) => n !== MARKETPLACE && n !== OFFICIAL);
 
-export const isStripped = (s) => Object.entries(STRIP).every(([k, v]) => s?.[k] === v);
+export const isStripped = (s: Settings) => Object.entries(STRIP).every(([k, v]) => s?.[k] === v);
 
 // One-way: unchecking it later changes nothing, since these keys are often set by hand too.
-export function stripDefaults(settings) {
+export function stripDefaults(settings: Settings): Settings {
   const out = { ...structuredClone(settings), ...STRIP };
   out.enabledPlugins = { ...out.enabledPlugins, ...STRIP_PLUGINS };
   // Another marketplace listed here would be re-added on the next launch.
   for (const name of foreignMarketplaces(Object.keys(out.extraKnownMarketplaces ?? {})))
-    delete out.extraKnownMarketplaces[name];
+    delete out.extraKnownMarketplaces![name];
   return out;
 }
 
 // Clean slate: only our settings survive, plus the official marketplace's entry and enabledPlugins entries from ours
 // and it (claude plugin install writes them; strip already uninstalled the official plugins we don't use)
 // and dcg's hook while dcg stays on (its installer only reruns on a toggle change, so dropping it would disable dcg).
-export function resetSettings(settings, { dcg, ...toggles }) {
+export function resetSettings(settings: Settings, { dcg, ...toggles }: Toggles & { dcg?: boolean }) {
   const out = stripDefaults(mergeSettings({}, toggles));
   for (const [id, v] of Object.entries(settings.enabledPlugins ?? {})) {
-    if ([MARKETPLACE, OFFICIAL].includes(marketOf(id))) out.enabledPlugins[id] = v;
+    if ([MARKETPLACE, OFFICIAL].includes(marketOf(id))) out.enabledPlugins![id] = v;
   }
   const official = settings.extraKnownMarketplaces?.[OFFICIAL];
-  if (official) out.extraKnownMarketplaces[OFFICIAL] = official;
+  if (official) out.extraKnownMarketplaces![OFFICIAL] = official;
   if (dcg && hasDcgHook(settings)) {
-    out.hooks = { PreToolUse: settings.hooks.PreToolUse.filter((e) => hasDcgHook({ hooks: { PreToolUse: [e] } })) };
+    out.hooks = { PreToolUse: settings.hooks!.PreToolUse!.filter((e) => hasDcgHook({ hooks: { PreToolUse: [e] } })) };
   }
   return out;
 }
 
 // settings.json as written back over raw: two-space JSON with raw's line endings.
-export const settingsText = (raw, obj) => {
+export const settingsText = (raw: string, obj: unknown) => {
   const eol = raw.includes('\r\n') ? '\r\n' : '\n';
   return JSON.stringify(obj, null, 2).replaceAll('\n', eol) + eol;
 };
 
 // What writing build(settings) over raw changes: undefined when raw isn't JSON, null when nothing changes.
-export function settingsChange(raw, build) {
-  let before;
+export function settingsChange(raw: string, build: (s: Settings) => Settings) {
+  let before: Settings;
   try {
     before = JSON.parse(raw);
   } catch {
@@ -266,7 +339,7 @@ export function settingsChange(raw, build) {
 }
 
 // dcg's own installer/uninstaller: they install the binary and write or remove its Claude Code hook.
-export function dcgCommand(platform, action) {
+export function dcgCommand(platform: string, action: 'install' | 'uninstall'): [string, string[]] {
   if (platform === 'win32') {
     const script = action === 'install' ? 'install.ps1' : 'uninstall.ps1';
     const flags = action === 'install' ? ' -EasyMode -Verify' : '';
@@ -281,8 +354,11 @@ export function dcgCommand(platform, action) {
 // cswap.exe: claude-swap built by .github/workflows/build-cswap.yml and attached to this repo's release
 // v<package.json version> by release.yml. Windows only: the option is hidden elsewhere unless already installed.
 const RELEASES = `https://github.com/${REPO}/releases/download`;
+// The installer itself, built to JS and attached to every release by release.yml. One URL per version: npx caches by
+// URL, so a fixed latest/ link would keep running the first installer it fetched.
+export const installerUrl = (version: string) => `${RELEASES}/v${version}/installer.tgz`;
 
-export function cswapDownload(platform, env, release) {
+export function cswapDownload(platform: string, env: NodeJS.ProcessEnv, release: string) {
   if (platform !== 'win32' || !env.LOCALAPPDATA) return null;
   const dir = `${env.LOCALAPPDATA}\\Programs\\cswap`;
   const url = `${RELEASES}/v${release}/cswap.exe`;
@@ -290,17 +366,18 @@ export function cswapDownload(platform, env, release) {
 }
 
 // `cswap --version` prints "cswap 0.26.0"; the pin is the upstream tag "v0.26.0".
-export const cswapCurrent = (versionOutput, version) => versionOutput.trim() === `cswap ${version.replace(/^v/, '')}`;
+export const cswapCurrent = (versionOutput: string, version: string) =>
+  versionOutput.trim() === `cswap ${version.replace(/^v/, '')}`;
 
 // The user PATH with dir appended, or null when it's already there (Windows paths: case and trailing \ ignored).
-export function pathWith(userPath, dir) {
-  const norm = (p) => p.trim().replace(/\\+$/, '').toLowerCase();
+export function pathWith(userPath: string | undefined, dir: string) {
+  const norm = (p: string) => p.trim().replace(/\\+$/, '').toLowerCase();
   const parts = (userPath ?? '').split(';').filter((p) => p.trim());
   if (parts.some((p) => norm(p) === norm(dir))) return null;
   return [...parts, dir].join(';');
 }
 
-export function safeArg(s) {
+export function safeArg(s: string) {
   if (!/^[a-z0-9@.:=/_-]+$/i.test(s)) throw new Error(`refusing unsafe argument: ${JSON.stringify(s)}`);
   return s;
 }
@@ -329,7 +406,7 @@ const BINARIES = [
 ];
 
 // wanted: plugin names (plus 'ccstatusline' when that toggle is on). onPath(binary) -> bool.
-export function missingBinaries(platform, wanted, onPath) {
+export function missingBinaries(platform: string, wanted: string[], onPath: (binary: string) => boolean) {
   const win = platform === 'win32';
   return BINARIES.filter(([bin, for_]) => wanted.includes(for_) && !onPath(bin)).map(([binary, , nix, windows]) => {
     const cmd = win ? windows : nix;
@@ -339,18 +416,18 @@ export function missingBinaries(platform, wanted, onPath) {
 
 // The binaries releases ship, built per platform by .github/workflows/build-{tui-review,web-mcp}.yml and attached to the
 // vX.Y.Z release by release.yml. plugin: which plugin needs it; key: its userConfig key for the binary's path.
-export const BIN_PLUGINS = {
+export const BIN_PLUGINS: Record<string, { name: string; key: string }> = {
   'tui-review': { name: 'tui-review', key: 'binPath' },
   'web-mcp': { name: 'web-mcp', key: 'binPath' },
 };
 // Windows and Linux x64 only: no macOS or ARM builds.
-const BIN_TARGETS = {
+const BIN_TARGETS: Record<string, string> = {
   'win32-x64': 'x86_64-pc-windows-msvc',
   'linux-x64': 'x86_64-unknown-linux-musl',
 };
 
 // The release archive of binary `name` ('tui-review' or 'web-mcp') at `version` for this machine, or undefined where none is built.
-export function binAsset(name, platform, arch, version) {
+export function binAsset(name: string, platform: string, arch: string, version: string) {
   const target = BIN_TARGETS[`${platform}-${arch}`];
   if (!target) return undefined;
   const file = `${name}-${target}.${platform === 'win32' ? 'zip' : 'tar.gz'}`;
@@ -359,15 +436,26 @@ export function binAsset(name, platform, arch, version) {
 }
 
 // The checksum a `sha256sum` line starts with, lowercased; undefined when the text is not one.
-export const sha256Of = (text) => /^[0-9a-f]{64}(?=\s|$)/i.exec(text.trim())?.[0].toLowerCase();
+export const sha256Of = (text: string) => /^[0-9a-f]{64}(?=\s|$)/i.exec(text.trim())?.[0].toLowerCase();
 
 // Whether bytes hash to want, a lowercase hex sha256 (sha256Of's or a pinned one); never true without want.
-export const sha256Matches = (bytes, want) => !!want && createHash('sha256').update(bytes).digest('hex') === want;
+export const sha256Matches = (bytes: Buffer, want: string | undefined) =>
+  !!want && createHash('sha256').update(bytes).digest('hex') === want;
 
 // What to do about a binary: `skip` (one on PATH is the user's own), `configure` (ours is current, point the plugin at
 // it), `download` (none, or an older one), or `unsupported` (no build for this machine).
 // installed: the version our copy reports, or undefined when there is none.
-export function binAction({ onPath, installed, version, supported }) {
+export function binAction({
+  onPath,
+  installed,
+  version,
+  supported,
+}: {
+  onPath: boolean;
+  installed: string | undefined;
+  version: string;
+  supported: boolean;
+}) {
   if (onPath) return 'skip';
   if (installed === version) return 'configure';
   return supported ? 'download' : 'unsupported';
@@ -376,7 +464,7 @@ export function binAction({ onPath, installed, version, supported }) {
 // The installer's pages, in order. keys: plugin names and installer toggles; an opt-in not listed here lands in Other,
 // so a new marketplace plugin is never left out.
 export const TOGGLES = ['ccstatusline', 'sandbox', 'dcg', 'strip-defaults', 'clean', 'web-builtins-off'];
-export const CATEGORIES = [
+export const CATEGORIES: Page[] = [
   {
     id: 'workflow',
     title: 'Conductors & skills',
@@ -432,7 +520,7 @@ export const CATEGORIES = [
 ];
 
 // keys: opt-in plugin ids and toggle names. Returns the non-empty categories with their keys, in page order.
-export function categorize(keys) {
+export function categorize(keys: string[]) {
   const known = CATEGORIES.flatMap((c) => c.keys);
   const pages = CATEGORIES.map((c) => ({ ...c, keys: c.keys.flatMap((n) => keys.filter((k) => nameOf(k) === n)) }));
   const rest = keys.filter((k) => !known.includes(nameOf(k)) && !INCLUDED.includes(nameOf(k)));
@@ -441,7 +529,7 @@ export function categorize(keys) {
 }
 
 // Short descriptions for what marketplace.json doesn't describe: the official opt-ins and the toggles.
-export const HINTS = {
+export const HINTS: Record<string, string> = {
   'skill-creator': "Anthropic's skill for writing and testing skills",
   hookify: "Anthropic's rules-as-hooks from .claude/hookify.*.local.md",
   'rust-analyzer-lsp': 'Rust (rust-analyzer)',
@@ -457,7 +545,7 @@ export const HINTS = {
 };
 
 // Why an option can't work on this machine, or undefined when it can. version: the release whose binaries to look for.
-export function unavailable(key, platform, arch, version) {
+export function unavailable(key: string, platform: string, arch: string, version: string): string | undefined {
   const name = nameOf(key);
   if (platform === 'win32' && name === 'sandbox') return 'needs WSL2';
   if (platform === 'win32' && name === 'nix-lsp') return 'nixd is not available on Windows';
@@ -468,8 +556,12 @@ export function unavailable(key, platform, arch, version) {
   return undefined;
 }
 
-const semver = (v) => /^(\d+)\.(\d+)\.(\d+)$/.exec(v)?.slice(1).map(Number);
-const newer = (a, b) => {
+const semver = (v: string | undefined) =>
+  /^(\d+)\.(\d+)\.(\d+)$/
+    .exec(v ?? '')
+    ?.slice(1)
+    .map(Number);
+const newer = (a: string | undefined, b: string | undefined) => {
   const [x, y] = [semver(a), semver(b)];
   if (!x || !y) return false;
   const i = x.findIndex((n, k) => n !== y[k]);
@@ -477,25 +569,33 @@ const newer = (a, b) => {
 };
 
 // installed: version from `agent-browser --version` or undefined; pinned: installer/agent-browser.json. A newer one stays.
-export const agentBrowserAction = ({ installed, pinned }) =>
+export const agentBrowserAction = ({ installed, pinned }: { installed: string | undefined; pinned: string }) =>
   !installed ? 'install' : installed === pinned || newer(installed, pinned) ? 'skip' : 'upgrade';
 
 // Which agent-browser web-mcp runs: a current one on PATH as is, else ours in ~/.claude/bin, downloaded when missing
 // or older than the pin.
-export const agentBrowserPlan = ({ theirs, ours, pinned }) =>
+export const agentBrowserPlan = ({
+  theirs,
+  ours,
+  pinned,
+}: {
+  theirs: string | undefined;
+  ours: string | undefined;
+  pinned: string;
+}) =>
   theirs && agentBrowserAction({ installed: theirs, pinned }) === 'skip'
     ? { use: 'path' }
     : { use: 'ours', download: agentBrowserAction({ installed: ours, pinned }) };
 
 // agent-browser's own release binaries (statically linked musl on Linux, so NixOS runs it), keyed like BIN_TARGETS.
-export const AGENT_BROWSER_FILES = {
+export const AGENT_BROWSER_FILES: Record<string, string> = {
   'win32-x64': 'agent-browser-win32-x64.exe',
   'linux-x64': 'agent-browser-linux-musl-x64',
 };
 
 // The upstream binary for pin (installer/agent-browser.json) on this machine, checked against the pin's sha256, or
 // undefined where there is no build or no pinned hash.
-export function agentBrowserAsset(platform, arch, pin) {
+export function agentBrowserAsset(platform: string, arch: string, pin: AgentBrowserPin) {
   const key = `${platform}-${arch}`;
   const [file, digest] = [AGENT_BROWSER_FILES[key], pin.sha256?.[key]];
   if (!file || !semver(pin.upstream) || !/^[0-9a-f]{64}$/.test(digest ?? '')) return undefined;
@@ -504,11 +604,11 @@ export function agentBrowserAsset(platform, arch, pin) {
 }
 
 // `agent-browser --version` may print a name prefix ("agent-browser 0.39.1"); undefined when no version is in it.
-export const agentBrowserVersion = (out) => /(\d+\.\d+\.\d+)/.exec(out ?? '')?.[1];
+export const agentBrowserVersion = (out: string | undefined) => /(\d+\.\d+\.\d+)/.exec(out ?? '')?.[1];
 
 // { name: version } this release ships: a local plugin's plugin.json version (via localVersion(source)), or a url
 // plugin's pinned vX.Y.Z ref. Plugins without either (unpinned url sources) are left out.
-export function shippedVersions(plugins, localVersion) {
+export function shippedVersions(plugins: PluginEntry[], localVersion: (source: string) => string | undefined) {
   return Object.fromEntries(
     plugins.flatMap(({ name, source }) => {
       const v = typeof source === 'string' ? localVersion(source) : /^v(\d+\.\d+\.\d+)$/.exec(source?.ref ?? '')?.[1];
@@ -519,8 +619,8 @@ export function shippedVersions(plugins, localVersion) {
 
 // Our installed plugins whose version differs from the one this release ships, once per id. rows: `claude plugin
 // list --json`; shipped: shippedVersions(). A newer install isn't downgraded.
-export function outdated(rows, shipped) {
-  const seen = new Set();
+export function outdated(rows: PluginRow[], shipped: Record<string, string>) {
+  const seen = new Set<string>();
   return rows.flatMap(({ id, version }) => {
     const to = shipped[nameOf(id)];
     if (marketOf(id) !== MARKETPLACE || !to || seen.has(id)) return [];
