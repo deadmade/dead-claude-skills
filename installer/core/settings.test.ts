@@ -89,6 +89,22 @@ test('dcg hook detection', () => {
   assert.ok(!hasDcgHook({}));
 });
 
+// What dcg's own installers write, not the shapes we assume they write.
+const dcgHooks: Record<string, Settings | string> = JSON.parse(
+  readFileSync(new URL('./fixtures/dcg-hooks.json', import.meta.url), 'utf8'),
+);
+test(
+  'dcg hook detection reads every hook dcg writes, and a clean slate keeps it',
+  { todo: 'fixed in step 3: the PowerShell-form hook reads as off' },
+  () => {
+    for (const [os, settings] of Object.entries(dcgHooks)) {
+      if (typeof settings === 'string') continue;
+      assert.ok(hasDcgHook(settings), os);
+      assert.deepEqual(resetSettings(settings, { ...V, dcg: true }).hooks, settings.hooks, os);
+    }
+  },
+);
+
 test('strip disables defaults, keeps foreign keys, drops other marketplaces', () => {
   const before: Settings = {
     model: 'x',

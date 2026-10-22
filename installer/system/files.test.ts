@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -12,7 +13,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { backup, clearTargets, replaceBin, writeSearxng } from './files.ts';
+import { backup, clearTargets, replaceBin, writeAtomic, writeSearxng } from './files.ts';
 
 // A config dir with a skill, settings.json, a symlinked rules dir (home-manager) and a file clean never touches.
 function config() {
@@ -107,4 +108,41 @@ test('replaceBin: a failed swap reports its own error, not the cleanup of the st
     (e: NodeJS.ErrnoException) => e.syscall === 'rename',
   );
   assert.equal(readFileSync(bin, 'utf8'), 'v1');
+});
+
+// Windows: a PowerShell child holds file open with no sharing for ms, as Defender does with a fresh exe or an editor
+// with settings.json. Resolves once the file is held; released resolves when it's let go.
+async function hold(file: string, ms: number) {
+  const ps = spawn(
+    'powershell',
+    [
+      '-NoProfile',
+      '-Command',
+      `$f = [IO.File]::Open($env:DCS_FILE, 'Open', 'ReadWrite', 'None'); 'held'; Start-Sleep -Milliseconds ${ms}; $f.Close()`,
+    ],
+    { env: { ...process.env, DCS_FILE: file } },
+  );
+  await new Promise((resolve) => ps.stdout.once('data', resolve));
+  return { released: new Promise((resolve) => ps.on('close', resolve)) };
+}
+const LOCKS = { skip: process.platform !== 'win32', todo: 'fixed in step 3: no retry while a file is held open' };
+
+test('writeAtomic waits out a settings.json another program holds open', LOCKS, async () => {
+  const file = join(mkdtempSync(join(tmpdir(), 'dcs-files-')), 'settings.json');
+  writeFileSync(file, '{}');
+  const { released } = await hold(file, 500);
+  writeAtomic(file, '{"a":1}');
+  assert.equal(readFileSync(file, 'utf8'), '{"a":1}');
+  await released;
+});
+
+test('replaceBin waits out a staged binary that is still being scanned', LOCKS, async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'dcs-files-'));
+  const [bin, staged] = [join(dir, 'tool.exe'), join(dir, 'tool.exe.tmp')];
+  writeFileSync(bin, 'old');
+  writeFileSync(staged, 'new');
+  const { released } = await hold(staged, 500);
+  replaceBin(staged, bin, true);
+  assert.equal(readFileSync(bin, 'utf8'), 'new');
+  await released;
 });

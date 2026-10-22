@@ -5,14 +5,18 @@ import { pathWith } from '../core/binaries.ts';
 const ps = (cmd: string, env?: NodeJS.ProcessEnv) =>
   spawnSync('powershell', ['-NoProfile', '-Command', cmd], { encoding: 'utf8', env: { ...process.env, ...env } });
 
-// Appends dir to the user PATH unless it's there: 'added', 'present', or which half failed.
-export function addUserPath(dir: string): 'added' | 'present' | 'read-failed' | 'write-failed' {
-  const read = ps("[Environment]::GetEnvironmentVariable('Path', 'User')");
+// Appends dir to the user PATH unless it's there: 'added', 'present', or which half failed. name: the variable, which
+// only tests change.
+export function addUserPath(dir: string, name = 'Path'): 'added' | 'present' | 'read-failed' | 'write-failed' {
+  const read = ps("[Environment]::GetEnvironmentVariable($env:DCS_NAME, 'User')", { DCS_NAME: name });
   // Without the current PATH, writing would replace it with only this folder.
   if (read.status !== 0) return 'read-failed';
   const next = pathWith(read.stdout.trim(), dir);
   if (!next) return 'present';
   // The new PATH goes through the environment, never into the command text.
-  const r = ps("[Environment]::SetEnvironmentVariable('Path', $env:DCS_PATH, 'User')", { DCS_PATH: next });
+  const r = ps("[Environment]::SetEnvironmentVariable($env:DCS_NAME, $env:DCS_PATH, 'User')", {
+    DCS_NAME: name,
+    DCS_PATH: next,
+  });
   return r.status === 0 ? 'added' : 'write-failed';
 }
