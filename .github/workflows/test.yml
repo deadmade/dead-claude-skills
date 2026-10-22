@@ -38,6 +38,23 @@ jobs:
           npm ci
           npm run typecheck
 
+      # The installer as npx gets it: built, packed with its assets and without tests, and run through npx without a
+      # terminal, which it refuses only after every module has loaded.
+      - name: Installer package
+        run: |
+          npm pack
+          tar -tzf dead-claude-skills-*.tgz > packed.txt
+          grep -qx package/installer/install.js packed.txt
+          grep -qx package/installer/assets/cswap.json packed.txt
+          grep -qx package/installer/system/proc.js packed.txt
+          ! grep -q '\.test\.js$' packed.txt
+          set +e
+          out=$(npx --yes ./dead-claude-skills-*.tgz < /dev/null 2>&1)
+          code=$?
+          set -e
+          echo "$out"
+          [ "$code" = 1 ] && grep -q 'Run this in a terminal' <<< "$out"
+
       - name: cswap mod tests
         working-directory: plugins/opt-in/cswap
         run: claude plugin test .
