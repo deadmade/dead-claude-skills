@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 // Interactive installer for the dead-claude-skills marketplace: the flow. Decisions live in core/, the OS in system/,
 // each thing it applies in steps/.
-import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { missingBinaries } from './core/binaries.ts';
 import { HINTS, TOGGLES, categorize, unavailable } from './core/options.ts';
@@ -34,6 +33,7 @@ import {
   isSandboxOn,
   isStripped,
   isWebBuiltinsOff,
+  restoreHint,
   webBuiltinsDecision,
 } from './core/settings.ts';
 import {
@@ -42,7 +42,6 @@ import {
   PKG,
   SETTINGS,
   VERSION,
-  WIN,
   done,
   failures,
   green,
@@ -61,7 +60,8 @@ import { addMarketplaces, applyPlugins, listed, removeForeign } from './steps/pl
 import { applySearxng } from './steps/searxng.ts';
 import { applySettings } from './steps/settings.ts';
 import { clearTargets } from './system/files.ts';
-import { claude, onPath } from './system/proc.ts';
+import { trustSystemCerts } from './system/net.ts';
+import { claude, onPath, startSync, which } from './system/proc.ts';
 import { confirm, log, note, progress, screen } from './ui/ui.ts';
 import { type Data, changeList, initial, move, paint, render } from './ui/view.ts';
 
@@ -70,16 +70,20 @@ if (!process.stdin.isTTY || !process.stdout.isTTY) {
   process.exit(1);
 }
 
+const certs = trustSystemCerts();
+if (certs) log('warn', certs);
+
 // npx caches by URL, so the README's latest/ link runs whichever installer it fetched first. Offline: run this one.
 const latest = await fetch(LATEST_INSTALLER, { method: 'HEAD', redirect: 'manual', signal: AbortSignal.timeout(5000) })
   .then((res) => res.headers.get('location'))
   .catch(() => undefined);
 const next = newerInstaller(latest, VERSION);
-if (next) {
+const npx = next && which('npx');
+if (npx) {
   console.log(`Installer v${next} is out, running it instead of v${VERSION}.`);
-  process.exit(
-    spawnSync('npx', [...npxArgs(installerUrl(next)), ...FLAGS], { stdio: 'inherit', shell: WIN }).status ?? 1,
-  );
+  // The system certificates for npm's download too (behind HTTPS inspection it fails without them).
+  const env = { ...process.env, NODE_USE_SYSTEM_CA: '1' };
+  process.exit(startSync(npx, [...npxArgs(installerUrl(next)), ...FLAGS], { stdio: 'inherit', env }).status ?? 1);
 }
 
 const RULES = join(CONFIG, 'rules', 'dead-claude-skills.md');
@@ -286,7 +290,7 @@ note('Summary', [
   ...(done.length ? done.map((d) => green(`✓ ${d}`)) : [green('✓ nothing to change')]),
   ...failures.map((f) => red(`✗ ${f}`)),
   `marketplace autoUpdate (known_marketplaces.json): ${autoUpdate ?? 'not set'}`,
-  ...(clean ? [`restore the backup: cp -a ${backupDir}/. ${CONFIG}/`] : []),
+  ...(clean ? [`restore the backup: ${restoreHint(process.platform, backupDir!, CONFIG)}`] : []),
 ]);
 for (const id of plan.handoff) {
   note(`${nameOf(id)}: run this in Claude Code, it asks for the token`, [

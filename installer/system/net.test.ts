@@ -8,7 +8,7 @@ import { createServer as createHttps } from 'node:https';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import tls from 'node:tls';
-import { downloadBin } from './net.ts';
+import { downloadBin, trustSystemCerts } from './net.ts';
 
 const fixture = (f: string) => readFileSync(new URL(`./fixtures/${f}`, import.meta.url));
 const listen = (server: Server) =>
@@ -36,6 +36,17 @@ test('fetch trusts a root once it is in the default CA store', async () => {
   }
 });
 
+test('trustSystemCerts adds the OS store to the roots fetch trusts', () => {
+  const before = tls.getCACertificates('default');
+  try {
+    assert.equal(trustSystemCerts(), undefined);
+    const now = new Set(tls.getCACertificates('default'));
+    for (const cert of [...before, ...tls.getCACertificates('system')]) assert.ok(now.has(cert));
+  } finally {
+    tls.setDefaultCACertificates(before);
+  }
+});
+
 // The release archive of this OS, served with its .sha256 like a GitHub release.
 async function release(file: string, sum = createHash('sha256').update(fixture(file)).digest('hex')) {
   const server = createHttp((req, res) =>
@@ -48,21 +59,16 @@ const WIN = process.platform === 'win32';
 const archive = WIN ? 'fake-x86_64-pc-windows-msvc.zip' : 'fake-x86_64-unknown-linux-musl.tar.gz';
 const exe = WIN ? 'fake.exe' : 'fake';
 
-test(
-  "downloadBin unpacks this OS's release archive into place",
-  // Git Bash puts GNU tar first on PATH, which reads C:\… as a remote host and can't open a zip.
-  { todo: WIN && 'fixed in step 3: bare tar finds GNU tar' },
-  async () => {
-    const { server, url } = await release(archive);
-    const bin = join(mkdtempSync(join(tmpdir(), 'dcs-net-')), exe);
-    try {
-      await downloadBin('fake', { file: archive, url, sha256: `${url}.sha256`, exe }, bin);
-      assert.equal(readFileSync(bin, 'utf8'), 'fake binary\n');
-    } finally {
-      server.close();
-    }
-  },
-);
+test("downloadBin unpacks this OS's release archive into place", async () => {
+  const { server, url } = await release(archive);
+  const bin = join(mkdtempSync(join(tmpdir(), 'dcs-net-')), exe);
+  try {
+    await downloadBin('fake', { file: archive, url, sha256: `${url}.sha256`, exe }, bin);
+    assert.equal(readFileSync(bin, 'utf8'), 'fake binary\n');
+  } finally {
+    server.close();
+  }
+});
 
 test('downloadBin writes nothing when the checksum differs', async () => {
   const { server, url } = await release(archive, '0'.repeat(64));

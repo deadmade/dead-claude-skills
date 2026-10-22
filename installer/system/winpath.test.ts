@@ -21,20 +21,16 @@ const REGISTRY = {
   skip: !(process.platform === 'win32' && process.env.CI) && 'writes the user registry: Windows CI only',
 };
 
-test(
-  'addUserPath keeps %VAR% entries, non-ASCII folders and the expandable type',
-  { ...REGISTRY, todo: 'fixed in step 3: the PATH comes back expanded, re-encoded and as REG_SZ' },
-  () => {
-    const before = '%USERPROFILE%\\x;C:\\Schülein';
-    ps('Set-ItemProperty HKCU:\\Environment -Name $env:N -Value $env:V -Type ExpandString', { V: before });
-    try {
-      assert.equal(addUserPath('C:\\dcs-test', NAME), 'added');
-      assert.deepEqual(stored(), ['ExpandString', `${before};C:\\dcs-test`]);
-    } finally {
-      ps('Remove-ItemProperty HKCU:\\Environment -Name $env:N');
-    }
-  },
-);
+test('addUserPath keeps %VAR% entries, non-ASCII folders and the expandable type', REGISTRY, () => {
+  const before = '%USERPROFILE%\\x;C:\\Schülein';
+  ps('Set-ItemProperty HKCU:\\Environment -Name $env:N -Value $env:V -Type ExpandString', { V: before });
+  try {
+    assert.equal(addUserPath('C:\\dcs-test', NAME), 'added');
+    assert.deepEqual(stored(), ['ExpandString', `${before};C:\\dcs-test`]);
+  } finally {
+    ps('Remove-ItemProperty HKCU:\\Environment -Name $env:N');
+  }
+});
 
 test('addUserPath leaves a PATH that already has the folder alone', REGISTRY, () => {
   ps('Set-ItemProperty HKCU:\\Environment -Name $env:N -Value $env:V -Type ExpandString', {

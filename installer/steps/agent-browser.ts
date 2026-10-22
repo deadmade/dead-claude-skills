@@ -1,7 +1,6 @@
 // web-mcp's `browser` tool drives agent-browser. A current one on PATH is used as is; otherwise upstream's release
 // binary for the version pinned in installer/assets/agent-browser.json goes to ~/.claude/bin. Either way its browser is
 // installed and web-mcp's agentBrowserPath names it. Asks before a download; every failure is a summary line.
-import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import {
   AGENT_BROWSER_FILES,
@@ -10,9 +9,9 @@ import {
   agentBrowserPlan,
   agentBrowserVersion,
 } from '../core/binaries.ts';
-import { ASSETS, WIN, ask, done, failures, readJson } from '../context.ts';
+import { ASSETS, ask, done, failures, readJson } from '../context.ts';
 import { downloadBin } from '../system/net.ts';
-import { claude, errCode, onPath } from '../system/proc.ts';
+import { claude, errCode, startSync, which } from '../system/proc.ts';
 import { log, progress } from '../ui/ui.ts';
 import { BIN_DIR, WEB_MCP } from './binaries.ts';
 
@@ -20,20 +19,20 @@ export async function applyAgentBrowser() {
   const pin: AgentBrowserPin = readJson(join(ASSETS, 'agent-browser.json'));
   const pinned = pin.upstream ?? '';
   const key = `${process.platform}-${process.arch}`;
-  // npm's .cmd shim on Windows needs a shell; our own binary doesn't.
-  const versionOf = (bin: string, shell: boolean) => {
-    const r = spawnSync(bin, ['--version'], { encoding: 'utf8', shell });
+  const versionOf = (bin: string) => {
+    const r = startSync(bin, ['--version']);
     return r.status === 0 ? agentBrowserVersion(r.stdout) : undefined;
   };
   const asset = agentBrowserAsset(process.platform, process.arch, pin);
   const bin = asset && join(BIN_DIR, asset.exe);
-  const ours = bin && versionOf(bin, false);
+  const ours = bin && versionOf(bin);
+  const theirs = which('agent-browser');
   const plan = agentBrowserPlan({
-    theirs: onPath('agent-browser') ? versionOf('agent-browser', WIN) : undefined,
+    theirs: theirs && versionOf(theirs),
     ours,
     pinned,
   });
-  if (plan.use === 'path') return useAgentBrowser('agent-browser', false, WIN);
+  if (plan.use === 'path') return useAgentBrowser(theirs!, false);
   if (!asset)
     return failures.push(
       AGENT_BROWSER_FILES[key]
@@ -56,15 +55,15 @@ export async function applyAgentBrowser() {
     if (!r.ok) return failures.push(`agent-browser ${pinned}: ${r.err}`);
     done.push(`agent-browser: ${plan.download === 'install' ? 'installed' : 'upgraded to'} ${pinned} at ${bin}`);
   }
-  await useAgentBrowser(bin!, deps, false);
+  await useAgentBrowser(bin!, deps);
 }
 
 // Runs `agent-browser install` (the browser download) on the copy in use, every run, so a download that failed before
-// is retried, then points web-mcp's agentBrowserPath at it. shell: npm's .cmd shim on Windows.
-async function useAgentBrowser(path: string, deps: boolean, shell: boolean) {
+// is retried, then points web-mcp's agentBrowserPath at it. path: a full path, npm's .cmd shim on Windows included.
+async function useAgentBrowser(path: string, deps: boolean) {
   const args = deps ? ['install', '--with-deps'] : ['install'];
   log('info', `Running agent-browser ${args.join(' ')}`);
-  const run = spawnSync(path, args, { stdio: 'inherit', shell });
+  const run = startSync(path, args, { stdio: 'inherit' });
   if (run.status !== 0)
     failures.push(
       `agent-browser: \`${path} ${args.join(' ')}\` failed (${errCode(run.error) ?? `exit ${run.status}`})`,

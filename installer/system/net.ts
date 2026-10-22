@@ -3,9 +3,25 @@ import { spawnSync } from 'node:child_process';
 import { chmodSync, cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import tls from 'node:tls';
 import { WIN } from '../context.ts';
 import { sha256Matches, sha256Of } from '../core/binaries.ts';
 import { replaceBin } from './files.ts';
+import { which } from './proc.ts';
+
+// fetch trusts only Node's bundled roots, so behind HTTPS inspection (ESET at work re-signs every site with a root in the
+// Windows store) every download fails. Adding the OS store fixes fetch for this process; children don't inherit it.
+export function trustSystemCerts() {
+  try {
+    tls.setDefaultCACertificates([...tls.getCACertificates('default'), ...tls.getCACertificates('system')]);
+  } catch (e) {
+    return `couldn't load the system certificates (${e.message}), downloads trust Node's own roots only`;
+  }
+}
+
+// Windows' own bsdtar, which reads zips. A bare `tar` from Git Bash is GNU tar, which reads C:\… as a remote host.
+const tar = () =>
+  WIN ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe') : (which('tar') ?? 'tar');
 
 export async function fetchOk(url: string) {
   const res = await fetch(url);
@@ -32,8 +48,7 @@ export async function downloadBin(name: string, asset: Asset, bin: string) {
     const file = join(tmp, asset.file);
     writeFileSync(file, bytes);
     if (!asset.raw) {
-      // GNU tar on Linux, bsdtar on Windows 10+, which reads the zip too.
-      const r = spawnSync('tar', ['-xf', file, '-C', tmp], { encoding: 'utf8' });
+      const r = spawnSync(tar(), ['-xf', file, '-C', tmp], { encoding: 'utf8' });
       if (r.status !== 0)
         throw new Error(`could not unpack ${asset.file}: ${(r.stderr || r.error?.message || '').trim()}`);
     }

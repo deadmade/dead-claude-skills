@@ -60,8 +60,24 @@ export const isOurStatusLine = (s: Settings['statusLine']) =>
 
 export const isSandboxOn = (s: Settings) => s?.sandbox?.enabled === true;
 
+// The program a hook command runs. dcg's installers write a bare path (Linux) or `& '<path>'` (Windows, a PowerShell
+// call with '' for a quote); older ones wrote "<path>".
+const hookProgram = (command: string) => {
+  const c = command.trim().replace(/^&\s*/, '');
+  const quoted = /^'((?:[^']|'')*)'|^"([^"]*)"/.exec(c);
+  return quoted ? (quoted[2] ?? quoted[1].replaceAll("''", "'")) : c.split(/\s+/)[0];
+};
+
 export const hasDcgHook = (s: Settings) =>
-  (s?.hooks?.PreToolUse ?? []).some((e) => e?.hooks?.some((h) => /dcg(\.exe)?"?$/i.test(h?.command ?? '')));
+  (s?.hooks?.PreToolUse ?? []).some((e) =>
+    e?.hooks?.some((h) =>
+      /^dcg(\.exe)?$/i.test(
+        hookProgram(h?.command ?? '')
+          .split(/[\\/]/)
+          .pop()!,
+      ),
+    ),
+  );
 
 const KEEP_SESSIONS_DAYS = 36500;
 
@@ -151,6 +167,12 @@ export const CLEAN_TARGETS = [
   'workflows',
   'hooks',
 ];
+
+// The command that puts a clean slate's backup back, for the shell people use on platform.
+export const restoreHint = (platform: string, backupDir: string, config: string) =>
+  platform === 'win32'
+    ? `Copy-Item -Recurse -Force '${backupDir.replaceAll("'", "''")}\\*' '${config.replaceAll("'", "''")}'`
+    : `cp -a '${backupDir}/.' '${config}/'`;
 
 export const isStripped = (s: Settings) => Object.entries(STRIP).every(([k, v]) => s?.[k] === v);
 

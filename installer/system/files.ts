@@ -4,11 +4,24 @@ import { basename, dirname, join } from 'node:path';
 import { searxngSettings } from '../core/options.ts';
 import { CLEAN_TARGETS } from '../core/settings.ts';
 
+// Windows refuses a rename while another program has either file open: Defender scanning a fresh exe, an editor or
+// Claude Code holding settings.json. That passes, so it's retried for up to 2 s before the refusal is thrown.
+function rename(from: string, to: string) {
+  for (let i = 0; ; i++) {
+    try {
+      return renameSync(from, to);
+    } catch (e) {
+      if (process.platform !== 'win32' || i >= 20 || !['EPERM', 'EBUSY', 'EACCES'].includes(e.code)) throw e;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+    }
+  }
+}
+
 export function writeAtomic(file: string, text: string | Buffer) {
   mkdirSync(dirname(file), { recursive: true });
   const tmp = `${file}.tmp-${process.pid}`;
   writeFileSync(tmp, text);
-  renameSync(tmp, file);
+  rename(tmp, file);
 }
 
 // Moves staged to bin. aside (Windows): a running exe can be renamed but not replaced, so the old one is moved to
@@ -23,12 +36,12 @@ export function replaceBin(staged: string, bin: string, aside: boolean) {
         /* still running */
       }
   const moved = aside && existsSync(bin);
-  if (moved) renameSync(bin, old);
+  if (moved) rename(bin, old);
   try {
-    renameSync(staged, bin);
+    rename(staged, bin);
   } catch (e) {
     try {
-      if (moved) renameSync(old, bin);
+      if (moved) rename(old, bin);
     } catch (r) {
       // The swap's error stays the one reported; the next sweep would delete old, so say where it is.
       e.message += `; the old binary is at ${old} (${r.code}), rename it back to ${bin}`;
@@ -67,7 +80,7 @@ export function clearTargets(config: string) {
       out.push(`kept ${path}: symlink, remove it where it's managed`);
       continue;
     }
-    rmSync(path, { recursive: true });
+    rmSync(path, { recursive: true, maxRetries: 5 });
     out.push(`deleted ${path}`);
   }
   return out;

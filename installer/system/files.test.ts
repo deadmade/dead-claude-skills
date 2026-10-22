@@ -125,7 +125,7 @@ async function hold(file: string, ms: number) {
   await new Promise((resolve) => ps.stdout.once('data', resolve));
   return { released: new Promise((resolve) => ps.on('close', resolve)) };
 }
-const LOCKS = { skip: process.platform !== 'win32', todo: 'fixed in step 3: no retry while a file is held open' };
+const LOCKS = { skip: process.platform !== 'win32' };
 
 test('writeAtomic waits out a settings.json another program holds open', LOCKS, async () => {
   const file = join(mkdtempSync(join(tmpdir(), 'dcs-files-')), 'settings.json');

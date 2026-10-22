@@ -10,6 +10,7 @@ import {
   stripDefaults,
   isStripped,
   resetSettings,
+  restoreHint,
   CLEAN_TARGETS,
   settingsChange,
   settingsText,
@@ -93,17 +94,13 @@ test('dcg hook detection', () => {
 const dcgHooks: Record<string, Settings | string> = JSON.parse(
   readFileSync(new URL('./fixtures/dcg-hooks.json', import.meta.url), 'utf8'),
 );
-test(
-  'dcg hook detection reads every hook dcg writes, and a clean slate keeps it',
-  { todo: 'fixed in step 3: the PowerShell-form hook reads as off' },
-  () => {
-    for (const [os, settings] of Object.entries(dcgHooks)) {
-      if (typeof settings === 'string') continue;
-      assert.ok(hasDcgHook(settings), os);
-      assert.deepEqual(resetSettings(settings, { ...V, dcg: true }).hooks, settings.hooks, os);
-    }
-  },
-);
+test('dcg hook detection reads every hook dcg writes, and a clean slate keeps it', () => {
+  for (const [os, settings] of Object.entries(dcgHooks)) {
+    if (typeof settings === 'string') continue;
+    assert.ok(hasDcgHook(settings), os);
+    assert.deepEqual(resetSettings(settings, { ...V, dcg: true }).hooks, settings.hooks, os);
+  }
+});
 
 test('strip disables defaults, keeps foreign keys, drops other marketplaces', () => {
   const before: Settings = {
@@ -237,4 +234,15 @@ test('web builtins decision table', () => {
   assert.equal(webBuiltinsDecision({ toggle: false, was: false, healthy: false }), undefined);
   // Hand-added denies of someone who never had web-mcp stay.
   assert.equal(webBuiltinsDecision({ toggle: false, was: true, healthy: false, installed: false }), undefined);
+});
+
+test('the restore hint is a command for the shell of the platform', () => {
+  assert.equal(
+    restoreHint('linux', '/home/me/.claude.dead-backup-x', '/home/me/.claude'),
+    "cp -a '/home/me/.claude.dead-backup-x/.' '/home/me/.claude/'",
+  );
+  assert.equal(
+    restoreHint('win32', "C:\\Users\\O'Brien\\.claude.dead-backup-x", "C:\\Users\\O'Brien\\.claude"),
+    "Copy-Item -Recurse -Force 'C:\\Users\\O''Brien\\.claude.dead-backup-x\\*' 'C:\\Users\\O''Brien\\.claude'",
+  );
 });

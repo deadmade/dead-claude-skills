@@ -14,7 +14,9 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   clean-slate backup/delete, processes, downloads, the Windows user PATH); `steps/` one file per thing the installer
   applies; `ui/` the screens; `assets/` the shipped configs and pins. No runtime npm dependencies: Node's standard library
   only (`typescript` and `@types/node` are devDependencies, for `npm run typecheck` and the build). New logic goes into
-  `core/` or `system/` with a test next to it, not into `install.ts` or a step. Node runs the `.ts` files as they are
+  `core/` or `system/` with a test next to it, not into `install.ts` or a step. Programs start through `system/proc.ts`
+  (`which`, `start`/`startSync`), never by bare name: on Windows that searches the current folder first, and a `.cmd`
+  shim needs cmd.exe. Node runs the `.ts` files as they are
   (type stripping; Node 26+, `engines`), so only erasable syntax: no `enum`, `namespace` or parameter properties
   (`erasableSyntaxOnly`), and imports name the `.ts` file. Node won't strip types under `node_modules`, so npx can't run them: `release.yml` packs the installer
   (`npm pack`, whose `prepack` runs `tsc` and writes `installer/**/*.js`, gitignored) as `installer.tgz` on the release, and
@@ -117,8 +119,12 @@ plugins of ours that the manifest no longer lists.
 
 ## Checks
 
-- `npm test`: repo checks plus all `installer/**/*.test.ts`, `scripts/*.test.mjs` and `plugins/default/hooks/*.test.mjs` (`claude plugin validate` is skipped when `claude` isn't
-  on PATH).
+- `npm test`: repo checks plus all `installer/**/*.test.ts`, `scripts/*.test.mjs` and `plugins/default/hooks/*.test.mjs`
+  (`claude plugin validate` is skipped when `claude` isn't on PATH). The installer tests run with a line-coverage floor
+  (`--test-coverage-lines` in `package.json` and `flake.nix`; raise it, never lower it), and `installer/modules.test.ts`
+  loads every module so none hides from it. `system/` tests use the real OS: Windows-only cases skip elsewhere, the
+  registry one runs on CI only. Parsers of what other tools write test against captured output in `core/fixtures/`,
+  not shapes we assume. A test for a bug not fixed yet is marked `todo`, so it shows failing without blocking.
 - `npm ci` once, then `npm run typecheck`: `tsc --noEmit` over `installer/` (sources and tests, strict).
 - tui-review: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/tui-review`.
 - web-mcp: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/web-mcp`.

@@ -1,24 +1,24 @@
 // SearXNG in Docker for web-mcp's search. True when it answers JSON on 127.0.0.1:8888 within 30 s. Every failure is a
 // summary line, never a crash. An existing settings.yml is kept so the running container's secret stays valid.
-import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { searxngRun } from '../core/options.ts';
 import { CONFIG, asset, done, failures } from '../context.ts';
 import { writeSearxng } from '../system/files.ts';
-import { errCode, onPath } from '../system/proc.ts';
+import { errCode, startSync, which } from '../system/proc.ts';
 import { log, progress } from '../ui/ui.ts';
 
 const SEARXNG = join(CONFIG, 'searxng');
 
 export async function applySearxng(denied: boolean) {
-  if (!onPath('docker')) {
+  const file = which('docker');
+  if (!file) {
     failures.push(
       `SearXNG: docker not found; write ${join(SEARXNG, 'settings.yml')} (see installer/assets/searxng.yml) and run: docker ${searxngRun(SEARXNG).join(' ')}`,
     );
     return false;
   }
-  const docker = (...args: string[]) => spawnSync('docker', args, { encoding: 'utf8' });
+  const docker = (...args: string[]) => startSync(file, args);
   try {
     if (writeSearxng(SEARXNG, asset('searxng.yml'), randomBytes(32).toString('hex')))
       done.push(`wrote ${join(SEARXNG, 'settings.yml')}`);
