@@ -1,6 +1,7 @@
 // The installer's screens as pure functions: state + data in, next state or lines to draw out. ui.ts runs them.
 import { stripVTControlCharacters, styleText } from 'node:util';
-import { HINTS, TOGGLES, nameOf, withDependencies, type Page } from './core.ts';
+import { HINTS, TOGGLES, type Page } from '../core/options.ts';
+import { nameOf, withDependencies } from '../core/plugins.ts';
 
 type Style = Parameters<typeof styleText>[0];
 type Color = Exclude<Style, readonly unknown[]>;

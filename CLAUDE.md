@@ -8,14 +8,16 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
 
 ## Layout
 
-- `installer/`: TypeScript. `install.ts` is the entry point and does all prompting and I/O; `core.ts` holds the pure
-  decisions (settings merges, plugin plans, platform rules); `files.ts` the file writes and clean-slate backup/delete;
-  `view.ts`/`ui.ts` the screens. No runtime npm dependencies: Node's standard library only (`typescript` and
-  `@types/node` are devDependencies, for `npm run typecheck` and the build). New logic goes into `core.ts` or `files.ts`
-  with a test, not into `install.ts`. Node runs the `.ts` files as they are (type stripping; Node 26+, `engines`), so only
-  erasable syntax: no `enum`, `namespace` or parameter properties (`erasableSyntaxOnly`), and imports name the `.ts`
-  file. Node won't strip types under `node_modules`, so npx can't run them: `release.yml` packs the installer
-  (`npm pack`, whose `prepack` runs `tsc` and writes `installer/*.js`, gitignored) as `installer.tgz` on the release, and
+- `installer/`: TypeScript, by layer. `install.ts` is the entry point and only runs the flow (read state, screens, steps,
+  summary); `context.ts` holds the shared paths, version and summary lines; `core/` the pure decisions by topic
+  (`settings`, `plugins`, `binaries`, `options`, `release`); `system/` everything that touches the OS (file writes and
+  clean-slate backup/delete, processes, downloads, the Windows user PATH); `steps/` one file per thing the installer
+  applies; `ui/` the screens; `assets/` the shipped configs and pins. No runtime npm dependencies: Node's standard library
+  only (`typescript` and `@types/node` are devDependencies, for `npm run typecheck` and the build). New logic goes into
+  `core/` or `system/` with a test next to it, not into `install.ts` or a step. Node runs the `.ts` files as they are
+  (type stripping; Node 26+, `engines`), so only erasable syntax: no `enum`, `namespace` or parameter properties
+  (`erasableSyntaxOnly`), and imports name the `.ts` file. Node won't strip types under `node_modules`, so npx can't run them: `release.yml` packs the installer
+  (`npm pack`, whose `prepack` runs `tsc` and writes `installer/**/*.js`, gitignored) as `installer.tgz` on the release, and
   users run `npx --allow-remote=root <release>/latest/download/installer.tgz` (npm 12 refuses tarball URLs without the
   flag). npx caches by URL and keeps running the first installer it fetched (`--prefer-online` too), so each run reads
   the tag `latest/` redirects to and, when it is newer, hands over to that release's versioned URL (`newerInstaller`).
@@ -33,11 +35,11 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   their own until 0.3.0; the installer retires them, and `mergeSettings` moves a picked theme to its new id
   (`custom:dead-skills:night-city`: a plugin theme's id carries the plugin name).
 - Night City (`plugins/default/`): a theme (`themes/night-city.json`) plus a mod (`hooks/`). It is the house
-  look: tui-review's `hooks/theme.ts`, notify's wording and the installer's `paint` (`view.ts`) use its palette, with no
+  look: tui-review's `hooks/theme.ts`, notify's wording and the installer's `paint` (`ui/view.ts`) use its palette, with no
   stock fallback. Claude Code hardcodes syntax colours per base theme (Monokai for dark), so the installer always turns
   highlighting off. It also sets `CLAUDE_CODE_TMUX_TRUECOLOR=1`: inside tmux Claude
   Code otherwise draws in 256 colours and the theme's indigos turn grey.
-  The ccstatusline toggle writes `installer/ccstatusline-night-city.json` (`ccstatusline.json`, the old stock config, is
+  The ccstatusline toggle writes `installer/assets/ccstatusline-night-city.json` (`ccstatusline.json`, the old stock config, is
   kept only so the installer recognises and replaces it):
   Powerline (needs a Nerd Font), and since Powerline mode draws a gradient in its first colour only, the ナイトシティ
   sign is one widget per glyph. Only ponytail draws above the prompt: the flows band and Onibi's visits were removed in
@@ -52,18 +54,18 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   Conductors call each other by reading the callee's SKILL.md (`/fix-flow` → `/verify` → `/doc-audit branch`). Each
   conductor's `uses.json` lists what it runs; `scripts/flows-uses.mjs` generates flows' `dependencies` and the README
   tree from them, and check-repo fails when a listed skill is gone or the generated parts are stale. The installer
-  hides `INCLUDED` plugins (`installer/core.ts`): they arrive only as flows' dependencies (`withDependencies`).
+  hides `INCLUDED` plugins (`installer/core/plugins.ts`): they arrive only as flows' dependencies (`withDependencies`).
 - `plugins/shared/tui-review/`: a Claude Code mod (TypeScript, `hooks/`) driving the Rust binary `tui-review` (`crates/tui-review/`). The two
   share a binary cache format (`crates/tui-review/src/format.rs` ↔ `hooks/chunks.ts`) and a stdout line protocol; change both sides
   together.
 - `plugins/shared/web-mcp/`: a stdio MCP server (Rust, `crates/web-mcp/`) with `search`, `fetch`, `browser` and `lookup`, built for Windows and Linux
-  x64 only, like tui-review's binary (`build-web-mcp.yml`, `BIN_TARGETS` in `core.ts`; no macOS or ARM builds); the installer downloads it and sets `binPath`. Everything it pulls lands in
+  x64 only, like tui-review's binary (`build-web-mcp.yml`, `BIN_TARGETS` in `core/binaries.ts`; no macOS or ARM builds); the installer downloads it and sets `binPath`. Everything it pulls lands in
   `$CLAUDE_PROJECT_DIR/.web/` before Claude sees it. Ranking is BM25 only: the H4 experiment (`examples/h4.rs`, `h4`
   feature) showed embeddings don't help, so none ship. `browser` drives `agent-browser` (upstream's Rust CLI), pinned with its
-  release binaries' sha256 in `installer/agent-browser.json` (bumped by `sync-agent-browser.yml`, which imports
-  `AGENT_BROWSER_FILES` from `core.ts`). Unless a current one is on PATH, the installer keeps its own copy in
+  release binaries' sha256 in `installer/assets/agent-browser.json` (bumped by `sync-agent-browser.yml`, which imports
+  `AGENT_BROWSER_FILES` from `core/binaries.ts`). Unless a current one is on PATH, the installer keeps its own copy in
   `~/.claude/bin` (upstream's raw binary, checked against the pinned hash, downloaded when missing or older than the
-  pin); either way it sets `agentBrowserPath` to the one in use (`agentBrowserPlan` in `core.ts`). Test-only hooks: `WEB_MCP_TEST_PUBLIC_IP`
+  pin); either way it sets `agentBrowserPath` to the one in use (`agentBrowserPlan` in `core/binaries.ts`). Test-only hooks: `WEB_MCP_TEST_PUBLIC_IP`
   (debug builds or the `test-hooks` feature) treats a comma-separated list of IPs as public; `WEB_MCP_FALLBACK_MS` shortens the fetch browser fallback's deadline, `WEB_MCP_PAPERS_MS` each paper source's (8 s), `WEB_MCP_LOOKUP_MS` each lookup source's.
 - `plugins/shared/ponytail/`: vendored unchanged from upstream's newest stable release (`scripts/sync-ponytail.mjs`,
   ADR 0002): skills, SessionStart/SubagentStart/UserPromptSubmit hooks and its band mod. The sync PR carries upstream's
@@ -71,7 +73,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
 - `plugins/opt-in/md-pane/`: a mod. Pure path logic in `hooks/paths.ts`; `register.tsx` redraws replies that name an existing
   `.md` file as its own `Markdown` (only a plugin-drawn `Markdown` with `onLinkPress` receives plain link clicks, and
   only in the fullscreen terminal) and shows the clicked file in a pane, refreshed by a 1 s stat while open.
-- `plugins/opt-in/cswap/`: a mod wrapping the external `claude-swap` CLI, whose release tag is pinned in `installer/cswap.json`
+- `plugins/opt-in/cswap/`: a mod wrapping the external `claude-swap` CLI, whose release tag is pinned in `installer/assets/cswap.json`
   (bumped by `sync-cswap.yml`).
 - Notifications (`plugins/default/`, formerly the notify plugin): `hooks.json` entries (Stop, Notification, PreToolUse
   on AskUserQuestion) running one stdlib Node script, `hooks/notify.mjs`, async. Logic and tests in `hooks/lib.mjs`; Linux
@@ -115,7 +117,7 @@ plugins of ours that the manifest no longer lists.
 
 ## Checks
 
-- `npm test`: repo checks plus all `installer/*.test.ts`, `scripts/*.test.mjs` and `plugins/default/hooks/*.test.mjs` (`claude plugin validate` is skipped when `claude` isn't
+- `npm test`: repo checks plus all `installer/**/*.test.ts`, `scripts/*.test.mjs` and `plugins/default/hooks/*.test.mjs` (`claude plugin validate` is skipped when `claude` isn't
   on PATH).
 - `npm ci` once, then `npm run typecheck`: `tsc --noEmit` over `installer/` (sources and tests, strict).
 - tui-review: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/tui-review`.

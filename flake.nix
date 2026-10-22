@@ -41,7 +41,7 @@
       installer-test = pkgs.writeShellApplication {
         name = "installer-test";
         runtimeInputs = [pkgs.nodejs];
-        text = ''exec node --test 'installer/*.test.ts' 'scripts/*.test.mjs' 'plugins/default/hooks/*.test.mjs' '';
+        text = ''exec node --test 'installer/**/*.test.ts' 'scripts/*.test.mjs' 'plugins/default/hooks/*.test.mjs' '';
       };
     in
       git-hooks.lib.${system}.run {

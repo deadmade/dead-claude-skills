@@ -1,110 +1,69 @@
 #!/usr/bin/env node
-// Interactive installer for the dead-claude-skills marketplace. Decisions live in core.ts.
-import { spawn, spawnSync } from 'node:child_process';
-import { createHash, randomBytes } from 'node:crypto';
+// Interactive installer for the dead-claude-skills marketplace: the flow. Decisions live in core/, the OS in system/,
+// each thing it applies in steps/.
+import { spawnSync } from 'node:child_process';
+import { join } from 'node:path';
+import { missingBinaries } from './core/binaries.ts';
+import { HINTS, TOGGLES, categorize, unavailable } from './core/options.ts';
 import {
-  chmodSync,
-  cpSync,
-  existsSync,
-  lstatSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
-import { delimiter, join } from 'node:path';
-import {
-  type AgentBrowserPin,
   type Marketplace,
   type PluginJson,
   type PluginRow,
-  type Toggles,
   BUNDLE,
-  CLEAN_TARGETS,
-  HINTS,
-  MARKETPLACE,
+  INCLUDED,
   OFFICIAL,
-  TOGGLES,
-  BIN_PLUGINS,
-  binAction,
-  binAsset,
   bundleIds,
-  categorize,
-  cswapCurrent,
-  cswapDownload,
-  dcgCommand,
   duplicates,
   foreignMarketplaces,
   foreignPlugins,
+  idOf,
+  manifestPath,
+  nameOf,
+  needsToken,
+  optIns,
+  outdated,
+  planPlugins,
   retiredPlugins,
+  shippedVersions,
+  withDependencies,
+} from './core/plugins.ts';
+import { LATEST_INSTALLER, MARKETPLACE, installerUrl, newerInstaller, npxArgs } from './core/release.ts';
+import {
   hasDcgHook,
   isOurStatusLine,
   isSandboxOn,
-  isWebBuiltinsOff,
-  searxngRun,
-  webBuiltinsDecision,
   isStripped,
-  mergeSettings,
-  isShipped,
-  type Settings,
-  marketplaceArg,
-  missingBinaries,
-  agentBrowserAsset,
-  agentBrowserPlan,
-  AGENT_BROWSER_FILES,
-  agentBrowserVersion,
-  nameOf,
-  manifestPath,
-  needsToken,
-  optIns,
-  pathWith,
-  pinMarketplace,
-  outdated,
-  planPlugins,
-  resetSettings,
-  safeArg,
-  settingsChange,
-  settingsText,
-  sha256Of,
-  sha256Matches,
-  shippedVersions,
-  stripDefaults,
-  unavailable,
-  INCLUDED,
-  installerUrl,
-  LATEST_INSTALLER,
-  newerInstaller,
-  npxArgs,
-  idOf,
-  withDependencies,
-} from './core.ts';
-import { backup, clearTargets, replaceBin, writeAtomic, writeSearxng } from './files.ts';
-import { confirm, line, log, note, progress, screen } from './ui.ts';
-import { type Data, changeList, initial, move, paint, render } from './view.ts';
-
-const PKG = join(import.meta.dirname, '..');
-const CONFIG = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude');
-const SETTINGS = join(CONFIG, 'settings.json');
-const SEARXNG = join(CONFIG, 'searxng');
-const RULES = join(CONFIG, 'rules', 'dead-claude-skills.md');
-const CCSL = join(homedir(), '.config', 'ccstatusline', 'settings.json');
-const WIN = process.platform === 'win32';
-const FLAGS = process.argv.slice(2);
-
-// shortcut: JSON is trusted to have the shape its caller declares, as our own files and Claude Code's do.
-const readJson = (file: string) => JSON.parse(readFileSync(file, 'utf8'));
-const tryJson = <T = any>(file: string): T | undefined => {
-  try {
-    return readJson(file);
-  } catch {
-    return undefined;
-  }
-};
-const VERSION: string = readJson(join(PKG, 'package.json')).version;
-const failures: string[] = [];
-const done: string[] = [];
+  isWebBuiltinsOff,
+  webBuiltinsDecision,
+} from './core/settings.ts';
+import {
+  CONFIG,
+  FLAGS,
+  PKG,
+  SETTINGS,
+  VERSION,
+  WIN,
+  done,
+  failures,
+  green,
+  readJson,
+  red,
+  remove,
+  tryJson,
+} from './context.ts';
+import { applyAgentBrowser } from './steps/agent-browser.ts';
+import { TUI_REVIEW, WEB_MCP, applyBin } from './steps/binaries.ts';
+import { applyCcstatusline } from './steps/ccstatusline.ts';
+import { confirmClean } from './steps/clean.ts';
+import { applyCswap } from './steps/cswap.ts';
+import { applyDcg } from './steps/dcg.ts';
+import { addMarketplaces, applyPlugins, listed, removeForeign } from './steps/plugins.ts';
+import { applySearxng } from './steps/searxng.ts';
+import { applySettings } from './steps/settings.ts';
+import { clearTargets } from './system/files.ts';
+import { claude, onPath } from './system/proc.ts';
+import { confirm, log, note, progress, screen } from './ui/ui.ts';
+import { type Data, changeList, initial, move, paint, render } from './ui/view.ts';
 
 if (!process.stdin.isTTY || !process.stdout.isTTY) {
   console.error(`Run this in a terminal: npx ${npxArgs(LATEST_INSTALLER).slice(1).join(' ')}`);
@@ -123,393 +82,7 @@ if (next) {
   );
 }
 
-// --- terminal UI ------------------------------------------------------------------------------------------------
-const red = (s: string) => paint('red', s);
-const green = (s: string) => paint('green', s);
-
-// The answer of a prompt; ctrl-c (null) ends the installer.
-function must<T>(answer: T | null): T {
-  if (answer !== null) return answer;
-  log('error', done.length ? 'Stopped. What ran so far is kept.' : 'Cancelled before installing anything.');
-  process.exit(130);
-}
-
-const ask = async (message: string, initialValue: boolean) => must(await confirm(message, initialValue));
-
-// --- claude CLI -------------------------------------------------------------------------------------------------
-// input: what the command reads on stdin, or undefined.
-type Result = { ok: boolean; out: string; err: string };
-function claude(input: string | undefined, ...args: string[]) {
-  args.forEach(safeArg);
-  // Windows: one string through the shell so both claude.cmd and claude.exe resolve; args are safeArg-checked.
-  const child = WIN ? spawn(['claude', ...args].join(' '), { shell: true }) : spawn('claude', args);
-  let out = '';
-  let err = '';
-  child.stdout.setEncoding('utf8').on('data', (d) => {
-    out += d;
-  });
-  child.stderr.setEncoding('utf8').on('data', (d) => {
-    err += d;
-  });
-  child.stdin.on('error', () => {}).end(input);
-  return new Promise<Result>((resolve) => {
-    child.on('error', (e: NodeJS.ErrnoException) => {
-      log('error', `Can't run claude (${e.code}). Install Claude Code and make sure it's on PATH.`);
-      process.exit(1);
-    });
-    child.on('close', (code) => resolve({ ok: code === 0, out: out.trim(), err: (err || out).trim() }));
-  });
-}
-
-const record = (label: string, r: { ok: boolean; err?: string }) => {
-  (r.ok ? done : failures).push(r.ok ? label : `${label}: ${r.err}`);
-  return r.ok;
-};
-
-// One claude command on its own progress line. doing: shown while it runs; label: what the summary says.
-const run = async (doing: string, label: string, ...args: string[]) =>
-  record(label, await progress(doing, () => claude(undefined, ...args)));
-
-// --- files ------------------------------------------------------------------------------------------------------
-const remove = (file: string, label: string) => {
-  if (!existsSync(file)) return;
-  rmSync(file);
-  done.push(`deleted ${label}`);
-};
-
-// strip: add the default-disabling keys. reset: clean slate, replace instead of merge.
-async function applySettings(
-  toggles: Toggles & { dcg: boolean },
-  { strip, reset }: { strip: boolean; reset: boolean },
-) {
-  const build = (s: Settings) =>
-    reset ? resetSettings(s, toggles) : strip ? stripDefaults(mergeSettings(s, toggles)) : mergeSettings(s, toggles);
-  const snippet = (title: string) => note(title, JSON.stringify(build({}), null, 2).split('\n'));
-  if (existsSync(SETTINGS) && lstatSync(SETTINGS).isSymbolicLink()) {
-    failures.push(`${SETTINGS} is a symlink; merge these keys where it's managed (printed above)`);
-    return snippet(`${SETTINGS} is a symlink, not writing it. Merge these keys where it's managed`);
-  }
-  const raw = existsSync(SETTINGS) ? readFileSync(SETTINGS, 'utf8') : '{}';
-  const change = settingsChange(raw, build);
-  if (change === undefined) {
-    failures.push(`${SETTINGS} is not valid JSON; merge these keys by hand (printed above)`);
-    return snippet(`${SETTINGS} is not valid JSON. Merge these keys by hand`);
-  }
-  if (!change) return;
-  const { before, after, changed } = change;
-  const lines = (sign: string, k: string, v: unknown) =>
-    `${k}: ${JSON.stringify(v, null, 2)}`.split('\n').map((l) => `${sign} ${l}`);
-  const diff = changed.flatMap((k) => [
-    ...(k in before ? lines('-', k, before[k]).map(red) : []),
-    ...(k in after ? lines('+', k, after[k]).map(green) : []),
-  ]);
-  note('settings.json changes', [SETTINGS, '', ...diff]);
-  if (!(await ask('Write these changes?', true))) return done.push('settings.json: skipped by you');
-  writeAtomic(SETTINGS, change.text);
-  done.push(`settings.json: updated ${changed.join(', ')}`);
-}
-
-// Off only deletes the config when this installer's status line was on: the toggle also reads off for a ccstatusline
-// set up some other way, whose config isn't ours to delete.
-async function applyCcstatusline(was: boolean, on: boolean) {
-  if (!on) return was ? remove(CCSL, CCSL) : undefined;
-  const shippedFile = (f: string) => readFileSync(join(PKG, 'installer', f), 'utf8');
-  const shipped = shippedFile('ccstatusline-night-city.json');
-  if (!existsSync(CCSL)) {
-    writeAtomic(CCSL, shipped);
-    return done.push(`wrote ${CCSL}`);
-  }
-  const current = readFileSync(CCSL, 'utf8');
-  if (isShipped(current, [shipped])) return;
-  const newer = (tryJson(CCSL)?.version ?? 0) > JSON.parse(shipped).version;
-  if (newer) log('warn', `${CCSL} has a newer config version than the shipped one; keeping it is safer.`);
-  // The stock config earlier versions wrote is ours, not a customization: swap it without asking.
-  const ours = isShipped(current, [shippedFile('ccstatusline.json'), shippedFile('ccstatusline-night-city.json')]);
-  if (ours || (await ask(`${CCSL} differs from the shipped config. Replace it?`, false))) {
-    writeAtomic(CCSL, shipped);
-    done.push(`replaced ${CCSL}`);
-  } else if (current) done.push(`kept your ${CCSL}`);
-}
-
-async function applyDcg(was: boolean, on: boolean) {
-  if (was === on) return;
-  const action = on ? 'install' : 'uninstall';
-  if (
-    !(await ask(
-      `Run dcg's official ${action}er? It ${on ? 'installs dcg and adds' : 'removes dcg and'} its Claude Code hook.`,
-      true,
-    ))
-  ) {
-    return done.push(`dcg: ${action} skipped by you`);
-  }
-  log('info', `Running dcg's ${action}er`);
-  const [bin, args] = dcgCommand(process.platform, action);
-  const r = spawnSync(bin, args, { stdio: 'inherit' });
-  if (r.status !== 0) return failures.push(`dcg ${action} failed (${errCode(r.error) ?? `exit ${r.status}`})`);
-  done.push(`dcg: ${action}ed`);
-  if (on && !WIN && !onPath('dcg')) log('warn', 'dcg is not on PATH: add ~/.local/bin (NixOS: home.sessionPath).');
-}
-
-// Windows: download cswap.exe from this version's release (checked against its .sha256), put its folder on PATH.
-async function applyCswap(on: boolean) {
-  const version = readJson(join(PKG, 'installer', 'cswap.json')).upstream;
-  const dl = cswapDownload(process.platform, process.env, VERSION);
-  if (!on || !dl) return;
-  const have = existsSync(dl.exe) ? spawnSync(dl.exe, ['--version'], { encoding: 'utf8' }) : undefined;
-  if (!(have?.status === 0 && cswapCurrent(have.stdout, version))) {
-    if (!(await ask(`Download cswap.exe ${version} (claude-swap, built by this repo's CI) to ${dl.dir}?`, true))) {
-      return done.push('cswap: download skipped by you');
-    }
-    const r = await progress(`Downloading cswap.exe ${version}`, async () => {
-      const get = async (url: string) => {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
-        return res;
-      };
-      const [exe, sum] = await Promise.all([
-        get(dl.url).then((res) => res.arrayBuffer()),
-        get(dl.sha256Url).then((res) => res.text()),
-      ]);
-      const bytes = Buffer.from(exe);
-      const want = sum.trim().split(/\s+/)[0].toLowerCase();
-      const got = createHash('sha256').update(bytes).digest('hex');
-      if (got !== want) throw new Error(`checksum mismatch (got ${got}, want ${want}), nothing written`);
-      mkdirSync(dl.dir, { recursive: true });
-      const tmp = `${dl.exe}.tmp-${process.pid}`;
-      writeFileSync(tmp, bytes);
-      // A running cswap.exe (the plugin polls it) can be renamed but not replaced.
-      replaceBin(tmp, dl.exe, true);
-      return { ok: true };
-    });
-    if (!r.ok) return failures.push(`cswap download failed: ${r.err}`);
-    done.push(`cswap: installed ${version} to ${dl.exe}`);
-  }
-  if (!process.env.PATH?.toLowerCase().includes(dl.dir.toLowerCase()))
-    process.env.PATH = `${process.env.PATH};${dl.dir}`;
-  const ps = (cmd: string, env?: NodeJS.ProcessEnv) =>
-    spawnSync('powershell', ['-NoProfile', '-Command', cmd], { encoding: 'utf8', env: { ...process.env, ...env } });
-  const read = ps("[Environment]::GetEnvironmentVariable('Path', 'User')");
-  // Without the current PATH, writing would replace it with only this folder.
-  if (read.status !== 0) return failures.push(`cswap: couldn't read your user PATH; add ${dl.dir} to it by hand`);
-  const next = pathWith(read.stdout.trim(), dl.dir);
-  if (!next) return;
-  // The new PATH goes through the environment, never into the command text.
-  const r = ps("[Environment]::SetEnvironmentVariable('Path', $env:DCS_PATH, 'User')", { DCS_PATH: next });
-  if (r.status === 0) done.push(`cswap: added ${dl.dir} to your user PATH (new terminals see it)`);
-  else failures.push(`cswap: couldn't add ${dl.dir} to PATH; add it by hand`);
-}
-
-// --- tui-review and web-mcp, the binaries of tui-review and web-mcp ---------------------------------------------------------
-const TUI_REVIEW = `tui-review@${MARKETPLACE}`;
-const WEB_MCP = `web-mcp@${MARKETPLACE}`;
-const BIN_DIR = join(CONFIG, 'bin');
-
-// The version a binary reports (`<name> <version>`), or undefined when there is none or it does not run.
-function binVersionAt(name: string, path: string) {
-  if (!existsSync(path)) return undefined;
-  const r = spawnSync(path, ['--version'], { encoding: 'utf8' });
-  return new RegExp(`^${name} (\\S+)`).exec(r.stdout ?? '')?.[1];
-}
-
-async function fetchOk(url: string) {
-  const res = await fetch(url);
-  if (res.status === 404) throw new Error(`no release at ${url} yet`);
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${url}`);
-  return res;
-}
-
-// Downloads the release asset, checks its sha256, and moves the binary to bin (on Windows the old one is renamed aside
-// first). asset.digest: a pinned checksum instead of the .sha256 file; asset.raw: the download is the binary itself.
-type Asset = { file: string; url: string; exe: string; sha256?: string; digest?: string; raw?: boolean };
-async function downloadBin(name: string, asset: Asset, bin: string) {
-  const [archive, want] = await Promise.all([
-    fetchOk(asset.url).then((r) => r.arrayBuffer()),
-    asset.digest ??
-      fetchOk(asset.sha256!)
-        .then((r) => r.text())
-        .then(sha256Of),
-  ]);
-  const bytes = Buffer.from(archive);
-  if (!sha256Matches(bytes, want)) throw new Error(`${asset.file}: checksum mismatch`);
-  const tmp = mkdtempSync(join(tmpdir(), `${name}-`));
-  try {
-    const file = join(tmp, asset.file);
-    writeFileSync(file, bytes);
-    if (!asset.raw) {
-      // GNU tar on Linux, bsdtar on Windows 10+, which reads the zip too.
-      const r = spawnSync('tar', ['-xf', file, '-C', tmp], { encoding: 'utf8' });
-      if (r.status !== 0)
-        throw new Error(`could not unpack ${asset.file}: ${(r.stderr || r.error?.message || '').trim()}`);
-    }
-    mkdirSync(BIN_DIR, { recursive: true });
-    const staged = `${bin}.tmp-${process.pid}`;
-    cpSync(asset.raw ? file : join(tmp, asset.exe), staged);
-    chmodSync(staged, 0o755);
-    // Windows can rename a running exe (agent-browser's daemon, a live web-mcp) but not replace it.
-    replaceBin(staged, bin, WIN);
-  } finally {
-    rmSync(tmp, { recursive: true, force: true });
-  }
-}
-
-// A plugin that needs its binary: one on PATH is used as is; otherwise the release for this version goes to
-// ~/.claude/bin and the plugin's userConfig key points at it.
-async function applyBin(pluginName: string, plugin: string) {
-  const { name, key } = BIN_PLUGINS[pluginName];
-  const version = VERSION;
-  const asset = binAsset(name, process.platform, process.arch, version);
-  const bin = join(BIN_DIR, asset?.exe ?? (WIN ? `${name}.exe` : name));
-  const action = binAction({
-    onPath: onPath(name),
-    installed: binVersionAt(name, bin),
-    version,
-    supported: asset !== undefined,
-  });
-  const build = `build it with \`cargo build --release\` in crates/${pluginName === 'web-mcp' ? 'web-mcp' : 'tui-review'} and set its path with /plugin configure ${pluginName}`;
-  if (action === 'skip') return done.push(`${name}: using the one on PATH`);
-  if (action === 'unsupported')
-    return failures.push(`${name}: no release build for ${process.platform}-${process.arch}; ${build}`);
-  if (action === 'download') {
-    const r = await progress(`Downloading ${name} ${version}`, async () => {
-      await downloadBin(name, asset!, bin);
-      return { ok: true };
-    });
-    if (!r.ok) return failures.push(`${name} ${version}: ${r.err}; ${build}`);
-    done.push(`installed ${name} ${version} to ${bin}`);
-  }
-  const r = await claude(JSON.stringify({ [key]: bin }), 'plugin', 'configure', plugin, '--values-stdin');
-  if (r.ok) done.push(`${pluginName}: ${key} is ${bin}`);
-  else
-    failures.push(
-      `${pluginName}: could not set ${key} (${r.err}); set it to ${bin} with /plugin configure ${pluginName}`,
-    );
-}
-
-// web-mcp's `browser` tool drives agent-browser. A current one on PATH is used as is; otherwise upstream's release
-// binary for the version pinned in installer/agent-browser.json goes to ~/.claude/bin. Either way its browser is
-// installed and web-mcp's agentBrowserPath names it. Asks before a download; every failure is a summary line.
-async function applyAgentBrowser() {
-  const pin: AgentBrowserPin = readJson(join(PKG, 'installer', 'agent-browser.json'));
-  const pinned = pin.upstream ?? '';
-  const key = `${process.platform}-${process.arch}`;
-  // npm's .cmd shim on Windows needs a shell; our own binary doesn't.
-  const versionOf = (bin: string, shell: boolean) => {
-    const r = spawnSync(bin, ['--version'], { encoding: 'utf8', shell });
-    return r.status === 0 ? agentBrowserVersion(r.stdout) : undefined;
-  };
-  const asset = agentBrowserAsset(process.platform, process.arch, pin);
-  const bin = asset && join(BIN_DIR, asset.exe);
-  const ours = bin && versionOf(bin, false);
-  const plan = agentBrowserPlan({
-    theirs: onPath('agent-browser') ? versionOf('agent-browser', WIN) : undefined,
-    ours,
-    pinned,
-  });
-  if (plan.use === 'path') return useAgentBrowser('agent-browser', false, WIN);
-  if (!asset)
-    return failures.push(
-      AGENT_BROWSER_FILES[key]
-        ? `agent-browser: bad pin in installer/agent-browser.json (${JSON.stringify(pin)})`
-        : `agent-browser: no upstream build for ${key}`,
-    );
-  // --with-deps runs sudo, so it is offered only with a download, behind its own prompt (default no).
-  let deps = false;
-  if (plan.download !== 'skip') {
-    const what = plan.download === 'install' ? 'Download' : `Upgrade ${ours} to`;
-    if (!(await ask(`${what} agent-browser ${pinned} (upstream's release binary) to ${bin}, then its browser?`, true)))
-      return done.push('agent-browser: install skipped by you');
-    deps =
-      process.platform === 'linux' &&
-      (await ask('Also install the browser system packages (agent-browser install --with-deps, runs sudo)?', false));
-    const r = await progress(`Downloading agent-browser ${pinned}`, async () => {
-      await downloadBin('agent-browser', asset, bin!);
-      return { ok: true };
-    });
-    if (!r.ok) return failures.push(`agent-browser ${pinned}: ${r.err}`);
-    done.push(`agent-browser: ${plan.download === 'install' ? 'installed' : 'upgraded to'} ${pinned} at ${bin}`);
-  }
-  await useAgentBrowser(bin!, deps, false);
-}
-
-// Runs `agent-browser install` (the browser download) on the copy in use, every run, so a download that failed before
-// is retried, then points web-mcp's agentBrowserPath at it. shell: npm's .cmd shim on Windows.
-async function useAgentBrowser(path: string, deps: boolean, shell: boolean) {
-  const args = deps ? ['install', '--with-deps'] : ['install'];
-  log('info', `Running agent-browser ${args.join(' ')}`);
-  const run = spawnSync(path, args, { stdio: 'inherit', shell });
-  if (run.status !== 0)
-    failures.push(
-      `agent-browser: \`${path} ${args.join(' ')}\` failed (${errCode(run.error) ?? `exit ${run.status}`})`,
-    );
-  const r = await claude(JSON.stringify({ agentBrowserPath: path }), 'plugin', 'configure', WEB_MCP, '--values-stdin');
-  if (r.ok) done.push(`web-mcp: agentBrowserPath is ${path}`);
-  else
-    failures.push(
-      `web-mcp: could not set agentBrowserPath (${r.err}); set it to ${path} with /plugin configure web-mcp`,
-    );
-}
-
-// SearXNG in Docker for web-mcp's search. True when it answers JSON on 127.0.0.1:8888 within 30 s. Every failure is a
-// summary line, never a crash. An existing settings.yml is kept so the running container's secret stays valid.
-async function applySearxng(denied: boolean) {
-  if (!onPath('docker')) {
-    failures.push(
-      `SearXNG: docker not found; write ${join(SEARXNG, 'settings.yml')} (see installer/searxng.yml) and run: docker ${searxngRun(SEARXNG).join(' ')}`,
-    );
-    return false;
-  }
-  const docker = (...args: string[]) => spawnSync('docker', args, { encoding: 'utf8' });
-  try {
-    if (
-      writeSearxng(
-        SEARXNG,
-        readFileSync(join(PKG, 'installer', 'searxng.yml'), 'utf8'),
-        randomBytes(32).toString('hex'),
-      )
-    )
-      done.push(`wrote ${join(SEARXNG, 'settings.yml')}`);
-    const exists = docker('container', 'inspect', 'searxng').status === 0;
-    if (!exists) log('info', 'First run pulls the SearXNG image and may take a minute');
-    const r = exists ? docker('start', 'searxng') : docker(...searxngRun(SEARXNG));
-    if (r.status !== 0) {
-      failures.push(
-        `SearXNG: docker ${exists ? 'start' : 'run'} failed (${errCode(r.error) ?? (r.stderr || `exit ${r.status}`).trim()})`,
-      );
-      return false;
-    }
-  } catch (e) {
-    failures.push(`SearXNG: ${e.message}`);
-    return false;
-  }
-  const healthy = await progress('Waiting for SearXNG', async () => {
-    for (const end = Date.now() + 30000; Date.now() < end; await new Promise((r) => setTimeout(r, 1000))) {
-      try {
-        const res = await fetch('http://127.0.0.1:8888/search?q=test&format=json', {
-          signal: AbortSignal.timeout(3000),
-        });
-        if (res.ok && (await res.json())) return { ok: true };
-      } catch {
-        /* not up yet */
-      }
-    }
-    return { ok: false };
-  });
-  if (healthy.ok) done.push('SearXNG answers on 127.0.0.1:8888');
-  else
-    failures.push(
-      `SearXNG did not answer JSON within 30 s; ${denied ? 'WebSearch and WebFetch stay denied; start SearXNG (docker start searxng)' : 'the built-in WebSearch and WebFetch stay on'}. If ${join(SEARXNG, 'settings.yml')} predates this installer, check that search.formats includes json`,
-    );
-  return healthy.ok;
-}
-
-function onPath(bin: string) {
-  const exts = WIN ? (process.env.PATHEXT || '.EXE;.CMD;.BAT').split(';') : [''];
-  return (process.env.PATH || '').split(delimiter).some((d) => exts.some((e) => existsSync(join(d, bin + e))));
-}
-
-// --- run --------------------------------------------------------------------------------------------------------
-const errCode = (e: Error | undefined) => (e as NodeJS.ErrnoException | undefined)?.code;
-
+const RULES = join(CONFIG, 'rules', 'dead-claude-skills.md');
 const HANDOFF: Record<string, string[]> = {
   'mcp-github': [
     'Needs a fine-grained PAT: https://github.com/settings/personal-access-tokens/new',
@@ -522,58 +95,13 @@ const HANDOFF: Record<string, string[]> = {
   ],
 };
 
-// The settings entry Claude Code checks the add against; a symlinked or broken settings.json is left as it is.
-// Returns the file as it was, or undefined when nothing was written.
-function pinSettingsEntry() {
-  if (!existsSync(SETTINGS) || lstatSync(SETTINGS).isSymbolicLink()) return undefined;
-  const raw = readFileSync(SETTINGS, 'utf8');
-  const before = tryJson(SETTINGS);
-  const after = before && pinMarketplace(before, VERSION);
-  if (!after || after === before) return undefined;
-  writeAtomic(SETTINGS, settingsText(raw, after));
-  done.push(`settings.json: pinned the ${MARKETPLACE} marketplace to v${VERSION}`);
-  return raw;
-}
-
 log('info', `${paint(['bold', 'magenta'], 'dead-claude-skills')} v${VERSION}`);
-
-// A failed list would read as "nothing installed": stop instead of planning from it.
-function listed(what: string, r: { ok: boolean; out?: string; err?: string }) {
-  try {
-    if (r.ok) return JSON.parse(r.out || '[]');
-  } catch {
-    /* falls through to the error */
-  }
-  log('error', `Can't read the ${what} (claude plugin … list --json): ${r.err || r.out}`);
-  process.exit(1);
-}
 
 const marketplaces: { name: string }[] = listed(
   'marketplaces',
   await claude(undefined, 'plugin', 'marketplace', 'list', '--json'),
 );
-const unpinned = pinSettingsEntry();
-// Adding again also moves an existing checkout to this installer's tag.
-const market = await progress(`Adding the ${MARKETPLACE} marketplace at v${VERSION}`, () =>
-  claude(undefined, 'plugin', 'marketplace', 'add', marketplaceArg(VERSION)),
-);
-if (!market.ok) {
-  // A pinned entry the checkout doesn't match hides the marketplace from Claude Code.
-  if (unpinned !== undefined) writeAtomic(SETTINGS, unpinned);
-  log('error', `Adding the marketplace at v${VERSION} failed (does the release exist?)`);
-  process.exit(1);
-}
-// The bundle's core plugins and some opt-ins install from Anthropic's marketplace.
-if (!marketplaces.some((m) => m.name === OFFICIAL)) {
-  await run(
-    `Adding ${OFFICIAL}`,
-    `added marketplace ${OFFICIAL}`,
-    'plugin',
-    'marketplace',
-    'add',
-    `anthropics/${OFFICIAL}`,
-  );
-}
+await addMarketplaces(marketplaces);
 const plugins: PluginRow[] | { installed?: PluginRow[] } = listed(
   'installed plugins',
   await progress('Reading installed plugins', () => claude(undefined, 'plugin', 'list', '--json')),
@@ -696,50 +224,11 @@ for (;;) {
 Object.assign(chosen, state.chosen);
 const on = (k: string) => chosen[k];
 
-let clean = on('clean');
-let backupDir: string | undefined;
-if (clean) {
-  backupDir = `${CONFIG}.dead-backup-${new Date().toISOString().replace(/[:.]/g, '-')}`;
-  note('Clean slate', [
-    ...[
-      `${SETTINGS} is replaced with only this installer's settings, and these are deleted:`,
-      ...CLEAN_TARGETS.map((t) => join(CONFIG, t))
-        .filter(existsSync)
-        .map((t) => `  ${t}`),
-      `Every plugin and marketplace not from dead-claude-skills is removed too, except the ${OFFICIAL} plugins used here.`,
-    ].map(red),
-    `A backup goes to ${backupDir} first.`,
-  ]);
-  const word = must(await line('Really wipe your Claude Code config? Type "clean" to continue:'));
-  clean = word?.trim() === 'clean';
-  if (!clean) done.push('clean slate: skipped by you');
-  else {
-    try {
-      backup(CONFIG, backupDir!);
-    } catch (e) {
-      log('error', `Backup failed, nothing was deleted: ${e.message}`);
-      process.exit(1);
-    }
-    done.push(`backed up your config to ${backupDir}`);
-  }
-}
+const backupDir = on('clean') ? await confirmClean() : undefined;
+const clean = backupDir !== undefined;
 const strip = clean || on('strip-defaults');
 
-const dupes = duplicates(installedIds, managed);
-const foreign = strip ? [...new Set([...foreignPlugins(installedIds, managed), ...dupes])] : [];
-if (foreign.length) {
-  log('info', `Removing plugins this setup doesn't use:\n${foreign.join('\n')}`);
-  for (const id of foreign) await run(`Uninstalling ${id}`, `uninstalled ${id}`, 'plugin', 'uninstall', id, '--json');
-} else if (dupes.length) {
-  log('warn', `Same plugins installed from another marketplace (they'd load twice):\n${dupes.join('\n')}`);
-  if (await ask('Uninstall them?', true)) {
-    for (const id of dupes) await run(`Uninstalling ${id}`, `uninstalled ${id}`, 'plugin', 'uninstall', id, '--json');
-  }
-}
-// After their plugins are gone, so nothing is left pointing at a removed marketplace.
-const foreignMarkets = strip ? foreignMarketplaces(marketplaces.map((m) => m.name)) : [];
-for (const name of foreignMarkets)
-  await run(`Removing marketplace ${name}`, `removed marketplace ${name}`, 'plugin', 'marketplace', 'remove', name);
+const removed = await removeForeign({ strip, installedIds, managed, marketplaces });
 
 // INCLUDED plugins have no row: only a chosen plugin's dependencies select them.
 const selected = withDependencies(
@@ -756,24 +245,13 @@ const plan = planPlugins(
 const installedJson: Record<string, { auto?: boolean }[]> =
   tryJson(join(CONFIG, 'plugins', 'installed_plugins.json'))?.plugins ?? {};
 plan.install.push(...selected.filter((id) => opts.includes(id) && installedJson[id]?.some((e) => e.auto)));
-for (const id of plan.install)
-  await run(`Installing ${nameOf(id)}`, `installed ${id}`, 'plugin', 'install', id, '--scope', 'user', '--json');
-for (const id of plan.uninstall)
-  await run(`Uninstalling ${nameOf(id)}`, `uninstalled ${id}`, 'plugin', 'uninstall', id, '--json');
-for (const id of retired)
-  await run(`Uninstalling ${nameOf(id)}`, `uninstalled ${id} (retired)`, 'plugin', 'uninstall', id, '--json');
-for (const u of changeList(state, data).update) {
-  await run(
-    `Updating ${nameOf(u.id)} ${u.from} → ${u.to}`,
-    `updated ${u.id} ${u.from} → ${u.to}`,
-    'plugin',
-    'update',
-    u.id,
-    '--json',
-  );
-}
-if (plan.uninstall.length || retired.length || dupes.length || foreign.length)
-  await run('Pruning unused dependencies', 'pruned unused dependencies', 'plugin', 'prune', '-y');
+await applyPlugins({
+  install: plan.install,
+  remove: plan.uninstall,
+  retired,
+  updates: changeList(state, data).update,
+  removedBefore: removed.dupes.length > 0 || removed.foreign.length > 0,
+});
 if (selected.includes(TUI_REVIEW)) await applyBin('tui-review', TUI_REVIEW);
 if (selected.includes(WEB_MCP)) await applyBin('web-mcp', WEB_MCP);
 

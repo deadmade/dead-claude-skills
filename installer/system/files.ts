@@ -1,7 +1,8 @@
 // The installer's file writes and the clean slate's backup and delete, split out of install.ts so they can be tested.
 import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
-import { CLEAN_TARGETS, searxngSettings } from './core.ts';
+import { searxngSettings } from '../core/options.ts';
+import { CLEAN_TARGETS } from '../core/settings.ts';
 
 export function writeAtomic(file: string, text: string | Buffer) {
   mkdirSync(dirname(file), { recursive: true });

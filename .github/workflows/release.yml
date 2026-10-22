@@ -26,7 +26,7 @@ jobs:
       - name: Repo checks and tests
         run: npm test
 
-  # cswap.exe is claude-swap at the pin in installer/cswap.json: while the pin is unchanged since the latest release, that
+  # cswap.exe is claude-swap at the pin in installer/assets/cswap.json: while the pin is unchanged since the latest release, that
   # release's exe (checked against its .sha256) is carried over instead of compiled again; if that fails, it's built.
   # A change to build-cswap.yml alone ships with the next pin bump (its PR run builds and smoke-tests it).
   cswap-reuse:
@@ -44,7 +44,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           prev=$(gh release view --json tagName -q .tagName 2>/dev/null || true)
-          if [ -z "$prev" ] || ! git diff --quiet "$prev" HEAD -- installer/cswap.json; then
+          if [ -z "$prev" ] || ! git diff --quiet "$prev" HEAD -- installer/assets/cswap.json; then
             echo "reused=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -94,7 +94,7 @@ jobs:
         with:
           node-version: 26
 
-      # The installer as npx runs it: prepack compiles installer/*.ts to JS, package.json's files picks what ships.
+      # The installer as npx runs it: prepack compiles installer/**/*.ts to JS, package.json's files picks what ships.
       - name: Pack the installer
         run: |
           npm ci
@@ -105,7 +105,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cswap=$(jq -r .upstream installer/cswap.json)
+          cswap=$(jq -r .upstream installer/assets/cswap.json)
           gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes \
             --notes "Install or update with \`npx --allow-remote=root https://github.com/deadmade/dead-claude-skills/releases/download/$GITHUB_REF_NAME/installer.tgz\`, which pins the marketplace to this release, or with \`/plugin update\` if you added the marketplace by hand.
 

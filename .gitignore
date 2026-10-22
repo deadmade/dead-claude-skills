@@ -10,4 +10,4 @@ plugins/shared/tui-review/tests/fixture.gen.ts
 plugins/**/.claude-plugin/types/
 node_modules/
 .superpowers/
-installer/*.js
+installer/**/*.js

@@ -1,11 +1,11 @@
 name: Build cswap
 
-# cswap.exe: claude-swap (https://github.com/realiti4/claude-swap) at the tag pinned in installer/cswap.json,
+# cswap.exe: claude-swap (https://github.com/realiti4/claude-swap) at the tag pinned in installer/assets/cswap.json,
 # compiled with Nuitka into one Windows exe. PRs that touch the pin build and smoke-test it; release.yml calls
 # this workflow and attaches the exe to the vX.Y.Z release the installer downloads from.
 on:
   pull_request:
-    paths: [installer/cswap.json, .github/workflows/build-cswap.yml]
+    paths: [installer/assets/cswap.json, .github/workflows/build-cswap.yml]
   workflow_dispatch:
   workflow_call:
 
@@ -23,7 +23,7 @@ jobs:
 
       - name: Read pin
         id: pin
-        run: echo "tag=$(jq -r .upstream installer/cswap.json)" >> "$GITHUB_OUTPUT"
+        run: echo "tag=$(jq -r .upstream installer/assets/cswap.json)" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
