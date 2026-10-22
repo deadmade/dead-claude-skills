@@ -74,6 +74,9 @@ import {
   unavailable,
   INCLUDED,
   installerUrl,
+  LATEST_INSTALLER,
+  newerInstaller,
+  npxArgs,
   idOf,
   withDependencies,
 } from './core.ts';
@@ -104,8 +107,20 @@ const failures: string[] = [];
 const done: string[] = [];
 
 if (!process.stdin.isTTY || !process.stdout.isTTY) {
-  console.error(`Run this in a terminal: npx ${installerUrl(VERSION)}`);
+  console.error(`Run this in a terminal: npx ${npxArgs(LATEST_INSTALLER).slice(1).join(' ')}`);
   process.exit(1);
+}
+
+// npx caches by URL, so the README's latest/ link runs whichever installer it fetched first. Offline: run this one.
+const latest = await fetch(LATEST_INSTALLER, { method: 'HEAD', redirect: 'manual', signal: AbortSignal.timeout(5000) })
+  .then((res) => res.headers.get('location'))
+  .catch(() => undefined);
+const next = newerInstaller(latest, VERSION);
+if (next) {
+  console.log(`Installer v${next} is out, running it instead of v${VERSION}.`);
+  process.exit(
+    spawnSync('npx', [...npxArgs(installerUrl(next)), ...FLAGS], { stdio: 'inherit', shell: WIN }).status ?? 1,
+  );
 }
 
 // --- terminal UI ------------------------------------------------------------------------------------------------

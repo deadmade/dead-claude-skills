@@ -60,8 +60,8 @@ const flowsReadme = readFileSync(`${FLOWS}/README.md`, 'utf8').replace(/\r\n/g, 
 if (withTree(flowsReadme, renderTree(uses)) !== flowsReadme)
   problems.push(`${FLOWS}/README.md: uses tree is stale: ${regen}`);
 
-// --- one version: package.json and its lock, marketplace metadata.version, every local plugin.json, each Rust crate and
-// the README's installer URL (scripts/release.mjs) ---
+// --- one version: package.json and its lock, marketplace metadata.version, every local plugin.json and each Rust crate
+// (scripts/release.mjs) ---
 const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
 const lock = JSON.parse(readFileSync('package-lock.json', 'utf8'));
 for (const [where, v] of [
@@ -69,9 +69,6 @@ for (const [where, v] of [
   ['packages[""].version', lock.packages?.['']?.version],
 ])
   if (v !== version) problems.push(`package-lock.json: ${where} is ${v}, package.json has ${version}`);
-const readmeVersion = /\/releases\/download\/v([^/]*)\/installer\.tgz/.exec(readFileSync('README.md', 'utf8'))?.[1];
-if (readmeVersion !== version)
-  problems.push(`README.md: the install command names v${readmeVersion}, package.json has ${version}`);
 const marketVersion = JSON.parse(readFileSync(MARKETPLACE, 'utf8')).metadata?.version;
 if (marketVersion !== version)
   problems.push(`${MARKETPLACE}: metadata.version is ${marketVersion}, package.json has ${version}`);

@@ -20,7 +20,7 @@ The opt-in [flows](plugins/flows/README.md) plugin ties the rest together: condu
 `/fix-flow`, `/test-audit`, `/doc-audit`, `/verify`, `/learn` and more) that run the other plugins' skills in order,
 with approval gates and a state file to resume from. Picking flows installs every plugin its conductors use.
 
-    npx https://github.com/deadmade/dead-claude-skills/releases/download/v0.5.0/installer.tgz
+    npx --allow-remote=root https://github.com/deadmade/dead-claude-skills/releases/latest/download/installer.tgz
 
 The installer (Node standard library only, written in TypeScript and attached to each release built to JS) shows one page per category where you pick what to install, remove or
 update, then applies only the changes. It pins the marketplace to its own release so plugins match the installer, and
@@ -31,4 +31,4 @@ work too, but track main.
 
 Everything ships as one version, cut with `npm run release -- patch` and `git push --follow-tags origin main`; the
 tag builds the installer and the binaries and publishes the GitHub release they're downloaded from. From a checkout,
-`npm ci` once, then `node installer/install.ts` runs the installer (Node 22.18 or newer) and `npm run typecheck` checks it.
+`npm ci` once, then `node installer/install.ts` runs the installer (Node 26 or newer) and `npm run typecheck` checks it.

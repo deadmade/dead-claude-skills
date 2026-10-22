@@ -12,12 +12,13 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   decisions (settings merges, plugin plans, platform rules); `files.ts` the file writes and clean-slate backup/delete;
   `view.ts`/`ui.ts` the screens. No runtime npm dependencies: Node's standard library only (`typescript` and
   `@types/node` are devDependencies, for `npm run typecheck` and the build). New logic goes into `core.ts` or `files.ts`
-  with a test, not into `install.ts`. Node runs the `.ts` files as they are (type stripping, Node 22.18+), so only
+  with a test, not into `install.ts`. Node runs the `.ts` files as they are (type stripping; Node 26+, `engines`), so only
   erasable syntax: no `enum`, `namespace` or parameter properties (`erasableSyntaxOnly`), and imports name the `.ts`
   file. Node won't strip types under `node_modules`, so npx can't run them: `release.yml` packs the installer
   (`npm pack`, whose `prepack` runs `tsc` and writes `installer/*.js`, gitignored) as `installer.tgz` on the release, and
-  users run `npx <release>/download/vX.Y.Z/installer.tgz`. The URL names the version on purpose: npx caches by URL, so a
-  `latest/download` link would keep running the first installer it fetched. `release.mjs` bumps it in README.md.
+  users run `npx --allow-remote=root <release>/latest/download/installer.tgz` (npm 12 refuses tarball URLs without the
+  flag). npx caches by URL and keeps running the first installer it fetched (`--prefer-online` too), so each run reads
+  the tag `latest/` redirects to and, when it is newer, hands over to that release's versioned URL (`newerInstaller`).
 - `plugins/` is grouped by how a plugin gets installed: `default/` (the bundle, dead-skills, on every machine),
   `flows` (the conductors), both plain plugins at the top, then `shared/` (what flows pulls in) and `opt-in/` (extras
   nothing else depends on; `opt-in/mcp/` holds the MCP configs, `opt-in/implementation/` the language, database and LSP
@@ -32,7 +33,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   their own until 0.3.0; the installer retires them, and `mergeSettings` moves a picked theme to its new id
   (`custom:dead-skills:night-city`: a plugin theme's id carries the plugin name).
 - Night City (`plugins/default/`): a theme (`themes/night-city.json`) plus a mod (`hooks/`). It is the house
-  look: tui-review's `hooks/theme.ts`, notify's wording and the installer's `paint` (`view.mjs`) use its palette, with no
+  look: tui-review's `hooks/theme.ts`, notify's wording and the installer's `paint` (`view.ts`) use its palette, with no
   stock fallback. Claude Code hardcodes syntax colours per base theme (Monokai for dark), so the installer always turns
   highlighting off. It also sets `CLAUDE_CODE_TMUX_TRUECOLOR=1`: inside tmux Claude
   Code otherwise draws in 256 colours and the theme's indigos turn grey.

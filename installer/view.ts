@@ -3,7 +3,7 @@ import { stripVTControlCharacters, styleText } from 'node:util';
 import { HINTS, TOGGLES, nameOf, withDependencies, type Page } from './core.ts';
 
 type Style = Parameters<typeof styleText>[0];
-type Color = Exclude<Style, unknown[]>;
+type Color = Exclude<Style, readonly unknown[]>;
 type Size = { columns: number; rows: number };
 
 // The installer's choices: the screen it shows, where the cursor is, and what is ticked.

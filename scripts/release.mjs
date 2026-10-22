@@ -1,5 +1,5 @@
-// Cuts a release: one version for package.json (and its lock), the marketplace, every local plugin, both crates and the
-// README's install command, committed and tagged vX.Y.Z on main. Pushing the tag runs .github/workflows/release.yml, which
+// Cuts a release: one version for package.json (and its lock), the marketplace, every local plugin and both crates,
+// committed and tagged vX.Y.Z on main. Pushing the tag runs .github/workflows/release.yml, which
 // builds the installer, cswap.exe, tui-review and web-mcp and publishes the GitHub release. Claude Code only offers plugin
 // updates when this version changes.
 // Usage: npm run release -- patch|minor|major|X.Y.Z
@@ -36,13 +36,12 @@ if (git('tag', '--list', `v${next}`)) die(`tag v${next} already exists`);
 
 // Each file's own version line, edited in place so the rest of the file keeps its formatting. JSON: the top-level
 // (or marketplace metadata) "version"; package-lock.json also its root package's. Each Rust crate: its version, and its
-// entry in Cargo.lock so --locked builds pass. README.md: the installer URL, which names its release.
+// entry in Cargo.lock so --locked builds pass.
 const json = /^( {2,4}"version": )"[^"]*"/m;
 const bumps = [
   ['package.json', json],
   ['package-lock.json', json],
   ['package-lock.json', /^( {6}"version": )"[^"]*"/m],
-  ['README.md', /(\/releases\/download\/v)[^/]*(?=\/installer\.tgz)/, next],
   ['.claude-plugin/marketplace.json', json],
   ...pluginDirs().map((p) => [`${p}/.claude-plugin/plugin.json`, json]),
   ...[
@@ -54,10 +53,10 @@ const bumps = [
   ]),
 ];
 const files = [...new Set(bumps.map(([f]) => f))];
-for (const [f, version, to = `"${next}"`] of bumps) {
+for (const [f, version] of bumps) {
   const text = readFileSync(f, 'utf8');
   if (!version.test(text)) die(`${f} has no version to bump`);
-  writeFileSync(f, text.replace(version, `$1${to}`));
+  writeFileSync(f, text.replace(version, `$1"${next}"`));
 }
 
 if (!run('npm', ['test'])) {

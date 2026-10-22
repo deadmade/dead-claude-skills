@@ -354,9 +354,17 @@ export function dcgCommand(platform: string, action: 'install' | 'uninstall'): [
 // cswap.exe: claude-swap built by .github/workflows/build-cswap.yml and attached to this repo's release
 // v<package.json version> by release.yml. Windows only: the option is hidden elsewhere unless already installed.
 const RELEASES = `https://github.com/${REPO}/releases/download`;
-// The installer itself, built to JS and attached to every release by release.yml. One URL per version: npx caches by
-// URL, so a fixed latest/ link would keep running the first installer it fetched.
+// The installer itself, built to JS and attached to every release by release.yml. npx caches by URL, so the README's
+// latest/ link keeps running the first installer it fetched: each run hands over to a newer release (newerInstaller).
 export const installerUrl = (version: string) => `${RELEASES}/v${version}/installer.tgz`;
+export const LATEST_INSTALLER = `https://github.com/${REPO}/releases/latest/download/installer.tgz`;
+// npm 12 refuses tarball URLs unless allowed.
+export const npxArgs = (url: string) => ['--yes', '--allow-remote=root', url];
+// The version latest/ redirects to (its Location header), when it is newer than ours.
+export function newerInstaller(location: string | null | undefined, version: string) {
+  const v = /\/releases\/download\/v(\d+\.\d+\.\d+)\/installer\.tgz$/.exec(location ?? '')?.[1];
+  return v && newer(v, version) ? v : undefined;
+}
 
 export function cswapDownload(platform: string, env: NodeJS.ProcessEnv, release: string) {
   if (platform !== 'win32' || !env.LOCALAPPDATA) return null;

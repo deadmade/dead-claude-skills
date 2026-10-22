@@ -21,7 +21,7 @@ jobs:
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version: 26
 
       - name: Repo checks and tests
         run: npm test
@@ -92,7 +92,7 @@ jobs:
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version: 26
 
       # The installer as npx runs it: prepack compiles installer/*.ts to JS, package.json's files picks what ships.
       - name: Pack the installer
@@ -107,7 +107,7 @@ jobs:
         run: |
           cswap=$(jq -r .upstream installer/cswap.json)
           gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes \
-            --notes "Install or update with \`npx https://github.com/deadmade/dead-claude-skills/releases/download/$GITHUB_REF_NAME/installer.tgz\`, which pins the marketplace to this release, or with \`/plugin update\` if you added the marketplace by hand.
+            --notes "Install or update with \`npx --allow-remote=root https://github.com/deadmade/dead-claude-skills/releases/download/$GITHUB_REF_NAME/installer.tgz\`, which pins the marketplace to this release, or with \`/plugin update\` if you added the marketplace by hand.
 
           installer.tgz: the installer, built to JS.
 

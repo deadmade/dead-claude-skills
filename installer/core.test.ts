@@ -28,6 +28,7 @@ import {
   CLEAN_TARGETS,
   marketplaceArg,
   installerUrl,
+  newerInstaller,
   pinMarketplace,
   settingsChange,
   settingsText,
@@ -151,6 +152,9 @@ test('the marketplace is pinned to the installer version', () => {
     installerUrl('1.2.3'),
     'https://github.com/deadmade/dead-claude-skills/releases/download/v1.2.3/installer.tgz',
   );
+  assert.equal(newerInstaller(installerUrl('1.10.0'), '1.9.9'), '1.10.0');
+  for (const location of [installerUrl('1.2.3'), installerUrl('1.2.2'), null, 'https://example.com/v9.0.0/x.tgz'])
+    assert.equal(newerInstaller(location, '1.2.3'), undefined);
   const pinned = { source: 'github', repo: 'deadmade/dead-claude-skills', ref: 'v1.2.3' };
   const before: Settings = {
     model: 'x',
