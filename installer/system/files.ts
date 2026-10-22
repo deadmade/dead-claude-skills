@@ -5,13 +5,14 @@ import { searxngSettings } from '../core/options.ts';
 import { CLEAN_TARGETS } from '../core/settings.ts';
 
 // Windows refuses a rename while another program has either file open: Defender scanning a fresh exe, an editor or
-// Claude Code holding settings.json. That passes, so it's retried for up to 2 s before the refusal is thrown.
+// Claude Code holding settings.json. That passes (a scan of a large exe can take seconds), so it's retried for up to 5 s
+// before the refusal is thrown.
 function rename(from: string, to: string) {
   for (let i = 0; ; i++) {
     try {
       return renameSync(from, to);
     } catch (e) {
-      if (process.platform !== 'win32' || i >= 20 || !['EPERM', 'EBUSY', 'EACCES'].includes(e.code)) throw e;
+      if (process.platform !== 'win32' || i >= 50 || !['EPERM', 'EBUSY', 'EACCES'].includes(e.code)) throw e;
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
     }
   }

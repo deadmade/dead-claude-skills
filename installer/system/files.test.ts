@@ -13,7 +13,8 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { backup, clearTargets, replaceBin, writeAtomic, writeSearxng } from './files.ts';
+import { Worker } from 'node:worker_threads';
+import { backup, clearTargets, replaceBin, writeSearxng } from './files.ts';
 
 // A config dir with a skill, settings.json, a symlinked rules dir (home-manager) and a file clean never touches.
 function config() {
@@ -112,30 +113,52 @@ test('replaceBin: a failed swap reports its own error, not the cleanup of the st
   assert.equal(readFileSync(join(bin, 'v1'), 'utf8'), 'v1');
 });
 
-// Windows: a PowerShell child holds file open with no sharing for ms, as Defender does with a fresh exe or an editor
-// with settings.json. Resolves once the file is held; released resolves when it's let go.
-async function hold(file: string, ms: number) {
+// Windows: a PowerShell child holds file open with no sharing, as Defender does with a fresh exe or an editor with
+// settings.json, until release() (no timer: a busy CI runner stretches those). Resolves once the file is held.
+async function hold(file: string) {
   const ps = spawn(
     'powershell',
     [
       '-NoProfile',
       '-Command',
-      `$f = [IO.File]::Open($env:DCS_FILE, 'Open', 'ReadWrite', 'None'); 'held'; Start-Sleep -Milliseconds ${ms}; $f.Close()`,
+      "$f = [IO.File]::Open($env:DCS_FILE, 'Open', 'ReadWrite', 'None'); 'held'; [void][Console]::In.ReadLine(); $f.Close()",
     ],
     { env: { ...process.env, DCS_FILE: file } },
   );
-  await new Promise((resolve) => ps.stdout.once('data', resolve));
-  return { released: new Promise((resolve) => ps.on('close', resolve)) };
+  let out = '';
+  await new Promise<void>((resolve) =>
+    ps.stdout.on('data', (d) => {
+      out += d;
+      if (out.includes('held')) resolve();
+    }),
+  );
+  const closed = new Promise((resolve) => ps.on('close', resolve));
+  return { release: () => (ps.stdin.end('\n'), closed) };
+}
+
+// Runs one of files.ts's functions in a worker: it blocks while retrying, and this thread has to let go of the lock.
+function inWorker(fn: 'writeAtomic' | 'replaceBin', args: unknown[]) {
+  const mod = new URL('./files.ts', import.meta.url).href;
+  const code =
+    "const { workerData: w } = require('node:worker_threads'); import(w.mod).then((m) => m[w.fn](...w.args));";
+  return new Promise<void>((resolve, reject) =>
+    new Worker(code, { eval: true, workerData: { mod, fn, args } })
+      .on('error', reject)
+      .on('exit', (c) => (c === 0 ? resolve() : reject(new Error(`worker exited ${c}`)))),
+  );
 }
 const LOCKS = { skip: process.platform !== 'win32' };
+const later = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 test('writeAtomic waits out a settings.json another program holds open', LOCKS, async () => {
   const file = join(mkdtempSync(join(tmpdir(), 'dcs-files-')), 'settings.json');
   writeFileSync(file, '{}');
-  const { released } = await hold(file, 500);
-  writeAtomic(file, '{"a":1}');
+  const { release } = await hold(file);
+  const writing = inWorker('writeAtomic', [file, '{"a":1}']);
+  await later(500);
+  await release();
+  await writing;
   assert.equal(readFileSync(file, 'utf8'), '{"a":1}');
-  await released;
 });
 
 test('replaceBin waits out a staged binary that is still being scanned', LOCKS, async () => {
@@ -143,8 +166,10 @@ test('replaceBin waits out a staged binary that is still being scanned', LOCKS, 
   const [bin, staged] = [join(dir, 'tool.exe'), join(dir, 'tool.exe.tmp')];
   writeFileSync(bin, 'old');
   writeFileSync(staged, 'new');
-  const { released } = await hold(staged, 500);
-  replaceBin(staged, bin, true);
+  const { release } = await hold(staged);
+  const swapping = inWorker('replaceBin', [staged, bin, true]);
+  await later(500);
+  await release();
+  await swapping;
   assert.equal(readFileSync(bin, 'utf8'), 'new');
-  await released;
 });
