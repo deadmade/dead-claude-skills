@@ -31,7 +31,7 @@ a plugin changed since the last release without a bump.
   - without the sync change, the sync PRs fail.
 - No npm dependencies. Node standard library only. New logic goes into a module with a `*.test.mjs` next to it.
 - The last shared-era version is `0.5.0`. The last shared-era tag is `v0.5.0`.
-- The plugins the user wrote start at `0.1.0`: dead-skills, flows, cswap, md-pane, tui-review, web-mcp, nix-lsp,
+- The plugins the user wrote start at `0.1.0`: dead-skills, flows, md-pane, tui-review, web-mcp, nix-lsp,
   mcp-azure and mcp-github.
 - The plugins vendored from an upstream branch also start at `0.1.0`: graphify, hallmark, mattpocock-picks,
   paper-lookup, pstack-picks, tob-picks, self-review, rust-skills, csharp-skills and postgres. Their `plugin.json`
@@ -152,32 +152,26 @@ test('bumpPatch, setVersion and syncBump', () => {
   assert.equal(syncBump('0.1.0', undefined), null); // new since the baseline
   assert.throws(() => syncBump('29c78da38ecf', '29c78da38ecf'));
 });
-const cswap = { name: 'cswap', dir: 'plugins/opt-in/cswap', tag: 'v0.6.0' };
+const flows = { name: 'flows', dir: 'plugins/flows', tag: 'v0.6.0' };
 test('bumpProblem: a changed plugin must move its version', () => {
-  const changed = ['plugins/opt-in/cswap/hooks/register.tsx', 'plugins/opt-in/md-pane/x'];
-  assert.match(bumpProblem({ ...cswap, now: '0.1.0', then: '0.1.0', changed }), /cswap.*v0\.6\.0.*bump/);
-  assert.equal(bumpProblem({ ...cswap, now: '0.1.1', then: '0.1.0', changed }), undefined);
+  const changed = ['plugins/flows/skills/verify/SKILL.md', 'plugins/opt-in/md-pane/x'];
+  assert.match(bumpProblem({ ...flows, now: '0.1.0', then: '0.1.0', changed }), /flows.*v0\.6\.0.*bump/);
+  assert.equal(bumpProblem({ ...flows, now: '0.1.1', then: '0.1.0', changed }), undefined);
   assert.equal(
-    bumpProblem({ ...cswap, now: '0.1.0', then: '0.1.0', changed: ['plugins/opt-in/md-pane/x'] }),
+    bumpProblem({ ...flows, now: '0.1.0', then: '0.1.0', changed: ['plugins/opt-in/md-pane/x'] }),
     undefined,
   );
-  assert.equal(
-    bumpProblem({ ...cswap, now: '0.1.0', then: '0.1.0', changed: ['plugins/opt-in/cswap-old/x'] }),
-    undefined,
-  );
+  assert.equal(bumpProblem({ ...flows, now: '0.1.0', then: '0.1.0', changed: ['plugins/flows-old/x'] }), undefined);
   // Windows: pluginDirs() gives '/', but a join() result must not silently exempt the plugin
-  assert.match(bumpProblem({ ...cswap, dir: 'plugins\\opt-in\\cswap', now: '0.1.0', then: '0.1.0', changed }), /bump/);
+  assert.match(bumpProblem({ ...flows, dir: 'plugins\\flows', now: '0.1.0', then: '0.1.0', changed }), /bump/);
 });
 test('bumpProblem: lower than the baseline only fails after the shared era', () => {
-  const changed = ['plugins/opt-in/cswap/x'];
-  assert.match(bumpProblem({ ...cswap, now: '0.1.0', then: '0.2.0', changed }), /lower/);
-  assert.equal(bumpProblem({ ...cswap, tag: 'v0.5.0', now: '0.1.0', then: '0.5.0', changed }), undefined);
+  const changed = ['plugins/flows/x'];
+  assert.match(bumpProblem({ ...flows, now: '0.1.0', then: '0.2.0', changed }), /lower/);
+  assert.equal(bumpProblem({ ...flows, tag: 'v0.5.0', now: '0.1.0', then: '0.5.0', changed }), undefined);
 });
 test('bumpProblem exemptions: new plugin, Cargo.lock only, ponytail without a new UPSTREAM', () => {
-  assert.equal(
-    bumpProblem({ ...cswap, now: '0.1.0', then: undefined, changed: ['plugins/opt-in/cswap/x'] }),
-    undefined,
-  );
+  assert.equal(bumpProblem({ ...flows, now: '0.1.0', then: undefined, changed: ['plugins/flows/x'] }), undefined);
   const tui = { name: 'tui-review', dir: 'plugins/shared/tui-review', tag: 'v0.6.0', now: '0.1.0', then: '0.1.0' };
   assert.equal(bumpProblem({ ...tui, changed: ['crates/tui-review/Cargo.lock'] }), undefined);
   assert.match(
@@ -313,13 +307,13 @@ version`.
 - [ ] **Step 1: Update the outdated test (failing)**
   - In `outdated compares our shipped versions only…`, set hallmark's installed version to `'0.6.0'`. Expected: not
     offered, because a post-switch newer install is kept.
-  - Add the row `{ id: \`md-pane@${M}\`, version: '0.5.0' }`, with shipped `'md-pane': '0.1.0'`. Expected entry:
-`{ id: \`md-pane@${M}\`, from: '0.5.0', to: '0.1.0' }`.
-  - Keep cswap (0.1.0 → 0.1.1) and graphify (sha → 0.1.1) as they are.
+  - Add the row `{ id: \`flows@${M}\`, version: '0.5.0' }`, with shipped `flows: '0.1.0'`. Expected entry:
+`{ id: \`flows@${M}\`, from: '0.5.0', to: '0.1.0' }`.
+  - Keep md-pane (0.1.0 → 0.1.1) and graphify (sha → 0.1.1) as they are.
   - Rename the test to `…, never downgrading past the shared era`.
 - [ ] **Step 2: Run it and check it fails**
   - Run: `node --test installer/core/plugins.test.ts`
-  - Expected: FAIL on the md-pane entry.
+  - Expected: FAIL on the flows entry.
 - [ ] **Step 3: Change `outdated`**
   - An install stays when `version === to`, or when `newer(version, to) && newer(version, LAST_SHARED)`.
   - Update its comment.

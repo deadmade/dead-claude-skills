@@ -5,8 +5,8 @@
 Today one number (0.5.0) is copied into 25 files, and every release bumps all of them. That means every plugin shows
 up as "outdated" in the installer after each release, even when nothing in it changed.
 
-What the user wants: after a release where only tui-review and cswap changed, the installer marks only tui-review and
-cswap as outdated, each with its own real number (`tui-review outdated 0.1.0 → 0.1.1`). Every other plugin shows
+What the user wants: after a release where only tui-review and md-pane changed, the installer marks only tui-review and
+md-pane as outdated, each with its own real number (`tui-review outdated 0.1.0 → 0.1.1`). Every other plugin shows
 "installed" with the number it already had.
 
 ## Goals
@@ -17,7 +17,7 @@ cswap as outdated, each with its own real number (`tui-review outdated 0.1.0 →
    session does the same. The release never sets a plugin's or a crate's number.
 3. **Ship on release only.** Numbers on `main` reach machines only when the user cuts a release. That is already true,
    because the installer and marketplace pin to the release tag.
-4. **Restart.** Plugins the user wrote restart at **0.1.0**: dead-skills, flows, cswap, md-pane, tui-review, web-mcp,
+4. **Restart.** Plugins the user wrote restart at **0.1.0**: dead-skills, flows, md-pane, tui-review, web-mcp,
    nix-lsp, mcp-azure and mcp-github.
 5. **Vendored plugins carry upstream's number** where we vendor an upstream release. Today that is only ponytail
    (5.3.2, synced at upstream's release tags). superpowers already works this way through its `ref`.
@@ -46,7 +46,7 @@ cswap as outdated, each with its own real number (`tui-review outdated 0.1.0 →
 - The repo keeps one overall number: `package.json` `version` and the marketplace's `metadata.version`. `npm run
 release -- patch|minor|major|X.Y.Z` bumps only those two, runs `npm test`, commits and tags `vX.Y.Z` as today.
 - The installer still shows this number in its title, installs from that tag (`marketplaceArg`/`pinMarketplace`) and
-  downloads binaries from that tag's GitHub release (`binAsset`, `cswapDownload`).
+  downloads binaries from that tag's GitHub release (`binAsset`).
 - `release.yml` is unchanged apart from its comments and notes, if they mention one version.
 
 ### Plugin numbers
@@ -62,7 +62,7 @@ Confirmed by the user on 2026-10-21, including our own 0.1.0 for plugins vendore
 
 | plugins                                                                                                                                                                          | number            |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
-| the user's own (dead-skills, flows, cswap, md-pane, tui-review + crate, web-mcp + crate, nix-lsp, mcp-azure, mcp-github)                                                         | 0.1.0             |
+| the user's own (dead-skills, flows, md-pane, tui-review + crate, web-mcp + crate, nix-lsp, mcp-azure, mcp-github)                                                                | 0.1.0             |
 | ponytail                                                                                                                                                                         | upstream's: 5.3.2 |
 | vendored from an upstream branch, not a release (graphify, hallmark, mattpocock-picks, paper-lookup, pstack-picks, tob-picks, self-review, rust-skills, csharp-skills, postgres) | our own: 0.1.0    |
 
@@ -135,8 +135,6 @@ one. self-review and postgres combine two upstreams; hallmark, cursor/plugins an
     plugins get reinstalled and which settings the user will have to enter again (user's decision). Settings the
     installer owns (`binPath`, `agentBrowserPath`) it sets again itself.
   - The reinstall must keep the `auto` dependency markers `prune` relies on.
-- cswap.exe stays tied to `installer/assets/cswap.json`'s upstream pin, as today. Bumping that pin is not a cswap plugin
-  change.
 
 ### Docs
 
