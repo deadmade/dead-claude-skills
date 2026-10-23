@@ -92,9 +92,9 @@ const WEB_BUILTINS = ['WebFetch', 'WebSearch'];
 export const isWebBuiltinsOff = (s: Settings) => WEB_BUILTINS.every((d) => s?.permissions?.deny?.includes(d));
 
 // The built-in web tools' new state: true deny them, false allow them again, undefined leave them.
-// toggle: the choice; was: it was on before; healthy: SearXNG answered JSON; installed: web-mcp was installed before
+// toggle: the choice; was: it was on before; healthy: web-mcp's search browser works; installed: web-mcp was installed before
 // this run (only then can the denies be ours; someone who never had web-mcp keeps theirs).
-// Only an explicit on to off allows them again: a down SearXNG must not undo denies that are already there.
+// Only an explicit on to off allows them again: a broken browser must not undo denies that are already there.
 export const webBuiltinsDecision = ({
   toggle,
   was,
@@ -122,7 +122,7 @@ export function mergeSettings(settings: Settings, { statusLine, version, webBuil
   const allow = out.permissions?.allow ?? [];
   const deny = out.permissions?.deny ?? [];
   let denied = [...deny, ...SECRET_DENIES.filter((d) => !deny.includes(d))];
-  // web-mcp replaces the built-in web tools once SearXNG answers.
+  // web-mcp replaces the built-in web tools once its search browser works.
   // shortcut: false also removes WebFetch/WebSearch entries the user added by hand; remember who set them if anyone minds.
   if (webBuiltinsOff) denied = [...denied, ...WEB_BUILTINS.filter((d) => !denied.includes(d))];
   if (webBuiltinsOff === false) denied = denied.filter((d) => !WEB_BUILTINS.includes(d));

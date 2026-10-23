@@ -2,13 +2,16 @@ mod api;
 mod archive;
 mod browser;
 mod config;
+mod engines;
 mod extract;
 mod fetch;
+mod fuse;
 mod images;
 mod limits;
 mod lookup;
 mod papers;
 mod passages;
+mod profile;
 mod rank;
 mod search;
 mod tools;
@@ -27,8 +30,8 @@ pub struct Ctx {
     pub archive: archive::Archive,
     pub inflight: fetch::Inflight,
     pub lookup: lookup::Cache,
-    pub index: rank::Index,
-    pub search: search::SearxNg,
+    /// `Err` without a search folder: then only `search` fails.
+    pub profiles: Result<profile::Profiles, String>,
     pub browser: browser::Browser,
 }
 
@@ -44,8 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let archive = archive::Archive::open(&cfg.project, &jiff::Zoned::now())?;
     let http = fetch::client(false)?;
     let ctx = Ctx {
-        search: search::SearxNg::new(cfg.searxng.clone(), http.clone()),
-        index: rank::Index::open(archive.web())?,
+        profiles: profile::Profiles::new(cfg.search_dir.clone()),
         archive,
         browser: browser_from(&cfg),
         http,

@@ -26,7 +26,6 @@ const BINARIES = [
   ['uv', 'graphify', 'nix: uv', 'winget install -e --id astral-sh.uv'],
   ['graphify', 'graphify', 'uv tool install graphifyy', 'uv tool install graphifyy'],
   ['ccstatusline', 'ccstatusline', 'nix: ccstatusline', 'npm i -g ccstatusline'],
-  ['docker', 'web-mcp', 'nix: docker', 'winget install -e --id Docker.DockerDesktop'],
 ];
 
 // wanted: plugin names (plus 'ccstatusline' when that toggle is on). onPath(binary) -> bool.
@@ -122,3 +121,12 @@ export function agentBrowserAsset(platform: string, arch: string, pin: AgentBrow
 
 // `agent-browser --version` may print a name prefix ("agent-browser 0.39.1"); undefined when no version is in it.
 export const agentBrowserVersion = (out: string | undefined) => /(\d+\.\d+\.\d+)/.exec(out ?? '')?.[1];
+
+// The newest `chrome-<a>.<b>.<c>.<d>` among a browsers folder's entries, compared numerically (upstream sorts the names
+// as strings, where chrome-99 beats chrome-156).
+export const newestChromeForTesting = (entries: string[]) =>
+  entries
+    .map((e) => ({ e, v: /^chrome-(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(e)?.slice(1).map(Number) }))
+    .filter((x): x is { e: string; v: number[] } => !!x.v)
+    .sort((a, b) => a.v.reduce((d, n, i) => d || n - b.v[i]!, 0))
+    .at(-1)?.e;

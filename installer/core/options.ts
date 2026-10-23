@@ -27,25 +27,6 @@ export function dcgCommand(platform: string, action: 'install' | 'uninstall'): [
   return ['bash', ['-c', `set -o pipefail; curl -fsSL '${DCG}/${script}' | bash -s -- ${flags}`]];
 }
 
-// The SearXNG container web-mcp searches through, bound to loopback only; configDir holds settings.yml.
-// shortcut: unpinned latest tag, pin when an upgrade breaks the JSON API.
-export const searxngRun = (configDir: string) => [
-  'run',
-  '-d',
-  '--name',
-  'searxng',
-  '--restart',
-  'unless-stopped',
-  '-p',
-  '127.0.0.1:8888:8080',
-  '-v',
-  `${configDir}:/etc/searxng/`,
-  'docker.io/searxng/searxng:latest',
-];
-
-export const searxngSettings = (template: string, secret: string) =>
-  template.replace(/^(\s*secret_key:).*$/m, `$1 "${secret}"`);
-
 // The installer's pages, in order. keys: plugin names and installer toggles; an opt-in not listed here lands in Other,
 // so a new marketplace plugin is never left out.
 export const TOGGLES = ['ccstatusline', 'dcg', 'strip-defaults', 'clean', 'web-builtins-off'];

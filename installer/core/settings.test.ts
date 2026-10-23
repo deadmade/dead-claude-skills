@@ -66,8 +66,8 @@ test('secret denies are added once and keep existing ones', () => {
 
 test("the sandbox keys an older installer turned on are removed, the user's stay", () => {
   const old = { enabled: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: false };
-  const out = mergeSettings({ sandbox: { ...old, excludedCommands: ['docker'] } }, V);
-  assert.deepEqual(out.sandbox, { excludedCommands: ['docker'] });
+  const out = mergeSettings({ sandbox: { ...old, excludedCommands: ['make'] } }, V);
+  assert.deepEqual(out.sandbox, { excludedCommands: ['make'] });
   assert.equal(mergeSettings({ sandbox: old }, V).sandbox, undefined);
   assert.equal(mergeSettings({}, V).sandbox, undefined);
 });
@@ -212,7 +212,6 @@ test('web builtins: tri-state merge keeps other denies, toggle reads deny', () =
   assert.ok(!isWebBuiltinsOff(back));
   assert.ok(!isWebBuiltinsOff({ permissions: { deny: ['WebFetch'] } }));
   assert.ok(TOGGLES.includes('web-builtins-off') && HINTS['web-builtins-off']);
-  assert.ok(missingBinaries('linux', ['web-mcp'], () => false).some((r) => r.binary === 'docker'));
 });
 
 test('web builtins decision table', () => {

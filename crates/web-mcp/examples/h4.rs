@@ -12,7 +12,7 @@ use std::process::Command;
 
 use anyhow::{Context, Result, bail, ensure};
 use model2vec_rs::model::StaticModel;
-use rank::{Hit, Index, PassageDoc, rrf};
+use rank::{Hit, MemIndex, PassageDoc, rrf};
 
 const BASE: &str = "https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets";
 const FUSE_K: f32 = 60.0;
@@ -120,15 +120,8 @@ fn pdoc(id: &str, text: &str) -> PassageDoc {
     }
 }
 
-async fn index_of(items: &[(String, String)]) -> Result<(Index, std::path::PathBuf)> {
-    let web = std::env::temp_dir().join(format!("h4-{}-{}", std::process::id(), items.len()));
-    let _ = std::fs::remove_dir_all(&web);
-    let idx = Index::open(&web)?;
-    for chunk in items.chunks(2000) {
-        idx.add(chunk.iter().map(|(i, t)| pdoc(i, t)).collect())
-            .await?;
-    }
-    Ok((idx, web))
+fn index_of(items: &[(String, String)]) -> Result<MemIndex> {
+    MemIndex::new(items.iter().map(|(i, t)| pdoc(i, t)).collect())
 }
 
 fn unit(mut v: Vec<f32>) -> Vec<f32> {
@@ -143,7 +136,7 @@ fn ids(hits: &[Hit]) -> Vec<String> {
     hits.iter().map(|h| h.doc.url.clone()).collect()
 }
 
-async fn eval(dir: &Path, name: &str, max_q: usize, model: &StaticModel) -> Result<(f64, f64)> {
+fn eval(dir: &Path, name: &str, max_q: usize, model: &StaticModel) -> Result<(f64, f64)> {
     let d = load(dir, name, max_q)?;
     let distinct: HashSet<_> = d.docs.iter().map(|(_, t)| t).collect();
     println!(
@@ -152,7 +145,7 @@ async fn eval(dir: &Path, name: &str, max_q: usize, model: &StaticModel) -> Resu
         distinct.len(),
         d.queries.len()
     );
-    let (idx, web) = index_of(&d.docs).await?;
+    let idx = index_of(&d.docs)?;
     let embs: Vec<Vec<f32>> = model
         .encode(&d.docs.iter().map(|(_, t)| t.clone()).collect::<Vec<_>>())
         .into_iter()
@@ -160,7 +153,7 @@ async fn eval(dir: &Path, name: &str, max_q: usize, model: &StaticModel) -> Resu
         .collect();
     let (mut bm, mut hy) = (HashMap::new(), HashMap::new());
     for (qid, q) in &d.queries {
-        let bm25 = idx.search(q, POOL, None)?;
+        let bm25 = idx.search(q, POOL)?;
         let qe = unit(model.encode_single(q));
         let mut sc: Vec<(usize, f32)> = embs
             .iter()
@@ -179,7 +172,6 @@ async fn eval(dir: &Path, name: &str, max_q: usize, model: &StaticModel) -> Resu
         hy.insert(qid.clone(), ids(&rrf(&[bm25.clone(), dense], FUSE_K)));
         bm.insert(qid.clone(), ids(&bm25));
     }
-    let _ = std::fs::remove_dir_all(web);
     Ok((recall_at_5(&d.qrels, &bm), recall_at_5(&d.qrels, &hy)))
 }
 
@@ -189,7 +181,7 @@ fn windows(text: &str, size: usize) -> Vec<String> {
     t.chunks(size).map(|c| c.join(" ")).collect()
 }
 
-async fn sweep(dir: &Path) -> Result<()> {
+fn sweep(dir: &Path) -> Result<()> {
     let d = load(dir, "scifact", usize::MAX)?;
     for size in [128, 256, 512] {
         let items: Vec<(String, String)> = d
@@ -197,13 +189,13 @@ async fn sweep(dir: &Path) -> Result<()> {
             .iter()
             .flat_map(|(id, t)| windows(t, size).into_iter().map(move |w| (id.clone(), w)))
             .collect();
-        let (idx, web) = index_of(&items).await?;
+        let idx = index_of(&items)?;
         let mut ranked = HashMap::new();
         for (qid, q) in &d.queries {
             // Max-pool: a doc ranks where its best passage does.
             let mut seen = HashSet::new();
             let docs: Vec<String> = idx
-                .search(q, POOL, None)?
+                .search(q, POOL)?
                 .into_iter()
                 .map(|h| h.doc.url)
                 .filter(|u| seen.insert(u.clone()))
@@ -215,25 +207,23 @@ async fn sweep(dir: &Path) -> Result<()> {
             items.len(),
             recall_at_5(&d.qrels, &ranked)
         );
-        let _ = std::fs::remove_dir_all(web);
     }
     Ok(())
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     let a: Vec<String> = std::env::args().collect();
     let Some(i) = a.iter().position(|x| x == "--data") else {
         bail!("usage: h4 --data <dir> [--sweep]")
     };
     let dir = Path::new(a.get(i + 1).context("--data needs a directory")?);
     if a.iter().any(|x| x == "--sweep") {
-        return sweep(dir).await;
+        return sweep(dir);
     }
     let model = StaticModel::from_pretrained("minishlab/potion-base-8M", None, None, None)?;
     let mut rows = Vec::new();
     for (name, n) in [("scifact", usize::MAX), ("fiqa", 300)] {
-        let (b, h) = eval(dir, name, n, &model).await?;
+        let (b, h) = eval(dir, name, n, &model)?;
         println!("{name}: BM25 {b:.4}  hybrid {h:.4}");
         rows.push((b, h));
     }

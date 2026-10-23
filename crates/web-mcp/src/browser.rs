@@ -1,7 +1,7 @@
 //! agent-browser, driven as a child process: one `--json` call per action, one named session per browser.
 
 use std::collections::BTreeSet;
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -30,10 +30,11 @@ pub fn check_session(s: &str) -> Result<(), String> {
     if !plain {
         return Err("session must be 1-32 characters of letters, digits, `_` and `-`, not starting with `-`".into());
     }
-    if s.starts_with(FETCH_PREFIX) {
-        return Err(format!(
-            "session names starting with `{FETCH_PREFIX}` are reserved"
-        ));
+    if let Some(p) = [FETCH_PREFIX, "search-", "web-mcp-search-"]
+        .into_iter()
+        .find(|p| s.starts_with(p))
+    {
+        return Err(format!("session names starting with `{p}` are reserved"));
     }
     Ok(())
 }
@@ -47,6 +48,8 @@ const MAX_OUTPUT: &str = "40000";
 pub enum BrowserError {
     Missing,
     Failed(String),
+    /// `render`'s deadline passed.
+    Timeout(Duration),
 }
 
 impl fmt::Display for BrowserError {
@@ -56,6 +59,7 @@ impl fmt::Display for BrowserError {
                 "agent-browser is not installed. Install it with the web-mcp installer, or put agent-browser on PATH (https://github.com/vercel-labs/agent-browser/releases) and run `agent-browser install`.",
             ),
             Self::Failed(m) => f.write_str(m),
+            Self::Timeout(d) => write!(f, "the page did not finish within {} s", d.as_secs_f32()),
         }
     }
 }
@@ -66,16 +70,75 @@ pub struct Browser {
     pub fallback_deadline: Duration,
     /// Agent-browser sessions the `browser` tool opened and has not closed; shutdown closes them.
     opened: Mutex<BTreeSet<String>>,
+    /// Where agent-browser keeps its sessions' `.pid` and `.sock` files; `None` where that isn't known.
+    pub socket_dir: Option<PathBuf>,
 }
+
+/// A search's page load: in an engine's session, under web-mcp's config for it.
+pub struct SearchRun<'a> {
+    /// The engine's `agent-browser.json`; its folder is the call's working directory.
+    pub config: &'a Path,
+    /// The `wait --fn` expression that is true once the page shows results, no results or a block.
+    pub ready_js: &'a str,
+    /// Close the session after this search (Windows, where an engine's window would otherwise stay up).
+    pub close_after: bool,
+}
+
+/// How a call to a search session runs (Global Constraints, "Isolation").
+#[derive(Clone, Copy)]
+struct Isolated<'a> {
+    config: &'a Path,
+    /// `AGENT_BROWSER_DEFAULT_TIMEOUT`: bounds the daemon's own wait, which outlives a killed call.
+    timeout: Duration,
+}
+
+/// Points `cmd` at the config with `--config`, runs it in the config's folder and drops every
+/// `AGENT_BROWSER_*` variable of `env` (web-mcp's), so nothing of the user's agent-browser setup applies.
+fn isolate(
+    cmd: &mut Command,
+    iso: Isolated<'_>,
+    env: impl IntoIterator<Item = (OsString, OsString)>,
+) {
+    cmd.arg("--config").arg(iso.config);
+    for (k, _) in env {
+        // Windows names are case-insensitive.
+        if k.to_string_lossy()
+            .to_ascii_uppercase()
+            .starts_with("AGENT_BROWSER_")
+        {
+            cmd.env_remove(k);
+        }
+    }
+    cmd.env(
+        "AGENT_BROWSER_DEFAULT_TIMEOUT",
+        iso.timeout.as_millis().to_string(),
+    );
+    if let Some(dir) = iso.config.parent() {
+        cmd.current_dir(dir);
+    }
+}
+
+/// How long a `close` may take.
+const CLOSE_TIMEOUT: Duration = Duration::from_secs(5);
+/// What a search batch keeps back from the daemon's wait for everything else: findings.md measured ~1 s of
+/// process start, `open` and reads beyond the wait (3000/8000 ms waits: 4.0/8.9 s calls) and up to 2 s for a
+/// whole warm batch, so 2 s lets a page that never gets ready still be read inside the deadline.
+pub const READ_MARGIN: Duration = Duration::from_secs(2);
 
 impl Browser {
     /// `name` as configured: found on PATH, or kept as given so that running it reports `Missing`.
     #[must_use]
     pub fn new(name: &str) -> Self {
         Self {
-            bin: Self::resolve(name).unwrap_or_else(|| name.into()),
+            // Absolute: search calls run in another working directory.
+            bin: Self::resolve(name)
+                .map_or_else(|| name.into(), |p| std::path::absolute(&p).unwrap_or(p)),
             fallback_deadline: Duration::from_secs(30),
             opened: Mutex::default(),
+            // The default dir: search calls drop `AGENT_BROWSER_SOCKET_DIR` with the rest of `AGENT_BROWSER_*`.
+            socket_dir: std::env::var_os("XDG_RUNTIME_DIR")
+                .filter(|d| !cfg!(windows) && !d.is_empty())
+                .map(|d| PathBuf::from(d).join("agent-browser")),
         }
     }
 
@@ -101,7 +164,7 @@ impl Browser {
         futures::future::join_all(open.iter().map(|s| {
             tokio::time::timeout(
                 Duration::from_secs(5),
-                self.run_with(s, &close, None, false),
+                self.run_with(s, &close, None, false, None),
             )
         }))
         .await;
@@ -111,9 +174,14 @@ impl Browser {
     /// tried too, so npm's `agent-browser.cmd` resolves (Rust runs `.cmd` files through cmd.exe itself).
     #[must_use]
     pub fn resolve(name: &str) -> Option<PathBuf> {
+        Self::resolve_on(name, &std::env::var_os("PATH").unwrap_or_default())
+    }
+
+    /// `resolve` with `path` in place of PATH.
+    #[must_use]
+    pub fn resolve_on(name: &str, path: &OsStr) -> Option<PathBuf> {
         let exts = std::env::var("PATHEXT").unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".into());
-        let path = std::env::var_os("PATH").unwrap_or_default();
-        resolve_in(name, &path, cfg!(windows).then_some(exts.as_str()))
+        resolve_in(name, path, cfg!(windows).then_some(exts.as_str()))
     }
 
     /// Runs `agent-browser --session <session> --json … <args>` and returns its `data`.
@@ -122,19 +190,24 @@ impl Browser {
     /// `Missing` when the binary can't be started; `Failed` when the call times out, answers
     /// `{"success": false}`, or answers no JSON.
     pub async fn run(&self, session: &str, args: &[String]) -> Result<Value, BrowserError> {
-        self.run_with(session, args, None, true).await
+        self.run_with(session, args, None, true, None).await
     }
 
     /// `limits`: cap and wrap the page output (for answers read as text; off where the output is data).
+    /// `iso`: a call to a search session.
     async fn run_with(
         &self,
         session: &str,
         args: &[String],
         stdin: Option<&str>,
         limits: bool,
+        iso: Option<Isolated<'_>>,
     ) -> Result<Value, BrowserError> {
         let mut cmd = Command::new(&self.bin);
         cmd.args(["--session", session, "--json"]);
+        if let Some(iso) = iso {
+            isolate(&mut cmd, iso, std::env::vars_os());
+        }
         if limits {
             cmd.args(["--max-output", MAX_OUTPUT, "--content-boundaries"]);
         }
@@ -195,23 +268,32 @@ impl Browser {
         session: &str,
         commands: &[Vec<&str>],
     ) -> Result<Vec<Value>, BrowserError> {
-        self.batch_with(session, commands, true).await
+        self.batch_with(session, commands, true, None, None).await
     }
 
+    /// `may_fail`: the index of a command whose failure doesn't fail the batch.
     async fn batch_with(
         &self,
         session: &str,
         commands: &[Vec<&str>],
         limits: bool,
+        iso: Option<Isolated<'_>>,
+        may_fail: Option<usize>,
     ) -> Result<Vec<Value>, BrowserError> {
         let input = json!(commands).to_string();
         let args = ["batch".to_owned(), "--json".to_owned()];
-        let answer = self.run_with(session, &args, Some(&input), limits).await?;
+        let answer = self
+            .run_with(session, &args, Some(&input), limits, iso)
+            .await?;
         // One entry per command: {"command", "success", "result"}.
         let entries = answer.as_array().ok_or_else(|| {
             BrowserError::Failed("agent-browser's batch answer is not a list".into())
         })?;
-        if let Some(bad) = entries.iter().find(|e| e["success"] == false) {
+        if let Some((_, bad)) = entries
+            .iter()
+            .enumerate()
+            .find(|(i, e)| e["success"] == false && may_fail != Some(*i))
+        {
             return Err(BrowserError::Failed(failure(bad)));
         }
         if entries.len() != commands.len() {
@@ -223,6 +305,88 @@ impl Browser {
             .iter()
             .map(|e| e.get("result").unwrap_or(&e["data"]).clone())
             .collect())
+    }
+
+    /// The rendered `<body>` of `url` and the URL the browser ended on (redirects included), from one batch
+    /// within `deadline`.
+    ///
+    /// Without `search`: in a throwaway `session`, closed again. With it: in the engine's session under its
+    /// config, waiting on `ready_js` first. The daemon's wait gets `deadline` less `READ_MARGIN`, so a page that
+    /// never gets ready (a consent wall, changed markup) times the wait out and is still read before the deadline:
+    /// the parser decides what it is. That session stays open for the next search unless `close_after`, the batch
+    /// failed or the deadline passed.
+    ///
+    /// # Errors
+    /// As `batch`, when the deadline passes, or when it answers no HTML or no URL.
+    pub async fn render(
+        &self,
+        url: &Url,
+        session: &str,
+        search: Option<SearchRun<'_>>,
+        deadline: Duration,
+    ) -> Result<(String, Url), BrowserError> {
+        let mut cmds = vec![vec!["open", url.as_str()]];
+        if let Some(s) = &search {
+            cmds.push(vec!["wait", "--fn", s.ready_js]);
+        }
+        cmds.extend([vec!["get", "html", "body"], vec!["get", "url"]]);
+        let iso = |timeout| {
+            search.as_ref().map(|s| Isolated {
+                config: s.config,
+                timeout,
+            })
+        };
+        // The HTML is data for the extractor: no output cap, no boundary markers.
+        let batch = self.batch_with(
+            session,
+            &cmds,
+            false,
+            // Never 0: what agent-browser makes of a zero timeout is unknown.
+            iso(deadline
+                .saturating_sub(READ_MARGIN)
+                .max(Duration::from_millis(100))),
+            search.as_ref().map(|_| 1),
+        );
+        let answer = tokio::time::timeout(deadline, batch)
+            .await
+            .unwrap_or(Err(BrowserError::Timeout(deadline)));
+        // A fetch's session (a daemon and its Chromium) never outlives the fetch; an engine's stays warm unless
+        // told otherwise or it failed (its page may be stuck).
+        if search
+            .as_ref()
+            .is_none_or(|s| s.close_after || answer.is_err())
+        {
+            let close = ["close".to_owned()];
+            let _ = tokio::time::timeout(
+                CLOSE_TIMEOUT,
+                self.run_with(session, &close, None, false, iso(CLOSE_TIMEOUT)),
+            )
+            .await;
+            if search.is_some() {
+                self.session_gone(session).await;
+            }
+        }
+        let answer = answer?;
+        let field =
+            |v: &Value, key: &str| v.as_str().or_else(|| v[key].as_str()).map(str::to_owned);
+        let n = answer.len(); // one entry per command: at least 3
+        let html = field(&answer[n - 2], "html");
+        let landed = field(&answer[n - 1], "url").and_then(|u| Url::parse(&u).ok());
+        html.zip(landed)
+            .ok_or_else(|| BrowserError::Failed("agent-browser returned no HTML or URL".into()))
+    }
+
+    /// Waits, at most 1 s, until agent-browser has removed `session`'s `.pid` and `.sock`: an `open` right
+    /// after a `close` fails otherwise (findings.md, "Daemon behaviour"). Where they live isn't known: 1 s.
+    async fn session_gone(&self, session: &str) {
+        let Some(dir) = &self.socket_dir else {
+            return tokio::time::sleep(Duration::from_secs(1)).await;
+        };
+        let files = ["pid", "sock"].map(|ext| dir.join(format!("{session}.{ext}")));
+        let until = std::time::Instant::now() + Duration::from_secs(1);
+        while files.iter().any(|f| f.exists()) && std::time::Instant::now() < until {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
     }
 
     /// The rendered `<body>` of `url` and the URL the browser ended on (redirects included), from one
@@ -237,36 +401,8 @@ impl Browser {
             std::process::id(), // sessions are global per user: another web-mcp may be running
             N.fetch_add(1, Ordering::Relaxed)
         );
-        let cmds = [
-            vec!["open", url.as_str()],
-            vec!["get", "html", "body"],
-            vec!["get", "url"],
-        ];
-        // The HTML is data for the extractor: no output cap, no boundary markers.
-        let answer = tokio::time::timeout(
-            self.fallback_deadline,
-            self.batch_with(&session, &cmds, false),
-        )
-        .await
-        .unwrap_or_else(|_| {
-            Err(BrowserError::Failed(format!(
-                "the page did not finish within {} s",
-                self.fallback_deadline.as_secs_f32()
-            )))
-        });
-        // Whatever happened, the session (a daemon and its Chromium) must not outlive the fetch.
-        let _ = tokio::time::timeout(
-            Duration::from_secs(5),
-            self.run_with(&session, &["close".to_owned()], None, false),
-        )
-        .await;
-        let answer = answer?;
-        let field =
-            |v: &Value, key: &str| v.as_str().or_else(|| v[key].as_str()).map(str::to_owned);
-        let html = field(&answer[1], "html");
-        let landed = field(&answer[2], "url").and_then(|u| Url::parse(&u).ok());
-        html.zip(landed)
-            .ok_or_else(|| BrowserError::Failed("agent-browser returned no HTML or URL".into()))
+        self.render(url, &session, None, self.fallback_deadline)
+            .await
     }
 }
 
@@ -310,5 +446,246 @@ mod tests {
         assert_eq!(got, Some(dir.join("agent-browser.CMD")));
         assert_eq!(resolve_in("agent-browser", &path, None), None);
         assert_eq!(resolve_in("nope", &path, Some(".CMD")), None);
+    }
+
+    fn fake() -> Browser {
+        // The fake sits next to the test binary's deps/ folder; cargo builds it for the integration tests.
+        let exe = std::env::current_exe().unwrap();
+        let fake = exe.parent().and_then(Path::parent).unwrap().join(format!(
+            "fake-agent-browser{}",
+            std::env::consts::EXE_SUFFIX
+        ));
+        assert!(fake.is_file(), "build the fake first: cargo build --bins");
+        Browser::new(&fake.to_string_lossy())
+    }
+
+    /// An engine folder with its config and a socket dir; the fake logs its calls beside the config.
+    fn engine_dir(tag: &str) -> (PathBuf, PathBuf) {
+        let dir = std::env::temp_dir().join(format!("web-mcp-render-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("sock")).unwrap();
+        let config = dir.join("agent-browser.json");
+        std::fs::write(&config, "{}").unwrap();
+        (dir, config)
+    }
+
+    fn calls(dir: &Path) -> Vec<Value> {
+        std::fs::read_to_string(dir.join("calls.jsonl"))
+            .unwrap_or_default()
+            .lines()
+            .map(|l| serde_json::from_str(l).unwrap())
+            .collect()
+    }
+
+    fn args(call: &Value) -> Vec<&str> {
+        call["args"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|a| a.as_str().unwrap())
+            .collect()
+    }
+
+    const READY_JS: &str = "!!(document.querySelector('#r'));";
+
+    #[test]
+    fn check_session_reserves_search() {
+        for s in [
+            "search-1",
+            "web-mcp-search-ab12cd34-brave",
+            "web-mcp-fetch-1",
+        ] {
+            assert!(check_session(s).is_err(), "{s}");
+        }
+        for s in ["research", "searches", "s1"] {
+            assert!(check_session(s).is_ok(), "{s}");
+        }
+    }
+
+    #[test]
+    fn search_calls_drop_agent_browser_env() {
+        let mut cmd = Command::new("x");
+        let config = Path::new("/srv/search/brave/agent-browser.json");
+        let iso = Isolated {
+            config,
+            timeout: Duration::from_millis(4200),
+        };
+        let env = [
+            ("AGENT_BROWSER_PROXY", "http://127.0.0.1:9"),
+            ("agent_browser_headed", "1"),
+            ("PATH", "/bin"),
+        ]
+        .map(|(k, v)| (OsString::from(k), OsString::from(v)));
+        isolate(&mut cmd, iso, env);
+        let set: Vec<_> = cmd.as_std().get_envs().collect();
+        assert!(
+            set.contains(&(OsStr::new("AGENT_BROWSER_PROXY"), None)),
+            "{set:?}"
+        );
+        assert!(
+            set.contains(&(OsStr::new("agent_browser_headed"), None)),
+            "{set:?}"
+        );
+        assert!(
+            set.contains(&(
+                OsStr::new("AGENT_BROWSER_DEFAULT_TIMEOUT"),
+                Some(OsStr::new("4200"))
+            )),
+            "{set:?}"
+        );
+        assert!(!set.iter().any(|(k, _)| *k == "PATH"), "{set:?}");
+        assert_eq!(cmd.as_std().get_current_dir(), config.parent());
+        let argv: Vec<_> = cmd.as_std().get_args().collect();
+        assert_eq!(argv, [OsStr::new("--config"), config.as_os_str()]);
+    }
+
+    #[tokio::test]
+    async fn render_search_tolerates_failed_wait() {
+        let (dir, config) = engine_dir("wait");
+        let mut b = fake();
+        b.socket_dir = Some(dir.join("sock"));
+        let url = Url::parse("http://example.com/wait-fail?q=x").unwrap();
+        let run = SearchRun {
+            config: &config,
+            ready_js: READY_JS,
+            close_after: false,
+        };
+        let session = "web-mcp-search-0-brave";
+        let (html, landed) = b
+            .render(&url, session, Some(run), Duration::from_secs(5))
+            .await
+            .unwrap();
+        assert!(html.contains("Rendered page for"), "{html}");
+        assert_eq!(landed, url);
+        let c = calls(&dir);
+        assert_eq!(c.len(), 1, "a session that answered stays open: {c:?}");
+        let a = args(&c[0]);
+        let at = a.iter().position(|x| *x == "--config").unwrap();
+        assert_eq!(a[at + 1], config.to_str().unwrap());
+        let at = a.iter().position(|x| *x == "--session").unwrap();
+        assert_eq!(a[at + 1], session);
+        let batch: Value = serde_json::from_str(c[0]["stdin"].as_str().unwrap()).unwrap();
+        assert_eq!(
+            batch,
+            json!([
+                ["open", url.as_str()],
+                ["wait", "--fn", READY_JS],
+                ["get", "html", "body"],
+                ["get", "url"]
+            ])
+        );
+        assert_eq!(
+            c[0]["env"],
+            json!({"AGENT_BROWSER_DEFAULT_TIMEOUT": "3000"})
+        );
+        let cwd = PathBuf::from(c[0]["cwd"].as_str().unwrap());
+        assert_eq!(cwd.canonicalize().unwrap(), dir.canonicalize().unwrap());
+    }
+
+    #[tokio::test]
+    async fn render_closes_on_deadline() {
+        let (dir, config) = engine_dir("deadline");
+        let mut b = fake();
+        b.socket_dir = Some(dir.join("sock"));
+        let url = Url::parse("http://example.com/slow").unwrap();
+        let run = SearchRun {
+            config: &config,
+            ready_js: READY_JS,
+            close_after: false,
+        };
+        let err = b
+            .render(
+                &url,
+                "web-mcp-search-0-bing",
+                Some(run),
+                Duration::from_millis(500),
+            )
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("did not finish"), "{err}");
+        let c = calls(&dir);
+        assert_eq!(c.len(), 2, "{c:?}");
+        let close = args(&c[1]);
+        assert_eq!(close.last(), Some(&"close"));
+        assert!(close.contains(&"--config"), "{close:?}");
+        assert_eq!(
+            c[1]["env"],
+            json!({"AGENT_BROWSER_DEFAULT_TIMEOUT": "5000"})
+        );
+    }
+
+    #[tokio::test]
+    async fn close_waits_for_session_files() {
+        let (dir, config) = engine_dir("gone");
+        let mut b = fake();
+        let sock = dir.join("sock");
+        b.socket_dir = Some(sock.clone());
+        let session = "web-mcp-search-0-duckduckgo";
+        let files = [
+            sock.join(format!("{session}.pid")),
+            sock.join(format!("{session}.sock")),
+        ];
+        let url = Url::parse("http://example.com/q").unwrap();
+        let run = || SearchRun {
+            config: &config,
+            ready_js: READY_JS,
+            close_after: true,
+        };
+        for f in &files {
+            std::fs::write(f, "").unwrap();
+        }
+        // Files that never go: the wait gives up after 1 s (plus the two spawns).
+        let t = std::time::Instant::now();
+        b.render(&url, session, Some(run()), Duration::from_secs(5))
+            .await
+            .unwrap();
+        let capped = t.elapsed();
+        assert!(capped >= Duration::from_secs(1), "{capped:?}");
+        assert!(capped < Duration::from_millis(2500), "{capped:?}");
+        assert_eq!(args(calls(&dir).last().unwrap()).last(), Some(&"close"));
+        // Files that go after 300 ms end the wait then, well before the cap (spawns cost both runs alike).
+        let gone = files.clone();
+        let remover = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(300));
+            for f in &gone {
+                std::fs::remove_file(f).unwrap();
+            }
+        });
+        let t = std::time::Instant::now();
+        b.render(&url, session, Some(run()), Duration::from_secs(5))
+            .await
+            .unwrap();
+        let waited = t.elapsed();
+        remover.join().unwrap();
+        assert!(waited >= Duration::from_millis(300), "{waited:?}");
+        assert!(
+            waited + Duration::from_millis(400) < capped,
+            "{waited:?} vs {capped:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn render_reads_a_page_that_never_gets_ready() {
+        let (dir, config) = engine_dir("never");
+        let mut b = fake();
+        b.socket_dir = Some(dir.join("sock"));
+        let url = Url::parse("http://example.com/wait-slow").unwrap();
+        let run = SearchRun {
+            config: &config,
+            ready_js: READY_JS,
+            close_after: false,
+        };
+        let deadline = READ_MARGIN + Duration::from_millis(700);
+        let t = std::time::Instant::now();
+        let (html, landed) = b
+            .render(&url, "web-mcp-search-0-google", Some(run), deadline)
+            .await
+            .unwrap();
+        assert!(t.elapsed() < deadline, "{:?}", t.elapsed());
+        assert!(html.contains("Rendered page for"), "{html}");
+        assert_eq!(landed, url);
+        let c = calls(&dir);
+        assert_eq!(c[0]["env"], json!({"AGENT_BROWSER_DEFAULT_TIMEOUT": "700"}));
+        assert_eq!(c.len(), 1, "a read page keeps its session: {c:?}");
     }
 }

@@ -1,7 +1,6 @@
 // The installer's file writes and the clean slate's backup and delete, split out of install.ts so they can be tested.
 import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
-import { searxngSettings } from '../core/options.ts';
 import { CLEAN_TARGETS } from '../core/settings.ts';
 
 // Windows refuses a rename while another program has either file open: Defender scanning a fresh exe, an editor or
@@ -85,13 +84,4 @@ export function clearTargets(config: string) {
     out.push(`deleted ${path}`);
   }
   return out;
-}
-
-// Writes SearXNG's settings.yml with this secret unless one exists: the container already uses that file's secret.
-// Returns whether it wrote.
-export function writeSearxng(dir: string, template: string, secret: string) {
-  const file = join(dir, 'settings.yml');
-  if (existsSync(file)) return false;
-  writeAtomic(file, searxngSettings(template, secret));
-  return true;
 }

@@ -18,7 +18,6 @@ use crate::archive::{Archived, Item, is_private, is_private_ip};
 use crate::extract::{Page, extract_html, extract_pdf, near_empty};
 use crate::images;
 use crate::limits::HostPermit;
-use crate::rank::PassageDoc;
 
 pub const MAX_BODY: usize = 20 * 1024 * 1024;
 const ACCEPT_VALUE: &str = "text/markdown, text/html;q=0.9, */*;q=0.8";
@@ -362,10 +361,6 @@ async fn run(
         .put(item)
         .await
         .map_err(|e| net(format!("could not archive the page: {e}")))?;
-    // Private pages skip the cache because they change; indexed, they'd surface stale passages later.
-    if !private {
-        index(ctx, &final_url, &page, &archived).await;
-    }
     Ok(Fetched {
         final_url,
         private,
@@ -410,39 +405,6 @@ async fn private_landing(url: &Url) -> bool {
     match tokio::net::lookup_host((host.trim_matches(['[', ']']), port)).await {
         Ok(addrs) => addrs.into_iter().any(|a| is_private_ip(a.ip())),
         Err(_) => true,
-    }
-}
-
-/// Adds the page's passages to the archive index. A failure only costs search recall, so it is
-/// reported on stderr and the fetch still succeeds.
-async fn index(ctx: &Ctx, url: &Url, page: &Page, archived: &Archived) {
-    let (markdown, title) = (page.markdown.clone(), page.title.clone());
-    let (url, path, fetched) = (
-        url.to_string(),
-        slash(&archived.path),
-        archived.time.clone(),
-    );
-    let docs = tokio::task::spawn_blocking(move || {
-        crate::passages::split(&markdown)
-            .into_iter()
-            .map(|text| PassageDoc {
-                text,
-                url: url.clone(),
-                title: title.clone(),
-                path: path.clone(),
-                fetched: fetched.clone(),
-            })
-            .collect()
-    })
-    .await;
-    if let Err(e) = match docs {
-        Ok(docs) => ctx.index.add(docs).await,
-        Err(e) => Err(e.into()),
-    } {
-        eprintln!(
-            "web-mcp: could not index {}: {e:#}",
-            archived.path.display()
-        );
     }
 }
 
@@ -789,7 +751,6 @@ pub(crate) mod tests {
         std::fs::create_dir_all(&project).unwrap();
         let archive = crate::archive::Archive::open(&project, &jiff::Zoned::now()).unwrap();
         Arc::new(Ctx {
-            index: crate::rank::Index::open(archive.web()).unwrap(),
             archive,
             cfg: crate::config::Config {
                 papers: crate::config::PaperUrls {
@@ -815,13 +776,10 @@ pub(crate) mod tests {
                 },
                 lookup_deadline: None,
                 project,
-                searxng: Url::parse("http://127.0.0.1:8888").unwrap(),
                 agent_browser: "agent-browser".into(),
+                search_dir: None,
             },
-            search: crate::search::SearxNg::new(
-                Url::parse("http://127.0.0.1:8888").unwrap(),
-                client(false).unwrap(),
-            ),
+            profiles: crate::profile::Profiles::new(None),
             http: client(false).unwrap(),
             http_public: client(true).unwrap(),
             limits: crate::limits::HostLimits::default(),
@@ -911,41 +869,6 @@ pub(crate) mod tests {
         assert!(dropped.contains("http://127.0.0.1/admin"), "{dropped}");
         let own = browser_page(&ctx, &url, true).await.unwrap();
         assert!(own.contains("Rendered page for"), "{own}");
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn private_pages_are_not_indexed() {
-        use std::io::{Read, Write};
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let port = listener.local_addr().unwrap().port();
-        std::thread::spawn(move || {
-            for mut c in listener.incoming().flatten() {
-                let _ = c.read(&mut [0; 4096]);
-                let body = "# devsite\n\nchanging local content\n";
-                let _ = write!(
-                    c,
-                    "HTTP/1.1 200 OK\r\nContent-Type: text/markdown\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-                    body.len()
-                );
-            }
-        });
-        let ctx = test_ctx();
-        let url = Url::parse(&format!("http://localhost:{port}/")).unwrap();
-        let opts = GetOpts {
-            allow_private: true,
-            ..GetOpts::default()
-        };
-        let f = get(&ctx, &url, Duration::from_secs(10), opts)
-            .await
-            .map_err(|e| e.to_string())
-            .unwrap();
-        assert!(f.private);
-        assert!(
-            ctx.index
-                .search("devsite changing", 5, None)
-                .unwrap()
-                .is_empty()
-        );
     }
 
     #[tokio::test]

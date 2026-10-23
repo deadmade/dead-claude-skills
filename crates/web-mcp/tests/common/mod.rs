@@ -161,48 +161,19 @@ fn file(path: &str) -> Resp {
     Resp::new(200, ct, std::fs::read(p).unwrap())
 }
 
-/// Scripts `fx` as a `SearXNG` answering the one-word `query` with `results` (url, title).
-pub fn searx(fx: &Fixture, query: &str, results: &[(String, &str)]) {
-    searx_with(fx, query, "", "bing", results);
-}
-
-/// Like `searx`, for a request with the extra query string `params` (e.g. `&engines=github`); every
-/// result comes from `engine`.
-pub fn searx_with(
-    fx: &Fixture,
-    query: &str,
-    params: &str,
-    engine: &str,
-    results: &[(String, &str)],
-) {
-    let rs: Vec<Value> = results
-        .iter()
-        .map(|(u, t)| json!({"url": u, "title": t, "content": "x", "engine": engine, "engines": [engine]}))
-        .collect();
-    fx.route(
-        &format!("/search?q={query}&format=json{params}"),
-        vec![Resp::new(
-            200,
-            "application/json",
-            json!({"query": query, "results": rs}).to_string(),
-        )],
-    );
-}
-
-/// Scripts `fx`'s `/config` with `engines` (name, categories, time-range support).
-pub fn searx_config(fx: &Fixture, engines: &[(&str, &[&str], bool)]) {
-    let es: Vec<Value> = engines
-        .iter()
-        .map(|(n, c, t)| json!({"name": n, "categories": c, "time_range_support": t}))
-        .collect();
-    fx.route(
-        "/config",
-        vec![Resp::new(
-            200,
-            "application/json",
-            json!({"engines": es}).to_string(),
-        )],
-    );
+/// A copy of `tests/fixtures/search/` with `{{STUB}}` pointing at `fx`, for the fake's `$FAKE_AB_PAGES`.
+pub fn pages(fx: &Fixture) -> PathBuf {
+    let dir = tempdir();
+    for e in std::fs::read_dir(fixtures().join("search")).unwrap() {
+        let p = e.unwrap().path();
+        let html = std::fs::read_to_string(&p).unwrap();
+        std::fs::write(
+            dir.join(p.file_name().unwrap()),
+            html.replace("{{STUB}}", &fx.url("")),
+        )
+        .unwrap();
+    }
+    dir
 }
 
 pub fn tempdir() -> PathBuf {
@@ -220,6 +191,8 @@ pub fn tempdir() -> PathBuf {
 /// The web-mcp binary over stdio, initialized, with its project in a fresh temp dir.
 pub struct Mcp {
     pub project: PathBuf,
+    /// The server's `WEB_MCP_SEARCH_DIR`.
+    pub search: PathBuf,
     child: Child,
     stdin: Option<ChildStdin>,
     out: BufReader<ChildStdout>,
@@ -232,9 +205,26 @@ impl Mcp {
     }
 
     /// In `project` (so a second server there sees the first one's `.web`), with extra environment.
+    /// Unless `envs` says otherwise, agent-browser is the fake, the browser a dummy file, and the search
+    /// folder a fresh one; whichever it is gets Consent-O-Matic already unpacked: no test starts a browser or
+    /// downloads.
     pub fn start_with(project: PathBuf, envs: &[(&str, String)]) -> Self {
+        let search = envs
+            .iter()
+            .find(|(k, _)| *k == "WEB_MCP_SEARCH_DIR")
+            .map_or_else(tempdir, |(_, v)| PathBuf::from(v));
+        let ext = search.join("extensions/consent-o-matic-37cec881");
+        std::fs::create_dir_all(&ext).unwrap();
+        std::fs::write(ext.join("manifest.json"), "{}").unwrap();
+        std::fs::write(search.join("chrome"), "").unwrap();
         let mut cmd = Command::new(env!("CARGO_BIN_EXE_web-mcp"));
-        cmd.envs(envs.iter().map(|(k, v)| (k, v)))
+        cmd.env("WEB_MCP_SEARCH_DIR", &search)
+            .env("WEB_MCP_CHROME", search.join("chrome"))
+            .env(
+                "WEB_MCP_AGENT_BROWSER",
+                env!("CARGO_BIN_EXE_fake-agent-browser"),
+            )
+            .envs(envs.iter().map(|(k, v)| (k, v)))
             .env("CLAUDE_PROJECT_DIR", &project)
             .env("WEB_MCP_TEST_PUBLIC_IP", PUBLIC)
             .stdin(Stdio::piped())
@@ -254,6 +244,7 @@ impl Mcp {
         let out = BufReader::new(child.stdout.take().unwrap());
         let mut m = Self {
             project,
+            search,
             child,
             stdin: Some(stdin),
             out,
@@ -337,11 +328,6 @@ impl Mcp {
     pub fn finish(&mut self) {
         self.stdin = None;
         self.child.wait().unwrap();
-    }
-
-    /// The server's environment for a `SearXNG` at `fx`.
-    pub fn searx_env(fx: &Fixture) -> [(&'static str, String); 1] {
-        [("WEB_MCP_SEARXNG_URL", fx.url(""))]
     }
 
     /// `<project>/.web/<run>`.

@@ -88,7 +88,7 @@
     },
     {
       "name": "web-mcp",
-      "description": "Web research tools for Claude: search (self-hosted SearXNG, paper APIs and the archive, ranked with BM25), fetch (whole pages as markdown, optionally with images), browser (via agent-browser) and lookup (passive DNS, RDAP, certificate, Wayback, IP and vulnerability records). Everything is archived in .web/. Needs the web-mcp binary, which the installer downloads. Opt-in.",
+      "description": "Web research tools for Claude: search (Google, Bing, DuckDuckGo and Brave read in web-mcp's own browser, paper APIs plus Google Scholar and Semantic Scholar, ranked with BM25), fetch (whole pages as markdown, optionally with images), browser (via agent-browser) and lookup (passive DNS, RDAP, certificate, Wayback, IP and vulnerability records). Everything is archived in .web/. Needs the web-mcp binary and agent-browser, which the installer downloads. Opt-in.",
       "source": "./plugins/shared/web-mcp",
       "category": "development"
     },

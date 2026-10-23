@@ -116,7 +116,7 @@ pub async fn render(ctx: &Ctx, kind: &'static str, target: &str, o: Outcome) -> 
             Ok(a) => format!(
                 "fetched {}, archived at .web/{}",
                 a.time,
-                a.path.to_string_lossy().replace('\\', "/")
+                crate::fetch::slash(&a.path)
             ),
             Err(e) => format!("fetched {}, not archived: {e}", jiff::Timestamp::now()),
         };
