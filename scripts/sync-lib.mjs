@@ -20,6 +20,21 @@ export function tempDir() {
   return dir;
 }
 
+// Every stable vX.Y.Z tag in `git ls-remote --tags` output with its commit (peeled for annotated tags), oldest first.
+export function stableTags(lsRemote) {
+  const tags = new Map();
+  for (const line of lsRemote.split('\n')) {
+    const m = /^([0-9a-f]{40})\trefs\/tags\/(v(\d+)\.(\d+)\.(\d+))(\^\{\})?$/.exec(line);
+    if (!m) continue;
+    const [, sha, tag, ...rest] = m;
+    const entry = tags.get(tag) ?? { tag, version: rest.slice(0, 3).map(Number) };
+    if (rest[3] || !entry.sha) entry.sha = sha; // the peeled ^{} line wins
+    tags.set(tag, entry);
+  }
+  const cmp = ({ version: a }, { version: b }) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+  return [...tags.values()].sort(cmp).map(({ tag, sha }) => ({ tag, sha }));
+}
+
 // Blobless, sparse clone of `url` into a temp dir, checked out to `patterns`: the default branch at depth 1, or `ref`
 // (a branch or tag); `depth: 0` keeps the whole history. Returns the clone dir.
 export function sparseClone(url, patterns, { noCone = false, ref, depth = 1 } = {}) {

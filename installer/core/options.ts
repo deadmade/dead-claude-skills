@@ -48,7 +48,7 @@ export const searxngSettings = (template: string, secret: string) =>
 
 // The installer's pages, in order. keys: plugin names and installer toggles; an opt-in not listed here lands in Other,
 // so a new marketplace plugin is never left out.
-export const TOGGLES = ['ccstatusline', 'sandbox', 'dcg', 'strip-defaults', 'clean', 'web-builtins-off'];
+export const TOGGLES = ['ccstatusline', 'dcg', 'strip-defaults', 'clean', 'web-builtins-off'];
 export const CATEGORIES: Page[] = [
   {
     id: 'workflow',
@@ -91,8 +91,8 @@ export const CATEGORIES: Page[] = [
   {
     id: 'system',
     title: 'System',
-    blurb: 'Status line, sandbox and command guard.',
-    keys: ['ccstatusline', 'sandbox', 'dcg'],
+    blurb: 'Status line and command guard.',
+    keys: ['ccstatusline', 'dcg'],
   },
   // bulk: false, so no single key ticks every option here.
   {
@@ -122,7 +122,6 @@ export const HINTS: Record<string, string> = {
   'typescript-lsp': 'TypeScript / JavaScript',
   'pyright-lsp': 'Python (pyright)',
   ccstatusline: 'status line + its config',
-  sandbox: 'Bash sandbox, no unsandboxed fallback',
   dcg: 'destructive command guard, runs its own installer',
   'strip-defaults': `remove other marketplaces + plugins (keeps the ${OFFICIAL} ones used here), claude.ai connectors, synced skills/plugins, builtins`,
   'web-builtins-off': 'Turn off the built-in WebSearch and WebFetch (web-mcp replaces them; only with web-mcp)',
@@ -132,7 +131,6 @@ export const HINTS: Record<string, string> = {
 // Why an option can't work on this machine, or undefined when it can. version: the release whose binaries to look for.
 export function unavailable(key: string, platform: string, arch: string, version: string): string | undefined {
   const name = nameOf(key);
-  if (platform === 'win32' && name === 'sandbox') return 'needs WSL2';
   if (platform === 'win32' && name === 'nix-lsp') return 'nixd is not available on Windows';
   if (name === 'web-builtins-off') return unavailable(`web-mcp@${MARKETPLACE}`, platform, arch, version);
   const bin = BIN_PLUGINS[name];

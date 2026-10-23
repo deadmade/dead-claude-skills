@@ -109,8 +109,16 @@ skill (MIT License, Copyright Matt Pocock; `LICENSE-MIT`), unmodified apart from
 `plugins/shared/ponytail/` is vendored from [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) (MIT
 License, Copyright (c) 2026 DietrichGebert; full text in `LICENSE`): the Claude Code plugin's `.claude-plugin/plugin.json`,
 `hooks/` (without the other hosts' hook configs) and `skills/`, at upstream's newest stable release. It is synced by
-`scripts/sync-ponytail.mjs` (weekly via GitHub Actions); the only local change is `plugin.json`'s `version`. The synced
+`scripts/sync-release.mjs` (weekly via GitHub Actions); the only local change is `plugin.json`'s `version`. The synced
 upstream commit is in `UPSTREAM`.
+
+## superpowers
+
+`plugins/shared/superpowers/` is vendored from [obra/superpowers](https://github.com/obra/superpowers) (MIT License,
+Copyright (c) 2025 Jesse Vincent; full text in `LICENSE`): the Claude Code plugin's `.claude-plugin/plugin.json`,
+`hooks/` (without Cursor's hook config) and `skills/`, at upstream's newest stable release. It is synced by
+`scripts/sync-release.mjs` (weekly via GitHub Actions); the only local change is `plugin.json`'s `version`. The
+synced upstream commit is in `UPSTREAM`.
 
 ## Night City (dead-skills)
 
@@ -120,7 +128,7 @@ License, Copyright its authors), with changed and added colors. Nothing is vendo
 
 ## Re-listed plugins
 
-The marketplace entry for superpowers only points at its upstream repository, pinned to a release commit; no code is
-vendored here. Anthropic's plugins (code-review, claude-code-setup, claude-md-management, security-guidance,
+The marketplace entry for Atlassian only points at its upstream repository; no code is vendored here. Anthropic's
+plugins (code-review, claude-code-setup, claude-md-management, security-guidance,
 claude-security, skill-creator, hookify and the LSPs) aren't listed here at all: they install from Anthropic's
 `claude-plugins-official` marketplace. Each is covered by its own upstream license.

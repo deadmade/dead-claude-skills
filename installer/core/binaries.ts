@@ -25,8 +25,6 @@ const BINARIES = [
   ['python3', BUNDLE, 'nix: python3', 'winget install -e --id Python.Python.3.13'],
   ['uv', 'graphify', 'nix: uv', 'winget install -e --id astral-sh.uv'],
   ['graphify', 'graphify', 'uv tool install graphifyy', 'uv tool install graphifyy'],
-  ['bwrap', 'sandbox', 'nix: bubblewrap', 'WSL2 only'],
-  ['socat', 'sandbox', 'nix: socat', 'WSL2 only'],
   ['ccstatusline', 'ccstatusline', 'nix: ccstatusline', 'npm i -g ccstatusline'],
   ['docker', 'web-mcp', 'nix: docker', 'winget install -e --id Docker.DockerDesktop'],
 ];

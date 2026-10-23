@@ -5,7 +5,6 @@ import {
   mergeSettings,
   isShipped,
   SECRET_DENIES,
-  isSandboxOn,
   hasDcgHook,
   stripDefaults,
   isStripped,
@@ -65,19 +64,12 @@ test('secret denies are added once and keep existing ones', () => {
   assert.deepEqual(mergeSettings(out, V), out);
 });
 
-test('sandbox on merges our keys, off removes only ours', () => {
-  const on = mergeSettings({ ...V, sandbox: { excludedCommands: ['docker'] } }, { ...V, sandbox: true });
-  assert.deepEqual(on.sandbox, {
-    excludedCommands: ['docker'],
-    enabled: true,
-    autoAllowBashIfSandboxed: true,
-    allowUnsandboxedCommands: false,
-  });
-  assert.ok(isSandboxOn(on));
-  assert.deepEqual(mergeSettings(on, { ...V, sandbox: true }), on);
-  assert.deepEqual(mergeSettings(on, { ...V, sandbox: false }).sandbox, { excludedCommands: ['docker'] });
-  assert.equal(mergeSettings(mergeSettings({}, { ...V, sandbox: true }), { ...V, sandbox: false }).sandbox, undefined);
-  assert.ok(!isSandboxOn({}));
+test("the sandbox keys an older installer turned on are removed, the user's stay", () => {
+  const old = { enabled: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: false };
+  const out = mergeSettings({ sandbox: { ...old, excludedCommands: ['docker'] } }, V);
+  assert.deepEqual(out.sandbox, { excludedCommands: ['docker'] });
+  assert.equal(mergeSettings({ sandbox: old }, V).sandbox, undefined);
+  assert.equal(mergeSettings({}, V).sandbox, undefined);
 });
 
 test('dcg hook detection', () => {
@@ -133,7 +125,7 @@ test('reset keeps only our settings plus the dcg hook while dcg stays on', () =>
       other: {},
     },
   };
-  const out = resetSettings(before, { ...V, statusLine: true, sandbox: false, dcg: true });
+  const out = resetSettings(before, { ...V, statusLine: true, dcg: true });
   assert.equal(out.model, undefined);
   assert.deepEqual(out.permissions!.allow, ['Read(~/.claude/plugins/**)']);
   assert.deepEqual(out.hooks, { PreToolUse: [dcgEntry] });
@@ -143,7 +135,7 @@ test('reset keeps only our settings plus the dcg hook while dcg stays on', () =>
   assert.equal(out.enabledPlugins!['x@other'], undefined);
   assert.ok(isStripped(out));
   assert.equal(resetSettings(before, { ...V, dcg: false }).hooks, undefined);
-  assert.deepEqual(resetSettings(out, { ...V, statusLine: true, sandbox: false, dcg: true }), out);
+  assert.deepEqual(resetSettings(out, { ...V, statusLine: true, dcg: true }), out);
 });
 
 test('settings changes: invalid JSON is never written, unchanged is null, line endings are kept', () => {

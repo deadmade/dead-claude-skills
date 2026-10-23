@@ -20,12 +20,7 @@
     {
       "name": "superpowers",
       "description": "Brainstorming, subagent driven development with built in code review, systematic debugging, and red/green TDD.",
-      "source": {
-        "source": "url",
-        "url": "https://github.com/obra/superpowers.git",
-        "ref": "v7.0.0",
-        "sha": "bb92a77741419a4ab5f06e711a283343f1ada0c3"
-      },
+      "source": "./plugins/shared/superpowers",
       "category": "development"
     },
     {

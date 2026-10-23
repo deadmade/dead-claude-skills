@@ -1,4 +1,4 @@
-name: Sync ponytail
+name: Sync vendored releases
 
 on:
   schedule:
@@ -12,15 +12,19 @@ permissions:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        plugin: [ponytail, superpowers]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Sync the newest stable release
         id: sync
-        run: node scripts/sync-ponytail.mjs
+        run: node scripts/sync-release.mjs ${{ matrix.plugin }}
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_BODY_FILE: /tmp/ponytail-pr-body.md
+          PR_BODY_FILE: /tmp/${{ matrix.plugin }}-pr-body.md
 
       # A PR opened with the workflow's token starts no other workflow, so test.yml never sees it: check here.
       - name: Claude Code, for plugin validate
@@ -32,9 +36,9 @@ jobs:
       - name: Open pull request
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
-          branch: sync/ponytail
+          branch: sync/${{ matrix.plugin }}
           delete-branch: true
-          commit-message: 'Sync ponytail to ${{ steps.sync.outputs.tag }}'
-          title: 'Sync ponytail to ${{ steps.sync.outputs.tag }}'
-          body-path: /tmp/ponytail-pr-body.md
-          add-paths: plugins/shared/ponytail
+          commit-message: 'Sync ${{ matrix.plugin }} to ${{ steps.sync.outputs.tag }}'
+          title: 'Sync ${{ matrix.plugin }} to ${{ steps.sync.outputs.tag }}'
+          body-path: /tmp/${{ matrix.plugin }}-pr-body.md
+          add-paths: plugins/shared/${{ matrix.plugin }}

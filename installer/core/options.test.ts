@@ -32,11 +32,11 @@ test('every opt-in and toggle is on exactly one page, except the INCLUDED ones o
 });
 
 test('an uncategorized plugin lands in Other, empty pages are dropped', () => {
-  const pages = categorize([`new-thing@${M}`, 'sandbox']);
+  const pages = categorize([`new-thing@${M}`, 'dcg']);
   assert.deepEqual(
     pages.map((p) => [p.id, p.keys]),
     [
-      ['system', ['sandbox']],
+      ['system', ['dcg']],
       ['other', [`new-thing@${M}`]],
     ],
   );
@@ -61,13 +61,12 @@ test('categorize keeps bulk:false on danger', () => {
 });
 
 test('options hidden per platform', () => {
-  assert.equal(unavailable('sandbox', 'win32', 'x64', '1.0.0'), 'needs WSL2');
   assert.ok(unavailable(`nix-lsp@${M}`, 'win32', 'x64', '1.0.0'));
   assert.equal(unavailable(`tui-review@${M}`, 'win32', 'x64', '1.0.0'), undefined);
   assert.ok(unavailable(`tui-review@${M}`, 'win32', 'arm64', '1.0.0'));
   assert.ok(unavailable(`tui-review@${M}`, 'darwin', 'arm64', '1.0.0'));
   assert.ok(unavailable(`tui-review@${M}`, 'linux', 'arm64', '1.0.0'));
-  for (const k of ['sandbox', `nix-lsp@${M}`, 'dcg']) {
+  for (const k of [`nix-lsp@${M}`, 'dcg']) {
     assert.equal(unavailable(k, 'linux', 'x64', '1.0.0'), undefined);
     assert.equal(unavailable(k, 'darwin', 'arm64', '1.0.0'), undefined);
   }

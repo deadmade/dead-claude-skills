@@ -6,7 +6,7 @@ My personal Claude Code setup as a plugin marketplace, so every machine (Linux, 
 built for me; use it if it fits, but expect it to change without notice.
 
 The default bundle, **[dead-skills](plugins/default/README.md)**, pulls in code-review, claude-code-setup, claude-md-management, security-guidance,
-claude-security, superpowers, ponytail (vendored: it also draws a band above the prompt with the task's cost, reuse and
+claude-security, superpowers (vendored), ponytail (vendored: it also draws a band above the prompt with the task's cost, reuse and
 tests), and itself carries Context7, Night City (a
 toned-down synthwave theme that everything else here is painted in), desktop notifications when a turn ends or Claude
 waits for you, and my global rules. Everything else is opt-in: language
@@ -24,7 +24,7 @@ with approval gates and a state file to resume from. Picking flows installs ever
 
 The installer (Node standard library only, written in TypeScript and attached to each release built to JS) shows one page per category where you pick what to install, remove or
 update, then applies only the changes. It pins the marketplace to its own release so plugins match the installer, and
-it always denies Claude reading `.env` files and credential dirs and keeps session transcripts (Claude Code deletes them after 30 days unless `cleanupPeriodDays` is set). Optional toggles add ccstatusline, the Bash sandbox
+it always denies Claude reading `.env` files and credential dirs and keeps session transcripts (Claude Code deletes them after 30 days unless `cleanupPeriodDays` is set). Optional toggles add ccstatusline
 and dcg; the danger zone can strip all foreign plugins or reset `~/.claude` to a clean slate (after a backup). Without
 the installer, `/plugin marketplace add deadmade/dead-claude-skills` and `/plugin install dead-skills@dead-claude-skills`
 work too, but track main.

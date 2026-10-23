@@ -11,6 +11,8 @@ The default bundle, on every machine:
 
   /plugin install dead-skills@dead-claude-skills
 
+superpowers is vendored the same way, in `plugins/shared/superpowers/`.
+
 ponytail (vendored in `plugins/shared/ponytail/` from its upstream release, unchanged) does more than set a prompt
 style: it adds its rules at session start together with a short map of the codebase, and to every subagent; it draws a
 band above the prompt with the task's cost, agent time, reuse and tests, with buttons for its review, audit and board

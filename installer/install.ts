@@ -30,7 +30,6 @@ import { LATEST_INSTALLER, MARKETPLACE, installerUrl, newerInstaller, npxArgs } 
 import {
   hasDcgHook,
   isOurStatusLine,
-  isSandboxOn,
   isStripped,
   isWebBuiltinsOff,
   restoreHint,
@@ -137,7 +136,6 @@ const settingsNow = tryJson(SETTINGS) ?? {};
 const current: Record<string, boolean> = {
   ...Object.fromEntries(opts.map((id) => [id, has(id)])),
   ccstatusline: isOurStatusLine(settingsNow.statusLine),
-  sandbox: isSandboxOn(settingsNow),
   dcg: hasDcgHook(settingsNow),
   'strip-defaults': isStripped(settingsNow),
   clean: false,
@@ -267,7 +265,6 @@ const webBuiltinsOff = webBuiltinsDecision({
 
 const toggles = {
   statusLine: on('ccstatusline'),
-  sandbox: on('sandbox'),
   dcg: on('dcg'),
   version: VERSION,
   webBuiltinsOff,
