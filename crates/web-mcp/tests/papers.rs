@@ -311,31 +311,36 @@ fn since_reaches_openalex_and_arxiv() {
         .to_zoned(jiff::tz::TimeZone::UTC)
         .date()
         .saturating_sub(jiff::ToSpan::year(1));
-    let compact = day.strftime("%Y%m%d").to_string();
-    fx.route(
-        &with_query(
-            "/openalex",
-            &[
-                ("search", "attention"),
-                ("per_page", "5"),
-                ("filter", &format!("from_publication_date:{day}")),
-            ],
-        ),
-        ok("application/json", "openalex-search.json"),
-    );
-    fx.route(
-        &with_query(
-            "/arxiv",
-            &[
-                (
-                    "search_query",
-                    &format!("all:\"attention\" AND submittedDate:[{compact}0000 TO 999912312359]"),
-                ),
-                ("max_results", "5"),
-            ],
-        ),
-        ok("application/atom+xml", "arxiv-ok.xml"),
-    );
+    // The server may read the clock just after UTC midnight: route the next day too.
+    for day in [day, day.tomorrow().unwrap()] {
+        let compact = day.strftime("%Y%m%d").to_string();
+        fx.route(
+            &with_query(
+                "/openalex",
+                &[
+                    ("search", "attention"),
+                    ("per_page", "5"),
+                    ("filter", &format!("from_publication_date:{day}")),
+                ],
+            ),
+            ok("application/json", "openalex-search.json"),
+        );
+        fx.route(
+            &with_query(
+                "/arxiv",
+                &[
+                    (
+                        "search_query",
+                        &format!(
+                            "all:\"attention\" AND submittedDate:[{compact}0000 TO 999912312359]"
+                        ),
+                    ),
+                    ("max_results", "5"),
+                ],
+            ),
+            ok("application/atom+xml", "arxiv-ok.xml"),
+        );
+    }
     let pages = pages(&fx);
     let mut mcp = start_browser(&fx, &pages, &[]);
     let r = mcp.call(

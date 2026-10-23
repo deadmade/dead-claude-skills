@@ -614,17 +614,19 @@ fn identifiers(f: &Found) -> (Option<String>, Option<String>) {
     {
         arxiv = arxiv_id(id.trim_end_matches(".pdf")).map(str::to_owned);
     }
-    let in_url = url.find("/10.").map(|i| &url[i + 1..]);
-    // The URL first: a publisher's own DOI beats one the snippet cites.
-    let tokens = in_url
-        .into_iter()
-        .chain(f.snippet.split_whitespace())
-        .map(|t| t.trim_matches(|c: char| ",.;:()[]<>\"'".contains(c)));
-    for t in tokens {
+    // The URL first: a publisher's own DOI (cut at its query or fragment) beats one the snippet cites.
+    let in_url = url
+        .find("/10.")
+        .and_then(|i| url[i + 1..].split(['?', '#']).next());
+    // A bare DOI in a snippet may belong to a cited work, so only a tagged one counts.
+    let in_snippet = f.snippet.split_whitespace().filter_map(|t| {
+        let t = t.trim_matches(|c: char| ",.;:()[]<>\"'".contains(c));
         let tagged = |p: &str| t.get(..p.len()).is_some_and(|h| h.eq_ignore_ascii_case(p));
-        if !(t.starts_with("10.") || tagged("doi:") || tagged("arxiv:")) {
-            continue;
-        }
+        t.find("doi.org/10.")
+            .map(|i| &t[i + "doi.org/".len()..])
+            .or_else(|| (tagged("doi:") || tagged("arxiv:")).then_some(t))
+    });
+    for t in in_url.into_iter().chain(in_snippet) {
         match classify(t) {
             Ident::Doi(d) => doi = doi.or(Some(d)),
             Ident::Arxiv(a) => arxiv = arxiv.or(Some(a)),
@@ -690,9 +692,9 @@ async fn engines(ctx: &Ctx, query: &str, f: &Filter) -> Engines {
     out
 }
 
-#[allow(clippy::too_many_lines)] // one pass: sources, merge, record, index
 /// Looks `query` up in the paper APIs (and, for a phrase, the browser engines), indexes every abstract and
 /// archives the records.
+#[allow(clippy::too_many_lines)] // one pass: sources, merge, record, index
 pub async fn search(ctx: &Ctx, query: &str, f: &Filter) -> PapersOutput {
     let ask_for = classify(query);
     let urls = &ctx.cfg.papers;
@@ -990,14 +992,28 @@ mod tests {
             Engine::SemanticScholar,
             &hit(
                 "https://x.org/p",
-                "In arXiv:2005.14165, 3.14 and 10.5555/z.1.",
+                "In arXiv:2005.14165, 3.14 and, as cited, 10.5555/z.1.",
             ),
         );
+        // A bare DOI in a snippet may be a cited work's.
         assert_eq!(
             (p.arxiv.as_deref(), p.doi.as_deref()),
-            (Some("2005.14165"), Some("10.5555/z.1"))
+            (Some("2005.14165"), None)
         );
         assert_eq!(p.sources, ["Semantic Scholar"]);
+        let p = engine_paper(
+            Engine::Scholar,
+            &hit(
+                "https://x.org/p",
+                "at https://doi.org/10.5555/z.2, DOI: 10.1/no",
+            ),
+        );
+        assert_eq!(p.doi.as_deref(), Some("10.5555/z.2"));
+        let p = engine_paper(
+            Engine::Scholar,
+            &hit("https://x.org/a/10.1007/s123?x=1#top", ""),
+        );
+        assert_eq!(p.doi.as_deref(), Some("10.1007/s123"));
     }
 
     #[test]
