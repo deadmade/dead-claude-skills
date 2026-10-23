@@ -68,7 +68,7 @@ _Avoid_: tab, browser instance
 
 **Passage**:
 A piece of a page's text, a few hundred tokens long, returned word for word as one ranked search result.
-_Avoid_: chunk, snippet, excerpt
+_Avoid_: chunk, excerpt
 
 **Lookup**:
 One request for one record about a target, such as a domain's DNS records or a CVE, answered by sources rather than
@@ -80,5 +80,14 @@ An outside service web-mcp reads records from directly, such as OSV or crt.sh.
 _Avoid_: provider, backend
 
 **Engine**:
-One of SearXNG's search sites, such as `github` or `bing`; a filtered search names the engines it uses.
-_Avoid_: source
+A search site whose result page web-mcp opens and reads, such as Google, Bing or Google Scholar; a search may name the
+engines it uses.
+_Avoid_: source, provider, backend
+
+**Snippet**:
+The short text an engine shows under one result; web-mcp ranks it alongside the passages of that search's pages.
+_Avoid_: passage, summary
+
+**Search profile**:
+The browser profile web-mcp's searches run in, with cookies and settings of its own and never the user's.
+_Avoid_: session (one browser), user profile
