@@ -53,6 +53,20 @@ struct Fields {
     hash: Field,
 }
 
+/// The passage schema (text is indexed with tantivy's default tokenizer), shared by `Index` and `MemIndex`.
+fn schema() -> (Schema, Fields) {
+    let mut b = Schema::builder();
+    let f = Fields {
+        text: b.add_text_field("text", TEXT | STORED),
+        url: b.add_text_field("url", STORED),
+        title: b.add_text_field("title", STORED),
+        path: b.add_text_field("path", STORED),
+        fetched: b.add_text_field("fetched", STORED),
+        hash: b.add_text_field("hash", STRING | STORED),
+    };
+    (b.build(), f)
+}
+
 type Job = (Vec<PassageDoc>, oneshot::Sender<Result<(), String>>);
 
 pub struct Index {
@@ -78,21 +92,13 @@ impl Index {
             anyhow::bail!("{} is a symlink; refusing to use it", dir.display());
         }
         std::fs::create_dir_all(&dir).with_context(|| format!("creating {}", dir.display()))?;
-        let mut b = Schema::builder();
-        let f = Fields {
-            text: b.add_text_field("text", TEXT | STORED),
-            url: b.add_text_field("url", STORED),
-            title: b.add_text_field("title", STORED),
-            path: b.add_text_field("path", STORED),
-            fetched: b.add_text_field("fetched", STORED),
-            hash: b.add_text_field("hash", STRING | STORED),
-        };
+        let (schema, f) = schema();
         // Two processes opening a new `.web/` would both create the index, the second replacing the first's
         // meta.json (on Windows refused while that is open: "Access is denied"). tantivy's meta lock makes one
         // wait; it is released before the reader is built, since reloads take it.
         let mmap = MmapDirectory::open(&dir)?;
         let creating = mmap.acquire_lock(&META_LOCK)?;
-        let index = tantivy::Index::open_or_create(mmap, b.build())?;
+        let index = tantivy::Index::open_or_create(mmap, schema)?;
         drop(creating);
         // OnCommitWithDelay watches meta.json, so other processes' commits show up too.
         let reader = index
@@ -166,19 +172,8 @@ impl Index {
         let mut seen: HashMap<String, usize> = HashMap::new();
         for (score, addr) in top {
             let d: TantivyDocument = searcher.doc(addr)?;
-            let get = |f: Field| {
-                d.get_first(f)
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_owned()
-            };
-            let doc = PassageDoc {
-                text: get(self.f.text),
-                url: get(self.f.url),
-                title: get(self.f.title),
-                path: get(self.f.path),
-                fetched: get(self.f.fetched),
-            };
+            let get = |f: Field| stored(&d, f);
+            let doc = passage(&d, self.f);
             if only.is_some_and(|o| !o.contains(&doc.url)) {
                 continue;
             }
@@ -194,6 +189,23 @@ impl Index {
         }
         hits.truncate(k);
         Ok(hits)
+    }
+}
+
+fn stored(d: &TantivyDocument, f: Field) -> String {
+    d.get_first(f)
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_owned()
+}
+
+fn passage(d: &TantivyDocument, f: Fields) -> PassageDoc {
+    PassageDoc {
+        text: stored(d, f.text),
+        url: stored(d, f.url),
+        title: stored(d, f.title),
+        path: stored(d, f.path),
+        fetched: stored(d, f.fetched),
     }
 }
 
@@ -375,6 +387,69 @@ impl Writer {
                 r => return r.context("opening the index writer"),
             }
         }
+    }
+}
+
+/// One search's own passages in RAM: BM25 over just these, never the archive.
+#[allow(dead_code)] // until Task 7
+pub struct MemIndex {
+    tantivy: tantivy::Index,
+    reader: IndexReader,
+    f: Fields,
+}
+
+#[allow(dead_code)] // until Task 7
+impl MemIndex {
+    /// Passages with the same URL and text collapse to one.
+    ///
+    /// # Errors
+    /// When tantivy can't build the index.
+    pub fn new(docs: Vec<PassageDoc>) -> anyhow::Result<MemIndex> {
+        let (schema, f) = schema();
+        let tantivy = tantivy::Index::create_in_ram(schema);
+        let mut writer: IndexWriter = tantivy.writer_with_num_threads(1, ARENA)?;
+        let mut seen = HashSet::new();
+        for d in docs {
+            let h = hash(&d);
+            if !seen.insert(h.clone()) {
+                continue;
+            }
+            let mut t = TantivyDocument::new();
+            t.add_text(f.text, &d.text);
+            t.add_text(f.url, &d.url);
+            t.add_text(f.title, &d.title);
+            t.add_text(f.path, &d.path);
+            t.add_text(f.fetched, &d.fetched);
+            t.add_text(f.hash, &h);
+            writer.add_document(t)?;
+        }
+        writer.commit()?;
+        let reader = tantivy.reader()?;
+        Ok(MemIndex { tantivy, reader, f })
+    }
+
+    /// The best `k` passages by BM25; the query never fails on syntax.
+    ///
+    /// # Errors
+    /// When tantivy can't read the index.
+    pub fn search(&self, query: &str, k: usize) -> anyhow::Result<Vec<Hit>> {
+        if k == 0 {
+            return Ok(Vec::new());
+        }
+        let searcher = self.reader.searcher();
+        let (q, _) =
+            QueryParser::for_index(&self.tantivy, vec![self.f.text]).parse_query_lenient(query);
+        searcher
+            .search(&q, &TopDocs::with_limit(k).order_by_score())?
+            .into_iter()
+            .map(|(score, addr)| {
+                let d: TantivyDocument = searcher.doc(addr)?;
+                Ok(Hit {
+                    doc: passage(&d, self.f),
+                    score,
+                })
+            })
+            .collect()
     }
 }
 
