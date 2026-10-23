@@ -85,7 +85,7 @@ export async function removeForeign({
   return { dupes, foreign };
 }
 
-// Installs, uninstalls, retires and updates, then prunes dependencies nothing needs when anything went. Records a
+// Installs, uninstalls, updates and retires, then prunes dependencies nothing needs when anything went. Records a
 // failure for any of packs (names) still installed afterwards.
 export async function applyPlugins({
   install,
@@ -106,8 +106,6 @@ export async function applyPlugins({
     await run(`Installing ${nameOf(id)}`, `installed ${id}`, 'plugin', 'install', id, '--scope', 'user', '--json');
   for (const id of remove)
     await run(`Uninstalling ${nameOf(id)}`, `uninstalled ${id}`, 'plugin', 'uninstall', id, '--json');
-  for (const id of retired)
-    await run(`Uninstalling ${nameOf(id)}`, `uninstalled ${id} (retired)`, 'plugin', 'uninstall', id, '--json');
   for (const u of updates) {
     await run(
       `Updating ${nameOf(u.id)} ${u.from} → ${u.to}`,
@@ -118,9 +116,12 @@ export async function applyPlugins({
       '--json',
     );
   }
+  // After the updates, so an old dead-skills or flows no longer lists the packs as dependencies.
+  for (const id of retired)
+    await run(`Uninstalling ${nameOf(id)}`, `uninstalled ${id} (retired)`, 'plugin', 'uninstall', id, '--json');
   if (remove.length || retired.length || removedBefore)
     await run('Pruning unused dependencies', 'pruned unused dependencies', 'plugin', 'prune', '-y');
-  // Retiring runs before the updates, and an old dead-skills or flows still lists the packs as dependencies.
+  // A pack something not updated still depends on can outlive its uninstall.
   const after = await progress('Checking no pack is still installed', () =>
     claude(undefined, 'plugin', 'list', '--json'),
   );
@@ -132,7 +133,7 @@ export async function applyPlugins({
     /* rows stays undefined: reported below */
   }
   const left = rows && stillInstalled(rows, packs);
-  if (!left) failures.push(`checking no pack is still installed: ${after.err}`);
+  if (!left) failures.push(`checking no pack is still installed: ${after.err || 'unreadable output'}`);
   else if (left.length)
     failures.push(`still installed, though flows carries them now (claude plugin uninstall each): ${left.join(', ')}`);
 }
