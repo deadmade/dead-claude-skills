@@ -112,6 +112,11 @@ License, Copyright (c) 2026 DietrichGebert; full text in `LICENSE`): the Claude 
 `scripts/sync-ponytail.mjs` (weekly via GitHub Actions); the only local change is `plugin.json`'s `version`. The synced
 upstream commit is in `UPSTREAM`.
 
+## web-mcp
+
+- **Consent-O-Matic**: MIT, https://github.com/cavi-au/Consent-O-Matic. web-mcp downloads the pinned v1.1.5 zip on the
+  first search (sha256-checked) and loads it into its search browsers; not vendored.
+
 ## Night City (dead-skills)
 
 The palette of `plugins/default/themes/night-city.json` is derived from the Cyberpunk Neon theme

@@ -3,16 +3,14 @@
 A stdio MCP server (`web-mcp`, Rust) with four tools, available to Claude as `mcp__plugin_web-mcp_web__*`. Everything
 they pull is archived in `.web/` in the project before Claude sees it.
 
-- `search { query, papers?, max_passages?, engines?, category?, since? }`: searches the local archive and the web
-  together (self-hosted SearXNG), fetches the top five results, and returns the best passages word for word (default 8,
-  at most 20), each with its URL, title and archive path. `engines` (comma-separated SearXNG engines such as `github`
-  or `pypi`), `category` and `since` (`day`, `week`, `month`, `year`) narrow the web side; a filtered search ranks only
-  its own pages, not the rest of the archive. `since` fails for engines without time-range support. An engine SearXNG
-  ships disabled (e.g. crates.io, npm) may need `disabled: false` under `engines:` in `~/.claude/searxng/settings.yml`,
-  then `docker restart searxng`, because the installer never overwrites that file. Ranking is BM25; there are no
-  embeddings. With `papers: true` it queries OpenAlex, arXiv and
-  Crossref instead, merged by DOI or arXiv id, one record per paper with its abstract. If SearXNG can't be reached, the
-  call fails and says how to start it.
+- `search { query, papers?, max_passages?, engines?, since? }`: reads Google, Bing, DuckDuckGo and Brave result pages
+  in web-mcp's own browser, fuses them, fetches the top five results, and returns the best passages word for word
+  (default 8, at most 20), each with its URL, title and archive path. Ranking is BM25 over this search's own pages;
+  there are no embeddings. `engines` (comma-separated: `google`, `bing`, `duckduckgo`, `brave`) and `since` (`day`,
+  `week`, `month`, `year`) narrow it. With `papers: true` it queries OpenAlex, arXiv and Crossref plus Google Scholar
+  and Semantic Scholar (`engines` picks among those two; the paper APIs always run), merged by DOI or arXiv id, one
+  record per paper with its abstract. One engine failing never fails the search; if none answers, the call says why.
+  See "How search reads engines" below.
 - `fetch { url, images? }`: a whole page as markdown (HTML main content, PDFs as text). With `images: true`, up to six
   content images come back downscaled. A page that is empty without JavaScript is re-fetched through the browser. A URL
   fetched earlier in the run comes from the archive, except localhost and private-network addresses.
@@ -37,6 +35,24 @@ RDAP servers and the registries they point to (`whois`), crt.sh (`certs`), archi
 (`ip`), and OSV, FIRST, CISA and NVD (`vuln`). No setting or prompt guards this, so a lookup tells those services what
 you are researching. Shodan InternetDB is free for non-commercial use only.
 
+## How search reads engines
+
+Each engine has its own browser profile under `WEB_MCP_SEARCH_DIR` (default `$XDG_DATA_HOME/web-mcp`,
+`~/.local/share/web-mcp`, or `%LOCALAPPDATA%\web-mcp`). There is no temp fallback: without a home folder, search asks
+for `WEB_MCP_SEARCH_DIR`, and on Unix a folder owned by someone else is refused. The browser is the first of:
+`WEB_MCP_CHROME`, the newest Chrome for Testing from `agent-browser install` (if it starts), `helium`, `chromium` on PATH.
+Branded Chrome is never used, because it ignores folder extensions since version 137. On Linux, Helium is started
+through a small wrapper web-mcp writes (nixpkgs' bwrap otherwise kills it after 10 s). Helium ships uBlock Origin. On
+Windows each search browser is closed after its search, because extensions force a visible window there.
+
+[Consent-O-Matic](https://github.com/cavi-au/Consent-O-Matic) (MIT, pinned v1.1.5, checked against a sha256) answers
+cookie banners with "reject". web-mcp downloads it on the first search; it is not loaded for Bing. A first consent
+page is skipped as "consent (clearing)"; only a second one rests the engine.
+
+An engine that is blocked (CAPTCHA, or consent twice) rests for 30 minutes, shared by every web-mcp process on the
+machine. A busy, slow, offline or unrecognised engine is skipped without a rest. Google and Semantic Scholar
+rate-limit bursts.
+
 ## The archive
 
 `.web/<date>_<run>/` holds an `index.jsonl` plus the searches, pages, PDFs and screenshots of one server run. `.web/`
@@ -53,10 +69,8 @@ The installer downloads the `web-mcp` binary from the release and sets `binPath`
 `cargo build --release --manifest-path crates/web-mcp/Cargo.toml` (or `nix build .#web-mcp`) and put it on PATH
 or set its path with `/plugin configure web-mcp`.
 
-- **SearXNG** (for `search`): with Docker, the installer starts it on 127.0.0.1:8888 with
-  `~/.claude/searxng/settings.yml`, which turns on the JSON format and searches Bing and Yahoo (SearXNG's default engines
-  CAPTCHA or rate-limit a scraper). Without Docker it prints what to run. If you
-  accept the `web-builtins-off` toggle, WebSearch and WebFetch are denied, but only when SearXNG answers.
+- **A search browser**: found as described above; the installer needs no Docker. If you accept the `web-builtins-off`
+  toggle, WebSearch and WebFetch are denied, but only once a search browser starts.
 - **agent-browser** (for `browser` and `fetch`'s fallback): a current one on PATH is used as is. Otherwise the
   installer keeps its own copy in `~/.claude/bin`: upstream's release binary for the version pinned in
   `installer/assets/agent-browser.json` (checked against the sha256 pinned there; `sync-agent-browser.yml` bumps both weekly),
@@ -67,9 +81,9 @@ or set its path with `/plugin configure web-mcp`.
 
 ## Configuration
 
-Environment variables, set in `.mcp.json`: `CLAUDE_PROJECT_DIR` (where `.web/` lives), `WEB_MCP_SEARXNG_URL` (default
-`http://127.0.0.1:8888`) and `WEB_MCP_AGENT_BROWSER` (the `agentBrowserPath` userConfig, default `agent-browser`). `WEB_MCP_ARXIV_URL`,
-`WEB_MCP_OPENALEX_URL` and `WEB_MCP_CROSSREF_URL` repoint the paper APIs (for tests). The lookup sources are repointed by `WEB_MCP_DOH_URL`, `WEB_MCP_RDAP_URL`, `WEB_MCP_CRTSH_URL`,
+Environment variables, set in `.mcp.json`: `CLAUDE_PROJECT_DIR` (where `.web/` lives), `WEB_MCP_AGENT_BROWSER` (the `agentBrowserPath` userConfig, default `agent-browser`),
+`WEB_MCP_SEARCH_DIR` and `WEB_MCP_CHROME` (see above). `WEB_MCP_ARXIV_URL`,
+`WEB_MCP_OPENALEX_URL` and `WEB_MCP_CROSSREF_URL` repoint the paper APIs (for tests); `WEB_MCP_PAPERS_MS` shortens each paper source's deadline. The lookup sources are repointed by `WEB_MCP_DOH_URL`, `WEB_MCP_RDAP_URL`, `WEB_MCP_CRTSH_URL`,
 `WEB_MCP_CDX_URL`, `WEB_MCP_WAYBACK_URL`, `WEB_MCP_INTERNETDB_URL`, `WEB_MCP_OSV_URL`, `WEB_MCP_NVD_URL`,
 `WEB_MCP_EPSS_URL` and `WEB_MCP_KEV_URL`; `WEB_MCP_LOOKUP_MS` shortens every lookup source's deadline (test-only).
 
