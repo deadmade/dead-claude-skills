@@ -1,7 +1,5 @@
 //! Merging one search's engines: URL normalisation, RRF over the engines' lists, and the final order.
 
-#![cfg_attr(not(test), allow(dead_code))]
-
 use std::collections::HashMap;
 
 use url::Url;

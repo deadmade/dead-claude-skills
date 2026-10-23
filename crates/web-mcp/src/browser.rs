@@ -72,7 +72,6 @@ pub struct Browser {
 }
 
 /// A search's page load: in an engine's session, under web-mcp's config for it.
-#[cfg_attr(not(test), allow(dead_code))] // built by `search` from Task 5 on
 pub struct SearchRun<'a> {
     /// The engine's `agent-browser.json`; its folder is the call's working directory.
     pub config: &'a Path,

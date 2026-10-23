@@ -34,10 +34,8 @@ pub struct SearchArgs {
     pub papers: Option<bool>,
     /// Passages to return, 1-20 (default 8).
     pub max_passages: Option<u32>,
-    /// Comma-separated engines, e.g. github, stackoverflow, pypi, docker hub, mdn, arch linux wiki, crates.io, npm, pkg.go.dev, gitlab, codeberg
+    /// Comma-separated engines: google, bing, duckduckgo, brave; with papers: scholar, semanticscholar (the paper APIs always run)
     pub engines: Option<String>,
-    /// A category, e.g. it, repos, news, science
-    pub category: Option<String>,
     /// Only results from the last day, week, month or year
     pub since: Option<search::Since>,
 }
@@ -325,11 +323,16 @@ impl Server {
 #[tool_router]
 impl Server {
     #[tool(
-        description = "Search the web (self-hosted SearXNG) and the local archive; returns ranked passages with sources. With papers: true it searches OpenAlex, arXiv and Crossref instead and recognises DOIs and arXiv ids in the query. Optional engines, category and since (day, week, month, year) narrow the web side to those SearXNG engines; then only this search's pages are ranked.",
+        description = "Search the web through Google, Bing, DuckDuckGo and Brave, read in web-mcp's own browser; returns ranked passages and snippets with sources. With papers: true it searches OpenAlex and arXiv (Crossref for DOIs), Google Scholar and Semantic Scholar instead and recognises DOIs and arXiv ids. Optional engines and since (day, week, month, year) narrow it. For one site, put site:example.com in the query.",
         annotations(read_only_hint = true)
     )]
     async fn search(&self, Parameters(args): Parameters<SearchArgs>) -> CallToolResult {
-        if args.papers == Some(true) {
+        let papers = args.papers == Some(true);
+        let filter = match search::filter(args.engines.as_deref(), args.since, papers) {
+            Ok(f) => f,
+            Err(e) => return error(e),
+        };
+        if papers {
             let out = papers::search(&self.ctx, &args.query).await;
             let text = out.to_string();
             return if out.papers.is_empty() && !out.failed.is_empty() {
@@ -339,17 +342,6 @@ impl Server {
             };
         }
         let n = args.max_passages.map_or(8, |n| n.clamp(1, 20)) as usize;
-        let filter = search::Filter {
-            engines: args
-                .engines
-                .iter()
-                .flat_map(|e| e.split(','))
-                .map(|e| e.trim().to_owned())
-                .filter(|e| !e.is_empty())
-                .collect(),
-            category: args.category,
-            since: args.since,
-        };
         match search::web(&self.ctx, &args.query, n, &filter).await {
             Ok(text) => CallToolResult::success(vec![ContentBlock::text(text)]),
             Err(e) => error(e.to_string()),

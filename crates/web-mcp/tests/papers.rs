@@ -1,9 +1,9 @@
-//! `search` with `papers: true` against stub `OpenAlex`, arXiv and Crossref servers. No `SearXNG` runs.
+//! `search` with `papers: true` against stub `OpenAlex`, arXiv and Crossref servers.
 mod common;
 
 use std::time::{Duration, Instant};
 
-use common::{Fixture, Mcp, PUBLIC, Resp, is_error, searx, tempdir, text};
+use common::{Fixture, Mcp, PUBLIC, Resp, is_error, tempdir, text};
 use serde_json::json;
 use url::Url;
 
@@ -54,7 +54,7 @@ fn doi_query_merges_crossref_and_openalex() {
         "/openalex/doi:10.7717/peerj.4375",
         ok("application/json", "openalex-doi.json"),
     );
-    let mut mcp = start(&fx); // SearXNG is not running: papers mode doesn't need it
+    let mut mcp = start(&fx);
     let r = papers(&mut mcp, "doi:10.7717/peerj.4375");
     assert!(!is_error(&r), "{r}");
     let t = text(&r);
@@ -74,7 +74,7 @@ fn doi_query_merges_crossref_and_openalex() {
 
 #[cfg(debug_assertions)]
 #[test]
-fn one_source_failing_keeps_others_and_abstracts_are_archived() {
+fn one_source_failing_keeps_others() {
     let fx = Fixture::start(PUBLIC);
     fx.route(
         &with_query("/openalex", &[("search", "attention"), ("per_page", "5")]),
@@ -87,13 +87,11 @@ fn one_source_failing_keeps_others_and_abstracts_are_archived() {
         ),
         ok("application/atom+xml", "arxiv-error.xml"),
     );
-    searx(&fx, "transformers", &[]);
     let mut mcp = Mcp::start_with(
         tempdir(),
         &[
             ("WEB_MCP_ARXIV_URL", fx.url("/arxiv")),
             ("WEB_MCP_OPENALEX_URL", fx.url("/openalex")),
-            ("WEB_MCP_SEARXNG_URL", fx.url("")),
         ],
     );
     let r = papers(&mut mcp, "attention");
@@ -108,9 +106,6 @@ fn one_source_failing_keeps_others_and_abstracts_are_archived() {
         t.contains("Failed: arXiv: incorrect id format for bogus"),
         "{t}"
     );
-    // The abstract was indexed: a web search finds it with no page fetched.
-    let r = mcp.call("search", json!({ "query": "transformers" }));
-    assert!(text(&r).contains("Transformers use attention"), "{r}");
 }
 
 #[cfg(debug_assertions)]

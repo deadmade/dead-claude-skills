@@ -1,8 +1,6 @@
 //! The search profiles: one persistent, isolated browser profile per engine, each with its own agent-browser config
 //! file, Consent-O-Matic (except for Bing), a lock and a rest shared by every web-mcp process on the machine.
 
-#![cfg_attr(not(test), allow(dead_code))] // until Task 5's `search` uses it
-
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::fs::{File, TryLockError};
@@ -25,7 +23,6 @@ pub const CONSENT_SHA256: &str = "37cec881fc5f53c84419e39d6a01cb79ff0b06b8df5562
 /// How long a blocked engine sits out.
 pub const REST: Duration = Duration::from_mins(30);
 /// Each engine's whole budget in a search, lock wait included.
-#[cfg_attr(test, allow(dead_code))]
 pub const ENGINE_DEADLINE: Duration = Duration::from_secs(10);
 /// The Consent-O-Matic download's budget.
 const DOWNLOAD: Duration = Duration::from_secs(20);
@@ -145,7 +142,6 @@ impl Profiles {
     ///
     /// # Errors
     /// When the search folder isn't the user's, no browser is found or the extension can't be had.
-    #[cfg_attr(test, allow(dead_code))] // the tests call `ready_with`: this reads the real PATH
     pub async fn ready(&self) -> Result<Ready, String> {
         let var = |k: &str| std::env::var_os(k).filter(|v| !v.is_empty());
         let home = var(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(PathBuf::from);
@@ -333,7 +329,10 @@ async fn pick(
     };
     if let Some(p) = chrome_env {
         if !p.is_file() {
-            return Err(format!("WEB_MCP_CHROME={} is not a file", p.display()));
+            return Err(format!(
+                "WEB_MCP_CHROME={} is not a file: point it at a browser, or unset it and run `agent-browser install`",
+                p.display()
+            ));
         }
         let m = major_of(&p).await;
         return Ok((p, m));

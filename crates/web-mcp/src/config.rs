@@ -35,7 +35,6 @@ pub struct Config {
     /// How long each paper source may take before a search answers without it.
     pub papers_deadline: Duration,
     pub project: PathBuf,
-    pub searxng: Url,
     pub agent_browser: String,
     /// The search profiles' folder: per user and machine, not per project. `None` without a home folder: search
     /// then fails, the other tools work.
@@ -43,7 +42,7 @@ pub struct Config {
 }
 
 impl Config {
-    /// Reads `CLAUDE_PROJECT_DIR`, `WEB_MCP_SEARXNG_URL`, `WEB_MCP_AGENT_BROWSER`, `WEB_MCP_SEARCH_DIR` (unset:
+    /// Reads `CLAUDE_PROJECT_DIR`, `WEB_MCP_AGENT_BROWSER`, `WEB_MCP_SEARCH_DIR` (unset:
     /// `$XDG_DATA_HOME/web-mcp`, `~/.local/share/web-mcp`, or `%LOCALAPPDATA%\web-mcp` on Windows) and
     /// `WEB_MCP_{ARXIV,OPENALEX,CROSSREF,DOH,RDAP,CRTSH,CDX,WAYBACK,INTERNETDB,OSV,NVD,EPSS,KEV}_URL`, each with its default, `WEB_MCP_PAPERS_MS` (8 s; shorter for
     /// tests) and `WEB_MCP_LOOKUP_MS` (unset: each lookup source's own deadline).
@@ -84,9 +83,6 @@ impl Config {
                 .and_then(|v| v.parse().ok())
                 .map_or(Duration::from_secs(8), Duration::from_millis),
             project: var("CLAUDE_PROJECT_DIR").map_or_else(|| PathBuf::from("."), PathBuf::from),
-            searxng: Url::parse(
-                &var("WEB_MCP_SEARXNG_URL").unwrap_or_else(|| "http://127.0.0.1:8888".into()),
-            )?,
             agent_browser: var("WEB_MCP_AGENT_BROWSER").unwrap_or_else(|| "agent-browser".into()),
             search_dir: search_dir(|k| {
                 std::env::var_os(k)

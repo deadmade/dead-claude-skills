@@ -1,5 +1,4 @@
 //! The `search` tool's papers side: `OpenAlex`, arXiv and Crossref, merged by identifier.
-//! Unlike the web side it needs no `SearXNG`.
 
 use std::collections::BTreeMap;
 use std::fmt;

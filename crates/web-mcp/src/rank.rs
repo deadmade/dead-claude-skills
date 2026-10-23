@@ -391,14 +391,12 @@ impl Writer {
 }
 
 /// One search's own passages in RAM: BM25 over just these, never the archive.
-#[allow(dead_code)] // until Task 7
 pub struct MemIndex {
     tantivy: tantivy::Index,
     reader: IndexReader,
     f: Fields,
 }
 
-#[allow(dead_code)] // until Task 7
 impl MemIndex {
     /// Passages with the same URL and text collapse to one.
     ///
@@ -455,7 +453,6 @@ impl MemIndex {
 
 /// Reciprocal rank fusion: score = Σ 1 / (k + rank), rank from 1; ties keep the first list's order.
 /// A passage is the same across lists when its URL and text are.
-#[cfg_attr(not(feature = "h4"), allow(dead_code))] // used by examples/h4.rs
 pub fn rrf(lists: &[Vec<Hit>], k: f32) -> Vec<Hit> {
     let mut fused: Vec<Hit> = Vec::new();
     let mut at: HashMap<(&str, &str), usize> = HashMap::new();

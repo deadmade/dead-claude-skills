@@ -3,8 +3,6 @@
 //! Each engine's file holds its URL, its `wait --fn` expression and its parser, written from the pages captured in
 //! `tests/fixtures/engines/` (`docs/features/web-mcp-search/findings.md` has the table and what no capture covers).
 
-#![cfg_attr(not(test), allow(dead_code))]
-
 mod bing;
 mod brave;
 mod duckduckgo;
