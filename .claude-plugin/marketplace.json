@@ -70,14 +70,8 @@
     },
     {
       "name": "flows",
-      "description": "Conductor skills that run the rest of the marketplace in order, with approval gates and resumable state: /feature-flow, /research-flow, /implement, /fix-flow and /upgrade build; /test-audit, /doc-audit and /harden check a branch or the whole repo; /verify proves a branch is ready for a PR; /understand teaches a codebase; /learn saves what a flow taught. Carries its skill packs, which only its conductors read, and installs the other plugins they use. Opt-in.",
+      "description": "Conductor skills that run the rest of the marketplace in order, with approval gates and resumable state: /feature-flow, /research-flow, /implement, /fix-flow and /upgrade build; /test-audit, /doc-audit and /harden check a branch or the whole repo; /self-review reviews your branch before a PR and /verify proves it is ready for one; /understand teaches a codebase; /learn saves what a flow taught. Carries its skill packs, which only its conductors read, and installs the other plugins they use. Opt-in.",
       "source": "./plugins/flows",
-      "category": "development"
-    },
-    {
-      "name": "self-review",
-      "description": "/self-review: review your branch before opening a PR. Bug pass, spec and standards pass, security-review, a CLAUDE.md audit, and specialist agents (vendored from code-review, pr-review-toolkit and mattpocock) in one command, then fixes what you pick. Opt-in.",
-      "source": "./plugins/shared/self-review",
       "category": "development"
     },
     {

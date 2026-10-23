@@ -124,7 +124,7 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
     `args` as a JSON object (or just the path as a string).
     <!-- overrides tob-picks/skills/spec-to-code-compliance/SKILL.md: "Run `/tob-picks:spec-compliance <path>`." -->
 - **Installed plugins:** a skill the model may invoke, use the Skill tool. A skill with
-  `disable-model-invocation: true` can't be loaded that way (`self-review`, every conductor here): read its SKILL.md
+  `disable-model-invocation: true` can't be loaded that way (every conductor here, `/self-review` too): read its SKILL.md
   and follow it:
   - another plugin: `${CLAUDE_SKILL_DIR}/../../../../<plugin>/*/skills/<name>/SKILL.md` (in a checkout of this
     marketplace: the folder the plugin's marketplace `source` names, then `skills/<name>/SKILL.md`)
@@ -176,7 +176,6 @@ Say which plugin provides it, then use the fallback:
 | Missing                                  | Plugin                 | Fallback                                                  |
 | ---------------------------------------- | ---------------------- | --------------------------------------------------------- |
 | a pack file (`<packs>/…`)                | flows                  | none: flows is broken, reinstall it                       |
-| `/self-review`                           | self-review            | `/code-review` plus the built-in `security-review`        |
 | `search`, `fetch`, papers                | web-mcp                | paper-lookup for papers, WebSearch/WebFetch for the rest  |
 | a knowledge graph                        | graphify               | Explore agents                                            |
 | library docs                             | dead-skills (context7) | the library's docs via web-mcp `fetch` or WebFetch        |

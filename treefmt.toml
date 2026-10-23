@@ -4,15 +4,14 @@ on-unmatched = "debug"
 excludes = [
   "plugins/opt-in/hallmark/**",
   "plugins/flows/packs/**",
-  "plugins/flows/agents/spec-compliance-checker.md",
+  "plugins/flows/agents/**",
   "plugins/shared/graphify/**",
   "plugins/opt-in/implementation/*-skills/library/**",
   "plugins/opt-in/implementation/*-skills/skills/**",
   "plugins/opt-in/implementation/*-skills/LICENSE",
   "plugins/opt-in/implementation/*-skills/UPSTREAM",
   "plugins/opt-in/implementation/postgres/skills/**",
-  "plugins/shared/self-review/agents/**",
-  "plugins/shared/self-review/skills/self-review/references/upstream/**",
+  "plugins/flows/skills/self-review/references/upstream/**",
   ".pre-commit-config.yaml",
   # npm writes it.
   "package-lock.json",

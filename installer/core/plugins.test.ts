@@ -14,7 +14,6 @@ import {
   outdated,
   shippedVersions,
   manifestPath,
-  INCLUDED,
   idOf,
   withDependencies,
   BUNDLE,
@@ -44,7 +43,6 @@ test('opt-ins from the real manifests', () => {
         'nix-lsp',
         'postgres',
         'rust-skills',
-        'self-review',
         'tui-review',
         'web-mcp',
       ].map((n) => `${n}@${M}`),
@@ -136,9 +134,8 @@ test('withDependencies adds opt-in dependencies transitively, once, and nothing 
   );
 });
 
-test('flows brings every INCLUDED plugin, and its dependencies are marketplace or official plugins', () => {
+test("flows' dependencies are marketplace or official plugins", () => {
   const flows = json('plugins/flows/.claude-plugin/plugin.json').dependencies.map(idOf);
-  for (const n of INCLUDED) assert.ok(flows.includes(`${n}@${M}`), `${n} comes with flows`);
   for (const id of flows) {
     const [name, from] = id.split('@');
     assert.ok(from === O || marketplace.plugins.some((p) => p.name === name), id);

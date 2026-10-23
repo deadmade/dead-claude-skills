@@ -99,10 +99,13 @@ synced upstream commit is in `plugins/shared/graphify/UPSTREAM`.
 
 ## self-review
 
-`plugins/shared/self-review/` vendors review passes from two upstreams, synced by `scripts/sync-self-review.mjs` (weekly via
-GitHub Actions; the synced commits are in `plugins/shared/self-review/UPSTREAM`):
-[anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official)'s code-review command and
-pr-review-toolkit agents (Apache License 2.0, Copyright Anthropic, PBC; `LICENSE` and `NOTICE`), with the agents'
+flows' `/self-review` (`plugins/flows/skills/self-review/`) vendors review passes from two upstreams, synced by
+`scripts/sync-self-review.mjs` (weekly via GitHub Actions; the synced commits are in
+`plugins/flows/skills/self-review/UPSTREAM`, the license files and `NOTICE` sit next to it):
+[anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official)'s code-review command
+(`references/upstream/code-review.md`) and five pr-review-toolkit agents (`plugins/flows/agents/`: silent-failure-hunter,
+pr-test-analyzer, type-design-analyzer, comment-analyzer, code-simplifier; Apache License 2.0, Copyright Anthropic,
+PBC; `LICENSE`), with the agents'
 `description:` rewritten, and [mattpocock/skills](https://github.com/mattpocock/skills)'s engineering code-review
 skill (MIT License, Copyright Matt Pocock; `LICENSE-MIT`), unmodified apart from a source comment.
 

@@ -68,9 +68,6 @@ export function planPlugins(selected: string[], installedIds: string[], tokenPlu
   };
 }
 
-// Plugins only the flows conductors use: they come with flows (its dependencies) and get no row of their own.
-export const INCLUDED = ['self-review'];
-
 // selected plus the opt-ins among their dependencies, transitively. depsOf(id): a plugin's dependency ids, if any.
 export function withDependencies(selected: string[], depsOf: (id: string) => string[] | undefined, opts: string[]) {
   const out = [...selected];

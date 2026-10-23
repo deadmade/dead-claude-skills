@@ -51,7 +51,7 @@ Finish; this verify is its verify. It keeps no flow.md of its own: its Rulings a
 flow.md (standalone: into this verify's **Decisions** list), and its root cause into the verdict's Review row. A caller that says execution ran without per-task reviews also gets pstack
 `interrogate` offered here.
 
-Keep what the `self-review:pr-test-analyzer` agent returned (its reply and its findings in the report) for Phase 5.
+Keep what the `flows:pr-test-analyzer` agent returned (its reply and its findings in the report) for Phase 5.
 
 ## Phase 4: Docs
 

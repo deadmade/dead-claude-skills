@@ -53,7 +53,7 @@ it follows:
   code, state machines. Name the property, don't write it yet.
 - **Requirements:** tob `spec-to-code-compliance` with the spec (a `docs/features/*/` spec, CLAUDE.md, README) and the
   tests as the implementation: which stated behaviours no test checks.
-- **Smells:** agent `self-review:pr-test-analyzer` on the scope's tests: tests that assert nothing or only that no
+- **Smells:** agent `flows:pr-test-analyzer` on the scope's tests: tests that assert nothing or only that no
   error was thrown, mock the thing under test, sleep instead of waiting, pin implementation details, or duplicate
   another test (a delete candidate is a finding too). Called from `/verify` with its output: use that and don't run
   the agent again; this probe then checks the tests against `writing-good-tests.md`'s Warning Signs instead.

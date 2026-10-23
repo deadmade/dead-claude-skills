@@ -1,0 +1,11 @@
+/self-review vendors files from two upstreams (see UPSTREAM for the synced commits):
+
+- anthropics/claude-plugins-official: plugins/code-review/commands/code-review.md (here references/upstream/) and
+  the agents of plugins/pr-review-toolkit (here flows' agents/: silent-failure-hunter, pr-test-analyzer,
+  type-design-analyzer, comment-analyzer and code-simplifier). Copyright Anthropic, PBC. Licensed under the Apache
+  License, Version 2.0 (see LICENSE). scripts/sync-self-review.mjs rewrites the agents' `description:` frontmatter
+  and adds a source comment under each file's frontmatter; nothing else is changed.
+- mattpocock/skills: skills/engineering/code-review/SKILL.md (here references/upstream/). Copyright Matt Pocock.
+  Licensed under the MIT License (see LICENSE-MIT). The sync adds the same source comment; nothing else is changed.
+
+Everything else in this skill is deadmade's own.

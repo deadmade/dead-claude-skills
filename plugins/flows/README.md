@@ -14,6 +14,7 @@ keeps a state file so the next session can resume. Claude proposes and recommend
 | `/test-audit [branch\|all]` | is the test suite appropriate?                    | run it, then mutation testing, property-based candidates, untested requirements, test smells                                                       | gaps you pick filled |
 | `/doc-audit [branch\|all]`  | do the docs tell the truth?                       | `spec-to-code-compliance` with the docs as spec, `claude-md-improver`, links/commands, prose                                                       | fixes you pick       |
 | `/harden [branch\|all]`     | security, footguns, bloat, architecture           | claude-security, tob `sharp-edges`, ponytail audit/review, `improve-codebase-architecture`                                                         | fixes you pick       |
+| `/self-review [base]`       | review your branch before a PR                    | bug pass, spec and standards pass, `security-review`, `claude-md-improver`, specialist agents (silent failures, tests, types, comments)            | fixes you pick       |
 | `/verify [base]`            | is this branch ready for a PR?                    | checks once, `/self-review`, `/doc-audit branch`, optional `/test-audit branch`, tui-review, a Decisions gate on the build's rulings and shortcuts | how to integrate     |
 | `/integrate [base]`         | commit, open the PR, watch CI                     | commits shown first, `blast-radius` + `unslop` for the PR body, `!` lines for push and `gh` (never run), `Monitor` on the checks                   | PR open, CI green    |
 | `/learn [flow]`             | keep what the work taught                         | `revise-claude-md`, `domain-modeling`, a `docs/solutions/` note, `writing-skills` for a skill or conductor lesson                                  | done                 |
@@ -76,9 +77,13 @@ research-flow
 ├ web-mcp: search
 └ paper-lookup: paper-lookup
 
+self-review
+├ claude-code: security-review
+├ claude-md-management@claude-plugins-official: claude-md-improver
+└ pstack-picks: blast-radius
+
 test-audit
 ├ tob-picks: mutation-testing, property-based-testing, spec-to-code-compliance
-├ self-review: pr-test-analyzer
 └ superpowers: verification-before-completion, test-driven-development
 
 understand
@@ -94,7 +99,6 @@ upgrade
 
 verify
 ├ superpowers: verification-before-completion, systematic-debugging, finishing-a-development-branch
-├ self-review: self-review
 ├ pstack-picks: interrogate
 └ tui-review: tui-review
 ```
@@ -113,7 +117,9 @@ flows carries the skill packs its conductors run, in `packs/`: superpowers, pony
 tob-picks and paper-lookup, each written there by its `scripts/sync-*.mjs`. Claude Code scans only a plugin's root
 `skills/`, `agents/` and `hooks/hooks.json`, so nothing under `packs/` loads on its own; the conductors read a pack's
 skills by path (`${CLAUDE_PLUGIN_ROOT}/packs`). tob's spec checker is flows' own agent (`agents/spec-compliance-checker.md`),
-since a pack's agents don't load. Where a conductor changes a pack's rule it quotes the sentence it overrides in an
+since a pack's agents don't load. `/self-review` vendors its passes too, from claude-plugins-official's code-review
+and pr-review-toolkit and from mattpocock's code-review (`skills/self-review/references/upstream/` and the other five
+`agents/`, written by `scripts/sync-self-review.mjs`). Where a conductor changes a pack's rule it quotes the sentence it overrides in an
 `overrides` comment marker, and `npm test` fails when that sentence is gone from the pack. To add
 a pack, follow [docs/vendor-a-pack.md](../../docs/vendor-a-pack.md).
 

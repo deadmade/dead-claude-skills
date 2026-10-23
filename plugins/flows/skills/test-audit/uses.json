@@ -1,5 +1,4 @@
 {
   "tob-picks": ["mutation-testing", "property-based-testing", "spec-to-code-compliance"],
-  "self-review": ["pr-test-analyzer"],
   "superpowers": ["verification-before-completion", "test-driven-development"]
 }

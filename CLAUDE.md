@@ -50,13 +50,14 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   hand.
 - `plugins/opt-in/mcp/mcp-github/`, `plugins/opt-in/mcp/mcp-azure/`: MCP server configs only.
 - `plugins/flows/`: the conductor skills (`/feature-flow`, `/research-flow`, `/implement`, `/fix-flow`, `/upgrade`,
-  `/test-audit`, `/doc-audit`, `/harden`, `/verify`, `/integrate`, `/understand`, `/learn`). Each runs other plugins' skills in order;
+  `/test-audit`, `/doc-audit`, `/harden`, `/self-review`, `/verify`, `/integrate`, `/understand`, `/learn`). Each runs other plugins' skills in order;
   the rules they share (state files, gates, loading `disable-model-invocation` skills by path, fallbacks per missing
   plugin, audit scope and report format) live once in `references/flow-rules.md`, so a SKILL.md only says what it runs.
   Conductors call each other by reading the callee's SKILL.md (`/fix-flow` → `/verify` → `/doc-audit branch`). Each
   conductor's `uses.json` lists what it runs; `scripts/flows-uses.mjs` generates flows' `dependencies` and the README
-  tree from them, and check-repo fails when a listed skill is gone or the generated parts are stale. The installer
-  hides `INCLUDED` plugins (`installer/core/plugins.ts`): they arrive only as flows' dependencies (`withDependencies`).
+  tree from them, and check-repo fails when a listed skill is gone or the generated parts are stale. `/self-review`
+  was a plugin of its own until 0.5.0; its skill and its five agents (`agents/`, next to tob's checker) now ship in
+  flows, so its agents are `flows:pr-test-analyzer` and so on, and the installer keeps flows on a machine that had it.
 - `plugins/shared/tui-review/`: a Claude Code mod (TypeScript, `hooks/`) driving the Rust binary `tui-review` (`crates/tui-review/`). The two
   share a binary cache format (`crates/tui-review/src/format.rs` ↔ `hooks/chunks.ts`) and a stdout line protocol; change both sides
   together.
@@ -106,9 +107,9 @@ entry's version from its `ref` (`shippedVersions`).
 ## Vendored content: don't edit
 
 These are copied from upstream by `scripts/sync-*.mjs` (weekly workflows open the PRs) and overwritten on every
-sync: `plugins/opt-in/hallmark/`, `plugins/flows/packs/` (`tob-picks` is CC BY-SA 4.0), `plugins/flows/agents/spec-compliance-checker.md`,
-`plugins/shared/graphify/skills/`, `plugins/opt-in/implementation/*-skills/{library,skills}/`, `plugins/opt-in/implementation/*-skills/LICENSE` and `UPSTREAM` (their `plugin.json` and `evals/` are hand-written), `plugins/opt-in/implementation/postgres/skills/` (their `plugin.json` is hand-written), `plugins/shared/self-review/agents/`,
-`plugins/shared/self-review/skills/self-review/references/upstream/`, and the `plugin.json` version of the ponytail and superpowers packs (set by the sync and bumped by `release.mjs`). To change them, change the sync script's transform.
+sync: `plugins/opt-in/hallmark/`, `plugins/flows/packs/` (`tob-picks` is CC BY-SA 4.0), `plugins/flows/agents/`,
+`plugins/shared/graphify/skills/`, `plugins/opt-in/implementation/*-skills/{library,skills}/`, `plugins/opt-in/implementation/*-skills/LICENSE` and `UPSTREAM` (their `plugin.json` and `evals/` are hand-written), `plugins/opt-in/implementation/postgres/skills/` (their `plugin.json` is hand-written),
+`plugins/flows/skills/self-review/references/upstream/` with its `LICENSE` and `LICENSE-MIT`, and the `plugin.json` version of the ponytail and superpowers packs (set by the sync and bumped by `release.mjs`). To change them, change the sync script's transform.
 When what's vendored or its license changes, update THIRD_PARTY.md.
 
 ## Versions and releases
@@ -144,8 +145,8 @@ plugins of ours that the manifest no longer lists.
   Run it after a pack sync and fix the marker or the conductor text in the same PR.
 - `nix develop` (or direnv) gives the toolchain and installs the pre-commit hooks (treefmt, merge conflicts, JSON,
   check-repo, installer and scripts tests, end-of-file; vendored paths excluded). Enter it from the repo root only:
-  started in a subfolder, its hook setup treats that folder as the repo and uninstalls the pre-commit hook. The hook config is generated, so a commit touching `plugins/flows/packs/` or the
-  checker agent needs `nix develop` re-entered once to pick up their excludes.
+  started in a subfolder, its hook setup treats that folder as the repo and uninstalls the pre-commit hook. The hook config is generated, so a commit touching `plugins/flows/packs/` or
+  `plugins/flows/agents/` needs `nix develop` re-entered once to pick up their excludes.
 - `nix fmt` formats everything per `treefmt.toml` (alejandra, prettier for js/ts/json/md/yaml, rustfmt).
 
 CI: `test.yml` (npm test, the installer typecheck and the dead-skills and md-pane mod tests, Linux and Windows) on every PR and push to main; `tui-review.yml` on

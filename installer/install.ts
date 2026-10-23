@@ -10,7 +10,6 @@ import {
   type PluginJson,
   type PluginRow,
   BUNDLE,
-  INCLUDED,
   OFFICIAL,
   bundleIds,
   duplicates,
@@ -146,9 +145,9 @@ const chosen: Record<string, boolean> = {
   ...current,
   'strip-defaults': FLAGS.includes('--strip-defaults') || current['strip-defaults'],
   clean: FLAGS.includes('--clean'),
-  // flows replaced feature-flow and brings self-review (the packs ship inside flows, so only self-review is keyed on
-  // now): a machine that had either keeps them.
-  [FLOWS]: current[FLOWS] || has(`feature-flow@${MARKETPLACE}`) || INCLUDED.some(has),
+  // flows replaced feature-flow and carries self-review and the packs: a machine that had feature-flow or self-review
+  // keeps them.
+  [FLOWS]: current[FLOWS] || has(`feature-flow@${MARKETPLACE}`) || has(`self-review@${MARKETPLACE}`),
   // On by default where offered, until web-mcp is installed; then it keeps the user's choice. It does nothing unless
   // web-mcp is selected and SearXNG answers.
   'web-builtins-off': has(WEB_MCP)
@@ -233,12 +232,7 @@ const strip = clean || on('strip-defaults');
 
 const removed = await removeForeign({ strip, installedIds, managed, marketplaces });
 
-// INCLUDED plugins have no row: only a chosen plugin's dependencies select them.
-const selected = withDependencies(
-  [BUNDLE_ID, ...opts.filter((id) => on(id) && !INCLUDED.includes(nameOf(id)))],
-  (id) => deps[id],
-  opts,
-);
+const selected = withDependencies([BUNDLE_ID, ...opts.filter(on)], (id) => deps[id], opts);
 const plan = planPlugins(
   selected,
   installedIds.filter((id) => [BUNDLE_ID, ...opts].includes(id)),
