@@ -13,6 +13,8 @@ A checklist of the places a new vendored source touches. Tick each or say why no
 - [ ] Packs the conductors read live at `plugins/flows/packs/<pack>/`, not as a marketplace entry. Only a pack that
       brings tools (a binary, an MCP server, hooks) is its own plugin under `plugins/shared/` or `plugins/opt-in/`,
       with a marketplace entry and `plugin.json`.
+- [ ] A pack under `packs/` still carries its `.claude-plugin/plugin.json`: check-repo's version loop reads it, and
+      the installer's pack list comes from it (the installer tarball ships only `plugin.json` files).
 - [ ] A pack skill is read by path (`<packs>/<pack>/skills/<name>/SKILL.md`), so name the pack in `flow-rules.md`'s
       **Loading skills** list.
 
@@ -20,7 +22,8 @@ A checklist of the places a new vendored source touches. Tick each or say why no
 
 - [ ] `THIRD_PARTY.md`: source, license, what is vendored.
 - [ ] `CLAUDE.md`: add the path to "Vendored content: don't edit".
-- [ ] `flake.nix`, `treefmt.toml` and `.pre-commit-config.yaml`: exclude the vendored path from formatters and hooks.
+- [ ] `flake.nix`'s `vendored` list and `treefmt.toml`: exclude the vendored path from formatters and hooks.
+      `.pre-commit-config.yaml` is generated from that list, so don't edit it.
 
 ## Checks and wiring
 

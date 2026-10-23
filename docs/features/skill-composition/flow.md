@@ -459,12 +459,22 @@ Calls the build made on its own (not deviation-class), one line each, as they ar
 - 2026-10-23, Task 1: measure.mjs has no recorded RED run (the dcg hook blocked the attempt); accepted, since its tests run the script end to end on fixtures.
 - 2026-10-23, Task 1: measure.mjs got test-only `--projects`/`--flows` options. I treated these as test seams of a throwaway docs script, not a product interface.
 - 2026-10-23, Task 1: known, deferred to the final review: a session touching two slugs counts in both runs (web-mcp and website-mcp-server share 253 bash edits).
+- 2026-10-23, Task 1: the controller's own pre-flight Rulings hunk in flow.md stays bundled in Task 1's commit — it is harmless ruling text — cost if wrong: a noisier commit.
 
 - 2026-10-23, Tasks 3+4: the packs keep their own `.claude-plugin/plugin.json`, because the installer tarball only ships `plugin.json` files and the installer lists the packs from them; release.mjs and check-repo's version check now cover `packs/`. `claude plugin validate plugins/flows` passes, and a static check finds nothing from the packs at flows' root. Committed with `SKIP=end-of-file-fixer`: the nix-generated hook config still excludes the old paths until `nix develop` regenerates it.
+- 2026-10-23, Task 6: the commit rules in flow-rules widen goal 9's scope; kept — they are the owner's standing rules — cost if wrong: none.
 
 - 2026-10-23, Task 7 review: the conductors now name GLOSSARY.md (what domain-modeling writes and this repo has) instead of CONTEXT.md.
 - 2026-10-23, Task 7 review: in feature-flow, a small change keeps its short design doc and Gate 1, so the seam question and the build stop still apply; only the grill may be skipped. A quick task still leaves on the owner's yes.
 - 2026-10-23, Task 7 review: the brief clause in flow-rules now also carries the plan's Global Constraints (the seam lines), so builders, not only reviewers, see where each cross-cutting concern is resolved. This edits a Task 6 file; it implements spec goal 5.
+- 2026-10-23, Task 7: its fix round may edit flow-rules.md (the brief clause) and flow-template.md (GLOSSARY) outside Task 7's Files list — the spec mandates both — cost if wrong: two files touched out of task order. Put to the owner in the final review.
+- 2026-10-23, Task 7: one 126-character line in feature-flow's SKILL.md left for Task 10's docs pass — cosmetic, treefmt passed — cost if wrong: one long line.
+- 2026-10-23, Task 8: also fixes CONTEXT.md in README.md:8 and research-template.md:27 — same GLOSSARY ruling — cost if wrong: two extra files. Put to the owner in the final review.
+- 2026-10-23, Task 8: verify's and learn's extra skill-map owners left out — not in the brief; noted for the final review — cost if wrong: owners missing from those conductors.
+- 2026-10-23, Task 9: the README conductor-table row added outside the Files list stays — CLAUDE.md requires READMEs to match the code — cost if wrong: one row to revert. Put to the owner in the final review.
+- 2026-10-23, Task 10: adds .gitattributes, the marketplace description and feature-flow's long lines — deferred minors from earlier reviews, all docs and config text — cost if wrong: none. Put to the owner in the final review.
+- 2026-10-23, Task 10: the extra READMEs that still told users to `/plugin install` are in scope — the owner said to remove that route, UI only — cost if wrong: none. Put to the owner in the final review.
+- 2026-10-23, Task 10: installer/install.ts:297's `/plugin install` handoff for token plugins stays — it is deliberate runtime output — cost if wrong: a stale instruction at install time.
 
 ## Deviations
 
@@ -488,6 +498,33 @@ Calls the build made on its own (not deviation-class), one line each, as they ar
     fallback does the same).
   - Owner (2026-10-23): "Ship the checker in flows". sync-tob copies the agent into `plugins/flows/agents/`, and the
     workflow dispatches `flows:spec-compliance-checker`.
+
+- 2026-10-23, final review. The coordinator (me) had ruled on deviation-class items instead of asking the owner,
+  arguing "the spec requires it":
+  - files outside a task's list: Tasks 7–10;
+  - GLOSSARY.md over CONTEXT.md;
+  - small changes keep Gate 1;
+  - seam lines to builders.
+
+  The final review flagged this as the same failure the branch exists to stop. Put to the owner, who reopened all four
+  and then decided each:
+  - GLOSSARY.md;
+  - keep Gate 1 for small changes;
+  - builders get the Global Constraints, seam lines included;
+  - keep all the doc edits.
+
+  The owner declined both a "no exception for 'the spec requires it'" line in flow-rules and a files-check script
+  ("Neither").
+
+- 2026-10-23, final review fix wave (owner: "Fix all + cheap minors"):
+  - SDD's fix loop, breaker and final-review fix wave send deviation-class findings to the owner, with markers;
+  - ledger rulings are reconciled into flow.md before SDD deletes its workspace;
+  - /implement requires Files lists before its Gate;
+  - /integrate's gh and commit-gate contradictions are fixed, and so is /verify's standalone line;
+  - a check that pack paths named in conductors exist;
+  - `{baseDir}` mapped for pack agents;
+  - the installer retires old installs after updates;
+  - small stale lines.
 
 ## Results
 

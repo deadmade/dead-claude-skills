@@ -169,6 +169,7 @@ console.log(`Limits:
 - m2 uses today's uses.json and ignores order and optional skills.
 - Runs before 2026-10-17 had no uses.json.
 - Sessions that only read a flow.md are joined into its run.
+- A session that touches two flow.md files counts toward both runs.
 `);
 const head = ['slug', 'conductor', 'sessions', 'm1', 'm2 loaded/listed', 'missing'];
 const table = [head, head.map(() => '---'), ...rows.sort((a, b) => a[0].localeCompare(b[0]))];
