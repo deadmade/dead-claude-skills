@@ -2,6 +2,7 @@ mod api;
 mod archive;
 mod browser;
 mod config;
+mod engines;
 mod extract;
 mod fetch;
 mod images;

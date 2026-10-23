@@ -6,7 +6,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use futures::future::join_all;
-use rmcp::schemars::{self, JsonSchema};
 use serde::Deserialize;
 use serde_json::json;
 use tokio::sync::OnceCell;
@@ -52,26 +51,7 @@ impl fmt::Display for SearchError {
     }
 }
 
-/// How far back a search reaches (`SearXNG`'s `time_range`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum Since {
-    Day,
-    Week,
-    Month,
-    Year,
-}
-
-impl Since {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Day => "day",
-            Self::Week => "week",
-            Self::Month => "month",
-            Self::Year => "year",
-        }
-    }
-}
+pub use crate::engines::Since;
 
 /// What a search is narrowed to; the default narrows nothing.
 #[derive(Debug, Default)]
