@@ -1,6 +1,6 @@
 ---
 flow: research
-phase: execute
+phase: validate
 ---
 
 # Skill composition: research flow
