@@ -456,8 +456,25 @@ Calls the build made on its own (not deviation-class), one line each, as they ar
 
 - 2026-10-23, pre-flight: Tasks 3 and 4 run as one dispatch, because the marketplace still points at the moved folders until Task 4, so `npm test` can't pass between them.
 - 2026-10-23, pre-flight: Task 3's "list the skills of a `--plugin-dir` session" is replaced by `claude plugin validate plugins/flows` plus a static check; the sandbox blocks api.anthropic.com. The live check moves to Task 11's install.
+- 2026-10-23, Task 1: measure.mjs has no recorded RED run (the dcg hook blocked the attempt); accepted, since its tests run the script end to end on fixtures.
+- 2026-10-23, Task 1: measure.mjs got test-only `--projects`/`--flows` options. I treated these as test seams of a throwaway docs script, not a product interface.
+- 2026-10-23, Task 1: known, deferred to the final review: a session touching two slugs counts in both runs (web-mcp and website-mcp-server share 253 bash edits).
 
 ## Deviations
+
+- 2026-10-23, Task 2: pstack upstream deleted the line the spec relies on.
+  - **What changed:** at the old pin `4e5b1cf`, `principle-laziness-protocol` has six bullets, including "Question
+    the threading. If a task asks you to pass a new signal through types, schemas, pipelines, or similar layers,
+    stop and look for a more direct path." At upstream HEAD `8b3326d` only two remain: "Consolidate decisions" and
+    "Minimize the diff". Both were fetched raw from GitHub on 2026-10-23.
+  - **What else HEAD brings:** prose condensed across 29 files. interrogate drops a reviewer. how, no-comments,
+    arena, recall, show-me-your-work and interrogate now point at poteto-mode's Subagents section, which isn't
+    vendored.
+  - Options: (a) vendor at the old pin; (b) vendor HEAD's two bullets and write the threading line ourselves;
+    (c) don't vendor the skill and write the line ourselves in flow-rules, crediting pstack.
+  - Recommended (c). Owner's decision (2026-10-23): (c), "Write the line ourselves". The sync was set aside in
+    stash `c5b75b7` (tag `skill-composition-task2-pstack-head-sync`); nothing from pstack HEAD lands on this branch.
+    Task 2 becomes a no-op; the line goes into flow-rules in Task 6, credited to pstack's earlier version.
 
 ## Results
 

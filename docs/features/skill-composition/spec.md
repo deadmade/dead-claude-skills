@@ -70,8 +70,10 @@ default** (inside conductor work).
      `principle-redesign-from-first-principles`, at Brainstorm and Grill.
    - The answer goes verbatim into the plan's Global Constraints, so builders and reviewers get it.
    - implement asks the same in Read when its input doesn't say.
-   - pstack's `principle-laziness-protocol` is added to pstack-picks. Its "a new signal through types, schemas or
-     pipelines: stop, find a more direct path" goes into every builder brief.
+   - Every builder brief carries the threading rule, written in our own flow-rules text and credited to pstack:
+     "If a task asks you to pass a new signal through types, schemas, pipelines, or similar layers, stop and look for
+     a more direct path". It comes from `principle-laziness-protocol` at pstack `4e5b1cf`. Upstream deleted it at
+     `8b3326d`, so it isn't vendored (owner, 2026-10-23, Task 2 deviation).
 6. **Stack packs by detection.** One flow-rules rule maps repo files to pack skills: `*.csproj` → csharp-skills,
    `Cargo.toml` → rust-skills, SQL migrations → postgres, a web frontend → hallmark. The matching skills go into the plan,
    builder and review briefs.

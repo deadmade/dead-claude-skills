@@ -43,8 +43,9 @@ round 1".
 - Deviation classes (spec, verbatim): a new or changed public interface, a new library or outside call, a changed data
   flow or error handling, files the task didn't list. Private names and small cleanups inside the task's files are not
   deviations.
-- Builder brief line, from pstack `principle-laziness-protocol`: "a new signal through types, schemas or pipelines:
-  stop, find a more direct path".
+- Builder brief line, our own text credited to pstack's `principle-laziness-protocol` at `4e5b1cf` (not vendored):
+  "If a task asks you to pass a new signal through types, schemas, pipelines, or similar layers, stop and look for a
+  more direct path."
 - **Stack packs:** only the detected stack's router or single skill goes into a brief, never a whole library (review,
   E9 and E2).
 - **Repo rules:**
@@ -128,13 +129,8 @@ Steps:
 
 ### Task 2: Vendor `principle-laziness-protocol`
 
-**Files:** `scripts/sync-pstack.mjs:9-55` (move the name from `SKIPPED` to `SKILLS`), `.github/workflows/sync-pstack.yml:54`
-(`-eq 19`), `THIRD_PARTY.md`.
-
-- [ ] Run `node scripts/sync-pstack.mjs`. It pulls upstream HEAD, not the pin.
-      Expected: `skills/principle-laziness-protocol/SKILL.md` contains "through types, schemas or pipelines".
-- [ ] Record in flow.md what else changed upstream (`git diff --stat` on the pack, plus one line per changed skill).
-- [ ] Run `npm test`. Expected: PASS.
+Dropped (owner, 2026-10-23, flow.md Deviations): upstream HEAD deleted the threading bullet, so nothing is
+vendored. The line is our own text in Task 6.
 
 ### Task 3: Move the packs into flows
 
