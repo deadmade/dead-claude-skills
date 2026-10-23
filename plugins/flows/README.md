@@ -3,19 +3,19 @@
 Conductor skills: each one runs the skills the rest of this marketplace ships, in order, stops at approval gates, and
 keeps a state file so the next session can resume. Claude proposes and recommends; you decide.
 
-| Conductor                   | Job                                               | Runs                                                                                              | Ends in              |
-| --------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------- | -------------------- |
-| `/understand <topic>`       | learn a codebase, subsystem or concept            | graphify, pstack `how` and `why`, mattpocock `teach` in learning style (you write the key lines)  | terms in GLOSSARY.md |
-| `/feature-flow <what>`      | a new feature with a design                       | prior art, `brainstorming`, `grilling` + `domain-modeling`, `writing-plans`, plan review, execute | `/verify`, `/learn`  |
-| `/research-flow <what>`     | a feature grounded in papers, hypothesis measured | feature-flow plus a literature agent (web-mcp papers, paper-lookup) and a measured result         | `/verify`, `/learn`  |
-| `/implement <plan>`         | build from an existing plan, spec or ticket       | `to-tickets` or `writing-plans` if needed, superpowers execution                                  | `/verify`, `/learn`  |
-| `/fix-flow <symptom>`       | fix a bug                                         | reproduce, `how` + `blast-radius`, upstream search, `systematic-debugging`, failing test first    | `/verify`, `/learn`  |
-| `/upgrade <pkg>[@v]`        | bump a dependency                                 | changelogs via web-mcp and context7, `blast-radius`, bump, fix test-first                         | `/verify`, `/learn`  |
-| `/test-audit [branch\|all]` | is the test suite appropriate?                    | run it, then mutation testing, property-based candidates, untested requirements, test smells      | gaps you pick filled |
-| `/doc-audit [branch\|all]`  | do the docs tell the truth?                       | `spec-to-code-compliance` with the docs as spec, `claude-md-improver`, links/commands, prose      | fixes you pick       |
-| `/harden [branch\|all]`     | security, footguns, bloat, architecture           | claude-security, tob `sharp-edges`, ponytail audit/review, `improve-codebase-architecture`        | fixes you pick       |
-| `/verify [base]`            | is this branch ready for a PR?                    | checks, `/self-review`, `/doc-audit branch`, optional `/test-audit branch`, tui-review            | how to integrate     |
-| `/learn [flow]`             | keep what the work taught                         | `revise-claude-md`, `domain-modeling`, a `docs/solutions/` note                                   | done                 |
+| Conductor                   | Job                                               | Runs                                                                                                                                               | Ends in              |
+| --------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| `/understand <topic>`       | learn a codebase, subsystem or concept            | graphify, pstack `how` and `why`, mattpocock `teach` in learning style (you write the key lines)                                                   | terms in GLOSSARY.md |
+| `/feature-flow <what>`      | a new feature with a design                       | prior art, `brainstorming`, `grilling` + `domain-modeling`, `writing-plans`, plan review, execute                                                  | `/verify`, `/learn`  |
+| `/research-flow <what>`     | a feature grounded in papers, hypothesis measured | feature-flow plus a literature agent (web-mcp papers, paper-lookup) and a measured result                                                          | `/verify`, `/learn`  |
+| `/implement <plan>`         | build from an existing plan, spec or ticket       | `to-tickets` or `writing-plans` if needed, superpowers execution                                                                                   | `/verify`, `/learn`  |
+| `/fix-flow <symptom>`       | fix a bug                                         | reproduce, `how` + `blast-radius`, upstream search, `systematic-debugging`, failing test first                                                     | `/verify`, `/learn`  |
+| `/upgrade <pkg>[@v]`        | bump a dependency                                 | changelogs via web-mcp and context7, `blast-radius`, bump, fix test-first                                                                          | `/verify`, `/learn`  |
+| `/test-audit [branch\|all]` | is the test suite appropriate?                    | run it, then mutation testing, property-based candidates, untested requirements, test smells                                                       | gaps you pick filled |
+| `/doc-audit [branch\|all]`  | do the docs tell the truth?                       | `spec-to-code-compliance` with the docs as spec, `claude-md-improver`, links/commands, prose                                                       | fixes you pick       |
+| `/harden [branch\|all]`     | security, footguns, bloat, architecture           | claude-security, tob `sharp-edges`, ponytail audit/review, `improve-codebase-architecture`                                                         | fixes you pick       |
+| `/verify [base]`            | is this branch ready for a PR?                    | checks once, `/self-review`, `/doc-audit branch`, optional `/test-audit branch`, tui-review, a Decisions gate on the build's rulings and shortcuts | how to integrate     |
+| `/learn [flow]`             | keep what the work taught                         | `revise-claude-md`, `domain-modeling`, a `docs/solutions/` note, `writing-skills` for a skill or conductor lesson                                  | done                 |
 
 `branch` (the default) audits what changed against the base, plus the tests and docs that should have changed with
 it; `all` audits the whole repo, vendored content skipped.

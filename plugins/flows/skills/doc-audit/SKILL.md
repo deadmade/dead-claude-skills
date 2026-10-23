@@ -38,7 +38,7 @@ List the docs with a one-line reason each and continue.
 ## Phase 2: Claims
 
 Follow tob `spec-to-code-compliance` with the docs as the specification and the scope's code as the implementation.
-It checks no requirement in this context. A handful of claims (a usual `branch`): one `flows:spec-compliance-checker`
+Its own text dispatches the checks; here they run as: a handful of claims (a usual `branch`): one `flows:spec-compliance-checker`
 per claim, in parallel. More (`all`, or a long doc): offer the tob `spec-compliance` workflow (flow-rules **Loading
 skills**; `path` the scope's code, `spec` the doc, `outDir` under `$TMPDIR`), with its cost: one checker agent per
 requirement plus two refuters per divergence. Only on the user's yes; on no, the checkers per claim. Per doc, its

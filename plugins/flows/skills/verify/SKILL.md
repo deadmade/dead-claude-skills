@@ -34,10 +34,12 @@ CONTRIBUTING.md, the `test`/`lint` scripts, the CI workflows the diff would trig
 applies to the changed files and read the output. A red check stops the flow: show the failing output, find the cause
 with superpowers `systematic-debugging`, and fix it on the user's yes before going on.
 
-**One run.** This run's output is the evidence for every later phase and for the verdict. Keep it, with the commit
-(`git rev-parse HEAD`) and `git status --short` it ran on. Nothing re-runs the suite while the tree is unchanged: not
-self-review's fix step, not test-audit's baseline, not finishing's Step 1. Only a change to the tree (a fix in Phases
-3–5) calls for one re-run, in Phase 6, and that output replaces this one.
+**One run.** This run is the latest run: its output is the evidence for every later phase and for the verdict. Keep
+it, with the commit (`git rev-parse HEAD`) and `git status --short` it ran on. Nothing re-runs the suite while the
+tree is unchanged: not self-review's fix step, not test-audit's baseline, not finishing's Step 1. Where the latest run
+is used next (test-audit's baseline, Phase 6, the verdict), a tree changed since calls for one re-run first, which
+becomes the latest run. A full-suite run by an inline `/fix-flow` is the latest run too, while the tree is unchanged
+after it.
 <!-- overrides superpowers/skills/verification-before-completion/SKILL.md: "If you haven't run the verification command in this message, you cannot claim it passes." -->
 
 ## Phase 3: Review
@@ -45,7 +47,8 @@ self-review's fix step, not test-audit's baseline, not finishing's Step 1. Only 
 Run `/self-review` with the base from Phase 1 (read its SKILL.md, see flow-rules **Loading skills**). Its fix phase
 applies; the user picks what gets fixed. Skip its step that runs the tests after the fixes: Phase 6 re-runs them once.
 A finding it sends to `/fix-flow` runs that conductor inline (flow-rules **Calling another conductor**) up to its
-Finish; this verify is its verify. A caller that says execution ran without per-task reviews also gets pstack
+Finish; this verify is its verify. It keeps no flow.md of its own: its Rulings and Deviations go into the caller's
+flow.md (standalone: into this verify's **Decisions** list), and its root cause into the verdict's Review row. A caller that says execution ran without per-task reviews also gets pstack
 `interrogate` offered here.
 
 Keep what the `self-review:pr-test-analyzer` agent returned (its reply and its findings in the report) for Phase 5.
@@ -59,12 +62,12 @@ CLAUDE.md step.
 
 If non-test source changed and self-review's test analyzer reported gaps, offer `/test-audit branch` with your
 recommendation (yes for parsers, money, security, concurrency or anything shared; no for a rename or a doc change).
-Only on the user's yes. Hand it the Phase 2 run as its baseline and the pr-test-analyzer output from Phase 3, so
-neither runs twice.
+Only on the user's yes. Hand it the latest run as its baseline (re-run first if the tree changed since) and the
+pr-test-analyzer output from Phase 3, so neither runs twice.
 
 ## Phase 6: Read
 
-If anything was fixed since Phase 2, re-run the checks once now and read the output. Then ask the user to read the
+If the tree changed since the latest run, re-run the checks once now and read the output. Then ask the user to read the
 branch in tui-review (`/tui-review <base>`; it shows committed changes only, so say if uncommitted work is left) and
 answer their questions about it. Without tui-review: `git diff --stat <merge-base>` and offer to walk through it file
 by file.
@@ -85,7 +88,7 @@ The verdict, one row each, with the evidence:
 
 **Decisions** are what the build decided without the user, numbered in one list:
 
-- each line under **Rulings** in the caller's flow.md;
+- each line under **Rulings** in the caller's flow.md, or an inline `/fix-flow`'s when there is no caller;
 - each entry under **Deviations** in it, with the decision it got;
 - each new `shortcut:` line the branch adds: `git diff <merge-base> | rg '^\+.*shortcut:'`, plus `rg 'shortcut:'` on
   the untracked files.
@@ -97,5 +100,5 @@ the checks re-run.
 **Ready** means every row is green or the user accepted what is left. If the tree changed since the last run, re-run
 the checks first. Then follow `finishing-a-development-branch` from its Step 2: the last run is its Step 1. Show its
 options as it lists them, with your recommendation. It's the user's choice; called from a build flow, record it and
-the confirmed decisions in its flow.md.
+the confirmed decisions in its flow.md. With no caller to run `/learn` (standalone), offer it after this gate.
 <!-- overrides superpowers/skills/finishing-a-development-branch/SKILL.md: "Run the project's full test suite" -->

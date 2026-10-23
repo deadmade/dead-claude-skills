@@ -30,8 +30,8 @@ no test at all is already a finding. Called from `/verify`: its pr-test-analyzer
 ## Phase 2: Run
 
 Follow superpowers `verification-before-completion` with the test commands the repo documents (CLAUDE.md,
-CONTRIBUTING.md, scripts, CI) and read the output. Called from `/verify`, its Phase 2 run is the baseline: don't run
-the suite again. Record failures, skipped tests and the slowest ones. A red suite: stop, report it first and offer
+CONTRIBUTING.md, scripts, CI) and read the output. Called from `/verify`, its latest run is the baseline (it re-runs
+first if the tree changed since): don't run the suite again. Record failures, skipped tests and the slowest ones. A red suite: stop, report it first and offer
 `/fix-flow` on it; auditing tests that fail is pointless, and this flow fixes no code. Don't add tooling (coverage,
 mutation tools, new test frameworks) without the user's yes.
 
