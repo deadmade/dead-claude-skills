@@ -450,14 +450,53 @@ the plan approved at Gate 2):
 - **Fifth stop:** uses AskUserQuestion (Evidence 3).
 - **m2 report:** m2 is reported with no paper number to compare against (Evidence 10).
 
+## Rulings
+
+Calls the build made on its own (not deviation-class), one line each, as they are made:
+
+- 2026-10-23, pre-flight: Tasks 3 and 4 run as one dispatch, because the marketplace still points at the moved folders until Task 4, so `npm test` can't pass between them.
+- 2026-10-23, pre-flight: Task 3's "list the skills of a `--plugin-dir` session" is replaced by `claude plugin validate plugins/flows` plus a static check; the sandbox blocks api.anthropic.com. The live check moves to Task 11's install.
+
 ## Deviations
 
 ## Results
 
-| run      | command | numbers | date |
-| -------- | ------- | ------- | ---- |
-| baseline |         |         |      |
-| feature  |         |         |      |
+| run      | command                                                               | numbers                    | date       |
+| -------- | --------------------------------------------------------------------- | -------------------------- | ---------- |
+| baseline | `node docs/features/skill-composition/measure.mjs --until 2026-10-23` | 17 runs, full output below | 2026-10-23 |
+| feature  |                                                                       |                            |            |
+
+Baseline output (`node docs/features/skill-composition/measure.mjs --until 2026-10-23`, 2026-10-23). `general-purpose` is an agent, not a skill, so it always counts as missing.
+
+Limits:
+
+- m1 can't see Bash edits; the count of Bash commands that look like edits is printed next to it.
+- An early question excuses every later edit.
+- It compares against the whole plan text, not each task's Files list.
+- It doesn't count new public interfaces.
+- m2 uses today's uses.json and ignores order and optional skills.
+- Runs before 2026-10-17 had no uses.json.
+- Sessions that only read a flow.md are joined into its run.
+
+| slug                          | conductor    | sessions | m1                  | m2 loaded/listed | missing                                                                                                                                       |
+| ----------------------------- | ------------ | -------- | ------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| agent-browser-pr-review-fixes | fix-flow     | 1        | 1 (bash edits: 6)   | 1/6              | how, blast-radius, search, fetch, test-driven-development                                                                                     |
+| band-test                     | feature-flow | 2        | 12 (bash edits: 2)  | 0/10             | how, architect, arena, general-purpose, brainstorming, writing-plans, subagent-driven-development, executing-plans, grilling, domain-modeling |
+| band-test-research            | feature-flow | 2        | 9 (bash edits: 0)   | 0/10             | how, architect, arena, general-purpose, brainstorming, writing-plans, subagent-driven-development, executing-plans, grilling, domain-modeling |
+| code-rules                    | feature-flow | 1        | 0 (bash edits: 0)   | 1/10             | how, architect, arena, general-purpose, writing-plans, subagent-driven-development, executing-plans, grilling, domain-modeling                |
+| cyberpunk-theme               | feature-flow | 2        | 6 (bash edits: 90)  | 4/10             | how, architect, arena, general-purpose, executing-plans, domain-modeling                                                                      |
+| installer-rewrite             | feature-flow | 1        | 1 (bash edits: 37)  | 4/10             | how, architect, arena, general-purpose, subagent-driven-development, domain-modeling                                                          |
+| installer-ux                  | feature-flow | 1        | 1 (bash edits: 20)  | 3/10             | how, architect, arena, general-purpose, subagent-driven-development, grilling, domain-modeling                                                |
+| language-skills               | feature-flow | 1        | 11 (bash edits: 72) | 5/10             | how, architect, arena, general-purpose, executing-plans                                                                                       |
+| per-plugin-versions           | feature-flow | 1        | 1 (bash edits: 6)   | 4/10             | how, architect, arena, general-purpose, subagent-driven-development, executing-plans                                                          |
+| postgres-skills               | feature-flow | 1        | 0 (bash edits: 15)  | 5/10             | how, architect, arena, general-purpose, subagent-driven-development                                                                           |
+| repo-structure                | feature-flow | 2        | 5 (bash edits: 72)  | 5/10             | how, architect, arena, general-purpose, subagent-driven-development                                                                           |
+| skillspector                  | feature-flow | 1        | 3 (bash edits: 6)   | 2/10             | how, architect, arena, general-purpose, writing-plans, subagent-driven-development, executing-plans, domain-modeling                          |
+| superpowers-v7                | feature-flow | 1        | 12 (bash edits: 30) | 4/10             | how, architect, arena, general-purpose, subagent-driven-development, domain-modeling                                                          |
+| vendor-superpowers            | feature-flow | 1        | 4 (bash edits: 4)   | 1/10             | how, architect, arena, general-purpose, writing-plans, subagent-driven-development, executing-plans, grilling, domain-modeling                |
+| web-mcp                       | feature-flow | 1        | 1 (bash edits: 253) | 4/10             | how, architect, arena, general-purpose, brainstorming, executing-plans                                                                        |
+| web-mcp-search                | feature-flow | 1        | 0 (bash edits: 0)   | 1/10             | how, architect, arena, general-purpose, writing-plans, subagent-driven-development, executing-plans, grilling, domain-modeling                |
+| website-mcp-server            | feature-flow | 1        | 3 (bash edits: 253) | 4/10             | how, architect, arena, general-purpose, brainstorming, executing-plans                                                                        |
 
 Verdict: supported | not supported | inconclusive. Threats that showed up. The user's decision.
 
