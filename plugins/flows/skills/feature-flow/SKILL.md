@@ -99,8 +99,6 @@ from the user. Recommended answers are fine here.
 - Resolved terms go into `GLOSSARY.md` (or the one `GLOSSARY-MAP.md` points at) as they happen; ADRs only under
   domain-modeling's three conditions. Link them in flow.md.
 - Fold every settled decision back into the spec. The spec is the single source the plan is written from.
-- Fallback without mattpocock-picks: grill in rounds yourself, one numbered question per open decision, with your
-  recommendation under each.
 
 **Gate 1:** when the frontier is empty, give a five-line summary of what changed in the spec and ask the user to
 approve the spec. Record it.
@@ -134,6 +132,7 @@ up the worktree (`using-git-worktrees`), run TDD and reviews themselves. Stop wh
 `finishing-a-development-branch`.
 
 Deviations stop the build: flow-rules **Deviations** (the fifth stop, the brief clause, the files check, Rulings).
+Before SDD deletes its workspace, copy its ledger's `Ruling:` lines into flow.md (flow-rules **Rulings**).
 
 ## Phase 7: Verify and finish
 

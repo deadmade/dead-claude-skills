@@ -1,13 +1,14 @@
 ---
 name: integrate
-description: 'Take a verified branch to a PR: show and make the commits, write the PR title and body for your approval, hand you the push and gh lines to run yourself, then watch the CI checks and stop with cause and options on a red one. Never pushes, never runs gh, never fixes CI by pushing. Resumable. Use for /integrate [base]; no argument resumes.'
+description: 'Take a verified branch to a PR: show and make the commits, write the PR title and body for your approval, hand you the push and gh lines to run yourself, then watch the CI checks and stop with cause and options on a red one. Never pushes, never runs a gh command that writes, never fixes CI by pushing. Resumable. Use for /integrate [base]; no argument resumes.'
 disable-model-invocation: true
 argument-hint: '[base branch]'
 ---
 
 # integrate
 
-Commit, PR, CI. Push and `gh` are the owner's: this conductor writes the lines, the user runs them.
+Commit, PR, CI. Push and the `gh` commands that write are the owner's: this conductor writes the lines, the user runs
+them.
 
 | Phase    | Runs                                                                | Output                      |
 | -------- | ------------------------------------------------------------------- | --------------------------- |
@@ -19,8 +20,10 @@ Commit, PR, CI. Push and `gh` are the owner's: this conductor writes the lines, 
 `docs/features/<slug>/flow.md` when there is one (standalone: none), with `phase:` `commit | pr | ci | done`
 recorded in it. Packs: `${CLAUDE_PLUGIN_ROOT}/packs` (pstack is its `pstack-picks` folder).
 
-**Never** run `git push` or `gh`, and never push a CI fix: the owner's sandbox and hooks block them, and pushing is
-the owner's call. Hand each to the user as a `!` line to type. There is no release phase.
+**Never** run `git push` or a `gh` command that writes (`gh pr create`, `gh pr merge`, …), and never push a CI fix:
+the owner's sandbox and hooks block them, and pushing is the owner's call. Hand each to the user as a `!` line to type.
+Reading checks (`gh pr checks`, `gh run view`) is allowed; where it's blocked, the user runs it with `!`. There is no
+release phase.
 
 ## Phase 1: Commit
 
@@ -28,7 +31,7 @@ the owner's call. Hand each to the user as a `!` line to type. There is no relea
   since; otherwise follow superpowers `verification-before-completion` and run them fresh. A red check stops here.
 - Group the changes into commits by purpose and **show them** (message and files each) before making any. A message is
   one sentence with no co-author lines. Stage with `git add -u` plus new paths by name, never `git add -A`; `git add`
-  and `git commit` as separate commands.
+  and `git commit` as separate commands. **Gate:** make them only after the user says yes to what you showed.
 - Nothing to commit but the branch is ahead of its base: go on to Phase 2.
 
 ## Phase 2: PR

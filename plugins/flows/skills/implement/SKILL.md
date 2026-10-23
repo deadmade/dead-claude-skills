@@ -39,7 +39,8 @@ one at a time, with a recommendation each. More: the design isn't done; offer `/
 
 ## Phase 2: Plan
 
-- **A plan** (tasks with steps): check it against the code from Phase 1; stale paths or names are fixed in place.
+- **A plan** (tasks with steps): check it against the code from Phase 1; stale paths or names are fixed in place. A
+  task without a **Files** list gets one written before the Gate.
 - **A spec or ticket:** follow superpowers `writing-plans` on it. For a spec too big for one branch, first offer
   mattpocock `to-tickets` and plan only the first ticket.
 
@@ -53,7 +54,8 @@ recommendation. Record both.
 
 Read the chosen skill by path and follow it. It sets up the worktree and runs TDD and reviews itself. Stop where it
 would invoke `finishing-a-development-branch`. Deviations stop the build: flow-rules **Deviations** (the fifth stop,
-the brief clause, the files check, Rulings).
+the brief clause, the files check, Rulings). Before SDD deletes its workspace, copy its ledger's `Ruling:` lines into
+flow.md (flow-rules **Rulings**).
 
 ## Phase 4: Finish
 

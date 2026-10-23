@@ -93,7 +93,7 @@ The verdict, one row each, with the evidence:
 - each new `shortcut:` line the branch adds: `git diff <merge-base> | rg '^\+.*shortcut:'`, plus `rg 'shortcut:'` on
   the untracked files.
 
-Standalone, without a flow.md, only the shortcut lines. **Gate:** the user confirms or reopens each one (`all`, or
+Standalone, without a flow.md, the shortcut lines and an inline `/fix-flow`'s Rulings. **Gate:** the user confirms or reopens each one (`all`, or
 numbers to reopen). A reopened one is a fix on the user's yes: back to the caller's build flow, else fixed here, and
 the checks re-run.
 
