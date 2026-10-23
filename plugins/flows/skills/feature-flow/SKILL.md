@@ -34,11 +34,11 @@ mattpocock and tob are its `-picks` folders). Only this differs:
 
 - **With an argument, an existing run's slug** (`docs/features/<arg>/flow.md` exists in the repository root or a
   worktree under `.worktrees/*/` or `.claude/worktrees/*/`): read the newest copy. A `flow:` other than `feature` (or
-  missing) → say which conductor it belongs to and stop. `phase: done` → say it's done and ask what to do. When the newest copy is in a
-  worktree, work in that worktree (EnterWorktree with its path) and write that copy; if the switch is refused
-  (EnterWorktree only switches into `.claude/worktrees/` from inside another worktree), say so and ask the user to
-  start the session in that worktree. Then continue at its phase, as "Without one" does. Never create a flow.md over
-  an existing one.
+  missing) → say which conductor it belongs to and stop. `phase: done` → say it's done and ask what to do. When the
+  newest copy is in a worktree, work in that worktree (EnterWorktree with its path) and write that copy; if the
+  switch is refused (EnterWorktree only switches into `.claude/worktrees/` from inside another worktree), say so and
+  ask the user to start the session in that worktree. Then continue at its phase, as "Without one" does. Never create
+  a flow.md over an existing one.
 - **With an argument, anything else:** derive a kebab-case slug (`checkout-webhooks`), create
   `docs/features/<slug>/flow.md` from [references/flow-template.md](references/flow-template.md), then Phase 1. If
   the derived slug exists, ask before choosing another.
@@ -85,8 +85,8 @@ doesn't need to offer recon of the codebase, and the web recon is already runnin
 - **Spike.** A spike the user agrees to is allowed. Record it in flow.md as throwaway: it isn't building, it doesn't
   pass Gate 2, and keeping its code goes through the plan like any other code.
 - **Exit.** Once the spec is written (for a project, with the builder check folded in), stop: Gate 1 is the user's
-  review of it, after the grill. Don't invoke `writing-plans`, even though brainstorming's hard gate says to. Link the spec in
-  flow.md and go to Phase 3.
+  review of it, after the grill. Don't invoke `writing-plans`, even though brainstorming's hard gate says to. Link the
+  spec in flow.md and go to Phase 3.
 
 ## Phase 3: Grill
 

@@ -24,7 +24,7 @@ it; `all` audits the whole repo, vendored content skipped.
 ## What each conductor uses
 
 Generated from each conductor's `uses.json` by `node scripts/flows-uses.mjs`; `npm test` fails when it is stale.
-Installing flows installs every plugin below.
+Installing flows installs every plugin below; the packs ship inside flows itself.
 
 <!-- uses:start -->
 
@@ -107,9 +107,16 @@ are in [references/flow-rules.md](references/flow-rules.md).
 Calls between conductors (`/fix-flow` → `/verify`) aren't listed. Each conductor still has a fallback for a
 plugin that isn't there, for installs that skipped one.
 
+## Packs
+
+flows carries the skill packs its conductors run, in `packs/`: superpowers, ponytail, mattpocock-picks, pstack-picks,
+tob-picks and paper-lookup, each written there by its `scripts/sync-*.mjs`. Claude Code scans only a plugin's root
+`skills/`, `agents/` and `hooks/hooks.json`, so nothing under `packs/` loads on its own; the conductors read a pack's
+skills by path (`${CLAUDE_PLUGIN_ROOT}/packs`). tob's spec checker is flows' own agent (`agents/spec-compliance-checker.md`),
+since a pack's agents don't load. Where a conductor changes a pack's rule it quotes the sentence it overrides in an
+`overrides` comment marker, and `npm test` fails when that sentence is gone from the pack. To add
+a pack, follow [docs/vendor-a-pack.md](../../docs/vendor-a-pack.md).
+
 ## Install
 
-    /plugin install flows@dead-claude-skills
-
-or pick it in the installer (`npx --allow-git=root github:deadmade/dead-claude-skills#semver:*`), which also installs
-its dependencies.
+Pick it in the installer (see the [main README](../../README.md)), which also installs its dependencies.

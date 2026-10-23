@@ -69,7 +69,16 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   `~/.claude/bin` (upstream's raw binary, checked against the pinned hash, downloaded when missing or older than the
   pin); either way it sets `agentBrowserPath` to the one in use (`agentBrowserPlan` in `core/binaries.ts`). Test-only hooks: `WEB_MCP_TEST_PUBLIC_IP`
   (debug builds or the `test-hooks` feature) treats a comma-separated list of IPs as public; `WEB_MCP_FALLBACK_MS` shortens the fetch browser fallback's deadline, `WEB_MCP_PAPERS_MS` each paper source's (8 s), `WEB_MCP_LOOKUP_MS` each lookup source's.
-- `plugins/shared/ponytail/`, `plugins/shared/superpowers/`: vendored unchanged from upstream's newest stable release
+- `plugins/flows/packs/`: the skill packs the conductors run, one folder per upstream, each written by its
+  `scripts/sync-*.mjs`. They are not marketplace plugins and nothing there loads on its own (Claude Code scans only a
+  plugin's root `skills/`, `agents/` and `hooks/hooks.json`); conductors read a pack's skills by path
+  (`${CLAUDE_PLUGIN_ROOT}/packs`), and the installer retires old installs of them and checks none remains
+  (`stillInstalled`). The folder list is the source of truth, not this file. tob's spec checker ships as flows' own agent,
+  `plugins/flows/agents/spec-compliance-checker.md` (vendored by `sync-tob`), because a pack's agents don't load.
+  Where a conductor changes a pack's rule it quotes the sentence in an `<!-- overrides <pack>/<path>: "..." -->`
+  marker in flows' own `.md` files; `checkOverrides` (`scripts/flows-uses.mjs`, run by check-repo and by every pack
+  sync before its PR) fails when the quoted sentence is gone. `docs/vendor-a-pack.md` is the checklist for a new pack.
+- `plugins/flows/packs/ponytail/`, `plugins/flows/packs/superpowers/`: vendored unchanged from upstream's newest stable release
   (`scripts/sync-release.mjs <name>`, `sync-release.yml`, ADR 0002): ponytail's skills,
   SessionStart/SubagentStart/UserPromptSubmit hooks and band mod; superpowers' skills and SessionStart hook (its
   `run-hook.cmd` and `session-start` stay LF via `.gitattributes`). Other hosts' adapters are left out. The sync PR
@@ -97,10 +106,9 @@ entry's version from its `ref` (`shippedVersions`).
 ## Vendored content: don't edit
 
 These are copied from upstream by `scripts/sync-*.mjs` (weekly workflows open the PRs) and overwritten on every
-sync: `plugins/opt-in/hallmark/`, `plugins/shared/paper-lookup/skills/`, `plugins/shared/graphify/skills/`, `plugins/shared/mattpocock-picks/`, `plugins/shared/pstack-picks/`,
-`plugins/shared/tob-picks/` (CC BY-SA 4.0), `plugins/opt-in/implementation/*-skills/{library,skills}/`, `plugins/opt-in/implementation/*-skills/LICENSE` and `UPSTREAM` (their `plugin.json` and `evals/` are hand-written), `plugins/opt-in/implementation/postgres/skills/` (their `plugin.json` is hand-written), `plugins/shared/self-review/agents/`,
-`plugins/shared/self-review/skills/self-review/references/upstream/`, `plugins/shared/ponytail/` and `plugins/shared/superpowers/` (their `plugin.json` version is
-set by the sync and bumped by `release.mjs`). To change them, change the sync script's transform.
+sync: `plugins/opt-in/hallmark/`, `plugins/flows/packs/` (`tob-picks` is CC BY-SA 4.0), `plugins/flows/agents/spec-compliance-checker.md`,
+`plugins/shared/graphify/skills/`, `plugins/opt-in/implementation/*-skills/{library,skills}/`, `plugins/opt-in/implementation/*-skills/LICENSE` and `UPSTREAM` (their `plugin.json` and `evals/` are hand-written), `plugins/opt-in/implementation/postgres/skills/` (their `plugin.json` is hand-written), `plugins/shared/self-review/agents/`,
+`plugins/shared/self-review/skills/self-review/references/upstream/`, and the `plugin.json` version of the ponytail and superpowers packs (set by the sync and bumped by `release.mjs`). To change them, change the sync script's transform.
 When what's vendored or its license changes, update THIRD_PARTY.md.
 
 ## Versions and releases
@@ -132,9 +140,12 @@ plugins of ours that the manifest no longer lists.
 - mod tests: `claude plugin test .` in `plugins/default` and `plugins/opt-in/md-pane`.
   `tsc -p .` there needs the engine's typings in `.claude-plugin/types/` (gitignored; the engine
   writes them when it loads the mod).
+- The quote check: `npm test` (check-repo) fails when a sentence an `overrides` marker quotes is gone from its pack.
+  Run it after a pack sync and fix the marker or the conductor text in the same PR.
 - `nix develop` (or direnv) gives the toolchain and installs the pre-commit hooks (treefmt, merge conflicts, JSON,
   check-repo, installer and scripts tests, end-of-file; vendored paths excluded). Enter it from the repo root only:
-  started in a subfolder, its hook setup treats that folder as the repo and uninstalls the pre-commit hook.
+  started in a subfolder, its hook setup treats that folder as the repo and uninstalls the pre-commit hook. The hook config is generated, so a commit touching `plugins/flows/packs/` or the
+  checker agent needs `nix develop` re-entered once to pick up their excludes.
 - `nix fmt` formats everything per `treefmt.toml` (alejandra, prettier for js/ts/json/md/yaml, rustfmt).
 
 CI: `test.yml` (npm test, the installer typecheck and the dead-skills and md-pane mod tests, Linux and Windows) on every PR and push to main; `tui-review.yml` on

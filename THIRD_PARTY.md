@@ -10,7 +10,7 @@ It is synced by `scripts/sync-hallmark.mjs` (weekly via GitHub Actions); the onl
 
 ## paper-lookup
 
-`plugins/shared/paper-lookup/skills/paper-lookup/` is vendored from the paper-lookup skill of
+`plugins/flows/packs/paper-lookup/skills/paper-lookup/` is vendored from the paper-lookup skill of
 [K-Dense-AI/scientific-agent-skills](https://github.com/K-Dense-AI/scientific-agent-skills) (MIT License, Copyright (c)
 2025 K-Dense Inc.; full text in `skills/paper-lookup/LICENSE.md`). It is synced by `scripts/sync-paper-lookup.mjs`
 (weekly via GitHub Actions), which trims it for computer science: the reference files for PubMed, PMC, Europe PMC,
@@ -28,29 +28,31 @@ The synced upstream commit is in `skills/paper-lookup/UPSTREAM`.
 
 ## mattpocock-picks
 
-`plugins/shared/mattpocock-picks/skills/` vendors a picked set of skills from [mattpocock/skills](https://github.com/mattpocock/skills)
-(MIT License, Copyright (c) 2026 Matt Pocock; full text in `plugins/shared/mattpocock-picks/LICENSE`), unmodified
+`plugins/flows/packs/mattpocock-picks/skills/` vendors a picked set of skills from [mattpocock/skills](https://github.com/mattpocock/skills)
+(MIT License, Copyright (c) 2026 Matt Pocock; full text in `plugins/flows/packs/mattpocock-picks/LICENSE`), unmodified
 apart from flattening `engineering/` and `productivity/` into one folder. Synced by `scripts/sync-mattpocock.mjs`
-(weekly via GitHub Actions); the synced upstream commit is in `plugins/shared/mattpocock-picks/UPSTREAM`.
+(weekly via GitHub Actions); the synced upstream commit is in `plugins/flows/packs/mattpocock-picks/UPSTREAM`.
 
 ## pstack-picks
 
-`plugins/shared/pstack-picks/` vendors a picked set of skills and the `comment-sicko` agent from
+`plugins/flows/packs/pstack-picks/` vendors a picked set of skills and the `comment-sicko` agent from
 [pstack](https://github.com/cursor/plugins/tree/main/pstack) (MIT License, Copyright (c) 2026 Lauren Tan;
-full text in `plugins/shared/pstack-picks/LICENSE`). Modified mechanically for Claude Code by
+full text in `plugins/flows/packs/pstack-picks/LICENSE`). Modified mechanically for Claude Code by
 `scripts/sync-pstack.mjs` (tool names, subagent types, model names, paths, and an added port note
-under each file's frontmatter). The synced upstream commit is in `plugins/shared/pstack-picks/UPSTREAM`.
+under each file's frontmatter). The synced upstream commit is in `plugins/flows/packs/pstack-picks/UPSTREAM`.
 
 ## tob-picks
 
-`plugins/shared/tob-picks/` vendors four skills (property-based-testing, spec-to-code-compliance, sharp-edges,
+`plugins/flows/packs/tob-picks/` vendors four skills (property-based-testing, spec-to-code-compliance, sharp-edges,
 mutation-testing), the `spec-compliance-checker` and `sharp-edges-analyzer` agents and the `spec-compliance` workflow
 from [trailofbits/skills](https://github.com/trailofbits/skills) (Creative Commons Attribution-ShareAlike 4.0,
-Copyright Trail of Bits; full text in `plugins/shared/tob-picks/LICENSE`). The vendored files stay under CC BY-SA 4.0.
+Copyright Trail of Bits; full text in `plugins/flows/packs/tob-picks/LICENSE`). The vendored files stay under CC BY-SA 4.0.
 Modified by `scripts/sync-tob.mjs`: each upstream plugin's skill, agents and workflow are merged into one plugin,
 the Codex-only `agents/openai.yaml` and its icon are dropped, the `spec-to-code-compliance:` namespace is renamed to
-`tob-picks:`, and `FsCheck|CsCheck` is added to property-based-testing's library detection command. Synced weekly via
-GitHub Actions; the synced upstream commit is in `plugins/shared/tob-picks/UPSTREAM`.
+`tob-picks:`, the workflow's typed dispatch is pointed at `flows:spec-compliance-checker`, and `FsCheck|CsCheck` is
+added to property-based-testing's library detection command. The `spec-compliance-checker` agent is also copied to
+`plugins/flows/agents/spec-compliance-checker.md` (same CC BY-SA 4.0), because a pack's agents don't load. Synced weekly via
+GitHub Actions; the synced upstream commit is in `plugins/flows/packs/tob-picks/UPSTREAM`.
 
 ## rust-skills
 
@@ -106,7 +108,7 @@ skill (MIT License, Copyright Matt Pocock; `LICENSE-MIT`), unmodified apart from
 
 ## ponytail
 
-`plugins/shared/ponytail/` is vendored from [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) (MIT
+`plugins/flows/packs/ponytail/` is vendored from [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) (MIT
 License, Copyright (c) 2026 DietrichGebert; full text in `LICENSE`): the Claude Code plugin's `.claude-plugin/plugin.json`,
 `hooks/` (without the other hosts' hook configs) and `skills/`, at upstream's newest stable release. It is synced by
 `scripts/sync-release.mjs` (weekly via GitHub Actions); the only local change is `plugin.json`'s `version`. The synced
@@ -114,7 +116,7 @@ upstream commit is in `UPSTREAM`.
 
 ## superpowers
 
-`plugins/shared/superpowers/` is vendored from [obra/superpowers](https://github.com/obra/superpowers) (MIT License,
+`plugins/flows/packs/superpowers/` is vendored from [obra/superpowers](https://github.com/obra/superpowers) (MIT License,
 Copyright (c) 2025 Jesse Vincent; full text in `LICENSE`): the Claude Code plugin's `.claude-plugin/plugin.json`,
 `hooks/` (without Cursor's hook config) and `skills/`, at upstream's newest stable release. It is synced by
 `scripts/sync-release.mjs` (weekly via GitHub Actions); the only local change is `plugin.json`'s `version`. The

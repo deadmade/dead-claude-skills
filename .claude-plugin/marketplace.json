@@ -70,7 +70,7 @@
     },
     {
       "name": "flows",
-      "description": "Conductor skills that run the rest of the marketplace in order, with approval gates and resumable state: /feature-flow, /research-flow, /implement, /fix-flow and /upgrade build; /test-audit, /doc-audit and /harden check a branch or the whole repo; /verify proves a branch is ready for a PR; /understand teaches a codebase; /learn saves what a flow taught. Carries its skill packs (superpowers, ponytail, mattpocock-picks, pstack-picks, tob-picks, paper-lookup), which only its conductors read, and installs the other plugins they use. Opt-in.",
+      "description": "Conductor skills that run the rest of the marketplace in order, with approval gates and resumable state: /feature-flow, /research-flow, /implement, /fix-flow and /upgrade build; /test-audit, /doc-audit and /harden check a branch or the whole repo; /verify proves a branch is ready for a PR; /understand teaches a codebase; /learn saves what a flow taught. Carries its skill packs, which only its conductors read, and installs the other plugins they use. Opt-in.",
       "source": "./plugins/flows",
       "category": "development"
     },
