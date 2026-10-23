@@ -59,7 +59,8 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
     <!-- overrides superpowers/skills/executing-plans/SKILL.md: "Rulings, not stalls. Conflicts, ambiguities, plan defects — decide them." -->
     <!-- overrides superpowers/skills/executing-plans/SKILL.md: "Four things stop you, and only these: an irreversible or destructive operation;" -->
   - **The brief clause.** Paste into every implementer and task-review prompt, verbatim: the deviation classes above,
-    that a deviation is reported as `NEEDS_CONTEXT` and not decided, the task's **Files** list, and this line, ours,
+    that a deviation is reported as `NEEDS_CONTEXT` and not decided, the task's **Files** list, the plan's **Global
+    Constraints** (the seam lines included), and this line, ours,
     after pstack's `principle-laziness-protocol` (an earlier version; upstream has since dropped it): "If a task asks
     you to pass a new signal through types, schemas, pipelines, or similar layers, stop and look for a more direct
     path." A task that seems to need one value threaded through many modules is a deviation. The task reviewer reports

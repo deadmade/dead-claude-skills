@@ -58,8 +58,10 @@ only says what differs. Packs: `${CLAUDE_PLUGIN_ROOT}/packs`, for FF's pack skil
 
 FF Phase 1, and in the same message start a third background `general-purpose` agent with the prompt in
 [references/literature.md](references/literature.md); in that prompt, paper-lookup is
-`${CLAUDE_PLUGIN_ROOT}/packs/paper-lookup/skills/paper-lookup/SKILL.md`, read by path. Write its evidence table into
-flow.md under **Evidence** when it lands. If the literature is thin or contradicts itself, say so; that is a finding, not a reason to pad.
+`${CLAUDE_PLUGIN_ROOT}/packs/paper-lookup/skills/paper-lookup/SKILL.md`, read by path, and its strength column follows
+`${CLAUDE_PLUGIN_ROOT}/packs/pstack-picks/skills/why/references/epistemics.md`. Write its evidence table into flow.md
+under **Evidence** when it lands. If the literature is thin or contradicts itself, say so; that is a finding, not a
+reason to pad.
 
 ## Phase 2: Brainstorm
 

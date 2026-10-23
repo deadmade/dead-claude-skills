@@ -462,6 +462,10 @@ Calls the build made on its own (not deviation-class), one line each, as they ar
 
 - 2026-10-23, Tasks 3+4: the packs keep their own `.claude-plugin/plugin.json`, because the installer tarball only ships `plugin.json` files and the installer lists the packs from them; release.mjs and check-repo's version check now cover `packs/`. `claude plugin validate plugins/flows` passes, and a static check finds nothing from the packs at flows' root. Committed with `SKIP=end-of-file-fixer`: the nix-generated hook config still excludes the old paths until `nix develop` regenerates it.
 
+- 2026-10-23, Task 7 review: the conductors now name GLOSSARY.md (what domain-modeling writes and this repo has) instead of CONTEXT.md.
+- 2026-10-23, Task 7 review: in feature-flow, a small change keeps its short design doc and Gate 1, so the seam question and the build stop still apply; only the grill may be skipped. A quick task still leaves on the owner's yes.
+- 2026-10-23, Task 7 review: the brief clause in flow-rules now also carries the plan's Global Constraints (the seam lines), so builders, not only reviewers, see where each cross-cutting concern is resolved. This edits a Task 6 file; it implements spec goal 5.
+
 ## Deviations
 
 - 2026-10-23, Task 2: pstack upstream deleted the line the spec relies on.

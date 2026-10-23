@@ -30,7 +30,8 @@ done`. Packs: `${CLAUDE_PLUGIN_ROOT}/packs` (pstack and mattpocock are its `-pic
 ## Phase 1: Read
 
 Read the input and everything it links. Run pstack `how` (fallback: Explore agents) on the code it touches and read
-`CONTEXT.md` and `docs/adr/` if present. Under **Findings**: where it lands (`file:line`), and every point the input
+the domain docs that `<packs>/mattpocock-picks/skills/setup-matt-pocock-skills/domain.md` lists (the glossary and the
+ADRs). Under **Findings**: where it lands (`file:line`), and every point the input
 leaves open. A cross-cutting concern the input adds without saying where it is resolved and which modules never see
 it is an open point: ask feature-flow's seam question (mattpocock `codebase-design`, pstack
 `principle-redesign-from-first-principles` and `principle-boundary-discipline`). Up to three open points: ask them,

@@ -10,15 +10,15 @@ argument-hint: "What do you want to build (or a run's slug)?"
 One entry point that runs the skills this marketplace already ships, in order, and stops at two gates for the user.
 Claude proposes and recommends; the user decides.
 
-| Phase        | Runs                                                           | Output                                       |
-| ------------ | -------------------------------------------------------------- | -------------------------------------------- |
-| 1 Ground     | pstack `how` or Explore agents, a prior-art agent              | grounding notes, prior-art report            |
-| 2 Brainstorm | superpowers `brainstorming`, the seam question                 | spec                                         |
-| 3 Grill      | mattpocock `grilling` + `domain-modeling`                      | sharper spec, `CONTEXT.md`, ADRs. **Gate 1** |
-| 4 Plan       | superpowers `writing-plans`                                    | plan                                         |
-| 5 Evaluate   | reviewer subagents per plan-review.md                          | revised plan. **Gate 2**                     |
-| 6 Execute    | superpowers `subagent-driven-development` or `executing-plans` | code, tests                                  |
-| 7 Finish     | `/verify`, then `/learn`                                       | walkthrough, branch handled, lessons kept    |
+| Phase        | Runs                                                           | Output                                    |
+| ------------ | -------------------------------------------------------------- | ----------------------------------------- |
+| 1 Ground     | pstack `how` or Explore agents, a prior-art agent              | grounding notes, prior-art report         |
+| 2 Brainstorm | superpowers `brainstorming`, the seam question                 | spec                                      |
+| 3 Grill      | mattpocock `grilling` + `domain-modeling`                      | sharper spec, glossary, ADRs. **Gate 1**  |
+| 4 Plan       | superpowers `writing-plans`                                    | plan                                      |
+| 5 Evaluate   | reviewer subagents per plan-review.md                          | revised plan. **Gate 2**                  |
+| 6 Execute    | superpowers `subagent-driven-development` or `executing-plans` | code, tests                               |
+| 7 Finish     | `/verify`, then `/learn`                                       | walkthrough, branch handled, lessons kept |
 
 ## Rules for the whole run
 
@@ -51,7 +51,8 @@ mattpocock and tob are its `-picks` folders). Only this differs:
 Ask nothing yet. In one message, start both:
 
 - **Codebase:** pstack `how` on the subsystems the feature touches (fallback: 1–3 Explore agents), and pstack `why`
-  when the feature moves an existing concern. Also read `CONTEXT.md`, `CONTEXT-MAP.md` and `docs/adr/` if they exist.
+  when the feature moves an existing concern. Also read the domain docs that
+  `<packs>/mattpocock-picks/skills/setup-matt-pocock-skills/domain.md` lists (the glossary and the ADRs).
 - **Prior art:** one background `general-purpose` agent with the prompt in
   [references/prior-art.md](references/prior-art.md). Don't wait for it; Phase 2 starts with questions anyway.
 
@@ -73,16 +74,18 @@ doesn't need to offer recon of the codebase, and the web recon is already runnin
   it. Redesign picks the seam; boundary discipline keeps the policy there. Its "propagate" covers the seam's types and
   docs, never a parameter carried through modules that don't decide on it.
   <!-- overrides pstack-picks/skills/principle-redesign-from-first-principles/SKILL.md: "Propagate the change through every reference: types, docs, examples, rationale sections" -->
-- **Size.** Brainstorming sizes the work as a quick task, a small change, or a project with a written design. A quick
-  task or small change writes no spec, so this flow is overkill: say so and offer to drop out of it. If the user
-  agrees, set `phase: done` with a note and let brainstorming finish its own way. Only a project continues here.
+- **Size.** A quick task (everything that matters is in the request) doesn't need this flow: say so and offer to
+  leave it. Only on the user's yes, set `phase: done` with a note and do the task. A small change stays in the flow:
+  its short design doc is the spec, and Gate 1, the seam lines, the plan's Global Constraints and the build stop all
+  apply. The user may skip the Grill for it; record that in flow.md.
+  <!-- overrides superpowers/skills/brainstorming/SKILL.md: "This is a quick, clear task. Do it, and say what you did." -->
 - **Skip.** If the user takes brainstorming's offer to skip the questions, brainstorming ends without a spec. Write it
   yourself from the request and the grounding, mark every choice you made as your call, and go to Phase 3; the grill
   stands in for the builder check. Gate 1 still applies.
 - **Spike.** A spike the user agrees to is allowed. Record it in flow.md as throwaway: it isn't building, it doesn't
   pass Gate 2, and keeping its code goes through the plan like any other code.
-- **Exit.** Once the spec is written and the builder check is folded in, stop: Gate 1 is the user's review of it,
-  after the grill. Don't invoke `writing-plans`, even though brainstorming's hard gate says to. Link the spec in
+- **Exit.** Once the spec is written (for a project, with the builder check folded in), stop: Gate 1 is the user's
+  review of it, after the grill. Don't invoke `writing-plans`, even though brainstorming's hard gate says to. Link the spec in
   flow.md and go to Phase 3.
 
 ## Phase 3: Grill
@@ -93,8 +96,8 @@ from the user. Recommended answers are fine here.
 
 - The tree has one branch per cross-cutting concern: the seam question from Phase 2. Each answer goes into the spec
   as one line: `<concern>: resolved in <module>; never seen by <modules>`.
-- Resolved terms go into `CONTEXT.md` as they happen; ADRs only under domain-modeling's three conditions. Link them
-  in flow.md.
+- Resolved terms go into `GLOSSARY.md` (or the one `GLOSSARY-MAP.md` points at) as they happen; ADRs only under
+  domain-modeling's three conditions. Link them in flow.md.
 - Fold every settled decision back into the spec. The spec is the single source the plan is written from.
 - Fallback without mattpocock-picks: grill in rounds yourself, one numbered question per open decision, with your
   recommendation under each.
@@ -112,9 +115,11 @@ execution method yet and don't invoke an execution skill: link the plan in flow.
 ## Phase 5: Evaluate the plan
 
 Follow [references/plan-review.md](references/plan-review.md): 2–3 reviewer subagents with different angles, then
-you synthesize and screen; its Simpler angle is ponytail `ponytail-review`. Present the findings, each with options
-and a recommendation. The user decides each one; you edit the plan, and the spec too if a decision changes it (say
-so: that edit reopens Gate 1 for that item). Record a reopening on its Gate line in flow.md as `Reopened <date>: <why>`, and the re-approval date after it.
+you synthesize and screen. Its reviewers run on pstack `interrogate`'s models, Fit uses pstack `blast-radius`, and
+the Simpler angle is ponytail `ponytail-review`. Present the findings, each with options and a recommendation. The
+user decides each one; you edit the plan, and the spec too if a decision changes it (say so: that edit reopens Gate 1
+for that item). Record a reopening on its Gate line in flow.md as `Reopened <date>: <why>`, and the re-approval date
+after it.
 
 Optional, for a large or ambiguous design, offer before the review: pstack `architect` (sketch types and signatures
 first) or `arena` (several models draft the plan, best one wins). Only on the user's yes.

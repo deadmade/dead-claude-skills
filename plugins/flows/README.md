@@ -35,7 +35,7 @@ doc-audit
 └ pstack-picks: technical-writing, unslop
 
 feature-flow
-├ pstack-picks: how, why, architect, arena, principle-redesign-from-first-principles, principle-boundary-discipline
+├ pstack-picks: how, why, architect, arena, interrogate, blast-radius, principle-redesign-from-first-principles, principle-boundary-discipline
 ├ claude-code: general-purpose
 ├ superpowers: brainstorming, writing-plans, using-git-worktrees, subagent-driven-development, executing-plans
 ├ mattpocock-picks: codebase-design, grilling, domain-modeling
