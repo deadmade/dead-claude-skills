@@ -4199,6 +4199,7 @@ dependencies = [
  "htmd",
  "image",
  "jiff",
+ "libc",
  "model2vec-rs",
  "pdf_oxide",
  "quick-xml",

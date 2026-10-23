@@ -37,8 +37,9 @@ pub struct Config {
     pub project: PathBuf,
     pub searxng: Url,
     pub agent_browser: String,
-    /// The search profiles' folder: per user and machine, not per project.
-    pub search_dir: PathBuf,
+    /// The search profiles' folder: per user and machine, not per project. `None` without a home folder: search
+    /// then fails, the other tools work.
+    pub search_dir: Option<PathBuf>,
 }
 
 impl Config {
@@ -87,22 +88,55 @@ impl Config {
                 &var("WEB_MCP_SEARXNG_URL").unwrap_or_else(|| "http://127.0.0.1:8888".into()),
             )?,
             agent_browser: var("WEB_MCP_AGENT_BROWSER").unwrap_or_else(|| "agent-browser".into()),
-            search_dir: var("WEB_MCP_SEARCH_DIR").map_or_else(default_search_dir, PathBuf::from),
+            search_dir: search_dir(|k| {
+                std::env::var_os(k)
+                    .filter(|v| !v.is_empty())
+                    .map(PathBuf::from)
+            }),
         })
     }
 }
 
-fn default_search_dir() -> PathBuf {
-    let var = |k: &str| {
-        std::env::var_os(k)
-            .filter(|v| !v.is_empty())
-            .map(PathBuf::from)
-    };
-    if cfg!(windows) {
+/// Never a shared folder such as the temp dir: another user could plant the wrapper web-mcp runs there.
+fn search_dir(var: impl Fn(&str) -> Option<PathBuf>) -> Option<PathBuf> {
+    if let Some(d) = var("WEB_MCP_SEARCH_DIR") {
+        return Some(d);
+    }
+    let data = if cfg!(windows) {
         var("LOCALAPPDATA")
     } else {
         var("XDG_DATA_HOME").or_else(|| var("HOME").map(|h| h.join(".local/share")))
+    };
+    data.map(|d| d.join("web-mcp"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn search_dir_needs_a_home() {
+        fn env<'a>(pairs: &'a [(&'a str, &'a str)]) -> impl Fn(&str) -> Option<PathBuf> + 'a {
+            move |k| {
+                pairs
+                    .iter()
+                    .find(|(n, _)| *n == k)
+                    .map(|(_, v)| PathBuf::from(v))
+            }
+        }
+        assert_eq!(search_dir(env(&[])), None);
+        assert_eq!(
+            search_dir(env(&[("WEB_MCP_SEARCH_DIR", "/s"), ("HOME", "/h")])),
+            Some(PathBuf::from("/s"))
+        );
+        let home = if cfg!(windows) {
+            "LOCALAPPDATA"
+        } else {
+            "XDG_DATA_HOME"
+        };
+        assert_eq!(
+            search_dir(env(&[(home, "/d")])),
+            Some(PathBuf::from("/d/web-mcp"))
+        );
     }
-    .unwrap_or_else(std::env::temp_dir)
-    .join("web-mcp")
 }

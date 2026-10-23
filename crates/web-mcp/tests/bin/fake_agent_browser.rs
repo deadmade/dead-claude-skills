@@ -1,6 +1,7 @@
 //! A stand-in for agent-browser: appends its argv, stdin, `AGENT_BROWSER_*` env and cwd as a JSON line to
 //! `$FAKE_AB_LOG` (unset: to `calls.jsonl` beside its `--config`, if any) and prints canned `--json` answers.
-//! An `open` of a URL containing "fail" fails; a batch's `wait` fails for a URL containing "wait-fail".
+//! An `open` of a URL containing "fail" fails; a batch's `wait` fails for a URL containing "wait-fail", and for
+//! one containing "wait-slow" only after `$AGENT_BROWSER_DEFAULT_TIMEOUT` ms.
 use std::io::{Read, Write};
 use std::path::Path;
 
@@ -72,7 +73,7 @@ fn main() {
             let entries: Vec<Value> = cmds
                 .iter()
                 .map(|c| {
-                    if c[0] == "wait" && url.contains("wait-fail") {
+                    if c[0] == "wait" && wait_fails(url) {
                         return json!({"command": c, "success": false, "result": null, "error": "timed out"});
                     }
                     let result = match c.get(1).map(String::as_str) {
@@ -104,4 +105,16 @@ fn main() {
         cmd => json!({"success": true, "data": {"command": cmd, "session": session}}),
     };
     println!("{out}");
+}
+
+/// Whether a batch's `wait` on `url` fails; a page that never gets ready first runs out the wait's timeout, as the
+/// daemon does.
+fn wait_fails(url: &str) -> bool {
+    if url.contains("wait-slow") {
+        let ms =
+            std::env::var("AGENT_BROWSER_DEFAULT_TIMEOUT").map_or(25_000, |v| v.parse().unwrap());
+        std::thread::sleep(std::time::Duration::from_millis(ms));
+        return true;
+    }
+    url.contains("wait-fail")
 }

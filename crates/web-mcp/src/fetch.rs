@@ -817,7 +817,7 @@ pub(crate) mod tests {
                 project,
                 searxng: Url::parse("http://127.0.0.1:8888").unwrap(),
                 agent_browser: "agent-browser".into(),
-                search_dir: std::env::temp_dir().join("web-mcp-test-search"),
+                search_dir: None,
             },
             search: crate::search::SearxNg::new(
                 Url::parse("http://127.0.0.1:8888").unwrap(),

@@ -1,7 +1,7 @@
 //! The search profiles: one persistent, isolated browser profile per engine, each with its own agent-browser config
 //! file, Consent-O-Matic (except for Bing), a lock and a rest shared by every web-mcp process on the machine.
 
-#![allow(dead_code)] // until Task 5's `search` uses it; the tests leave `ready` alone (it reads the real PATH)
+#![cfg_attr(not(test), allow(dead_code))] // until Task 5's `search` uses it
 
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
@@ -10,6 +10,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use jiff::Timestamp;
@@ -24,16 +25,20 @@ pub const CONSENT_SHA256: &str = "37cec881fc5f53c84419e39d6a01cb79ff0b06b8df5562
 /// How long a blocked engine sits out.
 pub const REST: Duration = Duration::from_mins(30);
 /// Each engine's whole budget in a search, lock wait included.
+#[cfg_attr(test, allow(dead_code))]
 pub const ENGINE_DEADLINE: Duration = Duration::from_secs(10);
 /// The Consent-O-Matic download's budget.
 const DOWNLOAD: Duration = Duration::from_secs(20);
+/// The zip is 88 KB.
+const DOWNLOAD_MAX: usize = 1 << 20;
 
 /// The Chrome major the user agent names when the browser's version can't be read.
 // shortcut: Helium's Chromium at the spike (2026-10-23); raise it when engines start refusing user agents this old.
 const FALLBACK_MAJOR: u32 = 154;
 
 /// Unpacks the extension `zip` into `dir/consent-o-matic-<first 8 hex of its sha256>` and returns that folder.
-/// It goes through a temp folder and a rename, so the folder is whole or absent; one that exists is kept.
+/// It goes through a temp folder and a rename, so the folder is whole or absent; one that exists is kept, unless it
+/// has no `manifest.json` (then it is replaced).
 ///
 /// # Errors
 /// When the hash isn't `expected_sha256`, an entry is a symlink or would land outside the folder (nothing is
@@ -56,6 +61,11 @@ pub fn unpack(zip: &[u8], expected_sha256: &str, dir: &Path) -> Result<PathBuf, 
         }
     }
     let target = dir.join(format!("consent-o-matic-{}", &sha[..8]));
+    let whole = || target.join("manifest.json").is_file();
+    if target.exists() && !whole() {
+        std::fs::remove_dir_all(&target)
+            .map_err(|e| format!("could not replace {}: {e}", target.display()))?;
+    }
     let tmp = dir.join(format!(
         "consent-o-matic-{}.tmp-{}",
         &sha[..8],
@@ -83,7 +93,7 @@ pub fn unpack(zip: &[u8], expected_sha256: &str, dir: &Path) -> Result<PathBuf, 
     match written {
         Ok(()) => Ok(target),
         // Another web-mcp unpacked it first.
-        Err(_) if target.is_dir() => Ok(target),
+        Err(_) if whole() => Ok(target),
         Err(e) => Err(format!("could not unpack into {}: {e}", target.display())),
     }
 }
@@ -113,14 +123,18 @@ pub struct Profiles {
 }
 
 impl Profiles {
+    /// `dir` is `Config::search_dir`.
+    ///
     /// # Errors
-    /// When the HTTP client can't be built.
-    pub fn new(dir: PathBuf) -> reqwest::Result<Self> {
+    /// When there is no `dir` or the HTTP client can't be built.
+    pub fn new(dir: Option<PathBuf>) -> Result<Self, String> {
+        let dir = dir.ok_or("no folder for the search profiles: set WEB_MCP_SEARCH_DIR")?;
         let http = reqwest::Client::builder()
             .user_agent(concat!("web-mcp/", env!("CARGO_PKG_VERSION")))
             .https_only(true)
             .redirect(reqwest::redirect::Policy::limited(5))
-            .build()?;
+            .build()
+            .map_err(|e| e.to_string())?;
         // Absolute: the config files name paths in it, and agent-browser runs elsewhere.
         let dir = std::path::absolute(&dir).unwrap_or(dir);
         Ok(Self { dir, http })
@@ -130,7 +144,8 @@ impl Profiles {
     /// use.
     ///
     /// # Errors
-    /// When no browser is found or the extension can't be had.
+    /// When the search folder isn't the user's, no browser is found or the extension can't be had.
+    #[cfg_attr(test, allow(dead_code))] // the tests call `ready_with`: this reads the real PATH
     pub async fn ready(&self) -> Result<Ready, String> {
         let var = |k: &str| std::env::var_os(k).filter(|v| !v.is_empty());
         let home = var(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(PathBuf::from);
@@ -148,6 +163,7 @@ impl Profiles {
         home: Option<&Path>,
         path: &OsStr,
     ) -> Result<Ready, String> {
+        self.check_owner()?;
         let (chrome, major) = pick(chrome_env, home, path).await?;
         let chrome = std::path::absolute(&chrome).unwrap_or(chrome);
         let chrome = if !cfg!(windows) && chrome.file_name() == Some(OsStr::new("helium")) {
@@ -162,10 +178,34 @@ impl Profiles {
         })
     }
 
+    /// Creates the search folder, and refuses it when another user owns it: web-mcp runs the Helium wrapper and
+    /// loads the extension from there.
+    fn check_owner(&self) -> Result<(), String> {
+        let dir = &self.dir;
+        std::fs::create_dir_all(dir)
+            .map_err(|e| format!("could not create {}: {e}", dir.display()))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt as _;
+            let owner = std::fs::metadata(dir)
+                .map_err(|e| format!("could not read {}: {e}", dir.display()))?
+                .uid();
+            // SAFETY: geteuid has no preconditions and cannot fail.
+            let me = unsafe { libc::geteuid() };
+            if owner != me {
+                return Err(format!(
+                    "the search folder {} belongs to another user (uid {owner}); set WEB_MCP_SEARCH_DIR",
+                    dir.display()
+                ));
+            }
+        }
+        Ok(())
+    }
+
     /// A `#!/bin/sh` script running `helium` without `exec`: nixpkgs' Helium runs in `bwrap --die-with-parent`,
     /// which kills it 10 s after agent-browser starts it directly (findings.md, R9).
     fn helium_wrapper(&self, helium: &Path) -> Result<PathBuf, String> {
-        let quoted = helium.to_string_lossy().replace('\'', r"'\''");
+        let quoted = utf8(helium)?.replace('\'', r"'\''");
         let path = self.dir.join("helium-wrap.sh");
         let script = format!("#!/bin/sh\n'{quoted}' \"$@\"\n");
         write_if_changed(&path, script.as_bytes(), true)
@@ -189,13 +229,17 @@ impl Profiles {
             return Ok(ext);
         }
         let get = async {
-            self.http
+            let resp = self
+                .http
                 .get(CONSENT_URL)
                 .send()
-                .await?
-                .error_for_status()?
-                .bytes()
                 .await
+                .and_then(reqwest::Response::error_for_status)
+                .map_err(|e| e.to_string())?;
+            crate::fetch::read_capped(resp, DOWNLOAD_MAX)
+                .await
+                .map_err(|e| e.to_string())?
+                .ok_or_else(|| "it is over 1 MiB".to_owned())
         };
         let zip = tokio::time::timeout(DOWNLOAD, get)
             .await
@@ -210,17 +254,16 @@ impl Profiles {
     /// When it can't be written.
     pub fn config(&self, e: Engine, r: &Ready) -> Result<PathBuf, String> {
         let dir = self.dir.join(e.name());
-        let s = |p: &Path| p.to_string_lossy().into_owned();
         // Consent-O-Matic kills Bing's result page (findings.md, R7).
-        let extensions: Vec<String> = if e == Engine::Bing {
+        let extensions = if e == Engine::Bing {
             vec![]
         } else {
-            vec![s(&r.extension)]
+            vec![utf8(&r.extension)?]
         };
         let json = serde_json::json!({
-            "profile": s(&dir.join("profile")),
+            "profile": utf8(&dir.join("profile"))?,
             "extensions": extensions,
-            "executablePath": s(&r.chrome),
+            "executablePath": utf8(&r.chrome)?,
             "userAgent": r.ua,
             "headed": e.headed(),
             "idleTimeout": "120s",
@@ -242,8 +285,14 @@ impl Profiles {
 
     /// The engine's lock, shared by every web-mcp process, retried every 100 ms until `until`.
     pub async fn lock(&self, e: Engine, until: Instant) -> Option<EngineLock> {
-        let file = lock_file(&self.dir.join(e.name()).join("lock"), until).await;
-        Some(EngineLock { _file: file.ok()?? })
+        let path = self.dir.join(e.name()).join("lock");
+        match lock_file(&path, until).await {
+            Ok(file) => Some(EngineLock { _file: file? }),
+            Err(err) => {
+                eprintln!("web-mcp: could not lock {}: {err}", path.display());
+                None
+            }
+        }
     }
 
     /// When the engine's rest ends, if it is resting at `now`.
@@ -255,11 +304,16 @@ impl Profiles {
 
     /// Rests the engine until `until`. The caller holds its lock.
     pub fn rest(&self, e: Engine, until: Timestamp) {
-        let dir = self.dir.join(e.name());
         // Best effort: an engine that can't rest is only asked again.
-        let _ = std::fs::create_dir_all(&dir)
-            .and_then(|()| std::fs::write(dir.join("rest"), until.to_string()));
+        let path = self.dir.join(e.name()).join("rest");
+        let _ = write_if_changed(&path, until.to_string().as_bytes(), false);
     }
+}
+
+/// A path for a config file or script: written lossily, it would name another file.
+fn utf8(p: &Path) -> Result<&str, String> {
+    p.to_str()
+        .ok_or_else(|| format!("{} is not valid UTF-8", p.display()))
 }
 
 /// The browser for search and its Chrome major (findings.md, "Order and version"): `WEB_MCP_CHROME`, the newest
@@ -376,13 +430,18 @@ fn user_agent(major: u32) -> String {
 /// unless it already holds exactly that.
 #[cfg_attr(not(unix), allow(unused_variables))]
 fn write_if_changed(path: &Path, content: &[u8], executable: bool) -> io::Result<()> {
+    static N: AtomicU64 = AtomicU64::new(0); // temp names unique per call, not only per process
     if std::fs::read(path).is_ok_and(|old| old == content) {
         return Ok(());
     }
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
     }
-    let tmp = path.with_extension(format!("tmp-{}", std::process::id()));
+    let tmp = path.with_extension(format!(
+        "tmp-{}-{}",
+        std::process::id(),
+        N.fetch_add(1, Ordering::Relaxed)
+    ));
     std::fs::write(&tmp, content)?;
     #[cfg(unix)]
     if executable {
@@ -433,7 +492,53 @@ mod tests {
 
     fn profiles(dir: &Path) -> Profiles {
         let _ = rustls::crypto::ring::default_provider().install_default();
-        Profiles::new(dir.to_owned()).unwrap()
+        Profiles::new(Some(dir.to_owned())).unwrap()
+    }
+
+    #[test]
+    fn no_search_dir_fails_search_only() {
+        let err = Profiles::new(None).err().unwrap();
+        assert_eq!(
+            err,
+            "no folder for the search profiles: set WEB_MCP_SEARCH_DIR"
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn foreign_search_dir_is_refused() {
+        // SAFETY: geteuid has no preconditions and cannot fail.
+        if unsafe { libc::geteuid() } == 0 {
+            return; // root owns `/`
+        }
+        let p = profiles(Path::new("/"));
+        let err = p.ready_with(None, None, OsStr::new("")).await.unwrap_err();
+        assert!(err.contains("belongs to another user"), "{err}");
+    }
+
+    #[test]
+    fn broken_existing_version_is_replaced() {
+        let dir = tempdir("broken");
+        let zip = zip_of(&[("manifest.json", "{}")], None);
+        let sha = crate::archive::sha(&zip);
+        let target = dir.join(format!("consent-o-matic-{}", &sha[..8]));
+        std::fs::create_dir_all(target.join("half")).unwrap();
+        assert_eq!(unpack(&zip, &sha, &dir).unwrap(), target);
+        assert!(target.join("manifest.json").is_file());
+        assert!(!target.join("half").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn non_utf8_paths_are_refused() {
+        use std::os::unix::ffi::OsStrExt as _;
+        let dir = tempdir("utf8");
+        let p = profiles(&dir);
+        let mut r = ready(&dir);
+        r.chrome = dir.join(OsStr::from_bytes(b"chr\xffme"));
+        let err = p.config(Engine::Brave, &r).unwrap_err();
+        assert!(err.contains("not valid UTF-8"), "{err}");
+        assert!(p.helium_wrapper(&r.chrome).is_err());
     }
 
     fn zip_of(entries: &[(&str, &str)], symlink: Option<(&str, &str)>) -> Vec<u8> {
@@ -628,6 +733,7 @@ mod tests {
     }
 
     /// A search dir with Consent-O-Matic already unpacked, so `ready` never downloads.
+    #[cfg(unix)]
     fn seeded(tag: &str) -> PathBuf {
         let dir = tempdir(tag);
         let ext = dir.join(format!(

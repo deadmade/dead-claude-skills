@@ -118,6 +118,10 @@ fn isolate(
 
 /// How long a `close` may take.
 const CLOSE_TIMEOUT: Duration = Duration::from_secs(5);
+/// What a search batch keeps back from the daemon's wait for everything else: findings.md measured ~1 s of
+/// process start, `open` and reads beyond the wait (3000/8000 ms waits: 4.0/8.9 s calls) and up to 2 s for a
+/// whole warm batch, so 2 s lets a page that never gets ready still be read inside the deadline.
+const READ_MARGIN: Duration = Duration::from_secs(2);
 
 impl Browser {
     /// `name` as configured: found on PATH, or kept as given so that running it reports `Missing`.
@@ -305,8 +309,10 @@ impl Browser {
     /// within `deadline`.
     ///
     /// Without `search`: in a throwaway `session`, closed again. With it: in the engine's session under its
-    /// config, waiting on `ready_js` first (a wait that times out still reads the page: the parser decides).
-    /// That session stays open for the next search unless `close_after`, the batch failed or the deadline passed.
+    /// config, waiting on `ready_js` first. The daemon's wait gets `deadline` less `READ_MARGIN`, so a page that
+    /// never gets ready (a consent wall, changed markup) times the wait out and is still read before the deadline:
+    /// the parser decides what it is. That session stays open for the next search unless `close_after`, the batch
+    /// failed or the deadline passed.
     ///
     /// # Errors
     /// As `batch`, when the deadline passes, or when it answers no HTML or no URL.
@@ -333,7 +339,10 @@ impl Browser {
             session,
             &cmds,
             false,
-            iso(deadline),
+            // Never 0: what agent-browser makes of a zero timeout is unknown.
+            iso(deadline
+                .saturating_sub(READ_MARGIN)
+                .max(Duration::from_millis(100))),
             search.as_ref().map(|_| 1),
         );
         let answer = tokio::time::timeout(deadline, batch)
@@ -570,7 +579,7 @@ mod tests {
         );
         assert_eq!(
             c[0]["env"],
-            json!({"AGENT_BROWSER_DEFAULT_TIMEOUT": "5000"})
+            json!({"AGENT_BROWSER_DEFAULT_TIMEOUT": "3000"})
         );
         let cwd = PathBuf::from(c[0]["cwd"].as_str().unwrap());
         assert_eq!(cwd.canonicalize().unwrap(), dir.canonicalize().unwrap());
@@ -628,6 +637,16 @@ mod tests {
         for f in &files {
             std::fs::write(f, "").unwrap();
         }
+        // Files that never go: the wait gives up after 1 s (plus the two spawns).
+        let t = std::time::Instant::now();
+        b.render(&url, session, Some(run()), Duration::from_secs(5))
+            .await
+            .unwrap();
+        let capped = t.elapsed();
+        assert!(capped >= Duration::from_secs(1), "{capped:?}");
+        assert!(capped < Duration::from_millis(2500), "{capped:?}");
+        assert_eq!(args(calls(&dir).last().unwrap()).last(), Some(&"close"));
+        // Files that go after 300 ms end the wait then, well before the cap (spawns cost both runs alike).
         let gone = files.clone();
         let remover = std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(300));
@@ -642,18 +661,34 @@ mod tests {
         let waited = t.elapsed();
         remover.join().unwrap();
         assert!(waited >= Duration::from_millis(300), "{waited:?}");
-        assert!(waited < Duration::from_secs(1), "{waited:?}");
-        assert_eq!(args(calls(&dir).last().unwrap()).last(), Some(&"close"));
-        // Files that never go: the wait gives up after 1 s.
-        for f in &files {
-            std::fs::write(f, "").unwrap();
-        }
+        assert!(
+            waited + Duration::from_millis(400) < capped,
+            "{waited:?} vs {capped:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn render_reads_a_page_that_never_gets_ready() {
+        let (dir, config) = engine_dir("never");
+        let mut b = fake();
+        b.socket_dir = Some(dir.join("sock"));
+        let url = Url::parse("http://example.com/wait-slow").unwrap();
+        let run = SearchRun {
+            config: &config,
+            ready_js: READY_JS,
+            close_after: false,
+        };
+        let deadline = READ_MARGIN + Duration::from_millis(700);
         let t = std::time::Instant::now();
-        b.render(&url, session, Some(run()), Duration::from_secs(5))
+        let (html, landed) = b
+            .render(&url, "web-mcp-search-0-google", Some(run), deadline)
             .await
             .unwrap();
-        let waited = t.elapsed();
-        assert!(waited >= Duration::from_secs(1), "{waited:?}");
-        assert!(waited < Duration::from_secs(3), "{waited:?}");
+        assert!(t.elapsed() < deadline, "{:?}", t.elapsed());
+        assert!(html.contains("Rendered page for"), "{html}");
+        assert_eq!(landed, url);
+        let c = calls(&dir);
+        assert_eq!(c[0]["env"], json!({"AGENT_BROWSER_DEFAULT_TIMEOUT": "700"}));
+        assert_eq!(c.len(), 1, "a read page keeps its session: {c:?}");
     }
 }
