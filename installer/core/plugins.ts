@@ -68,9 +68,6 @@ export function planPlugins(selected: string[], installedIds: string[], tokenPlu
   };
 }
 
-// Plugins only the flows conductors use: they come with flows (its dependencies) and get no row of their own.
-export const INCLUDED = ['mattpocock-picks', 'pstack-picks', 'tob-picks', 'self-review', 'paper-lookup'];
-
 // selected plus the opt-ins among their dependencies, transitively. depsOf(id): a plugin's dependency ids, if any.
 export function withDependencies(selected: string[], depsOf: (id: string) => string[] | undefined, opts: string[]) {
   const out = [...selected];
@@ -90,6 +87,12 @@ export const foreignPlugins = (installedIds: string[], managedIds: string[]) =>
 // Ours but gone from the marketplace (dev-feature): nothing can update them, so every run removes them.
 export const retiredPlugins = (installedIds: string[], managedIds: string[]) =>
   installedIds.filter((id) => marketOf(id) === MARKETPLACE && !managedIds.includes(id));
+
+// The packs flows carries (pack names) that are still installed as plugins of ours, once per id. rows: `claude plugin
+// list --json`.
+export const stillInstalled = (rows: PluginRow[], packs: string[]) => [
+  ...new Set(rows.map((r) => r.id).filter((id) => marketOf(id) === MARKETPLACE && packs.includes(nameOf(id)))),
+];
 
 export const foreignMarketplaces = (names: string[]) => names.filter((n) => n !== MARKETPLACE && n !== OFFICIAL);
 

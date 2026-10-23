@@ -51,9 +51,13 @@ jobs:
       - name: Sanity checks
         id: check
         run: |
-          jq empty .claude-plugin/marketplace.json plugins/shared/mattpocock-picks/.claude-plugin/plugin.json
-          test "$(find plugins/shared/mattpocock-picks/skills -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l)" -eq 13
-          echo "sha=$(cat plugins/shared/mattpocock-picks/UPSTREAM)" >> "$GITHUB_OUTPUT"
+          jq empty .claude-plugin/marketplace.json plugins/flows/packs/mattpocock-picks/.claude-plugin/plugin.json
+          test "$(find plugins/flows/packs/mattpocock-picks/skills -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l)" -eq 13
+          echo "sha=$(cat plugins/flows/packs/mattpocock-picks/UPSTREAM)" >> "$GITHUB_OUTPUT"
+
+      # A PR opened with the workflow's token starts no other workflow, so test.yml never sees it: check here.
+      - name: Repo checks
+        run: node scripts/check-repo.mjs
 
       - name: Open pull request
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
@@ -67,4 +71,4 @@ jobs:
             https://github.com/mattpocock/skills/commit/${{ steps.check.outputs.sha }}.
 
             cc @deadmade
-          add-paths: plugins/shared/mattpocock-picks
+          add-paths: plugins/flows/packs/mattpocock-picks

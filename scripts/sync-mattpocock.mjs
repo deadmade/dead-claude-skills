@@ -1,4 +1,4 @@
-// Vendor a curated subset of mattpocock/skills into plugins/shared/mattpocock-picks/skills/<name>/.
+// Vendor a curated subset of mattpocock/skills into plugins/flows/packs/mattpocock-picks/skills/<name>/.
 // A strict:false marketplace entry can't narrow it: upstream's plugin.json already lists skills,
 // and Claude Code refuses to load a plugin whose manifest and marketplace entry both specify components.
 // Idempotent: re-running against the same upstream commit produces no diff.
@@ -39,7 +39,7 @@ const SKIPPED = [
   'productivity/writing-for-agents',
 ];
 
-const PLUGIN = join(ROOT, 'plugins', 'shared', 'mattpocock-picks');
+const PLUGIN = join(ROOT, 'plugins', 'flows', 'packs', 'mattpocock-picks');
 const DEST = join(PLUGIN, 'skills');
 
 const up = sparseClone(UPSTREAM_URL, ['.claude-plugin', ...SKILLS.map((s) => `skills/${s}`)]);

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { optIns, manifestPath, INCLUDED, BUNDLE, type Marketplace, type PluginJson } from './plugins.ts';
+import { optIns, manifestPath, BUNDLE, type Marketplace, type PluginJson } from './plugins.ts';
 import { dcgCommand, CATEGORIES, TOGGLES, categorize, unavailable, searxngRun, searxngSettings } from './options.ts';
 
 const json = (p: string) => JSON.parse(readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8'));
@@ -21,11 +21,10 @@ test('dcg runs its own installer per OS', () => {
   assert.match(dcgCommand('linux', 'uninstall')[1][1], /uninstall\.sh' \| bash -s -- --yes$/);
 });
 
-test('every opt-in and toggle is on exactly one page, except the INCLUDED ones on none', () => {
+test('every opt-in and toggle is on exactly one page', () => {
   const keys = [...optIns(marketplace, bundle), ...TOGGLES];
   const pages = categorize(keys);
-  const shown = keys.filter((k) => !INCLUDED.includes(k.split('@')[0]));
-  assert.deepEqual(pages.flatMap((p) => p.keys).sort(), shown.sort());
+  assert.deepEqual(pages.flatMap((p) => p.keys).sort(), keys.sort());
   assert.ok(!pages.some((p) => p.id === 'other'), 'every real opt-in has a category');
   const listed = CATEGORIES.flatMap((c) => c.keys);
   assert.equal(new Set(listed).size, listed.length);

@@ -7,16 +7,17 @@ silently edited plan.
 ## Reviewers
 
 Spawn 2–3 `general-purpose` subagents in one message. Each gets: the spec, the plan, the grounding and prior-art
-sections of flow.md, the ADRs, its angle below, and the rubric. If pstack `interrogate` is installed, use its model
-spread (one reviewer per model) instead of one model with three angles.
+sections of flow.md, the ADRs, its angle below, and the rubric. Spread the angles over models from pstack
+`interrogate`'s table, one angle per model; every angle below still runs, Simpler included.
 
-| Angle           | Looks for                                                                                                                                                                                                                                                                      |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Correctness** | Spec goals with no task. Failure paths with no handling or no test. Wrong use of an API or library against its docs. Concurrency, retries, ordering, data loss.                                                                                                                |
-| **Fit**         | Contradictions with existing code (`file:line`). Responsibility in the wrong module. Blast radius: callers, data, wire formats, configs the plan changes without saying so (pstack `blast-radius` if installed). Task order: dependencies, a slice that can't be tested alone. |
-| **Simpler**     | Tasks the spec doesn't need. A library or built-in that replaces custom code. A smaller first slice that delivers the core. Divergence from every prior-art approach with no stated reason.                                                                                    |
+| Angle           | Looks for                                                                                                                                                                                                                                                                                  |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Correctness** | Spec goals with no task. Failure paths with no handling or no test. Wrong use of an API or library against its docs. Concurrency, retries, ordering, data loss.                                                                                                                            |
+| **Fit**         | Contradictions with existing code (`file:line`). Responsibility in the wrong module. Blast radius: callers, data, wire formats, configs the plan changes without saying so (pstack `blast-radius`). Task order: dependencies, a slice that can't be tested alone.                          |
+| **Simpler**     | `<packs>/ponytail/skills/ponytail-review/SKILL.md`, with the plan in place of a diff: tasks the spec doesn't need, a library or built-in that replaces custom code. Also a smaller first slice that delivers the core, and divergence from every prior-art approach with no stated reason. |
 
-Reviewer prompt tail:
+Reviewer prompt tail (the Simpler reviewer reports in it, not in ponytail-review's Output format):
+<!-- overrides ponytail/skills/ponytail-review/SKILL.md: "Then the findings in three groups, skip empty groups:" -->
 
 ```
 Review only from your angle. Each finding: what is wrong, why (source: file:line, a doc section you fetched, or

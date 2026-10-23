@@ -20,11 +20,15 @@ jobs:
 
       - name: Sanity checks
         run: |
-          jq empty .claude-plugin/marketplace.json plugins/shared/paper-lookup/.claude-plugin/plugin.json
-          test -s plugins/shared/paper-lookup/skills/paper-lookup/SKILL.md
-          ! grep -q "Citing Scientific Agent Skills" plugins/shared/paper-lookup/skills/paper-lookup/SKILL.md
-          echo "sha=$(cat plugins/shared/paper-lookup/skills/paper-lookup/UPSTREAM)" >> "$GITHUB_OUTPUT"
+          jq empty .claude-plugin/marketplace.json plugins/flows/packs/paper-lookup/.claude-plugin/plugin.json
+          test -s plugins/flows/packs/paper-lookup/skills/paper-lookup/SKILL.md
+          ! grep -q "Citing Scientific Agent Skills" plugins/flows/packs/paper-lookup/skills/paper-lookup/SKILL.md
+          echo "sha=$(cat plugins/flows/packs/paper-lookup/skills/paper-lookup/UPSTREAM)" >> "$GITHUB_OUTPUT"
         id: check
+
+      # A PR opened with the workflow's token starts no other workflow, so test.yml never sees it: check here.
+      - name: Repo checks
+        run: node scripts/check-repo.mjs
 
       - name: Open pull request
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
@@ -38,4 +42,4 @@ jobs:
             https://github.com/K-Dense-AI/scientific-agent-skills/commit/${{ steps.check.outputs.sha }}.
 
             cc @deadmade
-          add-paths: plugins/shared/paper-lookup/skills/paper-lookup
+          add-paths: plugins/flows/packs/paper-lookup/skills/paper-lookup

@@ -41,4 +41,4 @@ jobs:
           commit-message: 'Sync ${{ matrix.plugin }} to ${{ steps.sync.outputs.tag }}'
           title: 'Sync ${{ matrix.plugin }} to ${{ steps.sync.outputs.tag }}'
           body-path: /tmp/${{ matrix.plugin }}-pr-body.md
-          add-paths: plugins/shared/${{ matrix.plugin }}
+          add-paths: plugins/flows/packs/${{ matrix.plugin }}

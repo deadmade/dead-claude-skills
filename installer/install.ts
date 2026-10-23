@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Interactive installer for the dead-claude-skills marketplace: the flow. Decisions live in core/, the OS in system/,
 // each thing it applies in steps/.
+import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { missingBinaries } from './core/binaries.ts';
 import { HINTS, TOGGLES, categorize, unavailable } from './core/options.ts';
@@ -9,7 +10,6 @@ import {
   type PluginJson,
   type PluginRow,
   BUNDLE,
-  INCLUDED,
   OFFICIAL,
   bundleIds,
   duplicates,
@@ -145,8 +145,9 @@ const chosen: Record<string, boolean> = {
   ...current,
   'strip-defaults': FLAGS.includes('--strip-defaults') || current['strip-defaults'],
   clean: FLAGS.includes('--clean'),
-  // flows replaced feature-flow and brings the picks: a machine that had either keeps them.
-  [FLOWS]: current[FLOWS] || has(`feature-flow@${MARKETPLACE}`) || INCLUDED.some(has),
+  // flows replaced feature-flow and carries self-review and the packs: a machine that had feature-flow or self-review
+  // keeps them.
+  [FLOWS]: current[FLOWS] || has(`feature-flow@${MARKETPLACE}`) || has(`self-review@${MARKETPLACE}`),
   // On by default where offered, until web-mcp is installed; then it keeps the user's choice. It does nothing unless
   // web-mcp is selected and SearXNG answers.
   'web-builtins-off': has(WEB_MCP)
@@ -231,12 +232,7 @@ const strip = clean || on('strip-defaults');
 
 const removed = await removeForeign({ strip, installedIds, managed, marketplaces });
 
-// INCLUDED plugins have no row: only a chosen plugin's dependencies select them.
-const selected = withDependencies(
-  [BUNDLE_ID, ...opts.filter((id) => on(id) && !INCLUDED.includes(nameOf(id)))],
-  (id) => deps[id],
-  opts,
-);
+const selected = withDependencies([BUNDLE_ID, ...opts.filter(on)], (id) => deps[id], opts);
 const plan = planPlugins(
   selected,
   installedIds.filter((id) => [BUNDLE_ID, ...opts].includes(id)),
@@ -246,12 +242,15 @@ const plan = planPlugins(
 const installedJson: Record<string, { auto?: boolean }[]> =
   tryJson(join(CONFIG, 'plugins', 'installed_plugins.json'))?.plugins ?? {};
 plan.install.push(...selected.filter((id) => opts.includes(id) && installedJson[id]?.some((e) => e.auto)));
+// The packs flows carries, one folder each beside its .claude-plugin/: none may stay installed as a plugin.
+const packs = readdirSync(join(PKG, manifestPath(manifest, FLOWS)!, '..', '..', 'packs'));
 await applyPlugins({
   install: plan.install,
   remove: plan.uninstall,
   retired,
   updates: changeList(state, data).update,
   removedBefore: removed.dupes.length > 0 || removed.foreign.length > 0,
+  packs,
 });
 if (selected.includes(TUI_REVIEW)) await applyBin('tui-review', TUI_REVIEW);
 if (selected.includes(WEB_MCP)) await applyBin('web-mcp', WEB_MCP);

@@ -9,11 +9,11 @@ import {
   bundleIds,
   foreignPlugins,
   retiredPlugins,
+  stillInstalled,
   foreignMarketplaces,
   outdated,
   shippedVersions,
   manifestPath,
-  INCLUDED,
   idOf,
   withDependencies,
   BUNDLE,
@@ -37,17 +37,12 @@ test('opt-ins from the real manifests', () => {
         'flows',
         'graphify',
         'hallmark',
-        'mattpocock-picks',
         'mcp-azure',
         'mcp-github',
         'md-pane',
         'nix-lsp',
-        'paper-lookup',
         'postgres',
-        'pstack-picks',
         'rust-skills',
-        'self-review',
-        'tob-picks',
         'tui-review',
         'web-mcp',
       ].map((n) => `${n}@${M}`),
@@ -58,9 +53,10 @@ test('opt-ins from the real manifests', () => {
   );
 });
 
-test('bundle ids resolve bare names to our marketplace', () => {
+test('bundle ids resolve bare names to our marketplace; flows carries the packs, so the bundle has none', () => {
   const ids = bundleIds(bundle);
-  assert.ok(ids.includes(`dead-skills@${M}`) && ids.includes(`superpowers@${M}`) && ids.includes(`code-review@${O}`));
+  assert.ok(ids.includes(`dead-skills@${M}`) && ids.includes(`claude-security@${O}`));
+  for (const gone of [`superpowers@${M}`, `ponytail@${M}`, `code-review@${O}`]) assert.ok(!ids.includes(gone), gone);
 });
 
 test('token plugins', () => {
@@ -105,6 +101,21 @@ test('retired plugins are ours but no longer in the marketplace', () => {
   ]);
 });
 
+test('stillInstalled names the packs installed from our marketplace, once each', () => {
+  const rows = [
+    { id: `superpowers@${M}`, version: '0.4.0' },
+    { id: `superpowers@${M}`, version: '0.4.0' },
+    { id: `ponytail@${M}` },
+    { id: `superpowers@${O}` },
+    { id: `graphify@${M}` },
+  ];
+  assert.deepEqual(stillInstalled(rows, ['ponytail', 'superpowers', 'tob-picks']), [
+    `superpowers@${M}`,
+    `ponytail@${M}`,
+  ]);
+  assert.deepEqual(stillInstalled(rows, []), []);
+});
+
 test('install.ts finds plugin folders through the marketplace, never by a literal plugins/ path', () => {
   const src = readFileSync(new URL('../install.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(src, /join\(PKG, 'plugins'/);
@@ -123,9 +134,8 @@ test('withDependencies adds opt-in dependencies transitively, once, and nothing 
   );
 });
 
-test('flows brings every INCLUDED plugin, and its dependencies are marketplace or official plugins', () => {
+test("flows' dependencies are marketplace or official plugins", () => {
   const flows = json('plugins/flows/.claude-plugin/plugin.json').dependencies.map(idOf);
-  for (const n of INCLUDED) assert.ok(flows.includes(`${n}@${M}`), `${n} comes with flows`);
   for (const id of flows) {
     const [name, from] = id.split('@');
     assert.ok(from === O || marketplace.plugins.some((p) => p.name === name), id);

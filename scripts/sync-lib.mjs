@@ -94,11 +94,12 @@ export function reportNew(entries) {
   }
 }
 
-// Record the upstream commit, but only when something under `dir` besides `upstreamFile` changed; otherwise restore
-// `upstreamFile` so an upstream move that touches nothing we vendor gives no diff (and no sync PR).
+// Record the upstream commit, but only when something under `dir` (a path or a list of them) besides `upstreamFile`
+// changed; otherwise restore `upstreamFile` so an upstream move that touches nothing we vendor gives no diff (and no
+// sync PR).
 export function finish(label, sha, upstreamFile, dir) {
   const rel = relative(ROOT, upstreamFile);
-  const changed = git('-C', ROOT, 'status', '--porcelain', '--', dir, `:(exclude)${rel}`) !== '';
+  const changed = git('-C', ROOT, 'status', '--porcelain', '--', ...[dir].flat(), `:(exclude)${rel}`) !== '';
   if (changed) writeFileSync(upstreamFile, sha + '\n');
   else git('-C', ROOT, 'checkout', '--', rel);
   console.log(changed ? `${label} synced to ${sha} (changed)` : `${label} unchanged at ${sha} (no vendored changes)`);

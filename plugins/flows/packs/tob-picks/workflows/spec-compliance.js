@@ -361,7 +361,7 @@ ${EVIDENCE_RULE}`,
   return null
 })
 
-const CHECKER = 'tob-picks:spec-compliance-checker'
+const CHECKER = 'flows:spec-compliance-checker'
 
 // The checker agent carries the durable judgment — what counts as evidence, why a name is not enforcement, the
 // on-disk format. When it cannot be resolved, the phase has to keep working rather than take the run down with

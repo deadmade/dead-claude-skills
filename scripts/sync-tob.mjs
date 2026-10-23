@@ -1,7 +1,7 @@
-// Vendor a curated subset of Trail of Bits' skills (trailofbits/skills, one plugin per folder) into plugins/shared/tob-picks/,
+// Vendor a curated subset of Trail of Bits' skills (trailofbits/skills, one plugin per folder) into plugins/flows/packs/tob-picks/,
 // renaming upstream plugin namespaces to ours (REWRITES). Idempotent: same upstream commit, same output.
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { ROOT, fail, finish, git, reportNew, sparseClone } from './sync-lib.mjs';
 
 const UPSTREAM_URL = 'https://github.com/trailofbits/skills.git';
@@ -63,16 +63,19 @@ const REWRITES = [
     '/tob-picks:spec-compliance',
   ],
   ['skills/spec-to-code-compliance/SKILL.md', /`spec-to-code-compliance:/g, '`tob-picks:'],
+  // A pack's agents don't load: flows ships the checker (FLOWS_CHECKER below).
   [
     'workflows/spec-compliance.js',
     /'spec-to-code-compliance:spec-compliance-checker'/g,
-    "'tob-picks:spec-compliance-checker'",
+    "'flows:spec-compliance-checker'",
   ],
   // Upstream's detection command misses C#'s PBT libraries.
   ['skills/property-based-testing/references/libraries.md', /\|invariant_"/g, '|invariant_|FsCheck|CsCheck"'],
 ];
 
-const PLUGIN = join(ROOT, 'plugins', 'shared', 'tob-picks');
+const PLUGIN = join(ROOT, 'plugins', 'flows', 'packs', 'tob-picks');
+// The spec-compliance workflow's checker, loaded as flows' own agent; its reference paths point into the pack.
+const FLOWS_CHECKER = join(ROOT, 'plugins', 'flows', 'agents', 'spec-compliance-checker.md');
 
 const up = sparseClone(UPSTREAM_URL, ['.claude-plugin', ...SKILLS.map((s) => `plugins/${s}`)]);
 for (const s of SKILLS) {
@@ -109,5 +112,11 @@ for (const [rel, pattern, replacement] of REWRITES) {
   if (!pattern.test(text)) fail(`rewrite ${pattern} found nothing in ${rel} (upstream changed?)`);
   writeFileSync(file, text.replace(pattern, replacement));
 }
+
+const checker = readFileSync(join(PLUGIN, 'agents', 'spec-compliance-checker.md'), 'utf8');
+if (!checker.includes('{baseDir}/skills/'))
+  fail('{baseDir}/skills/ not found in the checker agent (upstream changed?)');
+mkdirSync(dirname(FLOWS_CHECKER), { recursive: true });
+writeFileSync(FLOWS_CHECKER, checker.replaceAll('{baseDir}/skills/', '${CLAUDE_PLUGIN_ROOT}/packs/tob-picks/skills/'));
 
 finish('tob-picks', git('-C', up, 'rev-parse', 'HEAD'), join(PLUGIN, 'UPSTREAM'), PLUGIN);

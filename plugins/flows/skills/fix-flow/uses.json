@@ -1,5 +1,5 @@
 {
-  "pstack-picks": ["how", "blast-radius"],
+  "pstack-picks": ["how", "why", "blast-radius"],
   "web-mcp": ["search", "fetch"],
   "superpowers": ["systematic-debugging", "test-driven-development"]
 }

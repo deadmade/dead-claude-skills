@@ -5,30 +5,30 @@
 My personal Claude Code setup as a plugin marketplace, so every machine (Linux, Windows) gets the same skills. It's
 built for me; use it if it fits, but expect it to change without notice.
 
-The default bundle, **[dead-skills](plugins/default/README.md)**, pulls in code-review, claude-code-setup, claude-md-management, security-guidance,
-claude-security, superpowers (vendored), ponytail (vendored: it also draws a band above the prompt with the task's cost, reuse and
-tests), and itself carries Context7, Night City (a
+The default bundle, **[dead-skills](plugins/default/README.md)**, pulls in claude-code-setup, claude-md-management, security-guidance and
+claude-security, and itself carries Context7, Night City (a
 toned-down synthwave theme that everything else here is painted in), desktop notifications when a turn ends or Claude
 waits for you, and my global rules. Everything else is opt-in: language
 servers, language and database skills (rust, csharp, postgres), integrations (GitHub, Azure, Atlassian), skill packs
-like hallmark, paper-lookup, self-review, graphify and the mattpocock/pstack/Trail of Bits picks, and tools such as
+like hallmark and graphify, and tools such as
 [tui-review](plugins/shared/tui-review/README.md), [md-pane](plugins/opt-in/md-pane/README.md) for reading the `.md` files
 Claude names in a pane beside the chat, [web-mcp](plugins/shared/web-mcp/README.md) for web search, page fetching,
 passive lookups and a browser with an archive of everything it pulled.
 
 The opt-in [flows](plugins/flows/README.md) plugin ties the rest together: conductor skills (`/feature-flow`,
-`/fix-flow`, `/test-audit`, `/doc-audit`, `/verify`, `/learn` and more) that run the other plugins' skills in order,
+`/fix-flow`, `/test-audit`, `/doc-audit`, `/self-review`, `/verify`, `/learn` and more) that run the other plugins' skills in order,
 with approval gates and a state file to resume from. Picking flows installs every plugin its conductors use.
+flows also carries the skill packs they read by path from `plugins/flows/packs/` (superpowers, ponytail, paper-lookup
+and the mattpocock, pstack and Trail of Bits picks). The packs are not plugins: nothing in them loads on its own, so
+their skills, hooks and ponytail's band stay out of your sessions outside the conductors, and the installer removes
+old installs of them.
 
     npx --allow-remote=root https://github.com/deadmade/dead-claude-skills/releases/latest/download/installer.tgz
 
 The installer (Node standard library only, written in TypeScript and attached to each release built to JS) shows one page per category where you pick what to install, remove or
 update, then applies only the changes. It pins the marketplace to its own release so plugins match the installer, and
 it always denies Claude reading `.env` files and credential dirs and keeps session transcripts (Claude Code deletes them after 30 days unless `cleanupPeriodDays` is set). Optional toggles add ccstatusline
-and dcg; the danger zone can strip all foreign plugins or reset `~/.claude` to a clean slate (after a backup). Without
-the installer, `/plugin marketplace add deadmade/dead-claude-skills` and `/plugin install dead-skills@dead-claude-skills`
-work too, but track main.
-
+and dcg; the danger zone can strip all foreign plugins or reset `~/.claude` to a clean slate (after a backup).
 Everything ships as one version, cut with `npm run release -- patch` and `git push --follow-tags origin main`; the
 tag builds the installer and the binaries and publishes the GitHub release they're downloaded from. From a checkout,
 `npm ci` once, then `node installer/install.ts` runs the installer (Node 26 or newer) and `npm run typecheck` checks it.

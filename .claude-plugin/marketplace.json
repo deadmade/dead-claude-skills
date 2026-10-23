@@ -13,20 +13,8 @@
   "plugins": [
     {
       "name": "dead-skills",
-      "description": "Default bundle: global instructions, the Night City theme and mod (spinner words, status-line reactions), desktop notifications, Context7, and the core plugins of this marketplace as dependencies.",
+      "description": "Default bundle: global instructions, the Night City theme and mod (spinner words, status-line reactions), desktop notifications, Context7, and core plugins from claude-plugins-official as dependencies.",
       "source": "./plugins/default",
-      "category": "productivity"
-    },
-    {
-      "name": "superpowers",
-      "description": "Brainstorming, subagent driven development with built in code review, systematic debugging, and red/green TDD.",
-      "source": "./plugins/shared/superpowers",
-      "category": "development"
-    },
-    {
-      "name": "ponytail",
-      "description": "Forces the laziest solution that works. YAGNI, stdlib first, one line over fifty.",
-      "source": "./plugins/shared/ponytail",
       "category": "productivity"
     },
     {
@@ -57,24 +45,6 @@
       "category": "productivity"
     },
     {
-      "name": "mattpocock-picks",
-      "description": "Curated Matt Pocock skills that complement superpowers: the productivity skills plus grilling with domain docs, spec → tickets and architecture deepening. Opt-in.",
-      "source": "./plugins/shared/mattpocock-picks",
-      "category": "development"
-    },
-    {
-      "name": "pstack-picks",
-      "description": "Curated skills from poteto's pstack, rewritten for Claude Code: how/why, adversarial review, unslop, architect/arena, principles. Opt-in.",
-      "source": "./plugins/shared/pstack-picks",
-      "category": "development"
-    },
-    {
-      "name": "tob-picks",
-      "description": "Curated Trail of Bits skills: property-based testing, spec-to-code compliance, sharp-edges API and config review, mutation-testing analysis. Opt-in.",
-      "source": "./plugins/shared/tob-picks",
-      "category": "development"
-    },
-    {
       "name": "rust-skills",
       "description": "Rust best practices from Apollo GraphQL's handbook (rust-best-practices): ownership, errors, clippy, testing, dispatch. Vendored, synced weekly. Opt-in.",
       "source": "./plugins/opt-in/implementation/rust-skills",
@@ -100,26 +70,14 @@
     },
     {
       "name": "flows",
-      "description": "Conductor skills that run the rest of the marketplace in order, with approval gates and resumable state: /feature-flow, /research-flow, /implement, /fix-flow and /upgrade build; /test-audit, /doc-audit and /harden check a branch or the whole repo; /verify proves a branch is ready for a PR; /understand teaches a codebase; /learn saves what a flow taught. Installs every plugin its conductors use. Opt-in.",
+      "description": "Conductor skills that run the rest of the marketplace in order, with approval gates and resumable state: /feature-flow, /research-flow, /implement, /fix-flow and /upgrade build; /test-audit, /doc-audit and /harden check a branch or the whole repo; /self-review reviews your branch before a PR and /verify proves it is ready for one; /understand teaches a codebase; /learn saves what a flow taught. Carries its skill packs, which only its conductors read, and installs the other plugins they use. Opt-in.",
       "source": "./plugins/flows",
-      "category": "development"
-    },
-    {
-      "name": "self-review",
-      "description": "/self-review: review your branch before opening a PR. Bug pass, spec and standards pass, security-review, a CLAUDE.md audit, and specialist agents (vendored from code-review, pr-review-toolkit and mattpocock) in one command, then fixes what you pick. Opt-in.",
-      "source": "./plugins/shared/self-review",
       "category": "development"
     },
     {
       "name": "hallmark",
       "description": "Hallmark: anti-AI-slop design skill for web frontends, scoped to browser UI work. Vendored from nutlope/hallmark. Opt-in.",
       "source": "./plugins/opt-in/hallmark",
-      "category": "development"
-    },
-    {
-      "name": "paper-lookup",
-      "description": "Paper lookup: search arXiv, Semantic Scholar, OpenAlex, Crossref, Unpaywall and other scholarly APIs (trimmed for computer science) for papers, citations and open-access full text. Vendored from K-Dense-AI/scientific-agent-skills. Opt-in.",
-      "source": "./plugins/shared/paper-lookup",
       "category": "development"
     },
     {

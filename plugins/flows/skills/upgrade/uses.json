@@ -1,5 +1,6 @@
 {
   "dead-skills": ["context7"],
   "web-mcp": ["fetch"],
-  "pstack-picks": ["blast-radius"]
+  "pstack-picks": ["blast-radius"],
+  "superpowers": ["writing-plans", "test-driven-development"]
 }

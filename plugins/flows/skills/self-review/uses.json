@@ -1,0 +1,5 @@
+{
+  "claude-code": ["security-review"],
+  "claude-md-management@claude-plugins-official": ["claude-md-improver"],
+  "pstack-picks": ["blast-radius"]
+}

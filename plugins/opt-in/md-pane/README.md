@@ -5,9 +5,7 @@ specs, plans and flow files Claude writes during a feature workflow without leav
 
 ## Install
 
-    /plugin install md-pane@dead-claude-skills
-
-The installer offers it on its Tools page. It needs nothing else.
+Pick it in the installer (see the [main README](../../../README.md)), on its Tools page. It needs nothing else.
 
 ## Use
 

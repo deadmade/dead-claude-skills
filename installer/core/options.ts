@@ -1,6 +1,6 @@
 // The installer's pages and toggles, and what each option runs or why it can't run here.
 import { BIN_PLUGINS, binAsset } from './binaries.ts';
-import { INCLUDED, OFFICIAL, nameOf } from './plugins.ts';
+import { OFFICIAL, nameOf } from './plugins.ts';
 import { MARKETPLACE } from './release.ts';
 import { CLEAN_TARGETS } from './settings.ts';
 
@@ -108,7 +108,7 @@ export const CATEGORIES: Page[] = [
 export function categorize(keys: string[]) {
   const known = CATEGORIES.flatMap((c) => c.keys);
   const pages = CATEGORIES.map((c) => ({ ...c, keys: c.keys.flatMap((n) => keys.filter((k) => nameOf(k) === n)) }));
-  const rest = keys.filter((k) => !known.includes(nameOf(k)) && !INCLUDED.includes(nameOf(k)));
+  const rest = keys.filter((k) => !known.includes(nameOf(k)));
   if (rest.length) pages.push({ id: 'other', title: 'Other', blurb: 'Not sorted into a category yet.', keys: rest });
   return pages.filter((c) => c.keys.length);
 }

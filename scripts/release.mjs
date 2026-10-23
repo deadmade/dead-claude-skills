@@ -1,11 +1,12 @@
-// Cuts a release: one version for package.json (and its lock), the marketplace, every local plugin and both crates,
-// committed and tagged vX.Y.Z on main. Pushing the tag runs .github/workflows/release.yml, which
+// Cuts a release: one version for package.json (and its lock), the marketplace, every local plugin, flows' packs and
+// both crates, committed and tagged vX.Y.Z on main. Pushing the tag runs .github/workflows/release.yml, which
 // builds the installer, tui-review and web-mcp and publishes the GitHub release. Claude Code only offers plugin
 // updates when this version changes.
 // Usage: npm run release -- patch|minor|major|X.Y.Z
 import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { PACKS, packs } from './flows-uses.mjs';
 import { pluginDirs } from './plugin-dirs.mjs';
 
 process.chdir(join(import.meta.dirname, '..'));
@@ -43,7 +44,7 @@ const bumps = [
   ['package-lock.json', json],
   ['package-lock.json', /^( {6}"version": )"[^"]*"/m],
   ['.claude-plugin/marketplace.json', json],
-  ...pluginDirs().map((p) => [`${p}/.claude-plugin/plugin.json`, json]),
+  ...[...pluginDirs(), ...packs('.').map((p) => `${PACKS}/${p}`)].map((p) => [`${p}/.claude-plugin/plugin.json`, json]),
   ...[
     ['crates/tui-review', 'tui-review'],
     ['crates/web-mcp', 'web-mcp'],

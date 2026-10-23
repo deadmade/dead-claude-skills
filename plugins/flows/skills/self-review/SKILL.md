@@ -13,14 +13,14 @@ report, fix what they pick. Nothing is posted to GitHub or anywhere else.
 The first four passes are vendored in this plugin (synced weekly, don't edit them); the last two come from Claude Code
 and the claude-md-management plugin:
 
-| Pass        | Instructions                                                                                                  | Catches                                                                                |
-| ----------- | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Bugs        | [references/upstream/code-review.md](references/upstream/code-review.md)                                      | real bugs, CLAUDE.md breaches, regressions against history, each scored for confidence |
-| Spec        | [references/upstream/spec-standards-review.md](references/upstream/spec-standards-review.md)                  | missing or wrong requirements, scope creep                                             |
-| Standards   | same file                                                                                                     | breaches of the repo's documented standards, code smells                               |
-| Specialists | agents `self-review:silent-failure-hunter`, `:pr-test-analyzer`, `:type-design-analyzer`, `:comment-analyzer` | swallowed errors, test gaps, weak types, stale comments                                |
-| Security    | the built-in `security-review` skill                                                                          | exploitable vulnerabilities in the diff                                                |
-| CLAUDE.md   | `claude-md-management:claude-md-improver`, when installed                                                     | CLAUDE.md files the diff made stale, and gaps a future session would trip on           |
+| Pass        | Instructions                                                                                            | Catches                                                                                |
+| ----------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Bugs        | [references/upstream/code-review.md](references/upstream/code-review.md)                                | real bugs, CLAUDE.md breaches, regressions against history, each scored for confidence |
+| Spec        | [references/upstream/spec-standards-review.md](references/upstream/spec-standards-review.md)            | missing or wrong requirements, scope creep                                             |
+| Standards   | same file                                                                                               | breaches of the repo's documented standards, code smells                               |
+| Specialists | agents `flows:silent-failure-hunter`, `:pr-test-analyzer`, `:type-design-analyzer`, `:comment-analyzer` | swallowed errors, test gaps, weak types, stale comments                                |
+| Security    | the built-in `security-review` skill                                                                    | exploitable vulnerabilities in the diff                                                |
+| CLAUDE.md   | `claude-md-management:claude-md-improver`, when installed                                               | CLAUDE.md files the diff made stale, and gaps a future session would trip on           |
 
 ## Rules for the whole run
 
@@ -71,14 +71,14 @@ One message, every agent in parallel:
   nothing. Give it the diff too, and have it lead with the statements in any CLAUDE.md that the diff made untrue.
   Its proposed diffs are findings like any other and get applied in Phase 5.
 - **Specialists**, by what the diff touches. Give each the diff command, the file list and the intent:
-  - `self-review:silent-failure-hunter`: try/catch, error returns, fallbacks, retries, default values on failure
-  - `self-review:pr-test-analyzer`: whenever non-test source changed
-  - `self-review:type-design-analyzer`: new or changed types, interfaces, schemas
-  - `self-review:comment-analyzer`: added or changed comments or docs
-- **Optional**, only when installed and the diff calls for it:
-  - pstack `blast-radius`, for changes to shared code, public interfaces, data, wire formats or config. pstack skills
-    can't be loaded with the Skill tool: read
-    `${CLAUDE_SKILL_DIR}/../../../../pstack-picks/*/skills/blast-radius/SKILL.md` and follow it.
+  - `flows:silent-failure-hunter`: try/catch, error returns, fallbacks, retries, default values on failure
+  - `flows:pr-test-analyzer`: whenever non-test source changed
+  - `flows:type-design-analyzer`: new or changed types, interfaces, schemas
+  - `flows:comment-analyzer`: added or changed comments or docs
+- **Optional**, only when the diff calls for it:
+  - pstack `blast-radius`, for changes to shared code, public interfaces, data, wire formats or config. pstack is a
+    pack of this plugin and can't be loaded with the Skill tool: read
+    `${CLAUDE_PLUGIN_ROOT}/packs/pstack-picks/skills/blast-radius/SKILL.md` and follow it.
 
 Tell the user which passes are running and which were skipped, and why, in one line.
 
@@ -96,8 +96,11 @@ Follow [references/synthesis.md](references/synthesis.md): merge, check, bucket,
 
 Ask which findings to fix: "all fix-before-PR", numbers, or none. Then:
 
-1. Fix them. A fix that would change the design or the spec goes back to the user first.
+1. Fix them. A fix that would change the design or the spec goes back to the user first. A finding that needs a
+   cause before a fix (a failing test, a symptom whose root cause isn't known, a fix that would only hide it): offer
+   `/fix-flow` on it, with your recommendation. On the user's yes, read `${CLAUDE_SKILL_DIR}/../fix-flow/SKILL.md`
+   and follow it.
 2. Run the repo's tests, lint and typecheck, and read the output. Report what passed and what didn't.
-3. Offer the `self-review:code-simplifier` agent on the changed files, as a last polish. Only on the user's yes.
+3. Offer the `flows:code-simplifier` agent on the changed files, as a last polish. Only on the user's yes.
 4. Re-run only the passes whose findings were fixed, if the user wants a check.
 5. Say when the branch is ready for a PR. Commit only when asked.

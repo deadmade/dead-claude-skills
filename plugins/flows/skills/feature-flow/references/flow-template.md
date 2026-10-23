@@ -24,7 +24,7 @@ phase: ground
 - Spec:
 - Plan:
 - ADRs:
-- CONTEXT.md:
+- Glossary:
 
 ## Gates
 
@@ -51,10 +51,26 @@ phase: ground
 
 <!-- Round N: findings, the user's decision on each, what changed. -->
 
+## Tasks
+
+<!-- One line per task: `Task <N>: base <sha>`, untracked at start: <files or none>, then `files clean` or
+`deviation` (see Deviations). -->
+
+## Rulings
+
+<!-- Calls the build made on its own (not deviation-class), one line each, as they are made. -->
+
 ## Deviations
+
+<!-- Decisions that go to the user: what, why the plan doesn't hold, options with a recommendation, the
+user's decision. -->
 
 ## Walkthrough
 
 | spec goal | plan task | file:line | test |
 | --------- | --------- | --------- | ---- |
+
+## Run verdict
+
+<!-- The user's, at Finish: worked as a whole: yes | no; clean: yes | no. -->
 ```
