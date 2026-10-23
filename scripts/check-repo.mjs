@@ -4,7 +4,17 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { checkUses, expectedDeps, FLOWS, PACKS, packs, readUses, renderTree, withTree } from './flows-uses.mjs';
+import {
+  checkOverrides,
+  checkUses,
+  expectedDeps,
+  FLOWS,
+  PACKS,
+  packs,
+  readUses,
+  renderTree,
+  withTree,
+} from './flows-uses.mjs';
 import { pluginDirs as findPluginDirs } from './plugin-dirs.mjs';
 
 process.chdir(join(import.meta.dirname, '..'));
@@ -49,7 +59,7 @@ for (const dir of pluginDirs) {
 }
 
 // --- flows: each conductor's uses.json, and what is generated from them (scripts/flows-uses.mjs) ---
-problems.push(...checkUses('.', { plugins: market }));
+problems.push(...checkUses('.', { plugins: market }), ...checkOverrides('.'));
 const uses = readUses('.');
 const flowsManifest = `${FLOWS}/.claude-plugin/plugin.json`;
 const regen = 'run node scripts/flows-uses.mjs';

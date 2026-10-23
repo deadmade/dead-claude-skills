@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { checkUses, expectedDeps, packs, readUses, renderTree, withTree } from './flows-uses.mjs';
+import { checkOverrides, checkUses, expectedDeps, packs, readUses, renderTree, withTree } from './flows-uses.mjs';
 
 const ROOT = join(import.meta.dirname, '..');
 
@@ -93,4 +93,31 @@ test('the real conductors pass, and flows depends on exactly what they use', () 
   assert.deepEqual(checkUses(ROOT, marketplace), []);
   const deps = JSON.parse(readFileSync(join(ROOT, 'plugins/flows/.claude-plugin/plugin.json'), 'utf8')).dependencies;
   assert.deepEqual(deps, expectedDeps(readUses(ROOT), packs(ROOT)));
+  assert.deepEqual(checkOverrides(ROOT), []);
+});
+
+// A repo whose conductor quotes `quote` from a pack file that reads `pack`.
+function overrides(quote, pack = 'Always **write the\nplan** first.\n') {
+  const fx = mkdtempSync(join(tmpdir(), 'ov-'));
+  const put = (f, s) => (mkdirSync(dirname(join(fx, f)), { recursive: true }), writeFileSync(join(fx, f), s));
+  put('plugins/flows/packs/p/skills/s/SKILL.md', pack);
+  put('plugins/flows/skills/fix/SKILL.md', `intro\n<!-- overrides p/skills/s/SKILL.md: "${quote}" -->\n`);
+  return checkOverrides(fx);
+}
+
+test('checkOverrides: a found sentence passes, also across a wrap and bold in the pack', () => {
+  assert.deepEqual(overrides('Always write the plan first.'), []);
+});
+
+test('checkOverrides: a changed sentence fails, naming file and line', () => {
+  assert.deepEqual(overrides('Never write the plan.'), [
+    'plugins/flows/skills/fix/SKILL.md:2: p/skills/s/SKILL.md no longer contains "Never write the plan."',
+  ]);
+});
+
+test('checkOverrides: a missing pack file fails', () => {
+  const fx = mkdtempSync(join(tmpdir(), 'ov-'));
+  mkdirSync(join(fx, 'plugins/flows/skills/fix'), { recursive: true });
+  writeFileSync(join(fx, 'plugins/flows/skills/fix/SKILL.md'), '<!-- overrides p/gone.md: "x" -->');
+  assert.equal(checkOverrides(fx).length, 1);
 });

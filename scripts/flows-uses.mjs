@@ -86,6 +86,35 @@ export function checkUses(root, marketplace) {
   return problems;
 }
 
+// Conductors quote the pack sentence they override: <!-- overrides <pack>/<path in pack>: "<sentence>" -->.
+// Returns one problem per marker whose pack file is missing or no longer holds the sentence.
+// Bold marks and line wraps in the pack don't matter; the vendored packs/ and agents/ are not scanned.
+const MARKER = /<!--\s*overrides\s+(\S+?):\s*"(.*)"\s*-->/;
+const flat = (t) => t.replace(/\*\*/g, '').replace(/\s+/g, ' ');
+export function checkOverrides(root) {
+  const problems = [];
+  const walk = (dir) =>
+    readdirSync(join(root, dir), { withFileTypes: true }).flatMap((e) => {
+      const rel = `${dir}/${e.name}`;
+      if (e.isDirectory()) return rel === PACKS || rel === `${FLOWS}/agents` ? [] : walk(rel);
+      return e.name.endsWith('.md') ? [rel] : [];
+    });
+  for (const file of walk(FLOWS)) {
+    readFileSync(join(root, file), 'utf8')
+      .split(/\r?\n/)
+      .forEach((line, i) => {
+        const m = MARKER.exec(line);
+        if (!m) return;
+        const at = `${file}:${i + 1}`;
+        const target = join(root, PACKS, m[1]);
+        if (!existsSync(target)) return problems.push(`${at}: overrides ${m[1]}, which does not exist`);
+        if (!flat(readFileSync(target, 'utf8')).includes(flat(m[2])))
+          problems.push(`${at}: ${m[1]} no longer contains "${m[2]}"`);
+      });
+  }
+  return problems;
+}
+
 // packNames: packs(root); flows carries those, so they are never a dependency.
 export const expectedDeps = (all, packNames) =>
   [...new Set(Object.values(all).flatMap((uses) => Object.keys(uses ?? {})))]
