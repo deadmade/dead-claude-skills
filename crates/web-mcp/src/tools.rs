@@ -333,7 +333,7 @@ impl Server {
             Err(e) => return error(e),
         };
         if papers {
-            let out = papers::search(&self.ctx, &args.query).await;
+            let out = papers::search(&self.ctx, &args.query, &filter).await;
             let text = out.to_string();
             return if out.papers.is_empty() && !out.failed.is_empty() {
                 error(text)

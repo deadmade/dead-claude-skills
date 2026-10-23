@@ -3,7 +3,7 @@ mod common;
 
 use std::time::{Duration, Instant};
 
-use common::{Fixture, Mcp, PUBLIC, Resp, is_error, tempdir, text};
+use common::{Fixture, Mcp, PUBLIC, Resp, is_error, pages, tempdir, text};
 use serde_json::json;
 use url::Url;
 
@@ -205,4 +205,175 @@ fn a_stalled_source_is_cut_at_the_deadline_and_the_others_answer() {
     let t = text(&r);
     assert!(t.contains("## [1] Attention Is All You Need (2017)"), "{t}");
     assert!(t.contains("Failed: arXiv: no answer within 0.5 s"), "{t}");
+}
+
+/// A server whose browser engines read `pages` (logging to `pages/calls.jsonl`).
+fn start_browser(fx: &Fixture, pages: &std::path::Path, envs: &[(&str, String)]) -> Mcp {
+    let mut all = vec![
+        ("WEB_MCP_ARXIV_URL", fx.url("/arxiv")),
+        ("WEB_MCP_OPENALEX_URL", fx.url("/openalex")),
+        ("FAKE_AB_PAGES", pages.display().to_string()),
+        (
+            "FAKE_AB_LOG",
+            pages.join("calls.jsonl").display().to_string(),
+        ),
+    ];
+    all.extend_from_slice(envs);
+    Mcp::start_with(tempdir(), &all)
+}
+
+fn route_attention(fx: &Fixture) {
+    fx.route(
+        &with_query("/openalex", &[("search", "attention"), ("per_page", "5")]),
+        ok("application/json", "openalex-search.json"),
+    );
+    fx.route(
+        &with_query(
+            "/arxiv",
+            &[("search_query", "all:\"attention\""), ("max_results", "5")],
+        ),
+        ok("application/atom+xml", "arxiv-ok.xml"),
+    );
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn papers_merge_scholar_with_openalex_by_title() {
+    let fx = Fixture::start(PUBLIC);
+    route_attention(&fx);
+    let pages = pages(&fx);
+    let mut mcp = start_browser(&fx, &pages, &[]);
+    let r = papers(&mut mcp, "attention");
+    assert!(!is_error(&r), "{r}");
+    let t = text(&r);
+    assert!(
+        t.starts_with("Source: OpenAlex + arXiv + Google Scholar + Semantic Scholar (searched "),
+        "{t}"
+    );
+    // Scholar's "Attention is all you need" is the OpenAlex and arXiv record, not a second one.
+    let lower = t.to_lowercase();
+    assert_eq!(
+        lower.matches("attention is all you need (").count(),
+        1,
+        "{t}"
+    );
+    assert!(!lower.contains("## [1] attention is all you need\n"), "{t}");
+    assert!(t.contains("Scholar only study of zebra stripes"), "{t}");
+    assert!(t.contains("DOI 10.5555/zebra.1"), "{t}");
+    assert!(t.contains("Semantic only study of zebra stripes"), "{t}");
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn browser_trouble_still_answers_from_apis() {
+    let fx = Fixture::start(PUBLIC);
+    route_attention(&fx);
+    let pages = pages(&fx);
+    let mut mcp = start_browser(
+        &fx,
+        &pages,
+        &[("WEB_MCP_CHROME", "/nonexistent/chrome".into())],
+    );
+    let r = papers(&mut mcp, "attention");
+    assert!(!is_error(&r), "{r}");
+    let t = text(&r);
+    assert!(t.contains("## [1] Attention Is All You Need (2017)"), "{t}");
+    assert!(
+        t.contains("skipped: scholar: WEB_MCP_CHROME=/nonexistent/chrome is not a file"),
+        "{t}"
+    );
+    assert!(t.contains("semanticscholar: WEB_MCP_CHROME"), "{t}");
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn scholar_blocked_still_answers_from_apis() {
+    let fx = Fixture::start(PUBLIC);
+    route_attention(&fx);
+    let pages = pages(&fx);
+    std::fs::write(pages.join("scholar.blocked"), "").unwrap();
+    let mut mcp = start_browser(&fx, &pages, &[]);
+    let r = papers(&mut mcp, "attention");
+    assert!(!is_error(&r), "{r}");
+    let t = text(&r);
+    assert!(t.contains("## [1] Attention Is All You Need (2017)"), "{t}");
+    assert!(t.contains("skipped: scholar: captcha"), "{t}");
+    assert!(t.contains("Semantic only study"), "{t}");
+    assert!(!t.contains("Scholar only study"), "{t}");
+    assert!(mcp.search.join("scholar/rest").exists());
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn since_reaches_openalex_and_arxiv() {
+    let fx = Fixture::start(PUBLIC);
+    let day = jiff::Timestamp::now()
+        .to_zoned(jiff::tz::TimeZone::UTC)
+        .date()
+        .saturating_sub(jiff::ToSpan::year(1));
+    let compact = day.strftime("%Y%m%d").to_string();
+    fx.route(
+        &with_query(
+            "/openalex",
+            &[
+                ("search", "attention"),
+                ("per_page", "5"),
+                ("filter", &format!("from_publication_date:{day}")),
+            ],
+        ),
+        ok("application/json", "openalex-search.json"),
+    );
+    fx.route(
+        &with_query(
+            "/arxiv",
+            &[
+                (
+                    "search_query",
+                    &format!("all:\"attention\" AND submittedDate:[{compact}0000 TO 999912312359]"),
+                ),
+                ("max_results", "5"),
+            ],
+        ),
+        ok("application/atom+xml", "arxiv-ok.xml"),
+    );
+    let pages = pages(&fx);
+    let mut mcp = start_browser(&fx, &pages, &[]);
+    let r = mcp.call(
+        "search",
+        json!({"query": "attention", "papers": true, "since": "year"}),
+    );
+    assert!(!is_error(&r), "{r}");
+    let t = text(&r);
+    assert!(t.contains("## [1] Attention Is All You Need (2017)"), "{t}");
+    assert!(!t.contains("Failed:"), "{t}");
+    // Scholar takes a year; Semantic Scholar has no date filter.
+    assert!(
+        t.contains("skipped: semanticscholar: no year filter"),
+        "{t}"
+    );
+    assert!(t.contains("Scholar only study"), "{t}");
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn doi_query_skips_browser_engines() {
+    let fx = Fixture::start(PUBLIC);
+    fx.route(
+        "/crossref/10.7717%2Fpeerj.4375",
+        ok("application/json", "crossref-doi.json"),
+    );
+    fx.route(
+        "/openalex/doi:10.7717/peerj.4375",
+        ok("application/json", "openalex-doi.json"),
+    );
+    let pages = pages(&fx);
+    let mut mcp = start_browser(
+        &fx,
+        &pages,
+        &[("WEB_MCP_CROSSREF_URL", fx.url("/crossref"))],
+    );
+    let r = papers(&mut mcp, "doi:10.7717/peerj.4375");
+    assert!(!is_error(&r), "{r}");
+    assert!(!text(&r).contains("skipped"), "{r}");
+    assert!(!pages.join("calls.jsonl").exists());
 }
