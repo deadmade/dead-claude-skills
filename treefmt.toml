@@ -3,19 +3,15 @@ on-unmatched = "debug"
 # Vendored upstream files and the generated hook config: reformatting them would churn every sync.
 excludes = [
   "plugins/opt-in/hallmark/**",
-  "plugins/shared/paper-lookup/skills/**",
-  "plugins/shared/mattpocock-picks/**",
-  "plugins/shared/pstack-picks/**",
-  "plugins/shared/tob-picks/**",
+  "plugins/flows/packs/**",
+  "plugins/flows/agents/**",
   "plugins/shared/graphify/**",
-  "plugins/shared/ponytail/**",
   "plugins/opt-in/implementation/*-skills/library/**",
   "plugins/opt-in/implementation/*-skills/skills/**",
   "plugins/opt-in/implementation/*-skills/LICENSE",
   "plugins/opt-in/implementation/*-skills/UPSTREAM",
   "plugins/opt-in/implementation/postgres/skills/**",
-  "plugins/shared/self-review/agents/**",
-  "plugins/shared/self-review/skills/self-review/references/upstream/**",
+  "plugins/flows/skills/self-review/references/upstream/**",
   ".pre-commit-config.yaml",
   # npm writes it.
   "package-lock.json",

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { addPaths, frontmatterDescription, summary } from './sync-lib.mjs';
+import { addPaths, frontmatterDescription, stableTags, summary } from './sync-lib.mjs';
 
 test('frontmatterDescription', () => {
   assert.equal(
@@ -37,4 +37,25 @@ test('addPaths', () => {
   );
   assert.equal(addPaths('no frontmatter\n', globs), null);
   assert.equal(addPaths('---\npaths:\n  - "*.x"\n---\n', globs), null);
+});
+
+const sha = (c) => c.repeat(40);
+const lsRemote = (rows) => rows.map(([s, ref]) => `${s}\t${ref}`).join('\n');
+
+test('stableTags lists stable tags oldest first, each with its peeled commit', () => {
+  const out = lsRemote([
+    [sha('2'), 'refs/tags/v5.10.0'],
+    [sha('a'), 'refs/tags/v5.9.0'],
+    [sha('b'), 'refs/tags/v5.9.0^{}'],
+    [sha('c'), 'refs/tags/v6.0.0-beta.1'],
+  ]);
+  assert.deepEqual(stableTags(out), [
+    { tag: 'v5.9.0', sha: sha('b') },
+    { tag: 'v5.10.0', sha: sha('2') },
+  ]);
+});
+
+test('stableTags is empty without a stable tag', () => {
+  assert.deepEqual(stableTags(lsRemote([[sha('c'), 'refs/tags/v8.0.0-rc.1']])), []);
+  assert.deepEqual(stableTags(''), []);
 });

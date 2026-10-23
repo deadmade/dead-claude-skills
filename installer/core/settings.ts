@@ -21,18 +21,17 @@ export interface Settings {
 interface HookEntry {
   hooks?: { command?: string }[];
 }
-// statusLine and sandbox: missing reads as off.
+// statusLine: missing reads as off.
 export interface Toggles {
   statusLine?: boolean;
-  sandbox?: boolean;
   version: string;
   webBuiltinsOff?: boolean;
 }
 
 const PERMISSION = 'Read(~/.claude/plugins/**)';
 const STATUS_LINE = { type: 'command', command: 'ccstatusline', padding: 0 };
-// Always denied, sandbox or not. The sandbox also blocks Bash reads of these, except the ** globs it can't apply on
-// Linux; the ./ dotenv names cover the project root there.
+// Always denied. Claude Code's sandbox, when on, also blocks Bash reads of these, except the ** globs it can't apply
+// on Linux; the ./ dotenv names cover the project root there.
 export const SECRET_DENIES = [
   'Read(**/.env)',
   'Read(**/.env.*)',
@@ -52,13 +51,11 @@ export const SECRET_DENIES = [
   'Read(~/.config/gh/**)',
   'Read(~/.gnupg/**)',
 ];
-// The sandbox keys we own; excludedCommands, network etc. stay the user's.
-const SANDBOX = { enabled: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: false };
+// The sandbox keys our old sandbox toggle wrote; excludedCommands, network etc. stay the user's.
+const OLD_SANDBOX = ['enabled', 'autoAllowBashIfSandboxed', 'allowUnsandboxedCommands'];
 
 export const isOurStatusLine = (s: Settings['statusLine']) =>
   typeof s?.command === 'string' && s.command.includes('ccstatusline');
-
-export const isSandboxOn = (s: Settings) => s?.sandbox?.enabled === true;
 
 // The program a hook command runs. dcg's installers write a bare path (Linux) or `& '<path>'` (Windows, a PowerShell
 // call with '' for a quote); older ones wrote "<path>".
@@ -110,7 +107,7 @@ export const webBuiltinsDecision = ({
   installed?: boolean;
 }) => (toggle ? healthy || undefined : was && installed ? false : undefined);
 
-export function mergeSettings(settings: Settings, { statusLine, sandbox, version, webBuiltinsOff }: Toggles) {
+export function mergeSettings(settings: Settings, { statusLine, version, webBuiltinsOff }: Toggles) {
   const out = structuredClone(settings);
   // Night City ships with the bundle. Claude Code colours code in a fixed Monokai a theme can't change; off, diffs take
   // Night City's own diff colours.
@@ -142,9 +139,8 @@ export function mergeSettings(settings: Settings, { statusLine, sandbox, version
   out.cleanupPeriodDays ??= KEEP_SESSIONS_DAYS;
   if (statusLine && !isOurStatusLine(out.statusLine)) out.statusLine = STATUS_LINE;
   if (!statusLine && isOurStatusLine(out.statusLine)) delete out.statusLine;
-  if (sandbox) out.sandbox = { ...out.sandbox, ...SANDBOX };
-  else if (out.sandbox) {
-    for (const k of Object.keys(SANDBOX)) delete out.sandbox[k];
+  if (out.sandbox) {
+    for (const k of OLD_SANDBOX) delete out.sandbox[k];
     if (!Object.keys(out.sandbox).length) delete out.sandbox;
   }
   return out;

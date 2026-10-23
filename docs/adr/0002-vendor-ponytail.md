@@ -21,5 +21,6 @@ It costs:
 - **The sync fails on parts it doesn't know.** A new `plugin.json` component or default component folder upstream stops
   the sync until someone decides how it fits.
 
-Re-check this decision if superpowers needs the same treatment, or if upstream splits its other hosts' adapters out,
+superpowers got the same treatment on 2026-10-22, for the same reason (agents can read what it runs); one
+`scripts/sync-release.mjs` now vendors both. Re-check this decision if upstream splits its other hosts' adapters out,
 which would make a plain url entry of the Claude Code plugin readable enough.

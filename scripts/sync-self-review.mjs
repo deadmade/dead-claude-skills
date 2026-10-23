@@ -1,10 +1,10 @@
-// Vendor the review passes /self-review runs into plugins/shared/self-review/, so none of the same-named upstream plugins
+// Vendor the review passes flows' /self-review runs into plugins/flows/, so none of the same-named upstream plugins
 // (code-review, pr-review-toolkit, mattpocock's code-review) has to be installed:
-// - claude-plugins-official code-review's command → references/upstream/code-review.md (the bug pass)
-// - mattpocock/skills engineering/code-review → references/upstream/spec-standards-review.md (spec + standards)
+// - claude-plugins-official code-review's command → skills/self-review/references/upstream/code-review.md (the bug pass)
+// - mattpocock/skills engineering/code-review → skills/self-review/references/upstream/spec-standards-review.md
 // - pr-review-toolkit's specialist agents → agents/, with the description rewritten so they don't fire on their own
 // Idempotent: re-running against the same upstream commits produces no diff.
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT, fail, finish, git, sparseClone } from './sync-lib.mjs';
 
@@ -19,9 +19,10 @@ const AGENTS = [
   'code-simplifier',
 ];
 
-const PLUGIN = join(ROOT, 'plugins', 'shared', 'self-review');
-const AGENTS_DEST = join(PLUGIN, 'agents');
-const REFS_DEST = join(PLUGIN, 'skills', 'self-review', 'references', 'upstream');
+const FLOWS = join(ROOT, 'plugins', 'flows');
+const AGENTS_DEST = join(FLOWS, 'agents');
+const SKILL = join(FLOWS, 'skills', 'self-review');
+const REFS_DEST = join(SKILL, 'references', 'upstream');
 
 const official = sparseClone(OFFICIAL_URL, ['plugins/code-review/commands', 'plugins/pr-review-toolkit']);
 const matt = sparseClone(MATT_URL, ['skills/engineering/code-review']);
@@ -67,9 +68,10 @@ function stamp(text, url) {
 const OFFICIAL_WEB = 'https://github.com/anthropics/claude-plugins-official/blob/main/plugins';
 const MATT_WEB = 'https://github.com/mattpocock/skills/blob/main/skills';
 
-rmSync(AGENTS_DEST, { recursive: true, force: true });
+// flows' agents/ holds other syncs' agents too: replace only the ones this script stamped.
+const ours = (f) => readFileSync(join(AGENTS_DEST, f), 'utf8').includes('by scripts/sync-self-review.mjs.');
+for (const f of readdirSync(AGENTS_DEST).filter(ours)) rmSync(join(AGENTS_DEST, f));
 rmSync(REFS_DEST, { recursive: true, force: true });
-mkdirSync(AGENTS_DEST, { recursive: true });
 mkdirSync(REFS_DEST, { recursive: true });
 for (const a of AGENTS) {
   const text = stamp(
@@ -81,9 +83,9 @@ for (const a of AGENTS) {
 const vendor = (from, to, url) => writeFileSync(join(REFS_DEST, to), stamp(readFileSync(from, 'utf8'), url));
 vendor(bugPass, 'code-review.md', `${OFFICIAL_WEB}/code-review/commands/code-review.md`);
 vendor(specPass, 'spec-standards-review.md', `${MATT_WEB}/engineering/code-review/SKILL.md`);
-cpSync(join(toolkit, 'LICENSE'), join(PLUGIN, 'LICENSE'));
-cpSync(join(matt, 'LICENSE'), join(PLUGIN, 'LICENSE-MIT'));
+cpSync(join(toolkit, 'LICENSE'), join(SKILL, 'LICENSE'));
+cpSync(join(matt, 'LICENSE'), join(SKILL, 'LICENSE-MIT'));
 
 const sha = (dir) => git('-C', dir, 'rev-parse', 'HEAD');
 const shas = `anthropics/claude-plugins-official ${sha(official)}\nmattpocock/skills ${sha(matt)}`;
-finish('self-review', shas, join(PLUGIN, 'UPSTREAM'), PLUGIN);
+finish('self-review', shas, join(SKILL, 'UPSTREAM'), [SKILL, AGENTS_DEST]);

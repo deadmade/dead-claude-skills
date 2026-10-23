@@ -1,0 +1,8 @@
+{"timestamp":"2026-10-20T10:00:05Z","type":"assistant","message":{"content":[{"type":"tool_use","id":"6","name":"Read","input":{"file_path":"/home/deadmade/dead-claude-skills/docs/features/demo/flow.md"}}]}}
+{"timestamp":"2026-10-20T10:00:06Z","type":"assistant","message":{"content":[{"type":"tool_use","id":"7","name":"Read","input":{"file_path":"/home/deadmade/dead-claude-skills/docs/features/demo/plan.md"}}]}}
+{"timestamp":"2026-10-20T10:00:07Z","type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"7","content":"1\tFiles: `a.ts`"}]}}
+{"timestamp":"2026-10-20T10:00:08Z","type":"assistant","message":{"content":[{"type":"tool_use","id":"8","name":"Edit","input":{"file_path":"/home/deadmade/dead-claude-skills/a.ts","old_string":"a","new_string":"b"}}]}}
+{"timestamp":"2026-10-20T10:00:09Z","type":"assistant","message":{"content":[{"type":"tool_use","id":"9","name":"Edit","input":{"file_path":"/home/deadmade/dead-claude-skills/b.ts","old_string":"a","new_string":"b"}}]}}
+{"timestamp":"2026-10-20T10:00:10Z","type":"assistant","message":{"content":[{"type":"tool_use","id":"10","name":"AskUserQuestion","input":{}}]}}
+{"timestamp":"2026-10-20T10:00:11Z","type":"assistant","message":{"content":[{"type":"tool_use","id":"11","name":"Edit","input":{"file_path":"/home/deadmade/dead-claude-skills/c.ts","old_string":"a","new_string":"b"}}]}}
+{"timestamp":"2026-10-20T10:00:12Z","type":"assistant","message":{"content":[{"type":"tool_use","id":"12","name":"Write","input":{"file_path":"/home/deadmade/dead-claude-skills/docs/features/demo/flow.md","content":"notes"}}]}}

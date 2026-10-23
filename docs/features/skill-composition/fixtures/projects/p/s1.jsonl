@@ -1,0 +1,5 @@
+{"timestamp":"2026-10-20T10:00:00Z","type":"assistant","message":{"content":[{"type":"tool_use","id":"1","name":"Skill","input":{"skill":"demo-flow"}}]}}
+{"timestamp":"2026-10-20T10:00:01Z","type":"assistant","message":{"content":[{"type":"tool_use","id":"2","name":"Read","input":{"file_path":"/home/deadmade/dead-claude-skills/docs/features/demo/flow.md"}}]}}
+{"timestamp":"2026-10-20T10:00:02Z","type":"assistant","message":{"content":[{"type":"tool_use","id":"3","name":"Skill","input":{"skill":"plugin-x:writing-plans"}}]}}
+{"timestamp":"2026-10-20T10:00:03Z","type":"assistant","message":{"content":[{"type":"tool_use","id":"4","name":"Write","input":{"file_path":"/home/deadmade/dead-claude-skills/docs/features/demo/plan.md","content":"Files: a.ts"}}]}}
+{"timestamp":"2026-10-20T10:00:04Z","type":"assistant","message":{"content":[{"type":"tool_use","id":"5","name":"Edit","input":{"file_path":"/home/deadmade/dead-claude-skills/docs/features/demo/flow.md","old_string":"x","new_string":"- Gate 2, plan approved: 2026-10-20, execution: native"}}]}}

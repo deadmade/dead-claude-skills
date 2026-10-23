@@ -6,7 +6,7 @@ from small binary chunk files the binary writes to disk, so a 100k-line PR costs
 
 ## Install
 
-    /plugin install tui-review@dead-claude-skills
+Pick it in the installer (see the [main README](../../../README.md)).
 
 It needs the `tui-review` binary. The installer (`npx --allow-git=root github:deadmade/dead-claude-skills#semver:*`) downloads the build for your machine
 into `~/.claude/bin` and sets the plugin's `binPath`, unless a `tui-review` is already on PATH. By hand: unpack the `tui-review-*`

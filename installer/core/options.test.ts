@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { optIns, manifestPath, INCLUDED, BUNDLE, type Marketplace, type PluginJson } from './plugins.ts';
+import { optIns, manifestPath, BUNDLE, type Marketplace, type PluginJson } from './plugins.ts';
 import { dcgCommand, CATEGORIES, TOGGLES, categorize, unavailable } from './options.ts';
 
 const json = (p: string) => JSON.parse(readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8'));
@@ -21,22 +21,21 @@ test('dcg runs its own installer per OS', () => {
   assert.match(dcgCommand('linux', 'uninstall')[1][1], /uninstall\.sh' \| bash -s -- --yes$/);
 });
 
-test('every opt-in and toggle is on exactly one page, except the INCLUDED ones on none', () => {
+test('every opt-in and toggle is on exactly one page', () => {
   const keys = [...optIns(marketplace, bundle), ...TOGGLES];
   const pages = categorize(keys);
-  const shown = keys.filter((k) => !INCLUDED.includes(k.split('@')[0]));
-  assert.deepEqual(pages.flatMap((p) => p.keys).sort(), shown.sort());
+  assert.deepEqual(pages.flatMap((p) => p.keys).sort(), keys.sort());
   assert.ok(!pages.some((p) => p.id === 'other'), 'every real opt-in has a category');
   const listed = CATEGORIES.flatMap((c) => c.keys);
   assert.equal(new Set(listed).size, listed.length);
 });
 
 test('an uncategorized plugin lands in Other, empty pages are dropped', () => {
-  const pages = categorize([`new-thing@${M}`, 'sandbox']);
+  const pages = categorize([`new-thing@${M}`, 'dcg']);
   assert.deepEqual(
     pages.map((p) => [p.id, p.keys]),
     [
-      ['system', ['sandbox']],
+      ['system', ['dcg']],
       ['other', [`new-thing@${M}`]],
     ],
   );
@@ -61,13 +60,12 @@ test('categorize keeps bulk:false on danger', () => {
 });
 
 test('options hidden per platform', () => {
-  assert.equal(unavailable('sandbox', 'win32', 'x64', '1.0.0'), 'needs WSL2');
   assert.ok(unavailable(`nix-lsp@${M}`, 'win32', 'x64', '1.0.0'));
   assert.equal(unavailable(`tui-review@${M}`, 'win32', 'x64', '1.0.0'), undefined);
   assert.ok(unavailable(`tui-review@${M}`, 'win32', 'arm64', '1.0.0'));
   assert.ok(unavailable(`tui-review@${M}`, 'darwin', 'arm64', '1.0.0'));
   assert.ok(unavailable(`tui-review@${M}`, 'linux', 'arm64', '1.0.0'));
-  for (const k of ['sandbox', `nix-lsp@${M}`, 'dcg']) {
+  for (const k of [`nix-lsp@${M}`, 'dcg']) {
     assert.equal(unavailable(k, 'linux', 'x64', '1.0.0'), undefined);
     assert.equal(unavailable(k, 'darwin', 'arm64', '1.0.0'), undefined);
   }

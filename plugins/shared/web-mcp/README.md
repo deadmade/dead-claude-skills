@@ -63,7 +63,7 @@ deleted, so it grows; delete it by hand if you like.
 
 ## Install
 
-    /plugin install web-mcp@dead-claude-skills
+Pick it in the installer (see the [main README](../../../README.md)).
 
 The installer downloads the `web-mcp` binary from the release and sets `binPath`. By hand, build it with
 `cargo build --release --manifest-path crates/web-mcp/Cargo.toml` (or `nix build .#web-mcp`) and put it on PATH

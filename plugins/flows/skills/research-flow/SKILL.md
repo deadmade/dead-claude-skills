@@ -12,8 +12,8 @@ change and by how much, and the feature is measured against that before it is fi
 recommends; the user decides.
 
 Read feature-flow first: `${CLAUDE_SKILL_DIR}/../feature-flow/SKILL.md` (below: **FF**). Its rules for the whole run
-apply here unchanged (todo list, handoff override, gates, skips, deviations, commits). This file only says what
-differs.
+apply here unchanged (todo list, handoff override, gates, skips, the seam question, deviations, commits). This file
+only says what differs. Packs: `${CLAUDE_PLUGIN_ROOT}/packs`, for FF's pack skills as well.
 
 | Phase        | Runs                                                                     | Output                                          |
 | ------------ | ------------------------------------------------------------------------ | ----------------------------------------------- |
@@ -57,8 +57,11 @@ differs.
 ## Phase 1: Ground
 
 FF Phase 1, and in the same message start a third background `general-purpose` agent with the prompt in
-[references/literature.md](references/literature.md). Write its evidence table into flow.md under **Evidence** when
-it lands. If the literature is thin or contradicts itself, say so; that is a finding, not a reason to pad.
+[references/literature.md](references/literature.md); in that prompt, paper-lookup is
+`${CLAUDE_PLUGIN_ROOT}/packs/paper-lookup/skills/paper-lookup/SKILL.md`, read by path, and its strength column follows
+`${CLAUDE_PLUGIN_ROOT}/packs/pstack-picks/skills/why/references/epistemics.md`. Write its evidence table into flow.md
+under **Evidence** when it lands. If the literature is thin or contradicts itself, say so; that is a finding, not a
+reason to pad.
 
 ## Phase 2: Brainstorm
 
@@ -96,7 +99,9 @@ The Evidence reviewer also gets the Evidence and Hypothesis sections of flow.md.
 
 ## Phase 6: Execute
 
-FF Phase 6. The baseline task runs before any feature code; its numbers go into flow.md under **Results**.
+FF Phase 6, its build stop included. A change to a measurement task, its inputs or its machine is a deviation; a
+decision that changes the method reopens Gate 1. The baseline task runs before any feature code; its numbers go into
+flow.md under **Results**.
 
 ## Phase 7: Validate
 

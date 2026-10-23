@@ -19,11 +19,11 @@ const pages = [
   {
     id: 'system',
     title: 'System',
-    blurb: 'Status line, sandbox and command guard.',
-    keys: ['sandbox', 'ccstatusline'],
+    blurb: 'Status line and command guard.',
+    keys: ['dcg', 'ccstatusline'],
   },
 ];
-const current = { [azure]: false, [github]: false, [atlassian]: true, sandbox: true, ccstatusline: false };
+const current = { [azure]: false, [github]: false, [atlassian]: true, dcg: true, ccstatusline: false };
 const chosen = { ...current };
 const data: Data = {
   version: '0.1.1',
@@ -137,7 +137,7 @@ test('start shows kept, pending + and −, toggles and the Apply count', () => {
   const s: State = { ...initial(chosen), chosen: { ...chosen, [azure]: true, [atlassian]: false } };
   const out = text(s);
   assert.match(out, /Integrations\s+\+ mcp-azure {2}− atlassian/);
-  assert.match(out, /System\s+sandbox on, status line off/);
+  assert.match(out, /System\s+dcg on, status line off/);
   assert.match(out, /dead-skills \+ 7, always installed/);
   assert.match(out, /Apply 2 changes/);
   assert.ok(render(s, data, { columns: 80, rows: 30 }).join('\n').includes('\x1b[32m+ mcp-azure'));
@@ -173,7 +173,7 @@ test('category states are words', () => {
   const d = { ...data, updates: [], disabled: { [atlassian]: true } };
   assert.match(text({ ...s, chosen }, d), /atlassian\s+installed 0\.1\.0, disabled/);
   const sys = { ...s, page: 1, chosen: { ...chosen, ccstatusline: true } };
-  assert.match(text(sys), /sandbox\s+on/);
+  assert.match(text(sys), /dcg\s+on/);
   assert.match(text(sys), /ccstatusline\s+will turn on/);
 });
 

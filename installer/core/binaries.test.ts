@@ -32,15 +32,6 @@ test('missing binaries per OS', () => {
   );
 });
 
-test('sandbox needs bubblewrap and socat', () => {
-  const rows = missingBinaries('linux', ['sandbox'], () => false);
-  assert.deepEqual(
-    rows.map((r) => r.binary),
-    ['bwrap', 'socat'],
-  );
-  assert.match(rows[0].command, /home\.packages: bubblewrap/);
-});
-
 test('tui-review downloads the release archive built for this machine', () => {
   const win = binAsset('tui-review', 'win32', 'x64', '1.2.3')!;
   assert.equal(

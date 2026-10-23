@@ -1,7 +1,15 @@
 // Marketplaces and plugins, all through the claude CLI.
-import { OFFICIAL, duplicates, foreignMarketplaces, foreignPlugins, nameOf } from '../core/plugins.ts';
+import {
+  OFFICIAL,
+  duplicates,
+  foreignMarketplaces,
+  foreignPlugins,
+  nameOf,
+  stillInstalled,
+  type PluginRow,
+} from '../core/plugins.ts';
 import { MARKETPLACE, marketplaceArg } from '../core/release.ts';
-import { SETTINGS, VERSION, ask } from '../context.ts';
+import { SETTINGS, VERSION, ask, failures } from '../context.ts';
 import { writeAtomic } from '../system/files.ts';
 import { claude, run } from '../system/proc.ts';
 import { log, progress } from '../ui/ui.ts';
@@ -77,26 +85,27 @@ export async function removeForeign({
   return { dupes, foreign };
 }
 
-// Installs, uninstalls, retires and updates, then prunes dependencies nothing needs when anything went.
+// Installs, uninstalls, updates and retires, then prunes dependencies nothing needs when anything went. Records a
+// failure for any of packs (names) still installed afterwards.
 export async function applyPlugins({
   install,
   remove,
   retired,
   updates,
   removedBefore,
+  packs,
 }: {
   install: string[];
   remove: string[];
   retired: string[];
   updates: { id: string; from?: string; to: string }[];
   removedBefore: boolean;
+  packs: string[];
 }) {
   for (const id of install)
     await run(`Installing ${nameOf(id)}`, `installed ${id}`, 'plugin', 'install', id, '--scope', 'user', '--json');
   for (const id of remove)
     await run(`Uninstalling ${nameOf(id)}`, `uninstalled ${id}`, 'plugin', 'uninstall', id, '--json');
-  for (const id of retired)
-    await run(`Uninstalling ${nameOf(id)}`, `uninstalled ${id} (retired)`, 'plugin', 'uninstall', id, '--json');
   for (const u of updates) {
     await run(
       `Updating ${nameOf(u.id)} ${u.from} → ${u.to}`,
@@ -107,6 +116,24 @@ export async function applyPlugins({
       '--json',
     );
   }
+  // After the updates, so an old dead-skills or flows no longer lists the packs as dependencies.
+  for (const id of retired)
+    await run(`Uninstalling ${nameOf(id)}`, `uninstalled ${id} (retired)`, 'plugin', 'uninstall', id, '--json');
   if (remove.length || retired.length || removedBefore)
     await run('Pruning unused dependencies', 'pruned unused dependencies', 'plugin', 'prune', '-y');
+  // A pack something not updated still depends on can outlive its uninstall.
+  const after = await progress('Checking no pack is still installed', () =>
+    claude(undefined, 'plugin', 'list', '--json'),
+  );
+  let rows: PluginRow[] | undefined;
+  try {
+    const json = after.ok ? JSON.parse(after.out || '[]') : undefined;
+    rows = json && (Array.isArray(json) ? json : (json.installed ?? []));
+  } catch {
+    /* rows stays undefined: reported below */
+  }
+  const left = rows && stillInstalled(rows, packs);
+  if (!left) failures.push(`checking no pack is still installed: ${after.err || 'unreadable output'}`);
+  else if (left.length)
+    failures.push(`still installed, though flows carries them now (claude plugin uninstall each): ${left.join(', ')}`);
 }

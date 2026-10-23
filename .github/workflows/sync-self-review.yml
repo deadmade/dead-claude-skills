@@ -21,12 +21,12 @@ jobs:
       - name: Sanity checks
         id: check
         run: |
-          jq empty .claude-plugin/marketplace.json plugins/shared/self-review/.claude-plugin/plugin.json
-          test "$(find plugins/shared/self-review/agents -maxdepth 1 -name '*.md' | wc -l)" -eq 5
-          test -f plugins/shared/self-review/skills/self-review/references/upstream/code-review.md
-          test -f plugins/shared/self-review/skills/self-review/references/upstream/spec-standards-review.md
-          echo "official=$(awk '$1 == "anthropics/claude-plugins-official" {print $2}' plugins/shared/self-review/UPSTREAM)" >> "$GITHUB_OUTPUT"
-          echo "matt=$(awk '$1 == "mattpocock/skills" {print $2}' plugins/shared/self-review/UPSTREAM)" >> "$GITHUB_OUTPUT"
+          jq empty .claude-plugin/marketplace.json plugins/flows/.claude-plugin/plugin.json
+          test "$(grep -l 'by scripts/sync-self-review.mjs.' plugins/flows/agents/*.md | wc -l)" -eq 5
+          test -f plugins/flows/skills/self-review/references/upstream/code-review.md
+          test -f plugins/flows/skills/self-review/references/upstream/spec-standards-review.md
+          echo "official=$(awk '$1 == "anthropics/claude-plugins-official" {print $2}' plugins/flows/skills/self-review/UPSTREAM)" >> "$GITHUB_OUTPUT"
+          echo "matt=$(awk '$1 == "mattpocock/skills" {print $2}' plugins/flows/skills/self-review/UPSTREAM)" >> "$GITHUB_OUTPUT"
 
       - name: Open pull request
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
@@ -36,10 +36,12 @@ jobs:
           commit-message: 'Sync self-review to claude-plugins-official ${{ steps.check.outputs.official }} and mattpocock/skills ${{ steps.check.outputs.matt }}'
           title: 'Sync self-review upstreams'
           body: |
-            Automated sync of the review passes vendored in plugins/shared/self-review:
+            Automated sync of the review passes /self-review runs, vendored in plugins/flows:
             - https://github.com/anthropics/claude-plugins-official/commit/${{ steps.check.outputs.official }}
               (code-review command, pr-review-toolkit agents)
             - https://github.com/mattpocock/skills/commit/${{ steps.check.outputs.matt }} (engineering/code-review)
 
             cc @deadmade
-          add-paths: plugins/shared/self-review
+          add-paths: |
+            plugins/flows/skills/self-review
+            plugins/flows/agents
