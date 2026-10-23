@@ -1,6 +1,6 @@
 {
   "name": "pstack-picks",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Curated skills from poteto's pstack (Cursor), rewritten for Claude Code: how/why/recall, adversarial review, unslop, architect/arena, decision trails and engineering principles.",
   "author": {
     "name": "deadmade",

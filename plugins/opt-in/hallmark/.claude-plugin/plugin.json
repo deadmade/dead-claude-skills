@@ -1,6 +1,6 @@
 {
   "name": "hallmark",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Hallmark: anti-AI-slop design skill for web frontends, scoped to browser UI work. Vendored from nutlope/hallmark, synced weekly.",
   "author": {
     "name": "deadmade",

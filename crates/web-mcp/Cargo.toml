@@ -1,6 +1,6 @@
 [package]
 name = "web-mcp"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2024"
 rust-version = "1.97"
 description = "Stdio MCP server for the web-mcp plugin: search, fetch, browser and lookup tools that archive everything in .web/."

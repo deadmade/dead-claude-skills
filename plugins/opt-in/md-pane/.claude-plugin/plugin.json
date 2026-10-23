@@ -1,6 +1,6 @@
 {
   "name": "md-pane",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Click a .md path in Claude's reply to read it, rendered, in a pane beside the chat (fullscreen terminal).",
   "author": {
     "name": "deadmade",
