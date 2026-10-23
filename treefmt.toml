@@ -4,6 +4,7 @@ on-unmatched = "debug"
 excludes = [
   "plugins/opt-in/hallmark/**",
   "plugins/flows/packs/**",
+  "plugins/flows/agents/spec-compliance-checker.md",
   "plugins/shared/graphify/**",
   "plugins/opt-in/implementation/*-skills/library/**",
   "plugins/opt-in/implementation/*-skills/skills/**",

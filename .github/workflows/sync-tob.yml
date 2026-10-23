@@ -67,4 +67,6 @@ jobs:
             https://github.com/trailofbits/skills/commit/${{ steps.check.outputs.sha }}.
 
             cc @deadmade
-          add-paths: plugins/flows/packs/tob-picks
+          add-paths: |
+            plugins/flows/packs/tob-picks
+            plugins/flows/agents/spec-compliance-checker.md
