@@ -19,7 +19,7 @@ No fix before the cause is known and agreed, and no fix without a test that fail
 
 [flow-rules.md](../../references/flow-rules.md) applies: read it first. State: `docs/features/<slug>/flow.md` from
 [build-template.md](../../references/build-template.md), `flow: fix`, phases `reproduce | ground | cause | fix |
-finish | done`.
+finish | done`. Packs: `${CLAUDE_PLUGIN_ROOT}/packs` (pstack is its `pstack-picks` folder).
 
 ## Start or resume
 
@@ -37,22 +37,28 @@ reproduce: say what was tried, ask the user for what's missing (input, environme
 In one message:
 
 - pstack `how` on the code path the reproduction runs through (fallback: Explore agents), and `git log` on it: a
-  recent change there is the first suspect.
+  recent change there is the first suspect. pstack `why` when that code looks deliberate.
 - pstack `blast-radius` on that code: what else calls it, what a change there could break.
 - When a dependency is involved: web-mcp `search` for the error text and the dependency's issue tracker (fallback
   WebSearch). A known upstream bug changes the fix (pin, upgrade, work around); cite it.
 
 ## Phase 3: Cause
 
-Invoke superpowers `systematic-debugging` with the reproduction and the grounding. It ends with a root cause backed
+Follow superpowers `systematic-debugging` with the reproduction and the grounding. It ends with a root cause backed
 by evidence (a log line, a value, a bisect), not a guess. **Gate:** present the cause, the fix options (each with
-what blast-radius says it touches) and your recommendation. The user approves one.
+what blast-radius says it touches and the files it changes) and your recommendation. The user approves one. Its
+`defense-in-depth.md` (validation at every layer) is one of those options only when you offer it and the user picks
+it; otherwise the cause is fixed once.
+<!-- overrides superpowers/skills/systematic-debugging/defense-in-depth.md: "Core principle: Validate at EVERY layer data passes through. Make the bug structurally impossible." -->
+<!-- overrides superpowers/skills/systematic-debugging/root-cause-tracing.md: "BETTER: Also add defense-in-depth" -->
 
 ## Phase 4: Fix
 
-Invoke superpowers `test-driven-development`: the regression test reproduces the bug and fails for the stated cause
+Follow superpowers `test-driven-development`: the regression test reproduces the bug and fails for the stated cause
 (show the output); then the smallest fix that makes it pass; then the full suite. Fix the cause once in the shared
-code, not at each caller. A fix that needs more than the approved option is a deviation.
+code, not at each caller. The approved option is the task, and the files it names are its **Files** list. A fix that
+needs more is a deviation and stops the build: flow-rules **Deviations** (the fifth stop, the brief clause, the files
+check, Rulings).
 
 ## Phase 5: Finish
 

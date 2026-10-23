@@ -35,13 +35,14 @@ doc-audit
 └ pstack-picks: technical-writing, unslop
 
 feature-flow
-├ pstack-picks: how, architect, arena
+├ pstack-picks: how, why, architect, arena, principle-redesign-from-first-principles, principle-boundary-discipline
 ├ claude-code: general-purpose
-├ superpowers: brainstorming, writing-plans, subagent-driven-development, executing-plans
-└ mattpocock-picks: grilling, domain-modeling
+├ superpowers: brainstorming, writing-plans, using-git-worktrees, subagent-driven-development, executing-plans
+├ mattpocock-picks: codebase-design, grilling, domain-modeling
+└ ponytail: ponytail-review
 
 fix-flow
-├ pstack-picks: how, blast-radius
+├ pstack-picks: how, why, blast-radius
 ├ web-mcp: search, fetch
 └ superpowers: systematic-debugging, test-driven-development
 
@@ -49,12 +50,13 @@ harden
 ├ claude-security@claude-plugins-official: claude-security
 ├ tob-picks: sharp-edges
 ├ ponytail: ponytail-audit, ponytail-review
-├ mattpocock-picks: improve-codebase-architecture
+├ mattpocock-picks: improve-codebase-architecture, grilling
+├ pstack-picks: principle-boundary-discipline
 └ superpowers: test-driven-development
 
 implement
-├ pstack-picks: how
-├ mattpocock-picks: to-tickets
+├ pstack-picks: how, principle-redesign-from-first-principles, principle-boundary-discipline
+├ mattpocock-picks: codebase-design, to-tickets
 └ superpowers: writing-plans, subagent-driven-development, executing-plans
 
 learn
@@ -80,7 +82,8 @@ understand
 upgrade
 ├ dead-skills: context7
 ├ web-mcp: fetch
-└ pstack-picks: blast-radius
+├ pstack-picks: blast-radius
+└ superpowers: writing-plans, test-driven-development
 
 verify
 ├ superpowers: verification-before-completion, systematic-debugging, finishing-a-development-branch

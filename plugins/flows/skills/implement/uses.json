@@ -1,5 +1,5 @@
 {
-  "pstack-picks": ["how"],
-  "mattpocock-picks": ["to-tickets"],
+  "pstack-picks": ["how", "principle-redesign-from-first-principles", "principle-boundary-discipline"],
+  "mattpocock-picks": ["codebase-design", "to-tickets"],
   "superpowers": ["writing-plans", "subagent-driven-development", "executing-plans"]
 }
