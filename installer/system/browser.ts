@@ -14,7 +14,7 @@ export function findChromeForTesting(home: string, platform: NodeJS.Platform) {
   const binary = (dir: string) => names.map((n) => join(root, dir, n)).find((f) => existsSync(f));
   let entries: string[] = [];
   try {
-    entries = readdirSync(root).filter(binary);
+    entries = readdirSync(root).filter((d) => binary(d));
   } catch {
     /* no browsers folder yet */
   }

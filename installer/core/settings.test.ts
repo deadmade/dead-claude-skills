@@ -66,16 +66,16 @@ test('secret denies are added once and keep existing ones', () => {
 });
 
 test('sandbox on merges our keys, off removes only ours', () => {
-  const on = mergeSettings({ ...V, sandbox: { excludedCommands: ['docker'] } }, { ...V, sandbox: true });
+  const on = mergeSettings({ ...V, sandbox: { excludedCommands: ['make'] } }, { ...V, sandbox: true });
   assert.deepEqual(on.sandbox, {
-    excludedCommands: ['docker'],
+    excludedCommands: ['make'],
     enabled: true,
     autoAllowBashIfSandboxed: true,
     allowUnsandboxedCommands: false,
   });
   assert.ok(isSandboxOn(on));
   assert.deepEqual(mergeSettings(on, { ...V, sandbox: true }), on);
-  assert.deepEqual(mergeSettings(on, { ...V, sandbox: false }).sandbox, { excludedCommands: ['docker'] });
+  assert.deepEqual(mergeSettings(on, { ...V, sandbox: false }).sandbox, { excludedCommands: ['make'] });
   assert.equal(mergeSettings(mergeSettings({}, { ...V, sandbox: true }), { ...V, sandbox: false }).sandbox, undefined);
   assert.ok(!isSandboxOn({}));
 });
