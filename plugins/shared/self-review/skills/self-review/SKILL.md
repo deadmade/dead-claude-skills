@@ -76,9 +76,9 @@ One message, every agent in parallel:
   - `self-review:type-design-analyzer`: new or changed types, interfaces, schemas
   - `self-review:comment-analyzer`: added or changed comments or docs
 - **Optional**, only when installed and the diff calls for it:
-  - pstack `blast-radius`, for changes to shared code, public interfaces, data, wire formats or config. pstack skills
-    can't be loaded with the Skill tool: read
-    `${CLAUDE_SKILL_DIR}/../../../../pstack-picks/*/skills/blast-radius/SKILL.md` and follow it.
+  - pstack `blast-radius`, for changes to shared code, public interfaces, data, wire formats or config. pstack ships
+    inside the flows plugin and can't be loaded with the Skill tool: read
+    `${CLAUDE_SKILL_DIR}/../../../../flows/*/packs/pstack-picks/skills/blast-radius/SKILL.md` and follow it.
 
 Tell the user which passes are running and which were skipped, and why, in one line.
 
@@ -96,7 +96,11 @@ Follow [references/synthesis.md](references/synthesis.md): merge, check, bucket,
 
 Ask which findings to fix: "all fix-before-PR", numbers, or none. Then:
 
-1. Fix them. A fix that would change the design or the spec goes back to the user first.
+1. Fix them. A fix that would change the design or the spec goes back to the user first. A finding that needs a
+   cause before a fix (a failing test, a symptom whose root cause isn't known, a fix that would only hide it): offer
+   `/fix-flow` on it, with your recommendation. On the user's yes, read
+   `${CLAUDE_SKILL_DIR}/../../../../flows/*/skills/fix-flow/SKILL.md` and follow it; without the flows plugin, find
+   the cause first and show it before fixing.
 2. Run the repo's tests, lint and typecheck, and read the output. Report what passed and what didn't.
 3. Offer the `self-review:code-simplifier` agent on the changed files, as a last polish. Only on the user's yes.
 4. Re-run only the passes whose findings were fixed, if the user wants a check.

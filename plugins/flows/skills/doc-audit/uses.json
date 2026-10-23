@@ -1,5 +1,5 @@
 {
-  "tob-picks": ["spec-to-code-compliance", "spec-compliance"],
+  "tob-picks": ["spec-to-code-compliance", "spec-compliance", "spec-compliance-checker"],
   "claude-md-management@claude-plugins-official": ["claude-md-improver"],
   "web-mcp": ["fetch"],
   "pstack-picks": ["technical-writing", "unslop"]

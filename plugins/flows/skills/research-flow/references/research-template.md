@@ -24,7 +24,7 @@ phase: ground
 - Spec:
 - Plan:
 - ADRs:
-- CONTEXT.md:
+- Glossary:
 
 ## Gates
 

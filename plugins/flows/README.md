@@ -5,7 +5,7 @@ keeps a state file so the next session can resume. Claude proposes and recommend
 
 | Conductor                   | Job                                               | Runs                                                                                              | Ends in              |
 | --------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------- | -------------------- |
-| `/understand <topic>`       | learn a codebase, subsystem or concept            | graphify, pstack `how` and `why`, mattpocock `teach` in learning style (you write the key lines)  | terms in CONTEXT.md  |
+| `/understand <topic>`       | learn a codebase, subsystem or concept            | graphify, pstack `how` and `why`, mattpocock `teach` in learning style (you write the key lines)  | terms in GLOSSARY.md |
 | `/feature-flow <what>`      | a new feature with a design                       | prior art, `brainstorming`, `grilling` + `domain-modeling`, `writing-plans`, plan review, execute | `/verify`, `/learn`  |
 | `/research-flow <what>`     | a feature grounded in papers, hypothesis measured | feature-flow plus a literature agent (web-mcp papers, paper-lookup) and a measured result         | `/verify`, `/learn`  |
 | `/implement <plan>`         | build from an existing plan, spec or ticket       | `to-tickets` or `writing-plans` if needed, superpowers execution                                  | `/verify`, `/learn`  |
@@ -29,7 +29,7 @@ Installing flows installs every plugin below.
 
 ```text
 doc-audit
-├ tob-picks: spec-to-code-compliance, spec-compliance
+├ tob-picks: spec-to-code-compliance, spec-compliance, spec-compliance-checker
 ├ claude-md-management@claude-plugins-official: claude-md-improver
 ├ web-mcp: fetch
 └ pstack-picks: technical-writing, unslop
@@ -62,7 +62,8 @@ implement
 learn
 ├ claude-md-management@claude-plugins-official: revise-claude-md
 ├ mattpocock-picks: domain-modeling
-└ pstack-picks: recall
+├ pstack-picks: recall
+└ superpowers: writing-skills
 
 research-flow
 ├ claude-code: general-purpose
@@ -72,11 +73,11 @@ research-flow
 test-audit
 ├ tob-picks: mutation-testing, property-based-testing, spec-to-code-compliance
 ├ self-review: pr-test-analyzer
-└ superpowers: test-driven-development
+└ superpowers: verification-before-completion, test-driven-development
 
 understand
-├ graphify: graphify
 ├ pstack-picks: how, why
+├ graphify: graphify
 └ mattpocock-picks: teach, domain-modeling
 
 upgrade

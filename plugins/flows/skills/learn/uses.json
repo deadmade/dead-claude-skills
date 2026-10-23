@@ -1,5 +1,6 @@
 {
   "claude-md-management@claude-plugins-official": ["revise-claude-md"],
   "mattpocock-picks": ["domain-modeling"],
-  "pstack-picks": ["recall"]
+  "pstack-picks": ["recall"],
+  "superpowers": ["writing-skills"]
 }

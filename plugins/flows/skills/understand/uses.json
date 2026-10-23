@@ -1,5 +1,5 @@
 {
-  "graphify": ["graphify"],
   "pstack-picks": ["how", "why"],
+  "graphify": ["graphify"],
   "mattpocock-picks": ["teach", "domain-modeling"]
 }

@@ -19,7 +19,8 @@ is the bug.
 | 5 Prose     | pstack `technical-writing` + `unslop`       | wording findings, changed docs only            |
 | 6 Report    | flow-rules **Reports**                      | `docs/audits/…-doc-audit-<scope>.md`. **Gate** |
 
-[flow-rules.md](../../references/flow-rules.md) applies: read it first.
+[flow-rules.md](../../references/flow-rules.md) applies: read it first. Packs: `${CLAUDE_PLUGIN_ROOT}/packs` (tob and
+pstack are its `-picks` folders).
 
 ## Phase 1: Scope
 
@@ -36,15 +37,18 @@ List the docs with a one-line reason each and continue.
 
 ## Phase 2: Claims
 
-Invoke tob `spec-to-code-compliance` with the docs as the specification and the scope's code as the implementation.
-Per doc, its verdicts become findings:
+Follow tob `spec-to-code-compliance` with the docs as the specification and the scope's code as the implementation.
+It checks no requirement in this context. A handful of claims (a usual `branch`): one `flows:spec-compliance-checker`
+per claim, in parallel. More (`all`, or a long doc): offer the tob `spec-compliance` workflow (flow-rules **Loading
+skills**; `path` the scope's code, `spec` the doc, `outDir` under `$TMPDIR`), with its cost: one checker agent per
+requirement plus two refuters per divergence. Only on the user's yes; on no, the checkers per claim. Per doc, its
+verdicts become findings:
 
-- **contradicted:** the doc says X, the code does Y. Quote both with `file:line`.
-- **unbacked:** the doc claims behaviour no code implements.
-- **undocumented:** the code does something user-facing no doc mentions.
-
-For `all` on a repo with many docs, offer the tob `spec-compliance` workflow instead (one checker agent per
-requirement, more tokens); only on the user's yes. Without tob-picks: one Explore agent per doc, same three verdicts.
+- **contradicted** (and `partial`): the doc says X, the code does Y. Quote both with `file:line`.
+- **unbacked** (`absent`): the doc claims behaviour no code implements.
+- **undocumented** (`stronger-than-spec`, and the workflow's reverse sweep): the code does something user-facing no
+  doc mentions.
+- `undecidable`: the doc is too vague to check; a finding against the doc.
 
 ## Phase 3: CLAUDE.md
 
@@ -62,6 +66,7 @@ In the scoped docs, check what can be checked by running something:
   Run a documented command only when it's read-only or the repo's own check; never one that installs, deletes,
   pushes or publishes.
 - **Versions and names:** versions, plugin and package names, env vars and config keys match their source.
+- **Claude Code plugin manifests:** `claude plugin validate <plugin folder>`, when `claude` is on PATH.
 
 ## Phase 5: Prose
 
@@ -70,7 +75,8 @@ only, severity low unless the wording misleads.
 
 ## Phase 6: Report
 
-The findings table per flow-rules **Reports**. A fix changes the doc to match the code. When the code looks like the
+The findings table per flow-rules **Reports**, severity by consequence per tob `spec-to-code-compliance`'s
+`resources/DIVERGENCE_RUBRIC.md`. A fix changes the doc to match the code. When the code looks like the
 bug (the doc describes the intended behaviour), say so: that finding's options are fix the code or fix the doc, and
 the user picks. A vendored doc's fix goes into its sync script's transform. After the fixes, re-run Phases 2 and 4 on
 the changed docs.

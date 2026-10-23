@@ -1,6 +1,6 @@
 ---
 name: learn
-description: 'Keep what a piece of work taught, so the next session starts smarter: collect the surprises, decisions and root causes from a flow or the current session, sort each to its home (CLAUDE.md, CONTEXT.md, an ADR, docs/solutions/, or memory), and write the ones you pick. The last step of every build flow. Use for /learn [flow.md or topic].'
+description: 'Keep what a piece of work taught, so the next session starts smarter: collect the surprises, decisions and root causes from a flow or the current session, sort each to its home (CLAUDE.md, GLOSSARY.md, an ADR, docs/solutions/, a skill, or memory), and write the ones you pick. The last step of every build flow. Use for /learn [flow.md or topic].'
 disable-model-invocation: true
 argument-hint: '[path to a flow.md, or what to look back on]'
 ---
@@ -10,19 +10,21 @@ argument-hint: '[path to a flow.md, or what to look back on]'
 Most of what a session learns dies with it. This flow keeps the few things the next session would otherwise pay for
 again, and drops the rest.
 
-| Phase    | Runs                                                    | Output                     |
-| -------- | ------------------------------------------------------- | -------------------------- |
-| 1 Gather | the caller's flow.md, else pstack `recall`              | candidate lessons          |
-| 2 Sort   | each to one home                                        | proposed entries. **Gate** |
-| 3 Write  | `revise-claude-md`, `domain-modeling`, a solutions note | entries written            |
+| Phase    | Runs                                                                      | Output                     |
+| -------- | ------------------------------------------------------------------------- | -------------------------- |
+| 1 Gather | the caller's flow.md, else pstack `recall`                                | candidate lessons          |
+| 2 Sort   | each to one home                                                          | proposed entries. **Gate** |
+| 3 Write  | `revise-claude-md`, `domain-modeling`, `writing-skills`, a solutions note | entries written            |
 
-[flow-rules.md](../../references/flow-rules.md) applies: read it first.
+[flow-rules.md](../../references/flow-rules.md) applies: read it first. Packs: `${CLAUDE_PLUGIN_ROOT}/packs` (pstack
+and mattpocock are its `-picks` folders).
 
 ## Phase 1: Gather
 
-From a build flow: its flow.md (deviations, rejected options, plan-review findings, the verify verdict) and the
-branch's commits. Standalone: the flow.md named in the argument, else pstack `recall` on the topic or the current
-session.
+From a build flow: its flow.md (**Rulings**, deviations, rejected options, plan-review findings, the verify verdict
+with the decisions the user reopened) and the branch's commits. Each ruling is a candidate: one that cost a wrong
+turn, or that the user reopened at /verify, usually is a lesson. Standalone: the flow.md named in the argument, else
+pstack `recall` on the topic or the current session.
 
 A lesson is something that cost time or a wrong turn and isn't obvious from the code: a root cause, a constraint
 found the hard way, a convention the code follows that nobody wrote down, a decision and what it gave up, a tool or
@@ -36,9 +38,10 @@ Each lesson gets one home:
 | Home                       | When                                                                                 | Through                                 |
 | -------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------- |
 | CLAUDE.md                  | an instruction a future session must follow in this repo (a command, a trap, a rule) | `claude-md-management:revise-claude-md` |
-| `CONTEXT.md`               | a domain term or relationship got settled                                            | mattpocock `domain-modeling`            |
+| `GLOSSARY.md`              | a domain term or relationship got settled                                            | mattpocock `domain-modeling`            |
 | `docs/adr/`                | a decision that is hard to reverse, surprising without context, and a real trade-off | mattpocock `domain-modeling`            |
 | `docs/solutions/<slug>.md` | a solved problem someone may hit again                                               | the format below                        |
+| a skill or conductor       | a skill or conductor behaved wrong or left a step out                                | superpowers `writing-skills`            |
 | Claude's memory            | about the user or how they like to work, not about the repo                          | the memory directory                    |
 
 Present them as one numbered list: the lesson in one line, its home, and the exact text to write. Recommend dropping
@@ -46,7 +49,15 @@ weak ones; three good entries beat ten. **Gate:** the user picks.
 
 ## Phase 3: Write
 
-Write the picked entries through the skill named for their home. A solutions note:
+Write the picked entries through the skill named for their home. The glossary is where
+`<packs>/mattpocock-picks/skills/setup-matt-pocock-skills/domain.md` says it lives (`GLOSSARY.md`, or the one
+`GLOSSARY-MAP.md` points at).
+
+A skill or conductor entry: `writing-skills` owns skill writing, its description rule included. skill-creator, when
+installed, is used only for its eval tooling (running evals and benchmarks), never to write or reword a skill. A
+vendored skill changes in its sync script's transform, never in the copied file.
+
+A solutions note:
 
 ```markdown
 # <Symptom, in the words someone would search for>
