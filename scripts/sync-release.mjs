@@ -1,4 +1,4 @@
-// Vendor an upstream Claude Code plugin into plugins/shared/<name>/ at upstream's newest stable vX.Y.Z tag, unchanged
+// Vendor an upstream Claude Code plugin into plugins/flows/packs/<name>/ at upstream's newest stable vX.Y.Z tag, unchanged
 // but for plugin.json's version (ours: everything ships as one version). Upstreams also ship adapters for other hosts;
 // only what Claude Code loads is copied. Idempotent: re-running against the same tag gives no diff.
 // Usage: node scripts/sync-release.mjs <name>
@@ -101,7 +101,7 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const tags = stableTags(git('ls-remote', '--tags', `https://github.com/${repo}.git`));
   const latest = tags.at(-1);
   if (!latest) fail(`${repo} has no vX.Y.Z tag`);
-  const dest = join(ROOT, 'plugins', 'shared', name);
+  const dest = join(ROOT, 'plugins', 'flows', 'packs', name);
   const upstreamFile = join(dest, 'UPSTREAM');
   const oldSha = existsSync(upstreamFile) ? readFileSync(upstreamFile, 'utf8').trim() || undefined : undefined;
   let range;

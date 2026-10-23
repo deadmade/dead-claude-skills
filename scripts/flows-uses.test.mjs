@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { checkUses, expectedDeps, readUses, renderTree, withTree } from './flows-uses.mjs';
+import { checkUses, expectedDeps, packs, readUses, renderTree, withTree } from './flows-uses.mjs';
 
 const ROOT = join(import.meta.dirname, '..');
 
-// A repo with one conductor `fix` using `uses`, and local plugins picks (a skill, an agent, an MCP server) and web (an
-// MCP server).
+// A repo with one conductor `fix` using `uses`, local plugins picks (a skill, an agent, an MCP server) and web (an
+// MCP server), and the pack superpowers (a skill, no marketplace entry).
 function fixture(uses, skillText = 'how reviewer docs search general-purpose deep') {
   const fx = mkdtempSync(join(tmpdir(), 'fu-'));
   const put = (p, s) => (mkdirSync(dirname(join(fx, p)), { recursive: true }), writeFileSync(join(fx, p), s));
@@ -18,11 +18,12 @@ function fixture(uses, skillText = 'how reviewer docs search general-purpose dee
   put('plugins/picks/agents/reviewer.md', '');
   put('plugins/picks/.mcp.json', JSON.stringify({ docs: { type: 'http' } }));
   put('plugins/web/.mcp.json', '{}');
+  put('plugins/flows/packs/superpowers/skills/writing-plans/SKILL.md', '');
   const marketplace = {
     plugins: [
       { name: 'picks', source: './plugins/picks' },
       { name: 'web', source: './plugins/web' },
-      { name: 'superpowers', source: { source: 'url', url: 'https://example.invalid/sp.git' } },
+      { name: 'remote', source: { source: 'url', url: 'https://example.invalid/remote.git' } },
     ],
   };
   return checkUses(fx, marketplace);
@@ -32,11 +33,18 @@ test('a valid map has no problems: local skill and agent, MCP tool, url plugin, 
   const uses = {
     picks: ['how', 'reviewer'],
     web: ['search'],
-    superpowers: ['deep'],
+    remote: ['deep'],
     'claude-security@claude-plugins-official': ['deep'],
     'claude-code': ['general-purpose'],
   };
   assert.deepEqual(fixture(uses), []);
+});
+
+test('a pack resolves to its folder under plugins/flows/packs, with no marketplace entry', () => {
+  assert.deepEqual(fixture({ superpowers: ['writing-plans'] }, 'writing-plans'), []);
+  assert.deepEqual(fixture({ superpowers: ['nope'] }, 'nope'), [
+    'plugins/flows/skills/fix/uses.json: superpowers has no skill, agent or workflow nope',
+  ]);
 });
 
 test("an MCP server of a plugin that also has skills counts as that plugin's", () => {
@@ -53,9 +61,17 @@ test('each kind of problem is reported', () => {
   assert.match(fixture({ picks: ['how'] }, 'nothing here')[0], /how isn't mentioned in fix\/SKILL.md/);
 });
 
-test('expectedDeps: every plugin once, sorted, builtins left out', () => {
-  const all = { a: { z: ['x'], 'claude-code': ['y'] }, b: { m: ['x'], z: ['q'] } };
-  assert.deepEqual(expectedDeps(all), ['m', 'z']);
+test('expectedDeps: every plugin once, sorted, builtins and packs left out', () => {
+  const all = { a: { z: ['x'], 'claude-code': ['y'], superpowers: ['p'] }, b: { m: ['x'], z: ['q'] } };
+  assert.deepEqual(expectedDeps(all, ['superpowers']), ['m', 'z']);
+});
+
+test('packs lists the folders under plugins/flows/packs', () => {
+  const fx = mkdtempSync(join(tmpdir(), 'fu-'));
+  mkdirSync(join(fx, 'plugins/flows/packs/b'), { recursive: true });
+  mkdirSync(join(fx, 'plugins/flows/packs/a'), { recursive: true });
+  writeFileSync(join(fx, 'plugins/flows/packs/notes.txt'), '');
+  assert.deepEqual(packs(fx), ['a', 'b']);
 });
 
 test('renderTree draws one block per conductor', () => {
@@ -76,5 +92,5 @@ test('the real conductors pass, and flows depends on exactly what they use', () 
   const marketplace = JSON.parse(readFileSync(join(ROOT, '.claude-plugin/marketplace.json'), 'utf8'));
   assert.deepEqual(checkUses(ROOT, marketplace), []);
   const deps = JSON.parse(readFileSync(join(ROOT, 'plugins/flows/.claude-plugin/plugin.json'), 'utf8')).dependencies;
-  assert.deepEqual(deps, expectedDeps(readUses(ROOT)));
+  assert.deepEqual(deps, expectedDeps(readUses(ROOT), packs(ROOT)));
 });

@@ -1,4 +1,4 @@
-// Vendor a curated subset of Trail of Bits' skills (trailofbits/skills, one plugin per folder) into plugins/shared/tob-picks/,
+// Vendor a curated subset of Trail of Bits' skills (trailofbits/skills, one plugin per folder) into plugins/flows/packs/tob-picks/,
 // renaming upstream plugin namespaces to ours (REWRITES). Idempotent: same upstream commit, same output.
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
@@ -63,16 +63,24 @@ const REWRITES = [
     '/tob-picks:spec-compliance',
   ],
   ['skills/spec-to-code-compliance/SKILL.md', /`spec-to-code-compliance:/g, '`tob-picks:'],
+  // A pack's agents don't load (flows reads packs by path), so the checker runs as general-purpose with its agent
+  // file's text in front of each requirement's prompt.
   [
     'workflows/spec-compliance.js',
-    /'spec-to-code-compliance:spec-compliance-checker'/g,
-    "'tob-picks:spec-compliance-checker'",
+    /^const CHECKER = 'spec-to-code-compliance:spec-compliance-checker'$/m,
+    () =>
+      `const CHECKER = 'general-purpose'\n// agents/spec-compliance-checker.md, inlined by scripts/sync-tob.mjs.\nconst CHECKER_PROMPT = ${JSON.stringify(readFileSync(join(PLUGIN, 'agents', 'spec-compliance-checker.md'), 'utf8'))}`,
+  ],
+  [
+    'workflows/spec-compliance.js',
+    /agent\(prompt, \{ \.\.\.options, agentType: CHECKER \}\)/g,
+    'agent(`${CHECKER_PROMPT}\\n${prompt}`, { ...options, agentType: CHECKER })',
   ],
   // Upstream's detection command misses C#'s PBT libraries.
   ['skills/property-based-testing/references/libraries.md', /\|invariant_"/g, '|invariant_|FsCheck|CsCheck"'],
 ];
 
-const PLUGIN = join(ROOT, 'plugins', 'shared', 'tob-picks');
+const PLUGIN = join(ROOT, 'plugins', 'flows', 'packs', 'tob-picks');
 
 const up = sparseClone(UPSTREAM_URL, ['.claude-plugin', ...SKILLS.map((s) => `plugins/${s}`)]);
 for (const s of SKILLS) {

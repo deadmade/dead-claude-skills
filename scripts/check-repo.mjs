@@ -4,7 +4,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { checkUses, expectedDeps, FLOWS, readUses, renderTree, withTree } from './flows-uses.mjs';
+import { checkUses, expectedDeps, FLOWS, PACKS, packs, readUses, renderTree, withTree } from './flows-uses.mjs';
 import { pluginDirs as findPluginDirs } from './plugin-dirs.mjs';
 
 process.chdir(join(import.meta.dirname, '..'));
@@ -53,15 +53,18 @@ problems.push(...checkUses('.', { plugins: market }));
 const uses = readUses('.');
 const flowsManifest = `${FLOWS}/.claude-plugin/plugin.json`;
 const regen = 'run node scripts/flows-uses.mjs';
-if (JSON.stringify(JSON.parse(readFileSync(flowsManifest, 'utf8')).dependencies) !== JSON.stringify(expectedDeps(uses)))
+if (
+  JSON.stringify(JSON.parse(readFileSync(flowsManifest, 'utf8')).dependencies) !==
+  JSON.stringify(expectedDeps(uses, packs('.')))
+)
   problems.push(`${flowsManifest}: dependencies differ from the conductors' uses.json: ${regen}`);
 // A Windows checkout has CRLF; the generated tree is LF.
 const flowsReadme = readFileSync(`${FLOWS}/README.md`, 'utf8').replace(/\r\n/g, '\n');
 if (withTree(flowsReadme, renderTree(uses)) !== flowsReadme)
   problems.push(`${FLOWS}/README.md: uses tree is stale: ${regen}`);
 
-// --- one version: package.json and its lock, marketplace metadata.version, every local plugin.json and each Rust crate
-// (scripts/release.mjs) ---
+// --- one version: package.json and its lock, marketplace metadata.version, every local plugin.json (flows' packs too)
+// and each Rust crate (scripts/release.mjs) ---
 const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
 const lock = JSON.parse(readFileSync('package-lock.json', 'utf8'));
 for (const [where, v] of [
@@ -72,7 +75,7 @@ for (const [where, v] of [
 const marketVersion = JSON.parse(readFileSync(MARKETPLACE, 'utf8')).metadata?.version;
 if (marketVersion !== version)
   problems.push(`${MARKETPLACE}: metadata.version is ${marketVersion}, package.json has ${version}`);
-for (const dir of pluginDirs) {
+for (const dir of [...pluginDirs, ...packs('.').map((p) => `${PACKS}/${p}`)]) {
   const manifest = join(dir, '.claude-plugin', 'plugin.json');
   const v = existsSync(manifest) && JSON.parse(readFileSync(manifest, 'utf8')).version;
   if (v !== version) problems.push(`${manifest}: version is ${v}, package.json has ${version}`);

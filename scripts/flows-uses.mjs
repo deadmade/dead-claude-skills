@@ -5,6 +5,8 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 export const FLOWS = 'plugins/flows';
+// The skill packs flows carries, one synced folder each: no marketplace entry, read by path, never loaded on their own.
+export const PACKS = `${FLOWS}/packs`;
 export const OFFICIAL = 'claude-plugins-official';
 // Claude Code's own skills and agents (security-review, general-purpose): listed, never a dependency.
 export const BUILTIN = 'claude-code';
@@ -25,9 +27,19 @@ export function readUses(root) {
   );
 }
 
+// The pack names: the folders under PACKS.
+export const packs = (root) =>
+  existsSync(join(root, PACKS))
+    ? readdirSync(join(root, PACKS), { withFileTypes: true })
+        .filter((d) => d.isDirectory())
+        .map((d) => d.name)
+        .sort()
+    : [];
+
 // marketplace: the parsed marketplace.json. Returns problems as strings.
 export function checkUses(root, marketplace) {
   const problems = [];
+  const packNames = packs(root);
   for (const [conductor, uses] of Object.entries(readUses(root))) {
     const at = `${FLOWS}/skills/${conductor}/uses.json`;
     const valid =
@@ -45,13 +57,18 @@ export function checkUses(root, marketplace) {
         problems.push(`${at}: other conductors aren't listed`);
         continue;
       }
+      const pack = packNames.includes(plugin);
       const entry = marketplace.plugins.find((p) => p.name === plugin);
-      if (!entry && plugin !== BUILTIN && !plugin.endsWith(`@${OFFICIAL}`)) {
-        problems.push(`${at}: ${plugin} is not a plugin of this marketplace, …@${OFFICIAL} or ${BUILTIN}`);
+      if (!pack && !entry && plugin !== BUILTIN && !plugin.endsWith(`@${OFFICIAL}`)) {
+        problems.push(`${at}: ${plugin} is not a plugin of this marketplace, a pack, …@${OFFICIAL} or ${BUILTIN}`);
         continue;
       }
-      // Only local plugins with skills or agents can be checked offline; MCP servers and mods take tool names.
-      const dir = typeof entry?.source === 'string' ? join(root, entry.source) : undefined;
+      // Only packs and local plugins with skills or agents can be checked offline; MCP servers and mods take tool names.
+      const dir = pack
+        ? join(root, PACKS, plugin)
+        : typeof entry?.source === 'string'
+          ? join(root, entry.source)
+          : undefined;
       const checkable = dir && ['skills', 'agents', 'workflows'].some((d) => existsSync(join(dir, d)));
       const mcp =
         dir && existsSync(join(dir, '.mcp.json')) ? Object.keys(JSON.parse(readFileSync(join(dir, '.mcp.json')))) : [];
@@ -69,8 +86,11 @@ export function checkUses(root, marketplace) {
   return problems;
 }
 
-export const expectedDeps = (all) =>
-  [...new Set(Object.values(all).flatMap((uses) => Object.keys(uses ?? {})))].filter((p) => p !== BUILTIN).sort();
+// packNames: packs(root); flows carries those, so they are never a dependency.
+export const expectedDeps = (all, packNames) =>
+  [...new Set(Object.values(all).flatMap((uses) => Object.keys(uses ?? {})))]
+    .filter((p) => p !== BUILTIN && !packNames.includes(p))
+    .sort();
 
 export function renderTree(all) {
   const blocks = Object.entries(all).map(([conductor, uses]) => {
@@ -103,7 +123,7 @@ if (import.meta.main ?? process.argv[1] === import.meta.filename) {
   const all = readUses(root);
   const manifest = join(root, FLOWS, '.claude-plugin', 'plugin.json');
   const json = JSON.parse(readFileSync(manifest, 'utf8'));
-  json.dependencies = expectedDeps(all);
+  json.dependencies = expectedDeps(all, packs(root));
   writeFileSync(manifest, JSON.stringify(json, null, 2) + '\n');
   const readmePath = join(root, FLOWS, 'README.md');
   const readme = withTree(readFileSync(readmePath, 'utf8'), renderTree(all));

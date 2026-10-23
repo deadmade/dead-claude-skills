@@ -20,10 +20,10 @@ jobs:
 
       - name: Sanity checks
         run: |
-          jq empty .claude-plugin/marketplace.json plugins/shared/paper-lookup/.claude-plugin/plugin.json
-          test -s plugins/shared/paper-lookup/skills/paper-lookup/SKILL.md
-          ! grep -q "Citing Scientific Agent Skills" plugins/shared/paper-lookup/skills/paper-lookup/SKILL.md
-          echo "sha=$(cat plugins/shared/paper-lookup/skills/paper-lookup/UPSTREAM)" >> "$GITHUB_OUTPUT"
+          jq empty .claude-plugin/marketplace.json plugins/flows/packs/paper-lookup/.claude-plugin/plugin.json
+          test -s plugins/flows/packs/paper-lookup/skills/paper-lookup/SKILL.md
+          ! grep -q "Citing Scientific Agent Skills" plugins/flows/packs/paper-lookup/skills/paper-lookup/SKILL.md
+          echo "sha=$(cat plugins/flows/packs/paper-lookup/skills/paper-lookup/UPSTREAM)" >> "$GITHUB_OUTPUT"
         id: check
 
       - name: Open pull request
@@ -38,4 +38,4 @@ jobs:
             https://github.com/K-Dense-AI/scientific-agent-skills/commit/${{ steps.check.outputs.sha }}.
 
             cc @deadmade
-          add-paths: plugins/shared/paper-lookup/skills/paper-lookup
+          add-paths: plugins/flows/packs/paper-lookup/skills/paper-lookup

@@ -9,7 +9,7 @@ import { pathToFileURL } from 'node:url';
 import { ROOT, fail, finish, git, sparseClone } from './sync-lib.mjs';
 
 const UPSTREAM_URL = 'https://github.com/K-Dense-AI/scientific-agent-skills.git';
-const DEST = join(ROOT, 'plugins', 'shared', 'paper-lookup', 'skills', 'paper-lookup');
+const DEST = join(ROOT, 'plugins', 'flows', 'packs', 'paper-lookup', 'skills', 'paper-lookup');
 
 // references/<file>.md → the name upstream's tables use for it.
 export const DROPPED = {
