@@ -4211,6 +4211,7 @@ dependencies = [
  "tantivy",
  "tokio",
  "url",
+ "zip",
 ]
 
 [[package]]

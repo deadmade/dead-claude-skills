@@ -11,6 +11,7 @@ mod limits;
 mod lookup;
 mod papers;
 mod passages;
+mod profile;
 mod rank;
 mod search;
 mod tools;

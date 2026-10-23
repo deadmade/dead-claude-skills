@@ -232,9 +232,22 @@ impl Mcp {
     }
 
     /// In `project` (so a second server there sees the first one's `.web`), with extra environment.
+    /// Unless `envs` says otherwise, agent-browser is the fake, the browser a dummy file, and the search
+    /// folder a fresh one with Consent-O-Matic already unpacked: no test starts a browser or downloads.
     pub fn start_with(project: PathBuf, envs: &[(&str, String)]) -> Self {
+        let search = tempdir();
+        let ext = search.join("extensions/consent-o-matic-37cec881");
+        std::fs::create_dir_all(&ext).unwrap();
+        std::fs::write(ext.join("manifest.json"), "{}").unwrap();
+        std::fs::write(search.join("chrome"), "").unwrap();
         let mut cmd = Command::new(env!("CARGO_BIN_EXE_web-mcp"));
-        cmd.envs(envs.iter().map(|(k, v)| (k, v)))
+        cmd.env("WEB_MCP_SEARCH_DIR", &search)
+            .env("WEB_MCP_CHROME", search.join("chrome"))
+            .env(
+                "WEB_MCP_AGENT_BROWSER",
+                env!("CARGO_BIN_EXE_fake-agent-browser"),
+            )
+            .envs(envs.iter().map(|(k, v)| (k, v)))
             .env("CLAUDE_PROJECT_DIR", &project)
             .env("WEB_MCP_TEST_PUBLIC_IP", PUBLIC)
             .stdin(Stdio::piped())
