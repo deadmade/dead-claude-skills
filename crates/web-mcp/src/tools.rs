@@ -279,7 +279,7 @@ async fn browse(ctx: &Ctx, args: BrowserArgs) -> Result<CallToolResult, CallTool
         })
         .await
         .map_err(|e| error(format!("could not archive the screenshot: {e}")))?;
-    let path = archived.path.to_string_lossy().replace('\\', "/");
+    let path = fetch::slash(&archived.path);
     let mut content = vec![ContentBlock::text(format!(
         "{source}\n\nScreenshot archived at .web/{path}"
     ))];

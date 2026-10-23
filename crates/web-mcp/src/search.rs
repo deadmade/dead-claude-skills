@@ -3,7 +3,6 @@
 
 use std::collections::HashMap;
 use std::fmt::{self, Write as _};
-use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -16,7 +15,7 @@ use crate::Ctx;
 use crate::archive::Item;
 use crate::browser::{BrowserError, READ_MARGIN, SearchRun};
 use crate::engines::{Block, Engine, Found, Parsed};
-use crate::fetch::{self, GetOpts};
+use crate::fetch::{self, GetOpts, slash};
 use crate::fuse::{final_order, fuse, normalise};
 use crate::profile::{ENGINE_DEADLINE, REST, Ready};
 use crate::rank::{Hit, MemIndex, PassageDoc};
@@ -180,6 +179,8 @@ pub async fn run_engine(
         }
         Parsed::Blocked(b) => {
             profiles.rest(e, Timestamp::now() + REST);
+            // After the rest, a consent page gets a fresh clearing pass.
+            profiles.set_consent_seen(e, false);
             match b {
                 Block::Captcha => "captcha",
                 Block::Consent => "consent",
@@ -191,11 +192,6 @@ pub async fn run_engine(
         "{what} ({})",
         keep_page(ctx, url, landed, html).await
     ))
-}
-
-/// A path under `.web` as the output shows it, with `/` on Windows too.
-fn slashed(p: &Path) -> String {
-    p.to_string_lossy().replace('\\', "/")
 }
 
 /// Archives an engine page that held no results, for whoever fixes the parser; returns its `.web/` path.
@@ -211,7 +207,7 @@ async fn keep_page(ctx: &Ctx, url: Url, landed: Url, html: String) -> String {
         cache: false,
     });
     match put.await {
-        Ok(a) => format!(".web/{}", slashed(&a.path.with_file_name("raw.html"))),
+        Ok(a) => format!(".web/{}", slash(&a.path.with_file_name("raw.html"))),
         Err(e) => format!("not archived: {e}"),
     }
 }
@@ -356,7 +352,7 @@ pub async fn web(
     .await;
 
     let (record_path, searched_at) =
-        searched.map_or_else(Default::default, |a| (slashed(&a.path), a.time));
+        searched.map_or_else(Default::default, |a| (slash(&a.path), a.time));
     let mut docs: Vec<PassageDoc> = fused
         .iter()
         .flat_map(|r| {
@@ -376,7 +372,7 @@ pub async fn web(
             Ok(Err(fetch::FetchError::Blocked(_))) => blocked.push(url.to_string()),
             Ok(Err(e)) => failed.push(format!("{url} ({e})")),
             Ok(Ok(page)) => {
-                let path = slashed(&page.archived.path);
+                let path = slash(&page.archived.path);
                 // The requested URL, so the engines' order still finds the page after a redirect.
                 docs.extend(passages_of(&page, url, &path));
             }

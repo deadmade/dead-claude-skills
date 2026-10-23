@@ -52,7 +52,7 @@ pub async fn run(ctx: &Arc<Ctx>, target: &str, at: Option<&str>) -> CallToolResu
         Err(e) => return error(format!("Failed: Wayback Machine: {e}")),
     };
     let mut r = fetch::render(ctx, &f, false).await;
-    let full = f.archived.path.to_string_lossy().replace('\\', "/");
+    let full = crate::fetch::slash(&f.archived.path);
     if let Some(b) = r.content.first_mut()
         && let Some(t) = b.as_text()
     {

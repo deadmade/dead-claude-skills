@@ -249,6 +249,7 @@ fn second_consent_counts_as_blocked() {
     let t = text(&search(&mut mcp, json!({"query": "zebra"}))).to_owned();
     assert!(t.contains("(skipped: google: consent (.web/"), "{t}");
     assert!(mcp.search.join("google/rest").exists());
+    assert!(!mcp.search.join("google/consent-seen").exists());
 }
 
 #[cfg(debug_assertions)]
@@ -384,25 +385,23 @@ fn concurrent_searches_both_answer() {
 #[test]
 fn lock_won_late_starts_no_render() {
     let (_fx, pages) = setup();
-    let delay = ("FAKE_AB_DELAY_MS", "9000".to_owned());
+    // Both ask at once: the winner's 8 s render leaves it 2 s, the loser under READ_MARGIN of its 10 s.
+    let delay = ("FAKE_AB_DELAY_MS", "8000".to_owned());
     let a = start(&pages, std::slice::from_ref(&delay));
     let shared = ("WEB_MCP_SEARCH_DIR", a.search.display().to_string());
     let b = start(&pages, &[delay, shared]);
     let threads: Vec<_> = [a, b]
         .into_iter()
-        .enumerate()
-        .map(|(i, mut mcp)| {
+        .map(|mut mcp| {
             std::thread::spawn(move || {
-                // b asks 1 s after a, so it gets Bing's lock with under 2 s of its 10 left.
-                std::thread::sleep(Duration::from_secs(i as u64));
                 search(&mut mcp, json!({"query": "zebra", "engines": "bing"}))
             })
         })
         .collect();
     let rs: Vec<_> = threads.into_iter().map(|t| t.join().unwrap()).collect();
-    assert!(!is_error(&rs[0]), "{}", rs[0]);
-    assert!(is_error(&rs[1]), "{}", rs[1]);
-    assert_eq!(text(&rs[1]), "No engine answered: bing: timed out");
+    let (ok, lost): (Vec<_>, Vec<_>) = rs.iter().partition(|r| !is_error(r));
+    assert_eq!(ok.len(), 1, "{rs:?}");
+    assert_eq!(text(lost[0]), "No engine answered: bing: timed out");
     assert_eq!(opened(&pages, "www.bing.com"), 1);
 }
 
