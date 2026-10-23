@@ -115,6 +115,18 @@ test('checkOverrides: a changed sentence fails, naming file and line', () => {
   ]);
 });
 
+test('checkOverrides: *emphasis*, _emphasis_ and __strong__ in the pack are ignored', () => {
+  assert.deepEqual(overrides('Write the plan now.', 'Write *the* _plan_ __now__.\n'), []);
+});
+
+test('checkOverrides: a marker naming a directory is a problem, not a crash', () => {
+  const fx = mkdtempSync(join(tmpdir(), 'ov-'));
+  mkdirSync(join(fx, 'plugins/flows/packs/p/skills'), { recursive: true });
+  mkdirSync(join(fx, 'plugins/flows/skills/fix'), { recursive: true });
+  writeFileSync(join(fx, 'plugins/flows/skills/fix/SKILL.md'), '<!-- overrides p/skills: "x" -->');
+  assert.equal(checkOverrides(fx).length, 1);
+});
+
 test('checkOverrides: a missing pack file fails', () => {
   const fx = mkdtempSync(join(tmpdir(), 'ov-'));
   mkdirSync(join(fx, 'plugins/flows/skills/fix'), { recursive: true });

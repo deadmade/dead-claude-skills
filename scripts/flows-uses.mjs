@@ -1,7 +1,7 @@
 // Each flows conductor lists the skills, agents and tools it runs in its uses.json ({ plugin: [names] }).
 // From those lists come flows' plugin.json dependencies and the tree in its README; check-repo fails on drift.
 // Run directly to rewrite both.
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 export const FLOWS = 'plugins/flows';
@@ -90,7 +90,7 @@ export function checkUses(root, marketplace) {
 // Returns one problem per marker whose pack file is missing or no longer holds the sentence.
 // Bold marks and line wraps in the pack don't matter; the vendored packs/ and agents/ are not scanned.
 const MARKER = /<!--\s*overrides\s+(\S+?):\s*"(.*)"\s*-->/;
-const flat = (t) => t.replace(/\*\*/g, '').replace(/\s+/g, ' ');
+const flat = (t) => t.replace(/[*_]/g, '').replace(/\s+/g, ' ');
 export function checkOverrides(root) {
   const problems = [];
   const walk = (dir) =>
@@ -107,7 +107,8 @@ export function checkOverrides(root) {
         if (!m) return;
         const at = `${file}:${i + 1}`;
         const target = join(root, PACKS, m[1]);
-        if (!existsSync(target)) return problems.push(`${at}: overrides ${m[1]}, which does not exist`);
+        if (!existsSync(target) || !statSync(target).isFile())
+          return problems.push(`${at}: overrides ${m[1]}, which is not a file`);
         if (!flat(readFileSync(target, 'utf8')).includes(flat(m[2])))
           problems.push(`${at}: ${m[1]} no longer contains "${m[2]}"`);
       });
