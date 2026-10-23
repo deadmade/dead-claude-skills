@@ -75,8 +75,8 @@ only, severity low unless the wording misleads.
 
 ## Phase 6: Report
 
-The findings table per flow-rules **Reports**, severity by consequence per tob `spec-to-code-compliance`'s
-`resources/DIVERGENCE_RUBRIC.md`. A fix changes the doc to match the code. When the code looks like the
-bug (the doc describes the intended behaviour), say so: that finding's options are fix the code or fix the doc, and
+The findings table per flow-rules **Reports**, severity by consequence per
+`<packs>/tob-picks/skills/spec-to-code-compliance/resources/DIVERGENCE_RUBRIC.md`. A fix changes the doc to match the
+code. When the code looks like the bug (the doc describes the intended behaviour), say so: that finding's options are fix the code or fix the doc, and
 the user picks. A vendored doc's fix goes into its sync script's transform. After the fixes, re-run Phases 2 and 4 on
 the changed docs.

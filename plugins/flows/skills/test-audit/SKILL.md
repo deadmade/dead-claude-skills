@@ -42,8 +42,8 @@ it follows:
 
 - **Mutation:** tob `mutation-testing` when its tools (mewt, muton) support the language and are installed; read its
   results with its `workflows/analyzing-results.md`, and drop equivalent mutants (same behaviour) by
-  `references/equivalent-mutants.md`. Else the language's own tool if already installed (cargo-mutants, Stryker,
-  mutmut, PIT); offer to install one only with the cost (time per run). Else by hand: per scoped function, the
+  `<packs>/tob-picks/skills/mutation-testing/references/equivalent-mutants.md`. Else the language's own tool if
+  already installed (cargo-mutants, Stryker, mutmut, PIT); offer to install one only with the cost (time per run). Else by hand: per scoped function, the
   mutations in superpowers `test-driven-development`'s `writing-good-tests.md` (The Mutation Check) and the tests
   that cover it. Mutants run in a scratch `git worktree` of `git stash create` (HEAD when the tree is clean) with the
   scope's untracked files copied in, never in the user's tree; nothing there is committed. A surviving mutant is a
@@ -62,8 +62,8 @@ it follows:
 
 The findings table per flow-rules **Reports**, `kind` in the finding: missing test, surviving mutant (with the
 mutant as a diff), property candidate (with the property), untested requirement, smell, delete candidate. Rank by
-what a real bug there would cost, not by count: tob `mutation-testing`'s `references/severity-classification.md` for
-mutants, mapped onto high, med and low, with the source scale kept in the evidence.
+what a real bug there would cost, not by count:
+`<packs>/tob-picks/skills/mutation-testing/references/severity-classification.md` for mutants, mapped onto high, med and low, with the source scale kept in the evidence.
 
 ## Phase 5: Fill
 
@@ -78,8 +78,8 @@ Per picked finding, superpowers `test-driven-development`:
 3. Delete candidates: delete, and show the mutants the deleted test killed are still killed.
 
 Fill changes tests only. A production edit goes to the user first. A test or property that fails on the real code
-stops that pick: classify it by tob `property-based-testing`'s `references/interpreting-failures.md` (a bug, an
-ambiguous spec or a wrong test) and ask the user; a bug goes to `/fix-flow`.
+stops that pick: classify it by
+`<packs>/tob-picks/skills/property-based-testing/references/interpreting-failures.md` (a bug, an ambiguous spec or a wrong test) and ask the user; a bug goes to `/fix-flow`.
 
 Then re-run the suite (called from `/verify`, its Phase 6 does that) and the mutation probe on the touched area, and
 put the before and after survivor counts in the report.

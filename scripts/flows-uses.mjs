@@ -91,15 +91,16 @@ export function checkUses(root, marketplace) {
 // Bold marks and line wraps in the pack don't matter; the vendored packs/ and agents/ are not scanned.
 const MARKER = /<!--\s*overrides\s+(\S+?):\s*"(.*)"\s*-->/;
 const flat = (t) => t.replace(/[*_]/g, '').replace(/\s+/g, ' ');
+// flows' own .md files, the vendored packs/ and agents/ left out.
+const conductorDocs = (root, dir = FLOWS) =>
+  readdirSync(join(root, dir), { withFileTypes: true }).flatMap((e) => {
+    const rel = `${dir}/${e.name}`;
+    if (e.isDirectory()) return rel === PACKS || rel === `${FLOWS}/agents` ? [] : conductorDocs(root, rel);
+    return e.name.endsWith('.md') ? [rel] : [];
+  });
 export function checkOverrides(root) {
   const problems = [];
-  const walk = (dir) =>
-    readdirSync(join(root, dir), { withFileTypes: true }).flatMap((e) => {
-      const rel = `${dir}/${e.name}`;
-      if (e.isDirectory()) return rel === PACKS || rel === `${FLOWS}/agents` ? [] : walk(rel);
-      return e.name.endsWith('.md') ? [rel] : [];
-    });
-  for (const file of walk(FLOWS)) {
+  for (const file of conductorDocs(root)) {
     readFileSync(join(root, file), 'utf8')
       .split(/\r?\n/)
       .forEach((line, i) => {
@@ -111,6 +112,26 @@ export function checkOverrides(root) {
           return problems.push(`${at}: overrides ${m[1]}, which is not a file`);
         if (!flat(readFileSync(target, 'utf8')).includes(flat(m[2])))
           problems.push(`${at}: ${m[1]} no longer contains "${m[2]}"`);
+      });
+  }
+  return problems;
+}
+
+// Every `<packs>/…` or `${CLAUDE_PLUGIN_ROOT}/packs/…` path a conductor names must exist. A path ends at whitespace,
+// a backtick, a quote or a bracket; one with a placeholder (`<pack>`, `…`, `*`) is skipped.
+// shortcut: bare names (`references/x.md`) and paths broken across a line aren't seen; name the full pack path instead.
+const PACK_PATH = /(?:\$\{CLAUDE_PLUGIN_ROOT\}\/packs|<packs>)\/([^\s`'"()[\]]+)/g;
+export function checkPackPaths(root) {
+  const problems = [];
+  for (const file of conductorDocs(root)) {
+    readFileSync(join(root, file), 'utf8')
+      .split(/\r?\n/)
+      .forEach((line, i) => {
+        for (const [, raw] of line.matchAll(PACK_PATH)) {
+          const path = raw.replace(/[.,;:]+$/, '');
+          if (/[<>…*]/.test(path) || existsSync(join(root, PACKS, path))) continue;
+          problems.push(`${file}:${i + 1}: <packs>/${path} does not exist`);
+        }
       });
   }
   return problems;
