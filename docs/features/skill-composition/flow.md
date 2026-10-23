@@ -460,6 +460,8 @@ Calls the build made on its own (not deviation-class), one line each, as they ar
 - 2026-10-23, Task 1: measure.mjs got test-only `--projects`/`--flows` options. I treated these as test seams of a throwaway docs script, not a product interface.
 - 2026-10-23, Task 1: known, deferred to the final review: a session touching two slugs counts in both runs (web-mcp and website-mcp-server share 253 bash edits).
 
+- 2026-10-23, Tasks 3+4: the packs keep their own `.claude-plugin/plugin.json`, because the installer tarball only ships `plugin.json` files and the installer lists the packs from them; release.mjs and check-repo's version check now cover `packs/`. `claude plugin validate plugins/flows` passes, and a static check finds nothing from the packs at flows' root. Committed with `SKIP=end-of-file-fixer`: the nix-generated hook config still excludes the old paths until `nix develop` regenerates it.
+
 ## Deviations
 
 - 2026-10-23, Task 2: pstack upstream deleted the line the spec relies on.
@@ -475,6 +477,13 @@ Calls the build made on its own (not deviation-class), one line each, as they ar
   - Recommended (c). Owner's decision (2026-10-23): (c), "Write the line ourselves". The sync was set aside in
     stash `c5b75b7` (tag `skill-composition-task2-pstack-head-sync`); nothing from pstack HEAD lands on this branch.
     Task 2 becomes a no-op; the line goes into flow-rules in Task 6, credited to pstack's earlier version.
+
+- 2026-10-23, Tasks 3+4: the security hook flagged the sync-tob transform, which ran tob's spec checker as
+  `general-purpose` (all tools) instead of its own agent (Read, Grep, Glob, Write) while it reads untrusted docs.
+  - Options: ship the checker in flows' `agents/`; a read-only Explore agent; accept general-purpose (upstream's own
+    fallback does the same).
+  - Owner (2026-10-23): "Ship the checker in flows". sync-tob copies the agent into `plugins/flows/agents/`, and the
+    workflow dispatches `flows:spec-compliance-checker`.
 
 ## Results
 
