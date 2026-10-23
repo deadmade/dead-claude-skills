@@ -11,7 +11,6 @@ use url::Url;
 use crate::Ctx;
 use crate::archive::Item;
 use crate::engines::{Engine, Found};
-use crate::rank::PassageDoc;
 use crate::search::{Filter, Since, run_engine};
 
 /// Records asked of a list query.
@@ -568,32 +567,6 @@ impl fmt::Display for PapersOutput {
     }
 }
 
-/// One passage per abstract, at the paper's landing page.
-fn passages(papers: &[Paper], path: &str) -> Vec<PassageDoc> {
-    let fetched = jiff::Timestamp::now().to_string();
-    papers
-        .iter()
-        .filter(|p| !p.abstract_text.is_empty())
-        .map(|p| PassageDoc {
-            text: p.abstract_text.clone(),
-            url: p
-                .oa_url
-                .as_ref()
-                .map(Url::to_string)
-                .or_else(|| p.doi.as_ref().map(|d| format!("https://doi.org/{d}")))
-                .or_else(|| {
-                    p.arxiv
-                        .as_ref()
-                        .map(|a| format!("https://arxiv.org/abs/{a}"))
-                })
-                .unwrap_or_default(),
-            title: p.title.clone(),
-            path: path.to_owned(),
-            fetched: fetched.clone(),
-        })
-        .collect()
-}
-
 fn label(e: Engine) -> &'static str {
     match e {
         Engine::Scholar => "Google Scholar",
@@ -784,22 +757,14 @@ pub async fn search(ctx: &Ctx, query: &str, f: &Filter) -> PapersOutput {
         })
         .collect();
     // A failed archive write must not lose the answer.
-    let path = ctx
+    let _ = ctx
         .archive
         .put(Item::Search {
             query: query.to_owned(),
             filter: f.describe(true),
             json: json!({"query": query, "papers": records, "skipped": skipped}).to_string(),
         })
-        .await
-        .map(|a| crate::fetch::slash(&a.path))
-        .unwrap_or_default();
-    let docs = passages(&papers, &path);
-    if !docs.is_empty()
-        && let Err(e) = ctx.index.add(docs).await
-    {
-        eprintln!("web-mcp: could not index abstracts: {e:#}");
-    }
+        .await;
     PapersOutput {
         papers,
         failed,

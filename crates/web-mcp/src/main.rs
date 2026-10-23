@@ -30,7 +30,6 @@ pub struct Ctx {
     pub archive: archive::Archive,
     pub inflight: fetch::Inflight,
     pub lookup: lookup::Cache,
-    pub index: rank::Index,
     /// `Err` without a search folder: then only `search` fails.
     pub profiles: Result<profile::Profiles, String>,
     pub browser: browser::Browser,
@@ -49,7 +48,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let http = fetch::client(false)?;
     let ctx = Ctx {
         profiles: profile::Profiles::new(cfg.search_dir.clone()),
-        index: rank::Index::open(archive.web())?,
         archive,
         browser: browser_from(&cfg),
         http,

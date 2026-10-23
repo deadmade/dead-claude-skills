@@ -40,10 +40,10 @@ you are researching. Shodan InternetDB is free for non-commercial use only.
 ## The archive
 
 `.web/<date>_<run>/` holds an `index.jsonl` plus the searches, pages, PDFs and screenshots of one server run. `.web/`
-writes its own `.gitignore`. `.web/index/` is the BM25 passage index shared by all runs. Every lookup reply goes under `lookups/<kind>/` as one JSON file per source. Lookups are not
-answered from the archive (each asks again) and not added to the search index; a wayback snapshot read with `at` is a
-page, and is. Archived items are never
-deleted, so it grows; delete it by hand only while no server is running, since the index is memory-mapped.
+writes its own `.gitignore`. `.web/index/` is no longer written; an old one can be deleted. Every lookup reply goes under `lookups/<kind>/` as one JSON file per source. Lookups are not
+answered from the archive (each asks again) and a wayback snapshot read with `at` is a
+page. Archived items are never
+deleted, so it grows; delete it by hand if you like.
 
 ## Install
 
