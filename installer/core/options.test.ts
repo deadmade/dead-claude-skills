@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { optIns, manifestPath, INCLUDED, BUNDLE, type Marketplace, type PluginJson } from './plugins.ts';
-import { dcgCommand, CATEGORIES, TOGGLES, categorize, unavailable, searxngRun, searxngSettings } from './options.ts';
+import { dcgCommand, CATEGORIES, TOGGLES, categorize, unavailable } from './options.ts';
 
 const json = (p: string) => JSON.parse(readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8'));
 const marketplace: Marketplace = json('.claude-plugin/marketplace.json');
@@ -72,19 +72,4 @@ test('options hidden per platform', () => {
     assert.equal(unavailable(k, 'darwin', 'arm64', '1.0.0'), undefined);
   }
   assert.equal(unavailable(`tui-review@${M}`, 'linux', 'x64', '1.0.0'), undefined);
-});
-
-test('searxng binds loopback, mounts the config dir and takes the secret', () => {
-  const args = searxngRun('/c/searxng');
-  assert.ok(args.includes('127.0.0.1:8888:8080'));
-  assert.ok(args.includes('/c/searxng:/etc/searxng/'));
-  const tpl = readFileSync(new URL('../assets/searxng.yml', import.meta.url), 'utf8');
-  const out = searxngSettings(tpl, 'abc123');
-  assert.match(out, /secret_key: "abc123"/);
-  assert.doesNotMatch(out, /changeme/);
-  assert.match(out, /- json/);
-  // \r?: Windows checkouts turn the template's line endings into CRLF.
-  assert.match(out, /name: bing\r?\n\s+disabled: false/);
-  for (const e of ['duckduckgo', 'brave', 'google cse'])
-    assert.match(out, new RegExp(`name: ${e}\\r?\\n\\s+disabled: true`));
 });

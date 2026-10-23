@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   missingBinaries,
+  newestChromeForTesting,
   agentBrowserAction,
   agentBrowserAsset,
   agentBrowserPlan,
@@ -149,4 +150,13 @@ test('agent-browser plan: a current PATH copy wins, else ours, downloaded only w
     use: 'ours',
     download: 'upgrade',
   });
+});
+
+test('newestChromeForTesting picks the newest version', () => {
+  assert.equal(
+    newestChromeForTesting(['chrome-99.0.1.2', 'chrome-156.0.7.1', 'chrome-156.0.10.1', 'notes', 'chrome-1.2.3']),
+    'chrome-156.0.10.1',
+  );
+  assert.equal(newestChromeForTesting(['x', 'chrome-1.2.3']), undefined);
+  assert.equal(newestChromeForTesting([]), undefined);
 });

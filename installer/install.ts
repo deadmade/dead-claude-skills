@@ -50,13 +50,12 @@ import {
   remove,
   tryJson,
 } from './context.ts';
-import { applyAgentBrowser } from './steps/agent-browser.ts';
+import { configureAgentBrowser, installAgentBrowser } from './steps/agent-browser.ts';
 import { TUI_REVIEW, WEB_MCP, applyBin } from './steps/binaries.ts';
 import { applyCcstatusline } from './steps/ccstatusline.ts';
 import { confirmClean } from './steps/clean.ts';
 import { applyDcg } from './steps/dcg.ts';
 import { addMarketplaces, applyPlugins, listed, removeForeign } from './steps/plugins.ts';
-import { applySearxng } from './steps/searxng.ts';
 import { applySettings } from './steps/settings.ts';
 import { clearTargets } from './system/files.ts';
 import { trustSystemCerts } from './system/net.ts';
@@ -150,7 +149,7 @@ const chosen: Record<string, boolean> = {
   // flows replaced feature-flow and brings the picks: a machine that had either keeps them.
   [FLOWS]: current[FLOWS] || has(`feature-flow@${MARKETPLACE}`) || INCLUDED.some(has),
   // On by default where offered, until web-mcp is installed; then it keeps the user's choice. It does nothing unless
-  // web-mcp is selected and SearXNG answers.
+  // web-mcp is selected and its search browser works.
   'web-builtins-off': has(WEB_MCP)
     ? current['web-builtins-off']
     : unavailable('web-builtins-off', process.platform, process.arch, VERSION) === undefined,
@@ -258,11 +257,13 @@ await applyPlugins({
 if (selected.includes(TUI_REVIEW)) await applyBin('tui-review', TUI_REVIEW);
 if (selected.includes(WEB_MCP)) await applyBin('web-mcp', WEB_MCP);
 
+// The built-in web tools are denied only once web-mcp's search browser works.
+const browser = selected.includes(WEB_MCP) ? await installAgentBrowser() : { works: false };
 const webBuiltinsOff = webBuiltinsDecision({
   toggle: selected.includes(WEB_MCP) && on('web-builtins-off'),
   was: current['web-builtins-off'],
   installed: has(WEB_MCP),
-  healthy: selected.includes(WEB_MCP) && (await applySearxng(current['web-builtins-off'])),
+  healthy: browser.works,
 });
 
 const toggles = {
@@ -276,7 +277,7 @@ await applySettings(toggles, { strip, reset: clean });
 const autoUpdate = tryJson(join(CONFIG, 'plugins', 'known_marketplaces.json'))?.[MARKETPLACE]?.autoUpdate;
 await applyCcstatusline(current.ccstatusline, on('ccstatusline'));
 await applyDcg(current.dcg, on('dcg'));
-if (selected.includes(WEB_MCP)) await applyAgentBrowser();
+if (browser.path) await configureAgentBrowser(browser.path);
 if (clean) done.push(...clearTargets(CONFIG));
 // The global instructions moved into a dead-skills SessionStart hook; the old file would duplicate them.
 remove(RULES, RULES);

@@ -220,7 +220,6 @@ test('web builtins: tri-state merge keeps other denies, toggle reads deny', () =
   assert.ok(!isWebBuiltinsOff(back));
   assert.ok(!isWebBuiltinsOff({ permissions: { deny: ['WebFetch'] } }));
   assert.ok(TOGGLES.includes('web-builtins-off') && HINTS['web-builtins-off']);
-  assert.ok(missingBinaries('linux', ['web-mcp'], () => false).some((r) => r.binary === 'docker'));
 });
 
 test('web builtins decision table', () => {
