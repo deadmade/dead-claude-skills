@@ -51,10 +51,21 @@ phase: ground
 
 <!-- Round N: findings, the user's decision on each, what changed. -->
 
+## Rulings
+
+<!-- Calls the build made on its own (not deviation-class), one line each, as they are made. -->
+
 ## Deviations
+
+<!-- Per task: `Task <N>: base <sha>`, then `files clean` or the deviation. Each deviation: what, why the plan
+doesn't hold, options with a recommendation, the user's decision. -->
 
 ## Walkthrough
 
 | spec goal | plan task | file:line | test |
 | --------- | --------- | --------- | ---- |
+
+## Verdict
+
+<!-- The user's, at Finish: worked as a whole: yes | no; clean: yes | no. -->
 ```
