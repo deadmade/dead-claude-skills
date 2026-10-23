@@ -216,7 +216,7 @@ mod tests {
         Url::parse(s).unwrap()
     }
 
-    /// The rows of a page that must parse: at least five, the first complete and (for web engines) off `own`.
+    /// The rows of a page that must parse: at least five, the first complete and (for web engines) off the search host `own`.
     pub(super) fn assert_results(parsed: Parsed, own: Option<&str>) -> Vec<Found> {
         let Parsed::Results(found) = parsed else {
             panic!("not results: {parsed:?}");
@@ -229,7 +229,10 @@ mod tests {
             "{first:?}"
         );
         if let Some(own) = own {
-            assert!(found.iter().all(|f| !on_domain(&f.url, own)), "{found:?}");
+            assert!(
+                found.iter().all(|f| f.url.host_str() != Some(own)),
+                "{found:?}"
+            );
         }
         found
     }
@@ -314,6 +317,19 @@ mod tests {
             .to_zoned(jiff::tz::TimeZone::UTC)
             .year();
         assert_eq!(ylo, (this_year - 1).to_string());
+    }
+
+    #[test]
+    fn repeated_urls_yield_one_row() {
+        let html = r#"<div id="gs_res_ccl_mid">
+            <div class="gs_r gs_or"><h3 class="gs_rt"><a href="https://a.org/p">One</a></h3></div>
+            <div class="gs_r gs_or"><h3 class="gs_rt"><a href="https://a.org/p">Again</a></h3></div></div>"#;
+        let Parsed::Results(found) = Engine::Scholar.parse(html, &Engine::Scholar.url("x", None))
+        else {
+            panic!("no rows");
+        };
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].title, "One");
     }
 
     #[test]

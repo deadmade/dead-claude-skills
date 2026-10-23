@@ -32,7 +32,7 @@ pub(super) fn url(query: &str, since: Option<Since>) -> Url {
 
 pub(super) fn parse(doc: &Document, page: &Url) -> Parsed {
     let found = doc
-        .select(".gs_r.gs_or")
+        .select("#gs_res_ccl_mid .gs_r.gs_or")
         .iter()
         .filter_map(|r| {
             let a = r.select("h3.gs_rt a[href]").first();

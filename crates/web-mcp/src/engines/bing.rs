@@ -71,7 +71,7 @@ pub(super) fn parse(doc: &Document, page: &Url) -> Parsed {
                 snippet,
             )
         })
-        .filter(|f: &Found| !on_domain(&f.url, "bing.com"))
+        .filter(|f: &Found| f.url.host() != page.host())
         .collect();
     let block = captcha_if(
         doc,
@@ -100,7 +100,7 @@ mod tests {
 
     #[test]
     fn bing_parses_fixture() {
-        assert_results(Engine::Bing.parse(PAGE, &page()), Some("bing.com"));
+        assert_results(Engine::Bing.parse(PAGE, &page()), Some("www.bing.com"));
     }
 
     #[test]
@@ -117,7 +117,7 @@ mod tests {
             .iter()
             .filter_map(|a| a.attr("href"))
             .collect();
-        let found = assert_results(Engine::Bing.parse(ADS, &page()), Some("bing.com"));
+        let found = assert_results(Engine::Bing.parse(ADS, &page()), Some("www.bing.com"));
         assert_eq!(found.len(), doc.select("#b_results > li.b_algo").length());
         assert!(
             found

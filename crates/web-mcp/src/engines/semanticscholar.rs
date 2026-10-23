@@ -30,7 +30,9 @@ pub(super) fn parse(doc: &Document, page: &Url) -> Parsed {
         .select("[data-test-id=\"search-result\"], .cl-paper-row")
         .iter()
         .filter_map(|r| {
-            let a = r.select("a[href^=\"/paper/\"]").first();
+            let a = r
+                .select("a[href^=\"/paper/\"], a[href^=\"https://www.semanticscholar.org/paper/\"]")
+                .first();
             let snippet = first_text(&r, ".cl-paper-abstract, [data-test-id=\"abstract-text\"]");
             row(page, &a.attr("href")?, text(&a), snippet)
         })
@@ -91,11 +93,16 @@ mod tests {
     fn semanticscholar_keeps_paper_pages() {
         let html = r#"<div data-test-id="search-result"><a href="/paper/abc123">A paper</a>
             <div class="cl-paper-abstract">About it</div></div>
-            <div data-test-id="search-result"><a href="/author/9">Someone</a></div>"#;
+            <div data-test-id="search-result"><a href="/author/9">Someone</a></div>
+            <div data-test-id="search-result"><a href="https://www.semanticscholar.org/paper/def456">Another</a></div>"#;
         let Parsed::Results(found) = Engine::SemanticScholar.parse(html, &page()) else {
             panic!("no rows");
         };
-        assert_eq!(found.len(), 1);
+        assert_eq!(found.len(), 2);
+        assert_eq!(
+            found[1].url.as_str(),
+            "https://www.semanticscholar.org/paper/def456"
+        );
         assert_eq!(
             found[0].url.as_str(),
             "https://www.semanticscholar.org/paper/abc123"

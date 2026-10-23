@@ -259,7 +259,7 @@ from a capture.
   );
   ```
 
-- **brave**: results checked; no-results and block unverified (Brave never showed either).
+- **brave**: results checked; no-results and block unverified (Brave never showed either). The block marker is DOM only, `#captcha, form[action*="captcha"]`: no title or path test, because Brave puts the query in the title (R14).
 
   ```js
   !!(
@@ -268,7 +268,6 @@ from a capture.
       /No results found|Not many great matches/.test(
         (document.querySelector('#results, main') || {}).innerText || '',
       ) ||
-      /captcha/i.test(location.pathname + ' ' + document.title) ||
       document.querySelector('#captcha, form[action*="captcha"]'))
   );
   ```

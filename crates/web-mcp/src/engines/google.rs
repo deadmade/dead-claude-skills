@@ -63,14 +63,14 @@ pub(super) fn parse(doc: &Document, page: &Url) -> Parsed {
                 snippet,
             )
         })
-        .filter(|f: &Found| !on_domain(&f.url, "google.com"))
+        .filter(|f: &Found| f.url.host() != page.host())
         .collect();
     let block = if page.host_str() == Some("consent.google.com")
         || doc.select("form[action*=\"consent.google.com\"]").exists()
     {
         Some(Block::Consent)
     } else {
-        captcha_if(doc, "#captcha-form")
+        captcha_if(doc, "#captcha-form, form[action=\"index\"] #recaptcha")
             .or_else(|| page.path().starts_with("/sorry").then_some(Block::Captcha))
     };
     let none =
@@ -104,7 +104,7 @@ mod tests {
     fn google_parses_fixture() {
         assert_results(
             Engine::Google.parse(&fixture("google.html"), &page()),
-            Some("google.com"),
+            Some("www.google.com"),
         );
     }
 
@@ -127,6 +127,17 @@ mod tests {
         assert_eq!(found[0].url.as_str(), "https://tokio.rs/x");
         assert_eq!(found[0].title, "Tokio");
         assert_eq!(found[0].snippet, "An runtime");
+    }
+
+    #[test]
+    fn google_keeps_other_google_hosts() {
+        let html = r#"<div id="rso"><div class="g"><a href="https://developers.google.com/x"><h3>Docs</h3></a></div>
+            <div class="g"><a href="https://www.google.com/aclk?x"><h3>Ad</h3></a></div></div>"#;
+        let Parsed::Results(found) = Engine::Google.parse(html, &page()) else {
+            panic!("no rows");
+        };
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].url.host_str(), Some("developers.google.com"));
     }
 
     #[test]

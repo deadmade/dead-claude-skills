@@ -4,7 +4,7 @@
 use dom_query::Document;
 use url::Url;
 
-use super::{Found, Parsed, Since, captcha_if, first_text, on_domain, row, text, verdict};
+use super::{Found, Parsed, Since, captcha_if, first_text, row, verdict};
 
 pub(super) const READY: &str = r#"!!(
   document.body &&
@@ -12,7 +12,6 @@ pub(super) const READY: &str = r#"!!(
     /No results found|Not many great matches/.test(
       (document.querySelector('#results, main') || {}).innerText || '',
     ) ||
-    /captcha/i.test(location.pathname + ' ' + document.title) ||
     document.querySelector('#captcha, form[action*="captcha"]'))
 );"#;
 
@@ -48,15 +47,10 @@ pub(super) fn parse(doc: &Document, page: &Url) -> Parsed {
                 first_text(&snippet, ".generic-snippet .content"),
             )
         })
-        .filter(|f: &Found| !on_domain(&f.url, "brave.com"))
+        .filter(|f: &Found| f.url.host() != page.host())
         .collect();
-    // The page title is the only block marker that isn't a guess about an element.
-    let block = captcha_if(doc, "#captcha, form[action*=\"captcha\"]").or_else(|| {
-        text(&doc.select("title"))
-            .to_lowercase()
-            .contains("captcha")
-            .then_some(super::Block::Captcha)
-    });
+    // No title check: Brave puts the query in the title (R14).
+    let block = captcha_if(doc, "#captcha, form[action*=\"captcha\"]");
     verdict(found, block, false)
 }
 
@@ -73,7 +67,7 @@ mod tests {
 
     #[test]
     fn brave_parses_fixture() {
-        let found = assert_results(Engine::Brave.parse(PAGE, &page()), Some("brave.com"));
+        let found = assert_results(Engine::Brave.parse(PAGE, &page()), Some("search.brave.com"));
         assert_eq!(found.len(), 20);
     }
 
@@ -84,8 +78,15 @@ mod tests {
     }
 
     #[test]
+    fn brave_ignores_captcha_in_the_title() {
+        let html =
+            "<html><head><title>captcha solver - Brave Search</title></head><body></body></html>";
+        assert_eq!(Engine::Brave.parse(html, &page()), Parsed::Unrecognised);
+    }
+
+    #[test]
     fn brave_captcha_is_a_block() {
-        let html = "<html><head><title>Captcha</title></head><body></body></html>";
+        let html = "<html><body><div id=\"captcha\"></div></body></html>";
         assert_eq!(
             Engine::Brave.parse(html, &page()),
             Parsed::Blocked(Block::Captcha)

@@ -3,7 +3,7 @@
 use dom_query::Document;
 use url::Url;
 
-use super::{Found, Parsed, Since, captcha_if, first_text, on_domain, row, text, verdict};
+use super::{Found, Parsed, Since, captcha_if, first_text, row, text, verdict};
 
 pub(super) const READY: &str = r#"!!(
   document.body &&
@@ -41,7 +41,7 @@ pub(super) fn parse(doc: &Document, page: &Url) -> Parsed {
             let snippet = first_text(&article, "[data-result=\"snippet\"]");
             row(page, &a.attr("href")?, text(&a), snippet)
         })
-        .filter(|f: &Found| !on_domain(&f.url, "duckduckgo.com"))
+        .filter(|f: &Found| f.url.host() != page.host())
         .collect();
     let block = captcha_if(doc, "a[href^=\"mailto:error-lite\"], .anomaly-modal__title");
     let none = doc
