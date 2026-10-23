@@ -28,7 +28,7 @@ futures = { version = "0.3", default-features = false, features = ["std"] }
 base64 = "0.23"
 zip = { version = "=9.0.5", default-features = false, features = ["deflate"] }
 # Without zstd: no C toolchain needed to build.
-tantivy = { version = "=0.27.0", default-features = false, features = ["mmap", "lz4-compression"] }
+tantivy = { version = "=0.27.0", default-features = false }
 model2vec-rs = { version = "0.3.0", optional = true }
 
 [target.'cfg(unix)'.dependencies]

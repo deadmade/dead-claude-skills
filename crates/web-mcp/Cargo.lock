@@ -1183,16 +1183,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fs4"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8640e34b88f7652208ce9e88b1a37a2ae95227d84abec377ccd3c5cfeb141ed4"
-dependencies = [
- "rustix",
- "windows-sys 0.59.0",
-]
-
-[[package]]
 name = "futures"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1941,12 +1931,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "linux-raw-sys"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
-
-[[package]]
 name = "litemap"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1975,12 +1959,6 @@ checksum = "ef9ac18847474e638e3702b76c65d4eb93428471a74778ef0f1be711717f89b5"
 dependencies = [
  "hashbrown",
 ]
-
-[[package]]
-name = "lz4_flex"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ecbdfe44b1bd960b68170b417450a628c43f7cf56bb3c5317e61cb230ee7f226"
 
 [[package]]
 name = "macro_rules_attribute"
@@ -2066,15 +2044,6 @@ name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
-
-[[package]]
-name = "memmap2"
-version = "0.9.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b0ca1155a9ecc25aa12e8313a119f32edf0255fea2f44839c4ac0a12b2ac157"
-dependencies = [
- "libc",
-]
 
 [[package]]
 name = "minimal-lexical"
@@ -2944,19 +2913,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustix"
-version = "1.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "891efababe418670775f199f0d233d84843c227a0949a883ce15b37c78d6629d"
-dependencies = [
- "bitflags 2.13.2",
- "errno",
- "libc",
- "linux-raw-sys",
- "windows-sys 0.61.2",
-]
-
-[[package]]
 name = "rustls"
 version = "0.23.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3495,15 +3451,12 @@ dependencies = [
  "downcast-rs",
  "fastdivide",
  "fnv",
- "fs4",
  "htmlescape",
  "itertools 0.14.0",
  "levenshtein_automata",
  "log",
  "lru",
- "lz4_flex",
  "measure_time",
- "memmap2",
  "once_cell",
  "oneshot",
  "rayon",
@@ -3521,7 +3474,6 @@ dependencies = [
  "tantivy-query-grammar",
  "tantivy-stacker",
  "tantivy-tokenizer-api",
- "tempfile",
  "thiserror",
  "time",
  "typetag",
@@ -3623,19 +3575,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eac258c2c6390673f2685813afeeafcb8c4e0ee7de8dd3fc46838dcc37263f98"
 dependencies = [
  "serde",
-]
-
-[[package]]
-name = "tempfile"
-version = "3.27.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
-dependencies = [
- "fastrand",
- "getrandom 0.4.3",
- "once_cell",
- "rustix",
- "windows-sys 0.61.2",
 ]
 
 [[package]]
