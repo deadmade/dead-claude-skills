@@ -233,6 +233,36 @@ extensions? yes".
 
 ## Deviations
 
+**D-1 (Task 1, 2026-10-23): the spike can't run here, and Chrome for Testing doesn't start on NixOS.**
+- **What happened:**
+  - The Claude Code Bash sandbox's seccomp filter forbids AF_UNIX sockets. On Linux the agent-browser 0.39.1
+    daemon only listens on a Unix socket (`Failed to bind socket: Operation not permitted`).
+  - The downloaded Chrome for Testing 156 doesn't start on this NixOS machine
+    (`libglib-2.0.so.0: cannot open shared object file`): nix-ld is active but lacks 26 of its libraries.
+  - There is no other Chrome or Chromium on the machine. So the `browser` tool and the fetch fallback don't work
+    here today either.
+- **Why the plan doesn't hold:**
+  - Task 1 can't measure anything inside the sandbox.
+  - "Chrome for Testing from `agent-browser install`" can't be the only browser on NixOS, and a "file exists"
+    check doesn't prove that it starts.
+- **Done (Steps 1–3):**
+  - agent-browser's sha256 matches the pin.
+  - Chrome for Testing lands in `<home>/.agent-browser/browsers/chrome-<version>/`.
+  - The Consent-O-Matic zip matches the pin; it opens its welcome tab once and loads its rules from
+    raw.githubusercontent.com.
+  - `wait --fn` exists.
+- **Resolution (2026-10-23):** the user turned the sandbox off; the controller re-ran the spike in Helium 0.18.1.1
+  (Chromium 154). User: "I know this error and is the usual for Google etc. let's continue with the implementation".
+  - Found: every call needs `--config`; `args` splits on commas; `~/.agent-browser/config.json` merges in; `open`
+    reports ✓ on a blank page; Consent-O-Matic kills Bing's result page.
+  - On the user's Proton VPN exit only Brave and Scholar answered; Google, DuckDuckGo, Semantic Scholar and Bing
+    blocked, headless and headed alike. The user accepts that as normal.
+  - Spec amended (my rulings, R3–R7 in the ledger): browser order `WEB_MCP_CHROME` → Chrome for Testing if it
+    starts → `helium` → `chromium`; `--config` on every call, scratch `HOME`; no commas in `args`; no
+    Consent-O-Matic for Bing; outcome only from the parsed page.
+  - Result pages that couldn't be captured on the VPN (Google, Bing, DuckDuckGo, Semantic Scholar) get parsers
+    whose fixture tests are `#[ignore]`d until the user captures them off the VPN before the branch finishes (R8).
+
 ## Walkthrough
 
 | spec goal | plan task | file:line | test |

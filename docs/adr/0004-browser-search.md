@@ -26,6 +26,7 @@ that behaves like "a normal user", in "complete isolation" from their own.
 - **No stealth.** Normal browser settings are allowed (a regular user agent, window size, `Accept-Language`).
   Fingerprint patching is not. An engine that keeps blocking is dropped or switched to headed, not disguised.
 - **Consent banners** are answered by the Consent-O-Matic extension. Normal Google Chrome ignores extensions loaded
-  from a folder since version 137, so the search browser is Chrome for Testing.
+  from a folder since version 137, so the search browser is Chrome for Testing, or Helium or Chromium where
+  Chrome for Testing can't start (NixOS).
 - **Results are only as stable as the engines' pages.** The parsers test against captured result pages and need
   updating when an engine changes its markup.

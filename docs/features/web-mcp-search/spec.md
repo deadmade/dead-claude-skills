@@ -75,14 +75,26 @@ limitations etc" _(user, 3–5 s per search accepted)_.
          ([README "Configuration"](https://raw.githubusercontent.com/vercel-labs/agent-browser/v0.39.1/README.md))
          takes every flag as a camelCase key, so it can name the profile directory, the extensions, the
          `executablePath`, the user agent and `headed`.
-       - web-mcp keeps one such file beside the search profile and passes it with `--config`. That also keeps a
-         project's own `agent-browser.json` or `~/.agent-browser/config.json` out.
+       - web-mcp keeps one such file beside the search profile and passes it with `--config` on **every** call to a
+         search session: a call without it relaunches agent-browser's default browser and the page is lost (spike,
+         D-1). `--config` replaces `~/.agent-browser/config.json` and a project `agent-browser.json` (findings.md);
+         search calls still run with the search folder as working directory. `args` holds no commas:
+         agent-browser splits it on commas and newlines.
+       - On Linux, `executablePath` for Helium is a small `#!/bin/sh` wrapper web-mcp writes beside the profile,
+         running Helium without `exec`: nixpkgs' Helium dies 10 s after agent-browser starts it otherwise
+         (findings.md, upstream #1157).
      - web-mcp itself downloads the pinned Chromium release zip (v1.1.5 today) on the first search, checks its
        sha256 and unpacks it into the search profile's folder. The installer has no step for it _(grill Q12: yes)_.
-     - The browser is Chrome for Testing, as downloaded by `agent-browser install`, set as `executablePath`, never
-       the user's installed Chrome. Since Chrome 137, branded Chrome ignores extensions loaded from a folder
+     - The browser is set as `executablePath`, never the user's installed branded Chrome: since Chrome 137 it
+       ignores extensions loaded from a folder
        ([Chromium PSA](https://groups.google.com/a/chromium.org/g/chromium-extensions/c/1-g8EFx2BBY/m/S0ET5wPjCAAJ?hl=de))
-       _(grill Q12: yes)_.
+       _(grill Q12: yes)_. Order _(D-1, user: "there is helium", "let's continue")_: `WEB_MCP_CHROME`; else the newest
+       Chrome for Testing from `agent-browser install` if it starts (`--version`, checked once per process; it
+       doesn't on NixOS); else `helium`, then `chromium` on PATH. None found: the search fails with a message naming
+       `WEB_MCP_CHROME`.
+     - Consent-O-Matic is not loaded for Bing: with it, Bing's result page dies (spike, D-1).
+     - `open` reporting success proves nothing (it does for a blank page); an engine's outcome comes only from
+       parsing its page.
      - _(my call)_ Its choices are "reject" for everything.
      - _(left to the builder, check first)_ How its preferences are preset without the onboarding page it shows on
        install.
