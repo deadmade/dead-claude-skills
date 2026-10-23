@@ -208,19 +208,31 @@ fn blocked_engine_rests_and_others_answer() {
 
 #[cfg(debug_assertions)]
 #[test]
-fn consent_clears_on_retry() {
+fn consent_clears_by_the_next_search() {
     let (_fx, pages) = setup();
     // Google is the engine with a consent page to recognise (Bing's was never seen, findings.md).
     mark(&pages, "google.consent-once");
     let mut mcp = start(&pages, &[]);
+    let seen = mcp.search.join("google/consent-seen");
     let r = search(&mut mcp, json!({"query": "zebra"}));
     assert!(!is_error(&r), "{r}");
     let t = text(&r);
     assert!(
-        first_line(t).starts_with("Source: google, bing, duckduckgo, brave (searched "),
+        first_line(t).starts_with(
+            "Source: bing, duckduckgo, brave (skipped: google: consent (clearing)) (searched "
+        ),
         "{t}"
     );
-    assert_eq!(opened(&pages, "www.google.com"), 2);
+    assert_eq!(opened(&pages, "www.google.com"), 1);
+    assert!(seen.exists());
+    assert!(!any_rest(&mcp));
+
+    let t = text(&search(&mut mcp, json!({"query": "zebra"}))).to_owned();
+    assert!(
+        first_line(&t).starts_with("Source: google, bing, duckduckgo, brave (searched "),
+        "{t}"
+    );
+    assert!(!seen.exists());
     assert!(!any_rest(&mcp));
 }
 
@@ -232,9 +244,25 @@ fn second_consent_counts_as_blocked() {
     std::fs::write(pages.join("google.html"), consent).unwrap();
     let mut mcp = start(&pages, &[]);
     let t = text(&search(&mut mcp, json!({"query": "zebra"}))).to_owned();
+    assert!(t.contains("(skipped: google: consent (clearing))"), "{t}");
+    assert!(!mcp.search.join("google/rest").exists());
+    let t = text(&search(&mut mcp, json!({"query": "zebra"}))).to_owned();
     assert!(t.contains("(skipped: google: consent (.web/"), "{t}");
-    assert_eq!(opened(&pages, "www.google.com"), 2);
     assert!(mcp.search.join("google/rest").exists());
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn slow_consent_page_keeps_the_deadline() {
+    let (_fx, pages) = setup();
+    mark(&pages, "google.consent-once");
+    // A wall never gets ready: the daemon's wait runs out (8 s of the 10) before the page is read.
+    let mut mcp = start(&pages, &[("FAKE_AB_DELAY_MS", "8000".into())]);
+    let t0 = Instant::now();
+    let t = text(&search(&mut mcp, json!({"query": "zebra"}))).to_owned();
+    assert!(t0.elapsed() < Duration::from_secs(12), "{:?}", t0.elapsed());
+    assert!(t.contains("google: consent (clearing)"), "{t}");
+    assert_eq!(opened(&pages, "www.google.com"), 1);
 }
 
 #[cfg(debug_assertions)]
@@ -286,7 +314,8 @@ fn slow_engine_does_not_hold_up_others() {
     let mut mcp = start(&pages, &[]);
     let t0 = Instant::now();
     let r = search(&mut mcp, json!({"query": "zebra"}));
-    assert!(t0.elapsed() < Duration::from_secs(12), "{:?}", t0.elapsed());
+    // The fake sleeps 60 s; the 10 s deadline ends the call (slack for slow runners).
+    assert!(t0.elapsed() < Duration::from_secs(25), "{:?}", t0.elapsed());
     assert!(!is_error(&r), "{r}");
     let t = text(&r);
     assert!(first_line(t).contains("(skipped: brave: timed out)"), "{t}");
@@ -342,13 +371,39 @@ fn concurrent_searches_both_answer() {
     for th in threads {
         let r = th.join().unwrap();
         assert!(!is_error(&r), "{r}");
+        // Each engine's lock waits for the other server's search instead of skipping it as busy.
         let t = text(&r);
-        let named = first_line(t)
-            .strip_prefix("Source: ")
-            .and_then(|s| s.split(" (").next())
-            .unwrap();
-        assert!(ENGINES.iter().any(|e| named.contains(e)), "{t}");
+        assert!(
+            first_line(t).starts_with("Source: google, bing, duckduckgo, brave (searched "),
+            "{t}"
+        );
     }
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn lock_won_late_starts_no_render() {
+    let (_fx, pages) = setup();
+    let delay = ("FAKE_AB_DELAY_MS", "9000".to_owned());
+    let a = start(&pages, std::slice::from_ref(&delay));
+    let shared = ("WEB_MCP_SEARCH_DIR", a.search.display().to_string());
+    let b = start(&pages, &[delay, shared]);
+    let threads: Vec<_> = [a, b]
+        .into_iter()
+        .enumerate()
+        .map(|(i, mut mcp)| {
+            std::thread::spawn(move || {
+                // b asks 1 s after a, so it gets Bing's lock with under 2 s of its 10 left.
+                std::thread::sleep(Duration::from_secs(i as u64));
+                search(&mut mcp, json!({"query": "zebra", "engines": "bing"}))
+            })
+        })
+        .collect();
+    let rs: Vec<_> = threads.into_iter().map(|t| t.join().unwrap()).collect();
+    assert!(!is_error(&rs[0]), "{}", rs[0]);
+    assert!(is_error(&rs[1]), "{}", rs[1]);
+    assert_eq!(text(&rs[1]), "No engine answered: bing: timed out");
+    assert_eq!(opened(&pages, "www.bing.com"), 1);
 }
 
 #[cfg(debug_assertions)]

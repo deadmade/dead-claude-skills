@@ -135,7 +135,7 @@ fn wait_fails(url: &str) -> bool {
 
 /// The result page of the engine whose host `url` is on, from `$FAKE_AB_PAGES` (unset: `None`), after
 /// `$FAKE_AB_DELAY_MS`. A marker file `<engine>.<marker>` there picks it: `none`, `blocked`, `consent-once` (the
-/// consent page, once), `slow` (15 s first) or `offline` (`Err`: the failure `open` reports); else `<engine>.html`.
+/// consent page, once), `slow` (60 s first) or `offline` (`Err`: the failure `open` reports); else `<engine>.html`.
 fn engine_page(url: &str) -> Option<Result<String, &'static str>> {
     let host = url::Url::parse(url).ok()?.host_str()?.to_owned();
     // scholar.google.com before google.com.
@@ -158,7 +158,7 @@ fn engine_page(url: &str) -> Option<Result<String, &'static str>> {
     }
     let marker = |m: &str| dir.join(format!("{engine}.{m}"));
     if marker("slow").exists() {
-        std::thread::sleep(Duration::from_secs(15));
+        std::thread::sleep(Duration::from_mins(1)); // past any deadline; the server kills the call
     }
     if marker("offline").exists() {
         return Some(Err("net::ERR_INTERNET_DISCONNECTED"));

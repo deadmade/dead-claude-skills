@@ -304,6 +304,22 @@ impl Profiles {
         let path = self.dir.join(e.name()).join("rest");
         let _ = write_if_changed(&path, until.to_string().as_bytes(), false);
     }
+
+    /// Whether the last search of the engine met a consent page.
+    pub fn consent_seen(&self, e: Engine) -> bool {
+        self.dir.join(e.name()).join("consent-seen").exists()
+    }
+
+    /// Marks (or clears) that the engine met a consent page. The caller holds its lock.
+    pub fn set_consent_seen(&self, e: Engine, seen: bool) {
+        // Best effort, like `rest`: a lost mark costs one more `consent (clearing)`.
+        let path = self.dir.join(e.name()).join("consent-seen");
+        if seen {
+            let _ = write_if_changed(&path, b"", false);
+        } else {
+            let _ = std::fs::remove_file(&path);
+        }
+    }
 }
 
 /// A path for a config file or script: written lossily, it would name another file.

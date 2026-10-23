@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 use std::fmt::{self, Write as _};
+use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -13,7 +14,7 @@ use url::Url;
 
 use crate::Ctx;
 use crate::archive::Item;
-use crate::browser::SearchRun;
+use crate::browser::{BrowserError, READ_MARGIN, SearchRun};
 use crate::engines::{Block, Engine, Found, Parsed};
 use crate::fetch::{self, GetOpts};
 use crate::fuse::{final_order, fuse, normalise};
@@ -117,9 +118,13 @@ impl Filter {
 
 /// One engine's result page for `query`, read in its own profile before `deadline`.
 ///
+/// A consent page waits a search out first (R16): a wall never satisfies `ready_js`, so it takes the whole
+/// deadline, and Consent-O-Matic needs ~23 s on a fresh profile while the browser stays up 120 s, so its click
+/// lands for the next search. Only a consent page met twice in a row rests the engine.
+///
 /// # Errors
-/// Why the engine is skipped: resting, busy, blocked (it then rests), an unrecognised page, the browser's error or
-/// the deadline.
+/// Why the engine is skipped: resting, busy, a first consent page, blocked (it then rests), an unrecognised page,
+/// the browser's error or the deadline.
 pub async fn run_engine(
     ctx: &Ctx,
     r: &Ready,
@@ -143,42 +148,54 @@ pub async fn run_engine(
         return Err(why);
     }
     let config = profiles.config(e, r)?;
-    let session = profiles.session(e);
-    let url = e.url(query, since);
-    let mut consented = false;
-    loop {
-        let run = SearchRun {
-            config: &config,
-            ready_js: e.ready_js(),
-            close_after: cfg!(windows),
-        };
-        let left = deadline.saturating_duration_since(Instant::now());
-        let (html, landed) = match ctx.browser.render(&url, &session, Some(run), left).await {
-            Ok(page) => page,
-            Err(_) if Instant::now() >= deadline => return Err("timed out".into()),
-            Err(err) => return Err(err.to_string()),
-        };
-        let what = match e.parse(&html, &landed) {
-            Parsed::Results(found) => return Ok(found),
-            // Consent-O-Matic may still be clicking: one more look.
-            Parsed::Blocked(Block::Consent) if !consented => {
-                consented = true;
-                continue;
-            }
-            Parsed::Blocked(b) => {
-                profiles.rest(e, Timestamp::now() + REST);
-                match b {
-                    Block::Captcha => "captcha",
-                    Block::Consent => "consent",
-                }
-            }
-            Parsed::Unrecognised => "unrecognised page",
-        };
-        return Err(format!(
-            "{what} ({})",
-            keep_page(ctx, url, landed, html).await
-        ));
+    let left = deadline.saturating_duration_since(Instant::now());
+    // Too little left to read a page that never gets ready (a lock won late).
+    if left < READ_MARGIN {
+        return Err("timed out".into());
     }
+    let run = SearchRun {
+        config: &config,
+        ready_js: e.ready_js(),
+        close_after: cfg!(windows),
+    };
+    let url = e.url(query, since);
+    let (html, landed) = match ctx
+        .browser
+        .render(&url, &profiles.session(e), Some(run), left)
+        .await
+    {
+        Ok(page) => page,
+        Err(BrowserError::Timeout(_)) => return Err("timed out".into()),
+        Err(err) => return Err(err.to_string()),
+    };
+    let what = match e.parse(&html, &landed) {
+        Parsed::Results(found) => {
+            profiles.set_consent_seen(e, false);
+            return Ok(found);
+        }
+        Parsed::Blocked(Block::Consent) if !profiles.consent_seen(e) => {
+            profiles.set_consent_seen(e, true);
+            keep_page(ctx, url, landed, html).await;
+            return Err("consent (clearing)".into());
+        }
+        Parsed::Blocked(b) => {
+            profiles.rest(e, Timestamp::now() + REST);
+            match b {
+                Block::Captcha => "captcha",
+                Block::Consent => "consent",
+            }
+        }
+        Parsed::Unrecognised => "unrecognised page",
+    };
+    Err(format!(
+        "{what} ({})",
+        keep_page(ctx, url, landed, html).await
+    ))
+}
+
+/// A path under `.web` as the output shows it, with `/` on Windows too.
+fn slashed(p: &Path) -> String {
+    p.to_string_lossy().replace('\\', "/")
 }
 
 /// Archives an engine page that held no results, for whoever fixes the parser; returns its `.web/` path.
@@ -194,13 +211,7 @@ async fn keep_page(ctx: &Ctx, url: Url, landed: Url, html: String) -> String {
         cache: false,
     });
     match put.await {
-        Ok(a) => format!(
-            ".web/{}",
-            a.path
-                .with_file_name("raw.html")
-                .to_string_lossy()
-                .replace('\\', "/")
-        ),
+        Ok(a) => format!(".web/{}", slashed(&a.path.with_file_name("raw.html"))),
         Err(e) => format!("not archived: {e}"),
     }
 }
@@ -212,12 +223,17 @@ fn push_passages(out: &mut String, hits: &[Hit]) {
         let title = d.title.split_whitespace().collect::<Vec<_>>().join(" ");
         let title = if title.is_empty() { &d.url } else { &title };
         let date = d.fetched.split('T').next().unwrap_or(&d.fetched);
+        // Empty when the search record couldn't be written.
+        let at = if d.path.is_empty() {
+            "not archived".to_owned()
+        } else {
+            format!(".web/{}", d.path)
+        };
         let _ = write!(
             out,
-            "\n\n## [{}] {title}\n{} · .web/{} · fetched {date}\n\n{}",
+            "\n\n## [{}] {title}\n{} · {at} · fetched {date}\n\n{}",
             i + 1,
             d.url,
-            d.path,
             d.text
         );
     }
@@ -240,27 +256,35 @@ pub async fn web(
     } else {
         f.engines.clone()
     };
-    let profiles = ctx
-        .profiles
-        .as_ref()
-        .map_err(|e| SearchError::Failed(e.clone()))?;
-    let ready = profiles.ready().await.map_err(SearchError::Failed)?;
-    let deadline = Instant::now() + ENGINE_DEADLINE;
-    let ready = &ready;
-    let outcomes = join_all(asked.iter().map(|&e| async move {
-        let got = match f.since {
-            Some(s) if !e.supports_since(s) => Err(format!("no {} filter", s.as_str())),
-            _ => run_engine(ctx, ready, e, query, f.since, deadline).await,
-        };
-        (e, got)
-    }))
-    .await;
-    let (mut lists, mut skipped) = (Vec::new(), Vec::new());
-    for (e, got) in outcomes {
-        match got {
-            Ok(list) => lists.push((e, list)),
-            Err(why) => skipped.push((e, why)),
+    let (mut run, mut skipped) = (Vec::new(), Vec::new());
+    for &e in &asked {
+        match f.since {
+            Some(s) if !e.supports_since(s) => {
+                skipped.push((e, format!("no {} filter", s.as_str())));
+            }
+            _ => run.push(e),
         }
+    }
+    let mut lists = Vec::new();
+    if !run.is_empty() {
+        let profiles = ctx
+            .profiles
+            .as_ref()
+            .map_err(|e| SearchError::Failed(e.clone()))?;
+        let ready = profiles.ready().await.map_err(SearchError::Failed)?;
+        let deadline = Instant::now() + ENGINE_DEADLINE;
+        let ready = &ready;
+        let outcomes = join_all(run.iter().map(|&e| async move {
+            (e, run_engine(ctx, ready, e, query, f.since, deadline).await)
+        }))
+        .await;
+        for (e, got) in outcomes {
+            match got {
+                Ok(list) => lists.push((e, list)),
+                Err(why) => skipped.push((e, why)),
+            }
+        }
+        skipped.sort_by_key(|(e, _)| asked.iter().position(|a| a == e));
     }
     let skipped_list = skipped
         .iter()
@@ -331,9 +355,8 @@ pub async fn web(
     }))
     .await;
 
-    let (record_path, searched_at) = searched.map_or_else(Default::default, |a| {
-        (a.path.to_string_lossy().replace('\\', "/"), a.time)
-    });
+    let (record_path, searched_at) =
+        searched.map_or_else(Default::default, |a| (slashed(&a.path), a.time));
     let mut docs: Vec<PassageDoc> = fused
         .iter()
         .flat_map(|r| {
@@ -353,7 +376,7 @@ pub async fn web(
             Ok(Err(fetch::FetchError::Blocked(_))) => blocked.push(url.to_string()),
             Ok(Err(e)) => failed.push(format!("{url} ({e})")),
             Ok(Ok(page)) => {
-                let path = page.archived.path.to_string_lossy().replace('\\', "/");
+                let path = slashed(&page.archived.path);
                 // The requested URL, so the engines' order still finds the page after a redirect.
                 docs.extend(passages_of(&page, url, &path));
             }

@@ -48,6 +48,8 @@ const MAX_OUTPUT: &str = "40000";
 pub enum BrowserError {
     Missing,
     Failed(String),
+    /// `render`'s deadline passed.
+    Timeout(Duration),
 }
 
 impl fmt::Display for BrowserError {
@@ -57,6 +59,7 @@ impl fmt::Display for BrowserError {
                 "agent-browser is not installed. Install it with the web-mcp installer, or put agent-browser on PATH (https://github.com/vercel-labs/agent-browser/releases) and run `agent-browser install`.",
             ),
             Self::Failed(m) => f.write_str(m),
+            Self::Timeout(d) => write!(f, "the page did not finish within {} s", d.as_secs_f32()),
         }
     }
 }
@@ -120,7 +123,7 @@ const CLOSE_TIMEOUT: Duration = Duration::from_secs(5);
 /// What a search batch keeps back from the daemon's wait for everything else: findings.md measured ~1 s of
 /// process start, `open` and reads beyond the wait (3000/8000 ms waits: 4.0/8.9 s calls) and up to 2 s for a
 /// whole warm batch, so 2 s lets a page that never gets ready still be read inside the deadline.
-const READ_MARGIN: Duration = Duration::from_secs(2);
+pub const READ_MARGIN: Duration = Duration::from_secs(2);
 
 impl Browser {
     /// `name` as configured: found on PATH, or kept as given so that running it reports `Missing`.
@@ -346,12 +349,7 @@ impl Browser {
         );
         let answer = tokio::time::timeout(deadline, batch)
             .await
-            .unwrap_or_else(|_| {
-                Err(BrowserError::Failed(format!(
-                    "the page did not finish within {} s",
-                    deadline.as_secs_f32()
-                )))
-            });
+            .unwrap_or(Err(BrowserError::Timeout(deadline)));
         // A fetch's session (a daemon and its Chromium) never outlives the fetch; an engine's stays warm unless
         // told otherwise or it failed (its page may be stuck).
         if search
