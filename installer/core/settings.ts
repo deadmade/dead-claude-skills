@@ -114,7 +114,9 @@ export function mergeSettings(settings: Settings, { statusLine, version, webBuil
   out.syntaxHighlightingDisabled = true;
   // Inside tmux Claude Code draws in 256 colours unless told otherwise, which turns the theme's indigos grey. Outside
   // tmux (and on Windows, which has none) the variable does nothing.
-  out.env = { ...out.env, CLAUDE_CODE_TMUX_TRUECOLOR: '1' };
+  // At most 8 workflow agents run at once (flows' **Agents** rule), unless the user set their own number. Claude Code
+  // before 2.1.269 ignores the variable.
+  out.env = { CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS: '8', ...out.env, CLAUDE_CODE_TMUX_TRUECOLOR: '1' };
   // The theme's id carries its plugin's name, and night-city became part of dead-skills.
   if (out.theme === 'custom:night-city:night-city') out.theme = 'custom:dead-skills:night-city';
   // dead-skills raises its own popups; Claude Code's built-in one would double them.

@@ -53,6 +53,9 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   `/test-audit`, `/doc-audit`, `/harden`, `/self-review`, `/verify`, `/integrate`, `/understand`, `/learn`). Each runs other plugins' skills in order;
   the rules they share (state files, gates, loading `disable-model-invocation` skills by path, fallbacks per missing
   plugin, audit scope and report format) live once in `references/flow-rules.md`, so a SKILL.md only says what it runs.
+  Its short **Agents** section asks for few agents, combined where it makes sense, each on a model that fits its job
+  (ADR 0005). The installer's only part is `CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS=8` (`mergeSettings`); it never
+  writes `CLAUDE_CODE_SUBAGENT_MODEL`.
   Conductors call each other by reading the callee's SKILL.md (`/fix-flow` → `/verify` → `/doc-audit branch`). Each
   conductor's `uses.json` lists what it runs; `scripts/flows-uses.mjs` generates flows' `dependencies` and the README
   tree from them, and check-repo fails when a listed skill is gone or the generated parts are stale. `/self-review`

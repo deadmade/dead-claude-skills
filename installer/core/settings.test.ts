@@ -127,6 +127,7 @@ test('reset keeps only our settings plus the dcg hook while dcg stays on', () =>
   };
   const out = resetSettings(before, { ...V, statusLine: true, dcg: true });
   assert.equal(out.model, undefined);
+  assert.equal(out.env?.CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS, '8');
   assert.deepEqual(out.permissions!.allow, ['Read(~/.claude/plugins/**)']);
   assert.deepEqual(out.hooks, { PreToolUse: [dcgEntry] });
   assert.equal(out.enabledPlugins![`dead-skills@${M}`], true);
@@ -184,9 +185,23 @@ test('Night City ccstatusline keeps the stock widgets in order', () => {
 
 test('Night City settings are always on, next to other env, and leave the theme alone', () => {
   const out = mergeSettings({ env: { FOO: 'x' }, theme: 'dark' }, V);
-  assert.deepEqual(out.env, { FOO: 'x', CLAUDE_CODE_TMUX_TRUECOLOR: '1' });
+  assert.deepEqual(out.env, {
+    CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS: '8',
+    FOO: 'x',
+    CLAUDE_CODE_TMUX_TRUECOLOR: '1',
+  });
   assert.equal(out.syntaxHighlightingDisabled, true);
   assert.equal(out.theme, 'dark');
+});
+
+test('workflow concurrency defaults to 8, keeps a number the user set, and no subagent model is ever written', () => {
+  assert.equal(mergeSettings({}, V).env?.CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS, '8');
+  const own = mergeSettings({ env: { CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS: '3' } }, V);
+  assert.equal(own.env?.CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS, '3');
+  assert.deepEqual(
+    Object.keys(own.env ?? {}).filter((k) => k.startsWith('CLAUDE_CODE_SUBAGENT_MODEL')),
+    [],
+  );
 });
 
 test('Night City picked while it was its own plugin stays picked now that dead-skills ships it', () => {

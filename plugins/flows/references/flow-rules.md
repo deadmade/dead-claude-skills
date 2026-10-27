@@ -91,6 +91,14 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
 - At Finish, ask the user for the **Run verdict** and record it in flow.md: worked as a whole, yes or no; clean, yes
   or no.
 
+## Agents
+
+Don't start agents by the dozen, under ultracode or in a Workflow either. Decide how many a step really needs: combine
+related tasks, checks and verifications into one agent where that works, do small things inline, and ask before a run
+grows large. Give every agent a model that fits its job instead of the session's default: `haiku` for mechanical work,
+`sonnet` for searching and most review, `opus` or `fable` where the judgment is hard (a subtle review, the final
+review).
+
 ## Homes and commits
 
 - Specs and plans live only in `docs/features/<slug>/` (`spec.md`, `plan.md`), next to flow.md, not where
