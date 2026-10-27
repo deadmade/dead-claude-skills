@@ -93,17 +93,7 @@ before the task executes.
    ```
    The first build establishes the baseline. The second build is the one you want to be incremental. Analyze `second.binlog`.
 
-### Primary: binlog MCP (preferred)
-
-Use the **binlog MCP server** (`Microsoft.AITools.BinlogMcp`, exposed under the `binlog` MCP namespace) to analyze the second binlog:
-
-1. Use `load_binlog` to load `second.binlog`.
-2. Use `search_binlog` for "Building target completely", "Building target incrementally", "Skipping target", and "is newer than output".
-3. Use `get_target_info_by_name` for the target that reran.
-4. Use `get_project_target_list` to confirm the target and its project context.
-5. Use `get_expensive_targets` only to rank the non-skipped targets after the skip reason is understood.
-
-### Fallback: diagnostic text log (when MCP is unavailable)
+### Diagnostic text log
 
 2. **Read the diagnostic log captured during the second build**. Do not run
    another build or depend on replay support for the default fallback:

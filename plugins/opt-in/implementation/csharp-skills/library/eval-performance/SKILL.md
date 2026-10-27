@@ -44,17 +44,7 @@ Key insight: evaluation happens BEFORE any targets run. Slow evaluation = slow b
 
 ## Diagnosing Evaluation Performance
 
-### Primary: binlog MCP (preferred)
-
-Use the **binlog MCP server** (`Microsoft.AITools.BinlogMcp`, exposed under the `binlog` MCP namespace) to analyze evaluation performance:
-
-1. Use the evaluations tool to list all evaluations and their durations
-2. Use evaluation_global_properties to check for multiple evaluations with differing global properties
-3. Use evaluation_properties to inspect evaluated properties for a specific project+TFM
-4. Use imports tool to analyze the import chain depth and structure
-5. Use properties tool to check for expensive property function evaluations
-
-### Fallback: text-log replay and preprocessing (when MCP is unavailable)
+### Text-log replay and preprocessing
 
 ### Using binlog
 

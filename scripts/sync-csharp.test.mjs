@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { ROUTERS, assignRouter, entrySummary, isHidden, renderRouter } from './sync-csharp.mjs';
+import {
+  BINLOG_MCP,
+  ROUTERS,
+  assignRouter,
+  dropBinlogMcp,
+  entrySummary,
+  isHidden,
+  renderRouter,
+} from './sync-csharp.mjs';
 import { frontmatterDescription } from './sync-lib.mjs';
 
 test('assignRouter maps upstream plugins to routers, unknown ones to core', () => {
@@ -42,4 +50,36 @@ test('entrySummary overrides csharp-expert and summarizes the rest', () => {
     'C# semantics, and routing to the right specialist skill in this plugin.',
   );
   assert.equal(entrySummary('other', 'First sentence. Second.'), 'First sentence.');
+});
+
+test('dropBinlogMcp drops the MCP sections, keeps the replay ones and ignores headings in code', () => {
+  const text = [
+    '## Analyze',
+    '### Primary: binlog MCP (preferred)',
+    'Use the server.',
+    '#### Step',
+    'more MCP.',
+    '### Fallback: text-log replay (when MCP is unavailable)',
+    '```bash',
+    '# not a heading',
+    '```',
+    '## Primary workflow — binlog MCP',
+    '```bash',
+    '## also not a heading',
+    '```',
+    'MCP steps.',
+    '## Fallback workflow — diagnostic log (when MCP is unavailable)',
+    'Replay.',
+  ].join('\n');
+  assert.equal(
+    dropBinlogMcp(text),
+    ['## Analyze', '### Text-log replay', '```bash', '# not a heading', '```', '## Diagnostic log', 'Replay.'].join(
+      '\n',
+    ),
+  );
+});
+
+test('BINLOG_MCP leaves generic MCP server mentions alone', () => {
+  assert.equal(BINLOG_MCP.test('Setting up publishing for a dotnet tool, MCP server, or template package'), false);
+  assert.equal(BINLOG_MCP.test('Use this only when the MCP server cannot be started.'), true);
 });
