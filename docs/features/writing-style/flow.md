@@ -1,6 +1,6 @@
 ---
 flow: feature
-phase: brainstorm
+phase: grill
 ---
 
 # Writing style: flow
@@ -15,7 +15,7 @@ Started 2026-10-27 on branch `claude/relaxed-newton-cr62u9` (from `main` 753ba2c
 
 ## Artifacts
 
-- Spec: [spec.md](spec.md) (the user's draft of 2026-10-24, not yet approved)
+- Spec: [spec.md](spec.md) (the user's draft of 2026-10-24, rewritten 2026-10-27 after the bake-off; not yet approved)
 - Plan:
 - ADRs:
 - Glossary: [GLOSSARY.md](../../../GLOSSARY.md)
@@ -199,6 +199,19 @@ Started 2026-10-27 on branch `claude/relaxed-newton-cr62u9` (from `main` 753ba2c
   and LanguageTool (fed through a Markdown runner) skipped all of code, front matter, link targets and block quotes.
   Caveats: one document; the annotator and judges are LLMs; the haiku run was an agent with time to reread, not one
   hook-shaped call.
+
+- **Local model** (2026-10-27): the user asked about one ("my first thought was local model but I dont think this is
+  really doable"). Prompt hooks call only Claude models; a local model would need a command hook and a local server,
+  and its precision is unmeasured. Offered to measure one; the user moved on.
+- **Picked** (2026-10-27): "yes, go with Haiku plus the code check". A Haiku prompt hook for the judgment rules and a
+  dependency-free Node script for shorthand and undefined abbreviations (whole-file definitions). No crate, binary,
+  installer step or release workflow. The code check is dropped if the sample review shows it adds nothing over Haiku.
+  Rejected: Harper, Vale, LanguageTool, proselint (precision 0–3%), a hardened spaCy checker (47%, Python plus a
+  500 MB model per machine), an agent hook (experimental, slower). The spec was rewritten around the pick the same day.
+- **Hooks docs, checked 2026-10-27** ([hooks.md](https://code.claude.com/docs/en/hooks.md), "Prompt-based hooks",
+  "Common fields"): PostToolUse supports `type: "prompt"`; `model` is settable; default timeout 30 s; on `ok: false`
+  with `continueOnBlock: true` the reason goes back to Claude and the turn continues; matching hooks run in parallel;
+  `if` holds one permission rule per handler. Whether plugin `hooks.json` accepts prompt hooks isn't stated.
 
 ## Plan review
 
