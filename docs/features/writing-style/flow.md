@@ -295,12 +295,21 @@ order and modules (`flows-uses.mjs` joins Task 4), so no second review round; I 
   Probe (on the dependency-free copy): the code check exited 2 naming `Q4` and `CMP`, not `Q9`; the model check's reason
   named the nominalization and ended with the closing line. The model reason is in no hook event; it reaches Claude
   after Claude Code repeats the prompt twice, and appears in the stream only in Claude's own text and the final `result`.
-- Task 3: base 1ba2a0e, untracked at start: none.
+- Task 3: base 1ba2a0e, untracked at start: none. Sample review gate missed: the model check found 6 problems in about
+  7,800 words. Execution stopped after Task 3; see Deviations.
 
 ## Rulings
 
 - 2026-10-27, Task 2: probes and the sample run load a scratchpad copy of `plugins/flows` with `dependencies` removed, because on Claude Code 2.1.311 an unsatisfied dependency (graphify) disables flows under `--plugin-dir` — the copy is test scaffolding and changes nothing in the repo — if wrong, the measured hooks differ from the shipped ones only in the manifest.
 ## Deviations
+
+- 2026-10-27, Task 3 (sample review gate): the Haiku hook found too little to be worth its cost. A recount of the
+  comparison data shows why: Haiku's 31 of 47 were 27 shorthand, and it caught 4 of the 16 other problems; the hook
+  prompt then told it to skip shorthand. The user: "Clearly haiku failed". The user also said length is not the
+  problem ("I dont mind a long text for a long feautre. I just dont want slop text"), so hard limits are out, and wants
+  the book's method in the agents. Gate 1 is reopened at Options. Next, by the user's decision ("yes go ahead with the
+  test"): a test of an editor agent that applies the book's diagnosis against a plain editing prompt and no edit,
+  scored by code measures of the book's lessons, facts kept, known problems left, and blind judges.
 
 ## Walkthrough
 
