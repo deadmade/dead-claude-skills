@@ -170,6 +170,13 @@ Started 2026-10-27 on branch `claude/relaxed-newton-cr62u9` (from `main` 753ba2c
 
 ## Options
 
+- **The checker's approach** (2026-10-27). Offered A harper-core plus own rules, B own engine with data tables, C Vale
+  with a custom style; recommended B. The user rejected the criteria: "im locking for the best way not the easiest!! it
+  sounds like harper and vale are ruled out because to big or no rust pls take this req out and evaluate again." So the
+  spec's "the checker in Rust, not npm" no longer binds, and size and dependency weight don't count. Re-evaluated on
+  finding quality, measured: a bake-off on `docs/features/web-mcp-search/spec.md`, with prototypes and tool installs in
+  the scratchpad only (throwaway, not building; nothing enters the repo).
+
 ## Plan review
 
 ## Tasks
