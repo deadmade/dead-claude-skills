@@ -243,6 +243,45 @@ Started 2026-10-27 on branch `claude/relaxed-newton-cr62u9` (from `main` 753ba2c
 
 ## Plan review
 
+### Plan review round 1 (2026-10-27)
+
+Reviewers: correctness (fable), fit with pstack `blast-radius` (opus), simpler with ponytail-review (sonnet). Two
+claims were checked with a probe plugin the same day: Edit's and an overwriting Write's hook input carry the whole old
+file in `tool_response.originalFile` (confirmed); `if: "Write(**/*.md)"` matches a root-level `README.md` and an
+absolute path outside the project (confirmed, so the reviewers' worry about out-of-tree files is dropped).
+
+Decisions for the user:
+
+- **Copyedit commits.** They land on whatever branch is checked out (often `main` at feature-flow Gate 1, the audited
+  branch for audits); `git add -u` sweeps unrelated work in; an unchanged copyedit makes `HEAD~1` wrong; pre-commit
+  prettier can rewrap. Options: harden the commits (document only, refuse on the default branch, record both hashes),
+  or drop them for a saved copy and `git diff --no-index`. Recommended: drop them.
+- **Old text reaches Haiku on edits.** Options: the prompt says to judge only `tool_input` and ignore
+  `tool_response`, measured by an Edit run in the sample; or a command hook that calls Haiku on `new_string` only.
+  Recommended: the prompt, with the command hook as the fallback if the sample shows old-text findings.
+- **Every flows user gets the hooks everywhere.** Descriptions in `marketplace.json` and flows' `plugin.json` become
+  untrue; "Q1 2027" in another project's docs would be flagged; a provider without `claude-haiku-5-5` makes the
+  model check pass silently; a prompt hook can't read a userConfig switch. Recommended: update both descriptions with
+  the per-write cost, tighten the shorthand pattern (no year after a Q number), and document how to turn the hooks
+  off (disable flows' hooks or flows).
+- **`uses.json` can't name `writing`.** `checkUses` rejects a `flows` key and `readUses` treats every folder in
+  `skills/` as a conductor. Recommended: teach `flows-uses.mjs` that a skill without `disable-model-invocation` is not
+  a conductor and may be listed under `flows`, with tests.
+- **The `undefined` rule is noisy on this repo's prose:** 163 first uses over 36 docs, mostly PASS/FAIL, SKILL (from
+  `SKILL.md`), HEAD, all-caps emphasis, units and file types. Options: keep it with a seeded common-terms list, a
+  file-name skip and must-not-flag fixtures from real docs; or build shorthand first and add `undefined` only if the
+  sample shows Haiku misses abbreviations. Recommended: keep it with the fixes, measured at the sample gate.
+
+Plan fixes with no spec change (proposed as one batch): `readUses` skips non-conductors (Task 4); the two tests that
+contradict each other on "technical-writing-density"; `sync-pstack.yml`'s skill count 18 → 16; pack rewrites name
+`flows:writing` through the Skill tool, and conductors load it the same way; the pstack-picks `plugin.json`
+description is hand-written, so it is edited by hand; `flake.nix`'s test `files` regex gains `plugins/flows/hooks/`;
+the Task 2 probe also checks `--plugin-dir` with the whole flows plugin; empty `new_string` returns no ranges; CRLF
+edits find `new_string`; table and code-font definitions count; the copyedit agent returns text and the conductor
+writes once; Task 3 adds an Edit run and takes findings from the hook events; the command hook uses exec form; the
+dropped-name guard extends `GUARD` instead of a new check; wording tests shrink to the two verbatim strings, the
+handler structure and equal prompt copies; the wall-clock test becomes a one-time measurement.
+
 ## Tasks
 
 ## Rulings
