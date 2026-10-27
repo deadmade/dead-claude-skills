@@ -86,6 +86,47 @@ Started 2026-10-27 on branch `claude/relaxed-newton-cr62u9` (from `main` 753ba2c
 
 ## Prior art
 
+### Prose checkers and Claude Code hooks (background agent, 2026-10-27; every source fetched or cloned in that run)
+
+- **Harper** (`harper-core` 3.0.0, Apache-2.0, edition 2024;
+  [Cargo.toml](https://github.com/Automattic/harper/blob/master/harper-core/Cargo.toml)). It parses Markdown with
+  pulldown-cmark and skips code, math, HTML and link targets, but **lints block quotes**. It has `LongSentences` (a
+  hardcoded `> 40`), about 20 redundancy lints and a phrase DSL (`weir_rules/`). It has **no passive, nominalization or
+  undefined-acronym lint**. It pulls about 255 crates, `burn` (an ML framework) among them, and embeds about 3 MB of
+  dictionary and tagger models that can't be turned off.
+- **Vale** (Go). Styles map onto our rules: Microsoft, Google and write-good `Passive.yml` (a "be" verb plus `\w+ed` or
+  about 170 irregulars; Microsoft's own test flags "are related"); Microsoft `Wordiness.yml` (about 127 swaps, MIT);
+  proselint `RASSyndrome.yml` and `Needless.yml` (BSD-3); Microsoft and Google `Acronyms.yml` (a defined-before-use
+  check with an exceptions list, MIT). None checks nominalizations or negatives with affirmative forms.
+- **Data lists we could reuse with credit:** [retext-simplify](https://github.com/retextjs/retext-simplify)
+  `lib/patterns.js` (phrase → replacements, MIT); [retext-passive](https://github.com/retextjs/retext-passive)
+  `lib/list.js` (215 participles, MIT); [passive-voice](https://github.com/btford/passive-voice) (MIT);
+  proselint `checks/misc/composition.py` (negatives with affirmative forms from Strunk & White, BSD-3).
+- **Anti-slop linters:** [vale-ai-tells](https://github.com/tbhb/vale-ai-tells) (MIT) calibrates each rule on
+  pre-LLM corpora and keeps a must-stay-clean fixture; [slopless](https://github.com/berelevant-ai/slopless) (MIT) is a
+  textlint preset with a Claude skill. A paper the agent fetched, arXiv 2607.14167, reports that feedback naming the
+  location **and an admissible alternative** repairs better than raw diagnostics.
+- **Claude Code hooks** ([hooks reference](https://code.claude.com/docs/en/hooks)):
+  - PostToolUse exit 2 "Shows stderr to Claude; the tool already ran". Stderr of an exit 0 is never shown.
+  - Write's input has `file_path` and `content`; Edit's has `file_path`, `old_string`, `new_string`, `replace_all`.
+    Edit's `tool_response` is undocumented, so the hook re-reads the file and finds `new_string`.
+  - **`${user_config.*}` expands in plugin hooks only in exec form (`args` set).** Shell form reads
+    `$CLAUDE_PLUGIN_OPTION_<KEY>` instead.
+  - **MultiEdit no longer appears** in the hooks or tools reference (Edit, Write, NotebookEdit only).
+  - An `if` field takes one permission rule per handler (`"Edit(docs/**)"`), so Write and Edit get a handler each.
+- **Pitfalls:** regex passives flag adjectival participles ("is based", "is required"); proselint's philosophy is
+  "Better to say nothing than to say the wrong thing"; a PostToolUse loop is possible, so the feedback reports only new
+  text and always names a replacement.
+
+**Approaches for the checker** (the agent's grouping):
+
+- **A, harper-core as a library plus our own linters.** Good sentence splitting and POS tags. Costs about 255 crates and
+  3 MB of models, and most rules are still ours.
+- **B, our own small engine with data tables.** pulldown-cmark for masking, phrase tables vendored from MIT/BSD lists,
+  hand-written passive, acronym and shorthand rules. Few dependencies; passive stays heuristic.
+- **C, Vale with a custom style.** Mature scoping and rule DSL, but a second downloaded Go binary, against the user's
+  "in Rust" decision.
+
 ## Options
 
 ## Plan review
