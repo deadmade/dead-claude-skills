@@ -144,12 +144,61 @@ const REWRITES = [
     /^Register the marketplace:\n\n```text\ncodex plugin marketplace add dotnet\/skills\n```\n\nLaunch Codex[\s\S]*?\ncodex plugin marketplace upgrade dotnet-agent-skills\n```/gm,
     INSTALLED,
   ],
+  [
+    'binlog-failure-analysis/SKILL.md',
+    / binlog MCP startup or connection failures \(use troubleshoot-binlog-mcp\),/,
+    '',
+  ],
+  [
+    'binlog-failure-analysis/SKILL.md',
+    /^This skill diagnoses MSBuild build failures from a `\.binlog` file\. The preferred\n[\s\S]*?\n\n/m,
+    'This skill diagnoses MSBuild build failures from a `.binlog` file by replaying it to text logs.\n\n',
+  ],
+  ['binlog-failure-analysis/SKILL.md', /^Use this only when the MCP server cannot be started[\s\S]*?\n\n/m, ''],
+  ['binlog-generation/SKILL.md', /, binlog MCP startup failures \(use troubleshoot-binlog-mcp\)/, ''],
+  [
+    'build-perf-diagnostics/SKILL.md',
+    /^1\. \*\*Generate a binlog\*\*: [^\n]*\n2\. Use the \*\*binlog MCP server\*\*[\s\S]*?\n### Alternate flow when MCP is unavailable: binlog replay to text logs\n/m,
+    '### Binlog replay to text logs\n',
+  ],
+  ['check-bin-obj-clash/SKILL.md', /^Use this only when the MCP server cannot be started\.\n\n/m, ''],
+  ['check-bin-obj-clash/SKILL.md', /the same signals the MCP tools surface:/, 'the clash signals:'],
 ];
 // Index summaries that replace a skill's own description in the router.
 export const SUMMARY_OVERRIDES = {
   'csharp-expert': 'C# semantics, and routing to the right specialist skill in this plugin.',
 };
 export const entrySummary = (name, desc) => SUMMARY_OVERRIDES[name] ?? summary(desc);
+
+// Upstream's binlog MCP server isn't vendored, so its troubleshooting skill isn't either, and the binlog skills keep
+// only their text-log replay workflows (dropBinlogMcp, then the binlog rewrites above).
+const DROPPED = ['troubleshoot-binlog-mcp'];
+// Anything still naming the server after the rewrites fails the sync.
+export const BINLOG_MCP = /binlog MCP|BinlogMcp|binlog-mcp|MCP is unavailable|the MCP (?:server|tools)\b/;
+
+// Drops each section whose heading names the binlog MCP, up to the next heading of the same or a higher level, and
+// strips the "fallback, when MCP is unavailable" wording from the replay headings left behind.
+export function dropBinlogMcp(text) {
+  let fence = false;
+  let drop = 0; // level of the heading being dropped, 0 while keeping
+  return text
+    .split('\n')
+    .filter((line) => {
+      if (/^\s*(```|~~~)/.test(line)) fence = !fence;
+      const h = !fence && /^(#+) /.exec(line);
+      if (h && drop && h[1].length <= drop) drop = 0;
+      if (h && !drop && /binlog MCP/.test(line)) drop = h[1].length;
+      return !drop;
+    })
+    .map((line) =>
+      /^#+ /.test(line)
+        ? line
+            .replace(/ \(when MCP is unavailable\)$/, '')
+            .replace(/^(#+ )(?:Fallback workflow — |Fallback: )(.)/, (_, h, c) => h + c.toUpperCase())
+        : line,
+    )
+    .join('\n');
+}
 
 // Upstream plugin.json keys for parts we don't vendor.
 const UNVENDORED = ['agents', 'mcpServers', 'lspServers', 'hooks', 'commands'];
@@ -180,6 +229,10 @@ function main() {
     const dir = join(up, 'plugins', plugin, 'skills');
     if (!existsSync(dir)) fail(`upstream plugins/${plugin} has no skills/`);
     for (const name of readdirSync(dir)) {
+      if (DROPPED.includes(name)) {
+        report(`dropped: ${name}`);
+        continue;
+      }
       const md = join(dir, name, 'SKILL.md');
       if (!existsSync(md)) fail(`upstream plugins/${plugin}/skills/${name}/SKILL.md not found`);
       const text = readFileSync(md, 'utf8');
@@ -215,12 +268,20 @@ function main() {
   for (const [name, { src }] of skills) cpSync(src, join(LIBRARY, name), { recursive: true });
 
   // 6. Rewrites.
+  for (const f of listFiles(LIBRARY).filter((f) => f.endsWith('.md'))) {
+    const text = readFileSync(f, 'utf8');
+    const out = dropBinlogMcp(text);
+    if (out !== text) writeFileSync(f, out);
+  }
   for (const [rel, pattern, replacement] of REWRITES) {
     const file = join(LIBRARY, rel);
     const text = readFileSync(file, 'utf8');
     if (!pattern.test(text)) fail(`rewrite ${pattern} found nothing in library/${rel} (upstream changed?)`);
     writeFileSync(file, text.replace(pattern, replacement));
   }
+  for (const f of listFiles(LIBRARY).filter((f) => f.endsWith('.md')))
+    if (BINLOG_MCP.test(readFileSync(f, 'utf8')))
+      fail(`library/${relative(LIBRARY, f).split(sep).join('/')} still names the binlog MCP (upstream changed?)`);
 
   // 7. Agent mentions. Hyphens count as word characters, since agent names are hyphenated.
   const mentionPatterns = agents

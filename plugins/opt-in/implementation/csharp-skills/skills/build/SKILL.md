@@ -53,4 +53,3 @@ SKILL.md with the Read tool, and follow it. When a skill names another skill, re
 | template-smart-defaults | Applies cross-parameter default rules when creating .NET projects with dotnet new, filling gaps consistently without overriding values the user set explicitly. | `${CLAUDE_PLUGIN_ROOT}/library/template-smart-defaults/SKILL.md` |
 | template-validation | Validates custom dotnet new templates for correctness before publishing. | `${CLAUDE_PLUGIN_ROOT}/library/template-validation/SKILL.md` |
 | thread-abort-migration | Guides migration of .NET Framework Thread.Abort usage to cooperative cancellation in modern .NET. | `${CLAUDE_PLUGIN_ROOT}/library/thread-abort-migration/SKILL.md` |
-| troubleshoot-binlog-mcp | Diagnose dotnet-msbuild binlog MCP startup failures. | `${CLAUDE_PLUGIN_ROOT}/library/troubleshoot-binlog-mcp/SKILL.md` |
