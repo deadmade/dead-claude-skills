@@ -81,17 +81,7 @@ dependency chain that no number of cores can parallelize):
 
 ## Analyzing Parallelism with Binlog
 
-### Primary: binlog MCP (preferred)
-
-Use the **binlog MCP server** (`Microsoft.AITools.BinlogMcp`, exposed under the `binlog` MCP namespace):
-
-1. Use expensive_projects tool → find the slowest projects and compare individual vs total build time
-2. Use expensive_targets tool → find bottleneck targets
-3. Use project_target_times tool → drill into a specific project's target-level timing
-4. Ideal: build time should be much less than sum of project times (parallelism)
-5. If build time ≈ sum of project times: too many serial dependencies, or one slow project blocking others
-
-### Fallback: text-log replay (when MCP is unavailable)
+### Text-log replay
 
 Step-by-step:
 

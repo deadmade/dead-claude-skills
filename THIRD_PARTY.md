@@ -4,9 +4,12 @@
 
 `plugins/opt-in/hallmark/skills/hallmark/` is vendored from [nutlope/hallmark](https://github.com/nutlope/hallmark)
 (MIT License, Copyright (c) 2026 Hallmark contributors; full text in `skills/hallmark/LICENSE`).
-It is synced by `scripts/sync-hallmark.mjs` (weekly via GitHub Actions); the only local change is a
-"WEB FRONTEND ONLY" prefix on the frontmatter `description`. The synced upstream commit is in
-`skills/hallmark/UPSTREAM`.
+It is synced by `scripts/sync-hallmark.mjs` (weekly via GitHub Actions), which prefixes the frontmatter `description`
+with "WEB FRONTEND ONLY" and ships only the skill: upstream's installers, its settings.json lint hook, Together AI image
+generation (`comp.md`, `imagegen.mjs`), the theme-picture renderer, its dev checks and fixtures and the Codex adapter are
+deleted, along with the sentences that point at them. The synced upstream commit is in `skills/hallmark/UPSTREAM`.
+`scripts/photos.json` indexes Wikimedia Commons photos (CC0, public domain, CC BY or CC BY-SA, each with its author and
+licence); none are vendored, and the skill credits each one a page uses.
 
 ## paper-lookup
 
@@ -66,11 +69,12 @@ SKILL.md's frontmatter. Synced weekly via GitHub Actions (`sync-rust.yml`); the 
 
 `plugins/opt-in/implementation/csharp-skills/` vendors the skills of [dotnet/skills](https://github.com/dotnet/skills) (MIT License,
 Copyright (c) .NET Foundation and Contributors; `plugins/opt-in/implementation/csharp-skills/LICENSE`). Modified by
-`scripts/sync-csharp.mjs`: the 102 skills are copied to `library/`, and six generated router skills in `skills/` (core,
+`scripts/sync-csharp.mjs`: upstream's skills are copied to `library/`, and six generated router skills in `skills/` (core,
 testing, build, web, data, desktop) index them; the four skills upstream marks `disable-model-invocation: true` are
 left out of the indexes. csharp-expert gets a note that its specialists are already installed in csharp-skills, its
 install, restart and update blocks are rewritten, and it gets a fixed index summary. Upstream's agents, binlog MCP
-server, bundled LSP and dotnet-experimental plugin are not vendored. Synced weekly via GitHub Actions
+server, bundled LSP and dotnet-experimental plugin are not vendored, so neither is the troubleshoot-binlog-mcp skill, and
+the binlog skills' MCP workflows are cut down to their text-log replay ones. Synced weekly via GitHub Actions
 (`sync-csharp.yml`), which lists added, removed, skipped and unmapped skills and agent mentions in the PR body; the
 synced upstream commit is in `plugins/opt-in/implementation/csharp-skills/UPSTREAM`.
 

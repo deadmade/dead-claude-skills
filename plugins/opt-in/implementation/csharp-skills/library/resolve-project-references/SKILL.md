@@ -40,11 +40,7 @@ The reported time includes **waiting for dependent projects to build** while the
 
 Use the **Task** Performance Summary to identify the real bottleneck.
 
-#### Primary: binlog MCP (preferred)
-
-Use the **binlog MCP server** expensive_tasks tool to get task self-time rankings directly from the binlog.
-
-#### Fallback: text-log replay (when MCP is unavailable)
+#### Text-log replay
 
 ```bash
 dotnet msbuild build.binlog -noconlog -fl "-flp:v=diag;logfile=full.log;performancesummary"
