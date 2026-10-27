@@ -1,6 +1,6 @@
 ---
 flow: feature
-phase: ground
+phase: brainstorm
 ---
 
 # Writing style: flow
@@ -126,6 +126,47 @@ Started 2026-10-27 on branch `claude/relaxed-newton-cr62u9` (from `main` 753ba2c
   hand-written passive, acronym and shorthand rules. Few dependencies; passive stays heuristic.
 - **C, Vale with a custom style.** Mature scoping and rule DSL, but a second downloaded Go binary, against the user's
   "in Rust" decision.
+
+### Writing sources (background agent, 2026-10-27; free public pages only, every one fetched in that run)
+
+- **_Style_, 12th edition, contents** ([Pearson](https://pearson.com/en-us/subject-catalog/p/style-lessons-in-clarity-and-grace/P200000008731/9780134080413),
+  ISBN 9780134080413, 2016): I Style as Choice (1 Understanding Style, 2 Correctness); II Clarity (3 Actions,
+  4 Characters, 5 Cohesion and Coherence, 6 Emphasis); III Clarity of Form (7 Motivation, 8 Global Coherence);
+  IV Grace (9 Concision, 10 Shape, 11 Elegance); V Ethics (12 **The Ethics of Style**); appendices on punctuation and
+  using sources. The spec's table is right except Lesson 12's full title. The 11th edition has the same lessons.
+- **Lesson summaries** come from Greg Baker's SFU course notes on the 11th edition
+  ([index](https://www2.cs.sfu.ca/CC/376/ggbaker/notes/); e.g.
+  [characters](https://www2.cs.sfu.ca/CC/376/ggbaker/notes/content/characters.html),
+  [concision](https://www2.cs.sfu.ca/CC/376/ggbaker/notes/content/concision.html)), a
+  [Boston University lesson](https://www.bu.edu/teaching-writing/resources/essential-lesson-10), Justin Taylor's
+  [notes](https://www.thegospelcoalition.org/blogs/justin-taylor/style-some-notes-on-clarity-and-grace/) (blog) and
+  Williams' own essay [Problems into PROBLEMS](https://wacclearinghouse.org/docs/comppile/pd/JWilliamsProblemsdw.htm)
+  (condition plus cost; the point at the end of the introduction). Points the spec's table misses: passive is also
+  right when it keeps a paragraph's topic string consistent (L4); hedges stay where a claim isn't universal (L9);
+  metadiscourse is one of the cuts (L9); a section opens with its own short introduction (L8).
+- **Gopen and Swan, "The Science of Scientific Writing"** (1990,
+  [Michigan copy](https://prod.lsa.umich.edu/content/dam/sweetland-assets/sweetland-documents/Graduates/DWG/The-Science-of-Scientific-Writing.pdf)):
+  verb right after its subject; new, emphasized information in the stress position; the sentence's "whose story" and
+  old information in the topic position; action in the verb; context before the new. They warn these are reader
+  expectations, not rules.
+- **Strunk, _The Elements of Style_** (1920, public domain, [Gutenberg 37134](https://www.gutenberg.org/ebooks/37134.txt.utf-8)):
+  rules 10 (active voice; passive allowed when the paragraph's topic needs it), 11 (positive form: "did not remember"
+  → "forgot"), 13 (omit needless words: "the question as to whether" → "whether", "owing to the fact that" →
+  "since"), 18 (emphatic words at the end). Its phrase pairs are free to reuse.
+- **Pinker, "The Source of Bad Writing"** (WSJ 2014, [his site](https://stevenpinker.com/publications/source-bad-writing)):
+  the curse of knowledge, "a difficulty in imagining what it is like for someone else not to know something that you
+  know"; remedies: a test reader, or rereading after time has passed.
+- **technical-writing-density** ([repo](https://github.com/mlwelles/technical-writing-density), MIT confirmed, one
+  `SKILL.md`). The test verbatim: "Does removing this lose a reason, constraint, or disambiguation that matters to the
+  topic and prevents a likely misreading?" The spec's paraphrase drops "that matters to the topic" and the limit "Keep
+  the ones that matter, not every one you can think of". It also puts four or more distinct items in a list, and a
+  table when they share attributes.
+- **Phrase data free to reuse:**
+  [plainlanguage.gov "Use simple words and phrases"](https://github.com/GSA/plainlanguage.gov/blob/main/_pages/guidelines/words/use-simple-words-phrases.md)
+  (about 235 entries, US public domain plus CC0), its `avoid-hidden-verbs.md` (light verbs achieve, effect, give, have,
+  make, reach, take; "make an application" → "apply") and `use-positive-language.md` ("no fewer than" → "at least");
+  Strunk's pairs. GOV.UK's A–Z guide is OGL v3 (attribution); Wikipedia lists are CC BY-SA (share-alike). Williams'
+  own example lists are not reusable as data.
 
 ## Options
 
