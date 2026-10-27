@@ -195,14 +195,14 @@ Started 2026-10-27 on branch `claude/relaxed-newton-cr62u9` (from `main` 753ba2c
   tool and category; precision is extrapolated per stratum. Recall counts a gold item as caught when a finding of the
   same category overlaps it.
 
-  | tool (version, settings)                              | findings | precision | worth fixing | recall |
-  | ----------------------------------------------------- | -------- | --------- | ------------ | ------ |
-  | Harper 3.0.0, all 937 lints                           | 176      | 2.5%      | about 4      | 1/47   |
-  | Vale 3.25.1, Microsoft, Google, write-good, proselint, vale-ai-tells | 539 | 2.8% | about 15  | 9/47   |
-  | LanguageTool 6.6, picky, 28 style rules               | 163      | 0%        | 0            | 4/47   |
-  | proselint 0.16.0, all checks                          | 1,231    | 0%        | 0            | 3/47   |
-  | parser prototype (spaCy trf, WordNet, CC0/PD tables)  | 107      | 47%       | about 51     | 28/47  |
-  | LLM checker (haiku, rules.md)                         | 42       | 86%       | 36           | 31/47  |
+  | tool (version, settings)                                             | findings | precision | worth fixing | recall |
+  | -------------------------------------------------------------------- | -------- | --------- | ------------ | ------ |
+  | Harper 3.0.0, all 937 lints                                          | 176      | 2.5%      | about 4      | 1/47   |
+  | Vale 3.25.1, Microsoft, Google, write-good, proselint, vale-ai-tells | 539      | 2.8%      | about 15     | 9/47   |
+  | LanguageTool 6.6, picky, 28 style rules                              | 163      | 0%        | 0            | 4/47   |
+  | proselint 0.16.0, all checks                                         | 1,231    | 0%        | 0            | 3/47   |
+  | parser prototype (spaCy trf, WordNet, CC0/PD tables)                 | 107      | 47%       | about 51     | 28/47  |
+  | LLM checker (haiku, rules.md)                                        | 42       | 86%       | 36           | 31/47  |
 
   Per rule: shorthand is precise for both the prototype (22/25) and the LLM (29/29); mechanical passive was 2/18 in
   Vale, 0/6 in LanguageTool and 3/22 in the prototype; negative-to-affirmative suggestions were 0/6 (WordNet antonyms
@@ -243,6 +243,38 @@ Started 2026-10-27 on branch `claude/relaxed-newton-cr62u9` (from `main` 753ba2c
   the five remaining round 1 recommendations "Yes, accept all". The spec was revised with every settled decision the
   same day. New glossary terms: writing skill, conversation shorthand, prose check, copyedit pass. No ADR: the choice
   of a model hook over linters is easy to reverse, and the spec's Approaches section records the trade-off.
+
+### Editor test (2026-10-27, after the missed sample gate)
+
+Two real documents, `web-mcp-search/spec.md` (2,467 words, 47 known problems) and `web-mcp-search/findings.md`
+(2,901 words), each edited four ways: Opus with a plain prompt ("reads clearly to a smart reader who was not there"),
+Opus with the book's method (a guide written from the free sources above), Opus with the book's method plus the code's
+list of candidate problems, and Sonnet with the book's method. The same rules held for all: keep every fact, quote,
+code span and heading. Scored by blind section rankings (Sonnet and Fable judges, 28 sections), a fact check (304
+claims), the 47 known problems (one judge, one standard), and code measures of the book's lessons. Work files are in
+the scratchpad's `edittest/`.
+
+| version           | mean rank, 4 judgings (1 best, 5 worst) | sections ranked first (of 56) | known non-shorthand problems fixed (of 16) | shorthand fixed (of 31) | claims lost or changed (of 304) |
+| ----------------- | --------------------------------------- | ----------------------------- | ------------------------------------------ | ----------------------- | ------------------------------- |
+| book + candidates | 1.94                                    | 24                            | 12                                         | 0                       | 0                               |
+| book              | 2.46                                    | 11                            | 10                                         | 1                       | 1                               |
+| plain             | 2.64                                    | 17                            | 6                                          | 2                       | 0                               |
+| book, Sonnet      | 3.68                                    | 4                             | 6                                          | 16                      | 0                               |
+| original          | 4.28                                    | 0                             | 0                                          | 0                       | (none)                          |
+
+- The book's method beats a plain prompt, and the code's candidate list improves it further. Book + candidates
+  ranked best in all four judgings. It also moved the book's measures furthest. On the spec, adjacent sentences sharing
+  a content word went from 31.9% to 58.1% (plain: 44.7%), passive sentences from 25.3% to 14.0% (plain: 27.2%), and
+  abstract subjects from 5.2% to 1.9% (plain: 6.8%).
+- No editor can repair conversation shorthand, because none of them was there. Opus kept the labels and added a
+  legend. Sonnet replaced them with "the user agreed in the grill", which the judges read as lost meaning; Sonnet's
+  spec ranked below the original. Shorthand has to be fixed by the writer while it still has the context, which is
+  what the code check at write time does.
+- Sonnet's book edit was the weakest edit, so the model matters.
+- Filler and nominalizations were already rare in both originals (0.4–2.1 filler phrases per 1,000 words, about 1
+  nominalization per 100 words). These documents' problems are shorthand, cohesion and shape.
+- Limits: two documents, one run per version, model judges rather than people, and parser-based measures with known
+  noise.
 
 ## Plan review
 
@@ -301,6 +333,7 @@ order and modules (`flows-uses.mjs` joins Task 4), so no second review round; I 
 ## Rulings
 
 - 2026-10-27, Task 2: probes and the sample run load a scratchpad copy of `plugins/flows` with `dependencies` removed, because on Claude Code 2.1.311 an unsatisfied dependency (graphify) disables flows under `--plugin-dir` — the copy is test scaffolding and changes nothing in the repo — if wrong, the measured hooks differ from the shipped ones only in the manifest.
+
 ## Deviations
 
 - 2026-10-27, Task 3 (sample review gate): the Haiku hook found too little to be worth its cost. A recount of the
