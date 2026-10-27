@@ -59,6 +59,31 @@ Started 2026-10-27 on branch `claude/relaxed-newton-cr62u9` (from `main` 753ba2c
   `unslop` (an AI-tell catalog); `/doc-audit` Phase 5 and `/integrate` Phase 2 use them
   (`plugins/flows/skills/doc-audit/uses.json:5`, `integrate/uses.json:3`). Both are vendored and overlap the new skill.
 
+### Gates, writing rules and the sample document (Explore agent, 2026-10-27)
+
+- **Where a spec reaches a gate:** feature-flow Gate 1 (`plugins/flows/skills/feature-flow/SKILL.md:103-104`, reopened
+  from Phase 5 at `:117-120`) and research-flow Gate 1 (`research-flow/SKILL.md:82`, reopened at `:39-40`, `:103`).
+  implement, upgrade and fix-flow gate plans or causes, not specs.
+- **Audit reports** go to `docs/audits/<date>-<flow>-<scope>.md` (`flow-rules.md:19-20`) and reach the user at
+  test-audit Phase 4, doc-audit Phase 6 and harden Phase 3. No `docs/audits/` exists yet.
+- **Commit conflict:** flow-rules says "The spec and plan aren't committed when written" and "Commit or push only when
+  the user asks" (`flow-rules.md:96-101`). The spec's copyedit pass commits before and after on its own.
+- **A precedent for a fresh agent reading the spec:** brainstorming's builder check
+  (`plugins/flows/packs/superpowers/skills/brainstorming/SKILL.md:228-245`).
+- **Rules that conflict with Williams:** `unslop` 13 bans em dashes and 14 limits colons; `technical-writing:87` bans
+  semicolons; `technical-writing:56` and `unslop` 29 allow passive only when the actor is unknown or doesn't matter
+  (Williams also allows it to keep old information first); `technical-writing:70` splits sentences over about 25
+  words (the spec's `long` rule says 40).
+- **Where the shorthand comes from:** `Round N` is a comment in the templates (`flow-template.md:52`,
+  `research-template.md:60`) and in `plan-review.md:35`; `Q1, Q2…` is the grilling pack's question format
+  (`grilling/SKILL.md:8-22`); `D1…` has no source in any skill.
+- **`uses.json` and overrides:** a `prose` entry must name a skill that exists in the plugin and appears in that
+  conductor's own SKILL.md (`scripts/flows-uses.mjs:40-87`); overrides markers only point into packs (`:101-118`).
+  flow-rules' "A missing piece" table (`:176-186`) would need a `prose` row.
+- **The sample document** (`docs/features/web-mcp-search/spec.md`, 2,467 words; plan 5,305; flow 2,389): no sentence
+  over 40 words (longest 36); 21 Q/D/round tags (`Q1` means a grill question at `:35` and a bench threshold at
+  `:166`); hidden actors (`:118`, `:144`, `:161`); undefined CMP (`:68`) and BM25 (`:126`).
+
 ## Prior art
 
 ## Options
