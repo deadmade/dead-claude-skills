@@ -146,10 +146,11 @@ them, not everywhere:
 | Mechanical: lists, summaries, confidence scoring, `recall` slices, an implementer whose plan task holds the full code | `haiku`                                                                                                    | low             |
 | Gather: explorers, investigators, fact lookups, prior art, literature, probes, hunters, doc checkers                  | `sonnet`                                                                                                   | medium          |
 | Review: task reviewers, specialists, spec and standards, security, plan-review angles given no model                  | `sonnet`; `opus` when the change is large or subtle (concurrency, security, data loss, a public interface) | medium          |
-| Verify and judge: the final whole-branch review, fix rounds 4–5, refuters, `/harden`'s verifiers                      | `opus`                                                                                                     | high            |
+| Final judgment: the final whole-branch review, any other "most capable" dispatch                                      | `fable`                                                                                                    | high            |
+| Verify: fix rounds 4–5, refuters, `/harden`'s verifiers                                                               | `opus`                                                                                                     | high            |
 | Synthesis and model panels: `how`'s explainer, `why`'s synthesizer, plan review, `arena`, `architect`, `interrogate`  | as their text names them                                                                                   | as given        |
 
-superpowers' tiers map onto these: the cheap tier is `haiku`, the standard tier `sonnet`, the most capable `opus`.
+superpowers' tiers map onto these: the cheap tier is `haiku`, the standard tier `sonnet`, the most capable `fable`.
 The session's own model stays for the session's own work.
 
 ### Under ultracode or in a Workflow
