@@ -292,6 +292,9 @@ order and modules (`flows-uses.mjs` joins Task 4), so no second review round; I 
 
 - Task 1: base cf3ed1c, untracked at start: none; files clean; review clean after one fix round (2287a4c).
 - Task 2: base 3ce519e, untracked at start: none; files clean.
+  Probe (on the dependency-free copy): the code check exited 2 naming `Q4` and `CMP`, not `Q9`; the model check's reason
+  named the nominalization and ended with the closing line. The model reason is in no hook event; it reaches Claude
+  after Claude Code repeats the prompt twice, and appears in the stream only in Claude's own text and the final `result`.
 
 ## Rulings
 
