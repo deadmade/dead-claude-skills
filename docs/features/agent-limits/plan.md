@@ -2,6 +2,10 @@
 
 ## Decisions and status (2026-10-27)
 
+- **Superseded in the end:** the user cut the rule to one short paragraph in flow-rules **Agents** (few agents,
+  combined where it makes sense, a model that fits each job). The caps, tables and markers below were not kept; the
+  installer default and the ADR were.
+
 - The user's model is no ceiling; stronger models go to review only where the change calls for it.
 - The numbers below stand. Workflows may run a phase; limits, not bans.
 - test-audit gets no new gate. Its Requirements probe checks up to 10 requirements itself instead, because an agent

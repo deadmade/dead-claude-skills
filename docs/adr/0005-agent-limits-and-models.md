@@ -1,10 +1,10 @@
-# flows caps its agents per phase and names a model for each
+# flows asks for few agents, each on a model that fits its job
 
 Under ultracode a `/research-flow` could start 60 to 250 agents, and almost none of them named a model, so they ran on
 the session's model. The user wanted "a bit of limitations", not bans, and stronger models for review only "if it
-makes sense, not always". flow-rules' **Agents** section now gives each phase a cap, batches per-item work into at
-most 4 agents, asks the user before going past a cap, and names a model (and in a Workflow an effort) for every agent
-by its role. The installer sets `CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS=8` unless the user set it.
+makes sense, not always". flow-rules' **Agents** section is one short paragraph: decide how many agents a step needs,
+combine tasks and verification where that makes sense, ask before a run grows large, and give each agent a model that
+fits its job. Per-phase caps and a role table were tried and cut as too much; the judgment is left to Claude. The installer sets `CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS=8` unless the user set it.
 
 ## Considered options
 
@@ -35,9 +35,9 @@ transcript:
 
 ## Consequences
 
-- **Most of it is advice.** Caps, batching and models are rules Claude follows, like the gates. The concurrency
-  variable is the only enforced part, and Claude Code before 2.1.269 ignores it.
+- **Most of it is advice.** The rule is guidance Claude follows, like the gates. The concurrency variable is the only
+  enforced part, and Claude Code before 2.1.269 ignores it.
 - **Naming a model is the rule that matters most.** A model on the call wins over `model: inherit` in flows' vendored
   agents, so the rules work without changing their frontmatter.
-- **Counts can drift.** Pack syncs can add fan-out; the `overrides` markers catch the sentences quoted today, not
-  new ones.
+- **No pack sentence is overridden word for word.** The rule is general, so a pack's own fan-out ("one investigator
+  per category") still reads as written; the rule asks Claude to weigh it.

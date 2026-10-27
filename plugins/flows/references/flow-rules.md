@@ -91,29 +91,13 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
 - At Finish, ask the user for the **Run verdict** and record it in flow.md: worked as a whole, yes or no; clean, yes
   or no.
 
-## Agents: how many, and on which model
+## Agents
 
-Limits, not bans, under ultracode and in a Workflow too; they win over any count in a conductor or pack. Past one, ask
-(AskUserQuestion: count, models, recommendation); the answer, or a scale named in the request, is a **Rulings** line.
-
-- **Caps:** Ground 10, plan review one reviewer per angle, `/self-review` 17, any other phase 4; `arena` and
-  `architect` only on the user's yes. A build flow logs `<phase>: <n> (<model> <n>, …)` under **Agents** in flow.md
-  and asks before the run passes 60 (`/research-flow`) or 50.
-- **Batch:** per-item work (claims, issues, candidates, papers, facts, MCP categories, files) goes to at most 4 agents
-  sharing a ranked list; the rest goes under **Deferred**, never dropped silently. A few tool calls' worth stays inline.
-- **No nesting**, at most 8 agents per message. An agent runs its skills inline (Fit runs `blast-radius` itself); one
-  sent to a Workflow checks the 10 items that matter most itself. tob's workflow always gets `limit` 10.
-- **A Workflow** covers one phase, never crosses a gate, asks nothing, stays within the phase's cap and the session's
-  size guideline, and `log()`s what it deferred. Execute stays serial.
-- **Models:** every Agent call and `agent()` names one (and in a Workflow an effort); it wins over frontmatter.
-  `haiku` for mechanical work, `sonnet` for gathering and most review, `opus` for verifiers, refuters, fix rounds 4–5
-  and reviews of large or subtle changes, `fable` for superpowers' most capable tier (the final whole-branch review).
-  Panels keep the models their text names.
-  <!-- overrides pstack-picks/skills/why/SKILL.md: "Spawn one investigator per category that has a matching MCP, all in a single message so they run concurrently, each owning exactly one tool or MCP." -->
-  <!-- overrides pstack-picks/skills/arena/SKILL.md: "Spawn more runners when the arena covers multiple design directions." -->
-  <!-- overrides pstack-picks/skills/blast-radius/SKILL.md: "For a big or wide change, run it as an `arena`." -->
-  <!-- overrides mattpocock-picks/skills/grilling/SKILL.md: "When a frontier question needs a fact from the environment (filesystem, tools, etc.), dispatch a sub-agent to find it" -->
-  <!-- overrides tob-picks/skills/spec-to-code-compliance/SKILL.md: "Do not check requirements in this context" -->
+Don't start agents by the dozen, under ultracode or in a Workflow either. Decide how many a step really needs: combine
+related tasks, checks and verifications into one agent where that works, do small things inline, and ask before a run
+grows large. Give every agent a model that fits its job instead of the session's default: `haiku` for mechanical work,
+`sonnet` for searching and most review, `opus` or `fable` where the judgment is hard (a subtle review, the final
+review).
 
 ## Homes and commits
 
@@ -146,7 +130,7 @@ Limits, not bans, under ultracode and in a Workflow too; they win over any count
     <!-- overrides tob-picks/skills/spec-to-code-compliance/SKILL.md: "For a single requirement, dispatch the `tob-picks:spec-compliance-checker` agent at it." -->
   - tob's spec-compliance workflow runs from the main session through the Workflow tool with its path:
     `Workflow({scriptPath: "<packs>/tob-picks/workflows/spec-compliance.js", args: {path, spec, limit}})`, with
-    `args` as a JSON object and `limit` always set (**Agents**).
+    `args` as a JSON object (or just the path as a string).
     <!-- overrides tob-picks/skills/spec-to-code-compliance/SKILL.md: "Run `/tob-picks:spec-compliance <path>`." -->
 - **Installed plugins:** a skill the model may invoke, use the Skill tool. A skill with
   `disable-model-invocation: true` can't be loaded that way (every conductor here, `/self-review` too): read its SKILL.md
