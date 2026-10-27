@@ -107,8 +107,9 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
 
 - A conductor's `uses.json` lists the skills, agents and tools it runs (not other conductors). Change it with the
   SKILL.md, then run `node scripts/flows-uses.mjs`, which regenerates flows' dependencies and README tree.
-- **Packs** (superpowers, ponytail, mattpocock-picks, pstack-picks, tob-picks, paper-lookup) ship inside flows, in the
-  packs folder your SKILL.md names (below: `<packs>`). They aren't installed, so the Skill tool doesn't know them:
+- **Packs** (superpowers, ponytail, mattpocock-picks, pstack-picks, tob-picks, paper-lookup, security-audit) ship
+  inside flows, in the packs folder your SKILL.md names (below: `<packs>`). They aren't installed, so the Skill tool
+  doesn't know them:
   - A pack skill is read by path, `<packs>/<pack>/skills/<name>/SKILL.md`, and followed. Never through the Skill tool.
   - Inside a pack file, `<pack>:<name>` (`superpowers:writing-plans`) means `<packs>/<pack>/skills/<name>/SKILL.md`,
     and "invoke" or "use" it means read it there. `${CLAUDE_SKILL_DIR}` and relative paths (`./implementer-prompt.md`,
