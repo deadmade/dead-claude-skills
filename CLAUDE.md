@@ -129,7 +129,9 @@ highest `vX.Y.Z` tag (`scripts/next-version.mjs`; fetch tags before a local rele
     git push --follow-tags origin main
 
 Either way the `v*` tag's run packs the installer (`installer.tgz`), builds tui-review and web-mcp from the tag and
-publishes the GitHub release npx and the installer download from (ADR 0006). Removing a plugin from the marketplace is enough to retire it: the installer uninstalls installed
+publishes the GitHub release npx and the installer download from, then moves the `release` branch to it (never back).
+The installer points the marketplace at that branch (`RELEASE_BRANCH`, `core/release.ts`), so Claude Code's
+marketplace auto-update brings plugin updates without a rerun; the binaries still come from the installer (ADR 0006). Removing a plugin from the marketplace is enough to retire it: the installer uninstalls installed
 plugins of ours that the manifest no longer lists.
 
 ## Checks

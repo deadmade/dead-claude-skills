@@ -122,9 +122,24 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$TAG" dist/* --title "$TAG" --generate-notes \
-            --notes "Install or update with \`npx --allow-remote=root https://github.com/deadmade/dead-claude-skills/releases/download/$TAG/installer.tgz\`, which pins the marketplace to this release, or with \`/plugin update\` if you added the marketplace by hand.
+            --notes "Install or update with \`npx --allow-remote=root https://github.com/deadmade/dead-claude-skills/releases/download/$TAG/installer.tgz\`, which points the marketplace at the release branch (Claude Code then updates the plugins on its own) and installs this release's binaries, or with \`/plugin update\` if you added the marketplace by hand.
 
           installer.tgz: the installer, built to JS.
 
           tui-review-*: the binary behind tui-review, for each platform; the installer downloads yours.
           web-mcp-*: the binary behind the web-mcp plugin, for Windows and Linux x64; the installer downloads yours."
+
+      # The branch the installer points the marketplace at (RELEASE_BRANCH in installer/core/release.ts): Claude Code's
+      # marketplace auto-update follows it, so plugins update without rerunning the installer. Moved once the release
+      # exists, and never back to an older one (a re-run of an old tag's run).
+      - name: Move the release branch
+        run: |
+          if git fetch --depth=1 origin release 2>/dev/null; then
+            have=$(git show FETCH_HEAD:package.json | jq -r .version)
+            newest=$(printf '%s\n' "$have" "${TAG#v}" | sort -V | tail -n1)
+            if [ "$newest" != "${TAG#v}" ]; then
+              echo "release is at v$have, past $TAG"
+              exit 0
+            fi
+          fi
+          git push --force origin HEAD:refs/heads/release

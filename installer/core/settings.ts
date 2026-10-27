@@ -24,7 +24,6 @@ interface HookEntry {
 // statusLine: missing reads as off.
 export interface Toggles {
   statusLine?: boolean;
-  version: string;
   webBuiltinsOff?: boolean;
 }
 
@@ -107,7 +106,7 @@ export const webBuiltinsDecision = ({
   installed?: boolean;
 }) => (toggle ? healthy || undefined : was && installed ? false : undefined);
 
-export function mergeSettings(settings: Settings, { statusLine, version, webBuiltinsOff }: Toggles) {
+export function mergeSettings(settings: Settings, { statusLine, webBuiltinsOff }: Toggles) {
   const out = structuredClone(settings);
   // Night City ships with the bundle. Claude Code colours code in a fixed Monokai a theme can't change; off, diffs take
   // Night City's own diff colours.
@@ -135,7 +134,7 @@ export function mergeSettings(settings: Settings, { statusLine, version, webBuil
   };
   out.extraKnownMarketplaces = {
     ...out.extraKnownMarketplaces,
-    [MARKETPLACE]: { source: marketplaceSource(version), autoUpdate: true },
+    [MARKETPLACE]: { source: marketplaceSource(), autoUpdate: true },
   };
   // Claude Code deletes session transcripts after 30 days by default; a value set by hand wins.
   out.cleanupPeriodDays ??= KEEP_SESSIONS_DAYS;

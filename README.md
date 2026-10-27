@@ -27,7 +27,8 @@ old installs of them.
     npx --allow-remote=root https://github.com/deadmade/dead-claude-skills/releases/latest/download/installer.tgz
 
 The installer (Node standard library only, written in TypeScript and attached to each release built to JS) shows one page per category where you pick what to install, remove or
-update, then applies only the changes. It pins the marketplace to its own release so plugins match the installer, and
+update, then applies only the changes. It points the marketplace at the `release` branch, which follows the newest
+release, so Claude Code updates the plugins on its own (rerun the installer for new tui-review and web-mcp binaries), and
 it always denies Claude reading `.env` files and credential dirs and keeps session transcripts (Claude Code deletes them after 30 days unless `cleanupPeriodDays` is set). It
 lets at most 8 workflow agents run at once (`CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS`, unless you set your own). Optional toggles add ccstatusline
 and dcg; the danger zone can strip all foreign plugins or reset `~/.claude` to a clean slate (after a backup).

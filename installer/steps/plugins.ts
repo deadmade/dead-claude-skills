@@ -8,8 +8,8 @@ import {
   stillInstalled,
   type PluginRow,
 } from '../core/plugins.ts';
-import { MARKETPLACE, marketplaceArg } from '../core/release.ts';
-import { SETTINGS, VERSION, ask, failures } from '../context.ts';
+import { MARKETPLACE, RELEASE_BRANCH, marketplaceArg } from '../core/release.ts';
+import { SETTINGS, ask, failures } from '../context.ts';
 import { writeAtomic } from '../system/files.ts';
 import { claude, run } from '../system/proc.ts';
 import { log, progress } from '../ui/ui.ts';
@@ -26,17 +26,17 @@ export function listed(what: string, r: { ok: boolean; out?: string; err?: strin
   process.exit(1);
 }
 
-// Ours at this installer's tag, and Anthropic's when it's missing. Exits when ours can't be added.
+// Ours on its release branch, and Anthropic's when it's missing. Exits when ours can't be added.
 export async function addMarketplaces(marketplaces: { name: string }[]) {
   const unpinned = pinSettingsEntry();
-  // Adding again also moves an existing checkout to this installer's tag.
-  const market = await progress(`Adding the ${MARKETPLACE} marketplace at v${VERSION}`, () =>
-    claude(undefined, 'plugin', 'marketplace', 'add', marketplaceArg(VERSION)),
+  // Adding again also moves an existing checkout to the branch.
+  const market = await progress(`Adding the ${MARKETPLACE} marketplace on its ${RELEASE_BRANCH} branch`, () =>
+    claude(undefined, 'plugin', 'marketplace', 'add', marketplaceArg()),
   );
   if (!market.ok) {
     // A pinned entry the checkout doesn't match hides the marketplace from Claude Code.
     if (unpinned !== undefined) writeAtomic(SETTINGS, unpinned);
-    log('error', `Adding the marketplace at v${VERSION} failed (does the release exist?)`);
+    log('error', `Adding the marketplace on its ${RELEASE_BRANCH} branch failed (does the branch exist?)`);
     process.exit(1);
   }
   // The bundle's core plugins and some opt-ins install from Anthropic's marketplace.
