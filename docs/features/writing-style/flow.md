@@ -177,6 +177,29 @@ Started 2026-10-27 on branch `claude/relaxed-newton-cr62u9` (from `main` 753ba2c
   finding quality, measured: a bake-off on `docs/features/web-mcp-search/spec.md`, with prototypes and tool installs in
   the scratchpad only (throwaway, not building; nothing enters the repo).
 
+- **Bake-off results** (2026-10-27; scripts, outputs and verdicts in the session scratchpad, `bakeoff/`). Sample:
+  `docs/features/web-mcp-search/spec.md`. A blind annotator (opus) marked 47 places worth fixing: 31 shorthand,
+  3 passive, 2 redundant, 2 negative, 2 undefined, 1 nominalization, 1 list, 5 other (lost antecedent, term used before
+  it's defined, contradictions); no sentence over 40 words. Two blind judges (opus) labelled 260 findings sampled per
+  tool and category; precision is extrapolated per stratum. Recall counts a gold item as caught when a finding of the
+  same category overlaps it.
+
+  | tool (version, settings)                              | findings | precision | worth fixing | recall |
+  | ----------------------------------------------------- | -------- | --------- | ------------ | ------ |
+  | Harper 3.0.0, all 937 lints                           | 176      | 2.5%      | about 4      | 1/47   |
+  | Vale 3.25.1, Microsoft, Google, write-good, proselint, vale-ai-tells | 539 | 2.8% | about 15  | 9/47   |
+  | LanguageTool 6.6, picky, 28 style rules               | 163      | 0%        | 0            | 4/47   |
+  | proselint 0.16.0, all checks                          | 1,231    | 0%        | 0            | 3/47   |
+  | parser prototype (spaCy trf, WordNet, CC0/PD tables)  | 107      | 47%       | about 51     | 28/47  |
+  | LLM checker (haiku, rules.md)                         | 42       | 86%       | 36           | 31/47  |
+
+  Per rule: shorthand is precise for both the prototype (22/25) and the LLM (29/29); mechanical passive was 2/18 in
+  Vale, 0/6 in LanguageTool and 3/22 in the prototype; negative-to-affirmative suggestions were 0/6 (WordNet antonyms
+  like "not clear" → "bounce"). Only the LLM caught any of the five "other" problems (1/5). Masking: only the prototype
+  and LanguageTool (fed through a Markdown runner) skipped all of code, front matter, link targets and block quotes.
+  Caveats: one document; the annotator and judges are LLMs; the haiku run was an agent with time to reread, not one
+  hook-shaped call.
+
 ## Plan review
 
 ## Tasks
