@@ -1,6 +1,6 @@
 ---
 flow: feature
-phase: evaluate
+phase: execute
 ---
 
 # Writing style: flow
@@ -25,7 +25,8 @@ Started 2026-10-27 on branch `claude/relaxed-newton-cr62u9` (from `main` 753ba2c
 - Gate 1, spec approved: 2026-10-27, by the user ("I approve lets go"), after grill rounds 1–3.
   Reopened 2026-10-27 for the copyedit pass (no commits; a diff against a saved copy) and four smaller points, plan
   review round 1. Re-approved the same day ("yes to all").
-- Gate 2, plan approved:
+- Gate 2, plan approved: 2026-10-27, by the user ("approve, subagent-driven"), after plan review round 1.
+  Execution: subagent-driven (my recommendation). Commits: one per task on `claude/relaxed-newton-cr62u9`.
 
 ## Skipped
 
