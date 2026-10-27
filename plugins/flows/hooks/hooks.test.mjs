@@ -30,4 +30,11 @@ test('hooks.json declares both checks for Write and Edit of Markdown', () => {
   assert.equal(prompts[0], prompts[1]);
   assert.ok(prompts[0].includes(CLOSING));
   assert.ok(prompts[0].includes('$ARGUMENTS'));
+
+  // One quoted example per rule: each rule's line holds at least two quoted strings (before and after).
+  for (const rule of ['nominalization', 'hidden actor', 'wordy', 'list', 'sprawl', 'unclear']) {
+    const line = prompts[0].split('\n').find((l) => l.startsWith(`- ${rule}:`));
+    assert.ok(line, `no line for ${rule}`);
+    assert.ok((line.match(/"[^"]+"/g) ?? []).length >= 2, `no example for ${rule}`);
+  }
 });
