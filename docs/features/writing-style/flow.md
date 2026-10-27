@@ -290,7 +290,8 @@ order and modules (`flows-uses.mjs` joins Task 4), so no second review round; I 
 
 ## Tasks
 
-- Task 1: base cf3ed1c, untracked at start: none; files clean.
+- Task 1: base cf3ed1c, untracked at start: none; files clean; review clean after one fix round (2287a4c).
+- Task 2: base 2287a4c, untracked at start: none.
 
 ## Rulings
 
