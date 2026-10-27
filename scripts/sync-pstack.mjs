@@ -58,10 +58,21 @@ const SKIPPED = [
   'principle-sequence-verifiable-units',
   'principle-subtract-before-you-add',
   'principle-test-behavior-not-implementation',
+  'benchmark-checklist',
+  'correct',
+  'create-formal-verification-skill',
+  'in-your-own-words',
+  'ketchup',
+  'ketchup-video',
+  'maintain-formal-verification-skill',
+  'poteto-help',
+  'principle-explain-the-number',
+  'sharpen',
+  'statechart',
 ];
 // Cursor-isms that must not survive the rewrite, checked per line (case-sensitive; "cursor location" in prose is fine).
 const GUARD =
-  /\.cursor|Cursor|\bTask\b|AskQuestion|generalPurpose|[Rr]eadonly|environment: "|cloud_base_branch|agent-transcripts|mcps\/|todolist|grok-|gpt-5|sol-max|-thinking-|pstack-models|subagent_type: "Comment Sicko"|^name: Comment Sicko/;
+  /\.cursor|Cursor|\bTask\b|AskQuestion|generalPurpose|[Rr]eadonly|environment: "|cloud_base_branch|agent-transcripts|mcps\/|todolist|grok-|gpt-5|sol-max|-thinking-|pstack-models|poteto-mode|subagent_type: "Comment Sicko"|^name: Comment Sicko/;
 
 // --- Cursor -> Claude Code rewrites -------------------------------------------------------------
 // Applied in order to each whole .md file. Rules match content, never line numbers. Anything they miss is caught by GUARD.
@@ -113,6 +124,9 @@ const REWRITES = [
     /If the Task tool rejects a configured entry, run that reviewer[^\n]*\n/g,
     `Valid \`model\` values for the Agent tool are ${CLAUDE_MODELS}.\n`,
   ],
+
+  // poteto-mode (not vendored) tunes Cursor model slugs per spawn; the Agent tool's models carry no level or speed
+  [/ ?Pick each subagent's reasoning level and fast or standard speed[^\n]*?\*\*poteto-mode\*\* skill\./g, ''],
 
   // --- tool names ---
   [/Open a todolist/g, 'Open a todo list (`TodoWrite`)'],
