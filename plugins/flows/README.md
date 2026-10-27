@@ -22,13 +22,6 @@ keeps a state file so the next session can resume. Claude proposes and recommend
 `branch` (the default) audits what changed against the base, plus the tests and docs that should have changed with
 it; `all` audits the whole repo, vendored content skipped.
 
-Every conductor keeps its agents in proportion, ultracode or not (`references/flow-rules.md`, **Agents**): each phase
-has a cap, per-item work (claims, issues, papers) goes to at most 4 agents that share the list, and past a cap the
-conductor asks you. Every agent names a model by its role: `haiku` for mechanical work, `sonnet` for gathering and
-most review, `opus` for verifiers and for a review of a large or subtle change, `fable` for the final whole-branch
-review. Your selected model stays for the main session. Say "go wide" or answer the question to lift a cap;
-the answer is recorded as a ruling.
-
 ## What each conductor uses
 
 Generated from each conductor's `uses.json` by `node scripts/flows-uses.mjs`; `npm test` fails when it is stale.

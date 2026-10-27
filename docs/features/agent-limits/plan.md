@@ -8,9 +8,11 @@
   can't start tob's workflow.
 - The installer writes only the concurrency default, with no toggle.
 - superpowers' "most capable" tier, the final whole-branch review included, runs on `fable`; verifiers stay on `opus`.
-- Slice 1 is done: flow-rules **Agents**, the conductor edits, the installer default, docs, and the probes in
-  `docs/adr/0005-agent-limits-and-models.md`. Probe (b) passed, so slice 2 can land; slice 1 doesn't need it, since a
-  model named on the call wins over frontmatter. Still open: the end-to-end measurement (step 7) and slices 2 and 3.
+- Everything lives in flow-rules **Agents**; the conductors, their references and the flow.md templates stay as
+  they are (the user: "I only want it in the flow rules"). Step 4's per-conductor edits are dropped: the section's
+  caps and model table win over a conductor's own counts.
+- Slice 1 is done: flow-rules **Agents**, the installer default, docs, and the probes in
+  `docs/adr/0005-agent-limits-and-models.md`. Still open: the end-to-end measurement (step 7) and slices 2 and 3.
 
 ## Goal
 

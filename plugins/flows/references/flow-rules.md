@@ -14,8 +14,8 @@ sentence, so an upstream change to an overridden or pasted rule is noticed at it
 upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it after every phase, with links to every
   artifact. It is how the next session resumes. feature-flow and research-flow have their own templates; the others
   use [build-template.md](build-template.md).
-- A flow.md started before the **Tasks**, **Rulings** or **Agents** sections or the **Run verdict** line existed gets
-  them added when it is resumed; none is required of it.
+- A flow.md started before the **Tasks** and **Rulings** sections or the **Run verdict** line existed gets them added
+  when it is resumed; none is required of it.
 - **Audits** (`/test-audit`, `/doc-audit`, `/harden`) write `docs/audits/<YYYY-MM-DD>-<flow>-<scope>.md`: the scope
   line, the findings table, the user's pick per finding, and what was fixed.
 - `/verify`, `/understand` and `/learn` keep no state file of their own; called from a build flow, they write their
@@ -99,18 +99,23 @@ runs on the session's model. These rules keep a run in proportion. They are limi
 - **Caps.** Each phase starts at most the agents the table below gives it. Before going past a cap, ask with
   AskUserQuestion: how many more, on which models, why, and a recommendation. The user's answer, or a scale they
   named in the request ("go wide"), is a ruling: record it under **Rulings** so a resumed flow keeps it. These caps
-  win over any count in a pack's text; a ruling wins over these caps.
+  win over any count in a conductor's or a pack's text; a ruling wins over these caps.
 - **Batch per-item work.** Where a skill starts one agent per item (a claim, issue, candidate, fact, paper,
   requirement, MCP category, domain file), start at most 4 and give each a share of the list. Rank the items first;
   what a phase can't cover goes under **Deferred** in the report or flow.md, never dropped without a word.
+- **A workflow an agent can't start.** An agent following a skill that sends it to a Workflow (tob's
+  `spec-to-code-compliance` in `/test-audit`'s Requirements probe) checks the items itself: the 10 that matter most,
+  the rest deferred.
+  <!-- overrides tob-picks/skills/spec-to-code-compliance/SKILL.md: "Do not check requirements in this context" -->
 - **Small stays inline.** What a few tool calls answer runs in the session: self-review's small-diff rule, `how`'s
   simple path, a fact one grep finds.
 - **At most 8 agents in one message**; more go in waves.
 - **No nesting.** An agent runs the skills it is handed inline and starts no agents or workflows of its own (on Claude
   Code 2.1.311 subagents and workflow agents don't get the Agent or Workflow tool; the rule holds where they do). Plan
   review's Fit reviewer runs `blast-radius` inline, never as an `arena`.
-- **Run total.** A build flow adds one line per phase under **Agents** in flow.md: `<phase>: <n> (<model> <n>, …)`.
-  When the total would pass 60 (`/research-flow`) or 50 (the other build flows), ask before going on.
+- **Run total.** A build flow adds one line per phase under an **Agents** heading in flow.md (added before **Run
+  verdict** when missing): `<phase>: <n> (<model> <n>, …)`. When the total would pass 60 (`/research-flow`) or 50
+  (the other build flows), ask before going on.
 
 | Where                                     | Cap                                                                                                                                                                                                                 |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

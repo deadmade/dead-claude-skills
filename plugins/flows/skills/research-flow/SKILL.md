@@ -56,7 +56,7 @@ only says what differs. Packs: `${CLAUDE_PLUGIN_ROOT}/packs`, for FF's pack skil
 
 ## Phase 1: Ground
 
-FF Phase 1, and in the same message start a third background `general-purpose` agent on `sonnet` with the prompt in
+FF Phase 1, and in the same message start a third background `general-purpose` agent with the prompt in
 [references/literature.md](references/literature.md); in that prompt, paper-lookup is
 `${CLAUDE_PLUGIN_ROOT}/packs/paper-lookup/skills/paper-lookup/SKILL.md`, read by path, and its strength column follows
 `${CLAUDE_PLUGIN_ROOT}/packs/pstack-picks/skills/why/references/epistemics.md`. Write its evidence table into flow.md
@@ -95,8 +95,7 @@ FF Phase 5, with a fourth reviewer angle next to Correctness, Fit and Simpler:
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Evidence** | Design choices in the plan with no evidence row, or that contradict one. A paper's result used outside its setting. A measurement that can't falsify the hypothesis, or differs between baseline and final run. |
 
-The Evidence reviewer runs on `sonnet` and also gets the Evidence and Hypothesis sections of flow.md. **Gate 2** as
-in FF.
+The Evidence reviewer also gets the Evidence and Hypothesis sections of flow.md. **Gate 2** as in FF.
 
 ## Phase 6: Execute
 

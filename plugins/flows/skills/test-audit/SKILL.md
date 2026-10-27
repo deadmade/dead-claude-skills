@@ -37,8 +37,8 @@ mutation tools, new test frameworks) without the user's yes.
 
 ## Phase 3: Probe
 
-One message, these agents in parallel on `sonnet`, each given the scope, the test map, the baseline and the path of
-the pack file it follows:
+One message, these agents in parallel, each given the scope, the test map, the baseline and the path of the pack file
+it follows:
 
 - **Mutation:** tob `mutation-testing` when its tools (mewt, muton) support the language and are installed; read its
   results with its `workflows/analyzing-results.md`, and drop equivalent mutants (same behaviour) by
@@ -52,9 +52,7 @@ the pack file it follows:
   encode/decode and serialize/deserialize pairs, parsers, normalizers, validators, comparators and sorting, numeric
   code, state machines. Name the property, don't write it yet.
 - **Requirements:** tob `spec-to-code-compliance` with the spec (a `docs/features/*/` spec, CLAUDE.md, README) and the
-  tests as the implementation: which stated behaviours no test checks. The probe checks them itself, the 10 that
-  matter most first and the rest listed as deferred: an agent can't start the workflow tob sends it to.
-  <!-- overrides tob-picks/skills/spec-to-code-compliance/SKILL.md: "Do not check requirements in this context" -->
+  tests as the implementation: which stated behaviours no test checks.
 - **Smells:** agent `flows:pr-test-analyzer` on the scope's tests: tests that assert nothing or only that no
   error was thrown, mock the thing under test, sleep instead of waiting, pin implementation details, or duplicate
   another test (a delete candidate is a finding too). Called from `/verify` with its output: use that and don't run

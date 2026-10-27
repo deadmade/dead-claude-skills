@@ -5,8 +5,7 @@ inventions.
 
 ## Agent prompt
 
-Launch one `general-purpose` agent on `sonnet` in the background with this prompt, filled in. It covers every item
-itself and starts no agents of its own.
+Launch one `general-purpose` agent in the background with this prompt, filled in:
 
 ```
 Research how other projects implement: <feature, in one paragraph>.

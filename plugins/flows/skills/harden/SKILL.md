@@ -27,13 +27,11 @@ One message, in parallel, each given the scope:
   output directory or ledger). From `<packs>/security-audit/skills/security-audit/`, read each domain file's
   **When to use this file** and pick those whose boundary the scope has: a source fact (an MCP server, a release
   workflow, a D-Bus call), not a dependency name. None picked: skip this pass and say so.
-  - At most 4 `general-purpose` hunters on `sonnet`, the picked files split over them, each given the scope and its
-    files' **Core discipline**, attack-class sections, **Universal moves** and **Validation rules**, verbatim. Each
-    hunts its files' classes only (the security pass covers injection, access control, memory safety and crypto),
-    reads source and runs no target code, and returns each candidate with its source trace from entry point to sink,
-    the boundary it crosses, and the result.
-  - The candidates then go to at most 4 fresh `general-purpose` verifiers on `opus` (flow-rules **Agents**), none of
-    them a hunter, each given the
+  - One `general-purpose` hunter per picked file, given the scope and that file's **Core discipline**, attack-class
+    sections, **Universal moves** and **Validation rules**, verbatim. It hunts that file's classes only (the security
+    pass covers injection, access control, memory safety and crypto), reads source and runs no target code, and
+    returns each candidate with its source trace from entry point to sink, the boundary it crosses, and the result.
+  - Each candidate then goes to a fresh `general-purpose` verifier that did not hunt it, given the
     **Candidate-verifier prompt** from `VALIDATION-AND-REPORTING.md` and the `confirmed`, `needs_validation` and
     `rejected` branches of `report-schema.json`. Rejected candidates are dropped.
     <!-- overrides security-audit/skills/security-audit/SKILL.md: "Guidance mode: For security questions, focused reviews, methodology, triage, or investigation of specific findings, use only the relevant parts of this skill." -->
