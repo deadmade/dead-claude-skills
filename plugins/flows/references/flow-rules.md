@@ -93,85 +93,27 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
 
 ## Agents: how many, and on which model
 
-Ultracode, a Workflow or a large diff make it easy to start a hundred agents, and an agent started without a model
-runs on the session's model. These rules keep a run in proportion. They are limits, not bans: past a cap, ask.
+Limits, not bans, under ultracode and in a Workflow too; they win over any count in a conductor or pack. Past one, ask
+(AskUserQuestion: count, models, recommendation); the answer, or a scale named in the request, is a **Rulings** line.
 
-- **Caps.** Each phase starts at most the agents the table below gives it. Before going past a cap, ask with
-  AskUserQuestion: how many more, on which models, why, and a recommendation. The user's answer, or a scale they
-  named in the request ("go wide"), is a ruling: record it under **Rulings** so a resumed flow keeps it. These caps
-  win over any count in a conductor's or a pack's text; a ruling wins over these caps.
-- **Batch per-item work.** Where a skill starts one agent per item (a claim, issue, candidate, fact, paper,
-  requirement, MCP category, domain file), start at most 4 and give each a share of the list. Rank the items first;
-  what a phase can't cover goes under **Deferred** in the report or flow.md, never dropped without a word.
-- **A workflow an agent can't start.** An agent following a skill that sends it to a Workflow (tob's
-  `spec-to-code-compliance` in `/test-audit`'s Requirements probe) checks the items itself: the 10 that matter most,
-  the rest deferred.
+- **Caps:** Ground 10, plan review one reviewer per angle, `/self-review` 17, any other phase 4; `arena` and
+  `architect` only on the user's yes. A build flow logs `<phase>: <n> (<model> <n>, …)` under **Agents** in flow.md
+  and asks before the run passes 60 (`/research-flow`) or 50.
+- **Batch:** per-item work (claims, issues, candidates, papers, facts, MCP categories, files) goes to at most 4 agents
+  sharing a ranked list; the rest goes under **Deferred**, never dropped silently. A few tool calls' worth stays inline.
+- **No nesting**, at most 8 agents per message. An agent runs its skills inline (Fit runs `blast-radius` itself); one
+  sent to a Workflow checks the 10 items that matter most itself. tob's workflow always gets `limit` 10.
+- **A Workflow** covers one phase, never crosses a gate, asks nothing, stays within the phase's cap and the session's
+  size guideline, and `log()`s what it deferred. Execute stays serial.
+- **Models:** every Agent call and `agent()` names one (and in a Workflow an effort); it wins over frontmatter.
+  `haiku` for mechanical work, `sonnet` for gathering and most review, `opus` for verifiers, refuters, fix rounds 4–5
+  and reviews of large or subtle changes, `fable` for superpowers' most capable tier (the final whole-branch review).
+  Panels keep the models their text names.
+  <!-- overrides pstack-picks/skills/why/SKILL.md: "Spawn one investigator per category that has a matching MCP, all in a single message so they run concurrently, each owning exactly one tool or MCP." -->
+  <!-- overrides pstack-picks/skills/arena/SKILL.md: "Spawn more runners when the arena covers multiple design directions." -->
+  <!-- overrides pstack-picks/skills/blast-radius/SKILL.md: "For a big or wide change, run it as an `arena`." -->
+  <!-- overrides mattpocock-picks/skills/grilling/SKILL.md: "When a frontier question needs a fact from the environment (filesystem, tools, etc.), dispatch a sub-agent to find it" -->
   <!-- overrides tob-picks/skills/spec-to-code-compliance/SKILL.md: "Do not check requirements in this context" -->
-- **Small stays inline.** What a few tool calls answer runs in the session: self-review's small-diff rule, `how`'s
-  simple path, a fact one grep finds.
-- **At most 8 agents in one message**; more go in waves.
-- **No nesting.** An agent runs the skills it is handed inline and starts no agents or workflows of its own (on Claude
-  Code 2.1.311 subagents and workflow agents don't get the Agent or Workflow tool; the rule holds where they do). Plan
-  review's Fit reviewer runs `blast-radius` inline, never as an `arena`.
-- **Run total.** A build flow adds one line per phase under an **Agents** heading in flow.md (added before **Run
-  verdict** when missing): `<phase>: <n> (<model> <n>, …)`. When the total would pass 60 (`/research-flow`) or 50
-  (the other build flows), ask before going on.
-
-| Where                                     | Cap                                                                                                                                                                                                                 |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Ground, `/feature-flow`, `/research-flow` | `/feature-flow` 9, `/research-flow` 10: `how` at most 3 explorers and its explainer, `why` (only when the feature moves an existing concern) at most 3 investigators and its synthesizer, prior art 1, literature 1 |
-| Ground, other conductors; `/understand`   | 4                                                                                                                                                                                                                   |
-| Brainstorm's builder check                | 1                                                                                                                                                                                                                   |
-| Grill fact lookups                        | 3 over the whole grill, one at a time; look the fact up inline first                                                                                                                                                |
-| Plan review                               | one reviewer per angle (3; `/research-flow` 4); a re-review reruns only the angles the change touched; `arena` or `architect` only on the user's yes                                                                |
-| Execute                                   | the execution skill's own loop, serial                                                                                                                                                                              |
-| `/self-review`                            | 17: bug pass 1 setup, 5 reviewers, 3 scorers; spec and standards 2; security 1; CLAUDE.md 1; specialists 4. A small diff: none                                                                                      |
-| `/doc-audit` claims                       | 4 checkers; the tob workflow only on the user's yes                                                                                                                                                                 |
-| `/test-audit` probes                      | 4                                                                                                                                                                                                                   |
-| `/harden` security domains                | 4 hunters, 4 verifiers                                                                                                                                                                                              |
-| `/learn`, pstack `recall`                 | 3                                                                                                                                                                                                                   |
-| `arena`                                   | the four runners and the judge its text names                                                                                                                                                                       |
-
-<!-- overrides pstack-picks/skills/why/SKILL.md: "Default to the full parallel investigation." -->
-<!-- overrides pstack-picks/skills/why/SKILL.md: "Spawn one investigator per category that has a matching MCP, all in a single message so they run concurrently, each owning exactly one tool or MCP." -->
-<!-- overrides pstack-picks/skills/how/SKILL.md: "Decompose the question into 2 to 4 angles, each a distinct slice of the subsystem." -->
-<!-- overrides pstack-picks/skills/arena/SKILL.md: "Spawn more runners when the arena covers multiple design directions." -->
-<!-- overrides pstack-picks/skills/blast-radius/SKILL.md: "For a big or wide change, run it as an `arena`." -->
-<!-- overrides pstack-picks/skills/recall/SKILL.md: "Spawn parallel subagents on a fast, cheap model, each taking a slice of the corpus." -->
-<!-- overrides mattpocock-picks/skills/grilling/SKILL.md: "When a frontier question needs a fact from the environment (filesystem, tools, etc.), dispatch a sub-agent to find it" -->
-<!-- overrides mattpocock-picks/skills/codebase-design/DESIGN-IT-TWICE.md: "Spawn 3+ sub-agents in parallel." -->
-
-**Models.** Every Agent call and every Workflow `agent()` names its model, and in a Workflow its effort too. An
-agent started without one runs on the session's model, which is what this rule is here to avoid; a model named on
-the call wins over an agent's `model: inherit` or any other frontmatter. Stronger models go where the work needs
-them, not everywhere:
-
-| Role                                                                                                                  | Model                                                                                                      | Workflow effort |
-| --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | --------------- |
-| Mechanical: lists, summaries, confidence scoring, `recall` slices, an implementer whose plan task holds the full code | `haiku`                                                                                                    | low             |
-| Gather: explorers, investigators, fact lookups, prior art, literature, probes, hunters, doc checkers                  | `sonnet`                                                                                                   | medium          |
-| Review: task reviewers, specialists, spec and standards, security, plan-review angles given no model                  | `sonnet`; `opus` when the change is large or subtle (concurrency, security, data loss, a public interface) | medium          |
-| Final judgment: the final whole-branch review, any other "most capable" dispatch                                      | `fable`                                                                                                    | high            |
-| Verify: fix rounds 4–5, refuters, `/harden`'s verifiers                                                               | `opus`                                                                                                     | high            |
-| Synthesis and model panels: `how`'s explainer, `why`'s synthesizer, plan review, `arena`, `architect`, `interrogate`  | as their text names them                                                                                   | as given        |
-
-superpowers' tiers map onto these: the cheap tier is `haiku`, the standard tier `sonnet`, the most capable `fable`.
-The session's own model stays for the session's own work.
-
-### Under ultracode or in a Workflow
-
-Ultracode changes how work runs, not these rules: the caps, the gates and the model table still hold.
-
-- A Workflow covers at most one phase and never runs across a gate. It asks the user nothing: a deviation comes back
-  as `NEEDS_CONTEXT`, and the main session asks.
-- Its `parallel()` and `pipeline()` stay within the phase's cap, or within the session's workflow size guideline when
-  that is smaller. Batch and defer as above, and `log()` what was deferred.
-- Every `agent()` passes `model` and `effort` from the table.
-- Execute stays serial, as its skill says; a conductor called inline (`/verify` → `/self-review`) starts no workflow
-  inside another.
-- tob's spec-compliance workflow always gets a `limit`: 10, unless the user asked for more.
-- The installer sets `CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS` to 8 unless it is already set: at most 8 workflow
-  agents run at once. It is the one limit here Claude Code enforces.
 
 ## Homes and commits
 
@@ -204,7 +146,7 @@ Ultracode changes how work runs, not these rules: the caps, the gates and the mo
     <!-- overrides tob-picks/skills/spec-to-code-compliance/SKILL.md: "For a single requirement, dispatch the `tob-picks:spec-compliance-checker` agent at it." -->
   - tob's spec-compliance workflow runs from the main session through the Workflow tool with its path:
     `Workflow({scriptPath: "<packs>/tob-picks/workflows/spec-compliance.js", args: {path, spec, limit}})`, with
-    `args` as a JSON object and `limit` always set (**Agents**: 10 unless the user asked for more).
+    `args` as a JSON object and `limit` always set (**Agents**).
     <!-- overrides tob-picks/skills/spec-to-code-compliance/SKILL.md: "Run `/tob-picks:spec-compliance <path>`." -->
 - **Installed plugins:** a skill the model may invoke, use the Skill tool. A skill with
   `disable-model-invocation: true` can't be loaded that way (every conductor here, `/self-review` too): read its SKILL.md
