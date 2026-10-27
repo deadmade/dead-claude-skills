@@ -94,7 +94,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   sets `preferredNotifChannel: "notifications_disabled"`.
 - `plugins/opt-in/implementation/rust-skills/`, `plugins/opt-in/implementation/csharp-skills/`: vendored (`sync-rust.mjs`, `sync-csharp.mjs`). `paths:` frontmatter doesn't
   gate plugin skills in Claude Code (checked on 2.1.272 and 2.1.296), so csharp-skills exposes six router skills over an
-  unscanned `library/`; the router reads library files via the installer's `Read(~/.claude/plugins/**)` rule (without
+  unscanned `library/`, with upstream's binlog MCP workflows cut (the server isn't vendored); the router reads library files via the installer's `Read(~/.claude/plugins/**)` rule (without
   the installer users get a permission prompt).
 - `plugins/opt-in/implementation/postgres/`: a database plugin. It vendors
   Neon's and Timescale's Postgres skills from two upstreams (`sync-postgres.mjs`), so each skill folder carries its

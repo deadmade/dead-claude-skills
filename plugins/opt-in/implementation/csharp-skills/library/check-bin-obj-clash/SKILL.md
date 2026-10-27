@@ -35,47 +35,9 @@ Clashes can occur between:
 
 Use the `binlog-generation` skill to generate a binary log with the correct naming convention.
 
-## Primary workflow — binlog MCP
+## Text-log replay
 
-The MCP server exposes structured tools for inspecting a `.binlog` without
-parsing text logs. Call them directly instead of replaying the binlog to a text
-file. Call `tools/list` for the MCP first if you are unsure which tools are available.
-
-**Important constraints:**
-- The `.binlog` file is a **binary format** — do NOT try to `cat`, `head`, `strings`, or read it directly. Use only the MCP tools to query it.
-- **Synthesize findings as you go.** Do not spend all available time investigating — once you have enough evidence, present your conclusions.
-
-### Step 2: Get an overview and list projects
-
-Use the MCP overview and projects tools to understand the build and list all projects that participated.
-
-### Step 3: Check evaluations and global properties
-
-Use the MCP `evaluations` and `evaluation_global_properties` tools to find all evaluations per project. Look for:
-- Multiple evaluations for the same project (indicates multi-targeting or multiple build configurations)
-- Differing global properties between evaluations (`TargetFramework`, `Configuration`, `RuntimeIdentifier`, `SolutionFileName`, `PublishReadyToRun`, etc.)
-
-### Step 4: Get output paths for each evaluation
-
-Use the MCP properties tool to query `OutputPath`, `IntermediateOutputPath`, `BaseOutputPath`, and `BaseIntermediateOutputPath` for each project evaluation.
-
-### Step 5: Check for double writes
-
-Use the MCP double_writes tool if available — it directly detects files written by multiple project instances.
-
-### Step 6: Identify clashes
-
-Compare the `OutputPath` and `IntermediateOutputPath` values across all evaluations:
-1. **Normalize paths** - Convert to absolute paths and normalize separators
-2. **Group by path** - Find evaluations that share the same OutputPath or IntermediateOutputPath
-3. **Filter out non-build evaluations** - Exclude `BuildProjectReferences=false` instances (P2P queries)
-4. **Report clashes** - Any group with more than one evaluation indicates a clash
-
-## Fallback workflow — text-log replay (when MCP is unavailable)
-
-Use this only when the MCP server cannot be started.
-
-Replay the binlog to a diagnostic text log, then grep for the same signals the MCP tools surface:
+Replay the binlog to a diagnostic text log, then grep for the clash signals:
 
 ```bash
 dotnet msbuild build.binlog -noconlog -fl "-flp:v=diag;logfile=full.log"
