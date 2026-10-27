@@ -10,8 +10,7 @@ In order, the first that fits:
 2. **Screenshots of the real product,** taken by the build itself whenever the product can be reached: a URL, a running dev server, a project in the folder that starts with one command, a desktop or phone app on this machine (§ 4). A real screen beats any picture of one.
 3. **The product built,** only when there is no product to capture yet (§ 4).
 4. **Photographs from the library**, picked by script and treated in the theme's way (§ 2, § 5).
-5. **Generated stills**, only when `TOGETHER_API_KEY` is set and the user asked for them (§ 6).
-6. **Type at full scale**, when the prompt is about words.
+5. **Type at full scale**, when the prompt is about words.
 
 Which prompts want which:
 
@@ -73,10 +72,6 @@ A working control (a calculator on the user's prices, a booking form) is a fine 
 - **Facts on the pictures:** captions are facts from the prompt in the label style, beside or under the picture (the dish and its price, the room and its hours, the date, the place). Never a credit line there, and never a caption that claims a stand-in as the user's own person, place or product.
 - **The theme's treatment, on every photo.** The theme's `photo:` header sets it and the scaffold writes it into `base.css` as CSS on every image in a slot, the user's own included: `natural`, `warm`, `muted`, `mono`, `duotone` in two of the theme's tokens, or `tint` in one, with adjustments (`con=`, `sat=`, `exp=`). A duotone or tint flattens a pale subject (snow, a white wall) into an empty field: choose frames with tonal range and look at each through the treatment. A duotone or tint takes the slot's `::before`, so draw a keyline or scrim with `::after` or a sibling. A photo inside a built product takes the treatment only if the page adds it.
 - **The frame is the theme's:** its radius, an inset outline of ink at 6 to 10% (`outline: 1px solid ...; outline-offset: -1px`), its texture if it has one. Never a border and a wide shadow together (F24).
-
-## 6. Generated stills
-
-Only when `TOGETHER_API_KEY` is set and the user asked for generated images, or for a subject the library cannot reach: `comp.md` § Generated stills. Never auto-fire it.
 
 ## 7. Never
 

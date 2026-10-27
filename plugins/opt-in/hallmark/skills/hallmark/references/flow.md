@@ -62,7 +62,7 @@ What takes their place:
 - **Figures are the product's own.** A stat is a figure and its label in tabular numerals; no icon tile, no gradient, no trend arrow nobody measured (46a); on a redesign a figure the screen already shows stays and goes to the owner (`redesign.md`).
 - **The signature** is still owed: the one object this tool is known by (the ledger, the timeline, the queue), not a greeting above four stat cards.
 
-The load shrinks with the scope: no shape file, no `layout.md` past § 2, and of `craft.md` not § 4, § 7 or § 8. The Picks block drops Shape, Hero and Sections and names the screen instead: `Screen · transactions table with an inline filter row · states: loading, empty, error`. The stamp says `shape: app screen`, which sloplint and the edit-time hook read as the app scope, and the log entry carries `scope: app`.
+The load shrinks with the scope: no shape file, no `layout.md` past § 2, and of `craft.md` not § 4, § 7 or § 8. The Picks block drops Shape, Hero and Sections and names the screen instead: `Screen · transactions table with an inline filter row · states: loading, empty, error`. The stamp says `shape: app screen`, which sloplint reads as the app scope, and the log entry carries `scope: app`.
 
 ## The sweep, for a page Hallmark did not build
 
@@ -92,14 +92,6 @@ Two edge cases: the archive has written nothing yet (say so and wait; do not sta
 
 `--fast`, or a prompt that says quick, rough or prototype: "go ahead" at Step 1 with a one-line disclosure, narration capped at three lines, the Finish tier skipped, Reflex gates waivable with a one-line reason. Not relaxed: the Floor, the stamp, `tokens.css`, the log, contrast.
 
-## Edit-time linting
-
-On Claude Code, `node <skill-dir>/scripts/install-hook.mjs` wires sloplint as a PostToolUse hook that reports Floor findings the moment an artifact is written and stays quiet otherwise; Step 7 still runs.
-
-## Comp before build (signal 9)
-
-Fires only when `TOGETHER_API_KEY` is set. After the Picks block, load `comp.md`: two comps of the first viewport at 1280 x 800, built from the idea or the theme line rather than the prompt, varied on one compositional axis, one approval, then a medium inventory naming how each region gets built. Reproduction is checked against the comp at its own size before anything below the fold exists. The comp never overrides the Floor (an image generator has read no gates; take its composition, not its compliance) and never blocks: two comp rounds is the ceiling, then build unconstrained and say so.
-
 ## Harnesses
 
 Hallmark is tuned for Claude Code, Codex CLI and OpenCode. This section tunes execution, never standards: the Floor, the gates, the stamp, `tokens.css` and the log are identical everywhere; on any conflict SKILL.md wins.
@@ -107,14 +99,13 @@ Hallmark is tuned for Claude Code, Codex CLI and OpenCode. This section tunes ex
 | Lever | Claude Code | Codex CLI | OpenCode |
 | --- | --- | --- | --- |
 | Skill path | `~/.claude/skills/hallmark`, `/hallmark` | `~/.agents/skills/hallmark`, `$hallmark` (implicit invocation on) | `~/.config/opencode/skills` plus the Claude and Codex paths; `/hallmark` |
-| Edit-time hook | PostToolUse via `install-hook.mjs` | none; Step 7 sloplint is the only mechanical sweep | none; same |
 | Subagents | yes | none; the fresh-context review runs in-thread and says so | yes (`@general`); parallel work allowed |
 | Questions | AskUserQuestion | plain chat text, once, then wait | plain chat text, once, then wait |
 | Browser preview | preview pane | none; relay paths | none; relay paths |
-| Network | yes | off by default in the `workspace-write` sandbox; `imagegen.mjs` needs an explicit ask and an approval | `webfetch` permission-gated |
+| Network | yes | off by default in the `workspace-write` sandbox | `webfetch` permission-gated |
 | Node scripts | run freely | `sloplint.mjs` runs in-sandbox (local reads only) | bash gated allow / ask / deny; if *ask*, warn once and suggest allowing `node *` for the session; never edit the permission config |
 
-**The render tier** (`sloplint --render`, `capture.mjs`, `picture.mjs`) needs Node 18 or later, `puppeteer-core` (local, global or `HALLMARK_PUPPETEER`) and Chrome or Chromium (`CHROME_PATH` when it is not in a usual place). Without them sloplint runs the static gates and prints that the render tier did not run: say so in the handoff, never claim a render pass, and offer `npm i -g puppeteer-core`.
+**The render tier** (`sloplint --render`, `capture.mjs`) needs Node 18 or later, `puppeteer-core` (local, global or `HALLMARK_PUPPETEER`) and Chrome or Chromium (`CHROME_PATH` when it is not in a usual place). Without them sloplint runs the static gates and prints that the render tier did not run: say so in the handoff, never claim a render pass, and offer `npm i -g puppeteer-core`.
 
 Codex: batch a page's files into one patch so a dev server reloads once; never suggest editing `~/.codex/config.toml`, the sandbox mode or the approval policy; if the sandbox blocks something, name the block and take the fallback. OpenCode: a plan-style agent with edits denied cannot run Hallmark; say so rather than pasting files into chat; formatters cannot break a gate, LSP diagnostics are yours to fix before Step 7. Cursor: a skill picked with `/hallmark` rides one message, so later turns re-read the stamp before they build; Ask mode cannot edit, say so and stop.
 
