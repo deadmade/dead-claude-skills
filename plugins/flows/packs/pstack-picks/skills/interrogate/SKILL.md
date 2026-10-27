@@ -37,7 +37,7 @@ Each reviewer gets `subagent_type: Explore` and `model` set to the reviewer's mo
 
 Valid `model` values for the Agent tool are `fable`, `opus`, `sonnet`, `haiku`.
 
-Read `references/reviewer-prompt.md` and fill in the same template for every reviewer with the stated intent, the diff or file contents, the rubric from `references/rubric.md`, and the code-quality lens from `references/code-quality-review.md`. Pick each subagent's reasoning level and fast or standard speed for the job, per the Subagents section of the **poteto-mode** skill.
+Read `references/reviewer-prompt.md` and fill in the same template for every reviewer with the stated intent, the diff or file contents, the rubric from `references/rubric.md`, and the code-quality lens from `references/code-quality-review.md`.
 
 ## Step 4, Synthesize
 
