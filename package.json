@@ -8,6 +8,7 @@
     "release": "node scripts/release.mjs",
     "test": "node scripts/check-repo.mjs && node --test --experimental-test-coverage --test-coverage-include=\"installer/**\" --test-coverage-exclude=\"installer/**/*.test.ts\" --test-coverage-lines=79 \"installer/**/*.test.ts\" && node --test \"scripts/*.test.mjs\" \"plugins/default/hooks/*.test.mjs\"",
     "typecheck": "tsc --noEmit",
+    "scan-skills": "pipx run --spec cisco-ai-skill-scanner==2.3.2 skill-scanner scan-all plugins --recursive --policy .github/skill-scanner.yaml --fail-on-severity high",
     "prepack": "tsc"
   },
   "bin": {

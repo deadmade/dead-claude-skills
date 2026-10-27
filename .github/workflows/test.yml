@@ -1,4 +1,4 @@
-# Repo checks, installer tests and the mods' tests on every PR and push to main; tui-review has its own workflow.
+# Repo checks, installer tests, the mods' tests and the skill scan on every PR and push to main; tui-review has its own workflow.
 name: test
 
 on:
@@ -62,3 +62,12 @@ jobs:
       - name: md-pane mod tests
         working-directory: plugins/opt-in/md-pane
         run: claude plugin test .
+
+  # Cisco's skill-scanner over every skill under plugins/ (policy: .github/skill-scanner.yaml); fails on high or critical.
+  skills:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Skill scan
+        run: npm run scan-skills

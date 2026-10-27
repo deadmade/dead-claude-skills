@@ -30,6 +30,9 @@ jobs:
           echo "neon7=$(cut -c1-7 $d/skills/postgres-best-practices/UPSTREAM)" >> "$GITHUB_OUTPUT"
           echo "pgai7=$(cut -c1-7 $d/skills/postgres-database-migration/UPSTREAM)" >> "$GITHUB_OUTPUT"
 
+      - name: Skill scan
+        run: npm run scan-skills
+
       - name: Open pull request
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
