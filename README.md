@@ -31,6 +31,7 @@ update, then applies only the changes. It pins the marketplace to its own releas
 it always denies Claude reading `.env` files and credential dirs and keeps session transcripts (Claude Code deletes them after 30 days unless `cleanupPeriodDays` is set). It
 lets at most 8 workflow agents run at once (`CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS`, unless you set your own). Optional toggles add ccstatusline
 and dcg; the danger zone can strip all foreign plugins or reset `~/.claude` to a clean slate (after a backup).
-Everything ships as one version, cut with `npm run release -- patch` and `git push --follow-tags origin main`; the
-tag builds the installer and the binaries and publishes the GitHub release they're downloaded from. From a checkout,
+Everything ships as one version. Every merge to main releases a patch; a bigger step is `npm run release -- minor`
+and `git push --follow-tags origin main`. The tag builds the installer and the binaries and publishes the GitHub
+release they're downloaded from. From a checkout,
 `npm ci` once, then `node installer/install.ts` runs the installer (Node 26 or newer) and `npm run typecheck` checks it.
