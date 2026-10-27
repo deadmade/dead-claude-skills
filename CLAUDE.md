@@ -149,7 +149,10 @@ plugins of ours that the manifest no longer lists.
   started in a subfolder, its hook setup treats that folder as the repo and uninstalls the pre-commit hook. The hook config is generated, so a commit touching `plugins/flows/packs/` or
   `plugins/flows/agents/` needs `nix develop` re-entered once to pick up their excludes.
 - `nix fmt` formats everything per `treefmt.toml` (alejandra, prettier for js/ts/json/md/yaml, rustfmt).
+- `npm run scan-skills` (needs `pipx`): Cisco's skill-scanner, pinned in `package.json`, over every skill under `plugins/`;
+  it fails on a high or critical finding. A finding judged benign gets a scoped suppression with its reason in
+  `.github/skill-scanner.yaml`. Every sync workflow runs it before opening its PR.
 
-CI: `test.yml` (npm test, the installer typecheck and the dead-skills and md-pane mod tests, Linux and Windows) on every PR and push to main; `tui-review.yml` on
+CI: `test.yml` (npm test, the installer typecheck and the dead-skills and md-pane mod tests, Linux and Windows; the skill scan, Linux) on every PR and push to main; `tui-review.yml` on
 PRs touching tui-review; `web-mcp.yml` on PRs touching web-mcp; `build-tui-review.yml`/`build-web-mcp.yml` on PRs touching the workflow and from `release.yml`; `sync-*.yml`
 weekly.
