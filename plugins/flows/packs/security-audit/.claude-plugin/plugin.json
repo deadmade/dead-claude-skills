@@ -1,0 +1,11 @@
+{
+  "name": "security-audit",
+  "version": "0.6.0",
+  "description": "Cloudflare's security-audit skill: a source-first audit workflow with domain attack-class files (AI/LLM and MCP, supply chain and release, cloud, client-side, protocols, data isolation, resource exhaustion, desktop and local IPC, memory safety) and an independent candidate verifier. /harden runs its domain files as a lens beside claude-security. Vendored from cloudflare/security-audit-skill, synced weekly.",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "repository": "https://github.com/deadmade/dead-claude-skills",
+  "license": "MIT"
+}

@@ -18,8 +18,8 @@ passive lookups and a browser with an archive of everything it pulled.
 The opt-in [flows](plugins/flows/README.md) plugin ties the rest together: conductor skills (`/feature-flow`,
 `/fix-flow`, `/test-audit`, `/doc-audit`, `/self-review`, `/verify`, `/learn` and more) that run the other plugins' skills in order,
 with approval gates and a state file to resume from. Picking flows installs every plugin its conductors use.
-flows also carries the skill packs they read by path from `plugins/flows/packs/` (superpowers, ponytail, paper-lookup
-and the mattpocock, pstack and Trail of Bits picks). The packs are not plugins: nothing in them loads on its own, so
+flows also carries the skill packs they read by path from `plugins/flows/packs/` (superpowers, ponytail, paper-lookup,
+Cloudflare's security-audit and the mattpocock, pstack and Trail of Bits picks). The packs are not plugins: nothing in them loads on its own, so
 their skills, hooks and ponytail's band stay out of your sessions outside the conductors, and the installer removes
 old installs of them.
 

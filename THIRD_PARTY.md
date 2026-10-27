@@ -22,6 +22,14 @@ note under the title covers leftover mentions, the frontmatter `description` is 
 Agent Skills" section is removed.
 The synced upstream commit is in `skills/paper-lookup/UPSTREAM`.
 
+## security-audit
+
+`plugins/flows/packs/security-audit/skills/security-audit/` is vendored unchanged from
+[cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (MIT License, Copyright (c)
+2025-2026 Cloudflare, Inc.; full text in `plugins/flows/packs/security-audit/LICENSE`) by
+`scripts/sync-security-audit.mjs` (weekly via GitHub Actions). `/harden` reads its domain files and candidate-verifier
+prompt by path. The synced upstream commit is in `plugins/flows/packs/security-audit/UPSTREAM`.
+
 ## MCP servers (dead-skills, mcp-github, mcp-azure)
 
 - **Context7**: hosted service by Upstash (https://context7.com), used over HTTP; nothing vendored.
