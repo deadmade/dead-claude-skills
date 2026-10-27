@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { copyFileSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import { check, main, mask, newRanges, report } from './prose.mjs';
 
@@ -134,4 +137,20 @@ test('main fails open', () => {
   const hit = main({ stdin: json('a.md'), readFile, terms: TERMS });
   assert.equal(hit.code, 2);
   assert.match(hit.stderr, /^a\.md:1:5 shorthand: "Q11"/);
+});
+
+test('shorthand leaves lowercase q and d numbers alone', () => {
+  assert.deepEqual(run('Use d3.js and q4 data, see d12.'), []);
+  assert.deepEqual(rules(run('We chose Round 2 and My Call.'), 'shorthand'), ['Round 2', 'My Call']);
+});
+
+test('prose-check exits 0 and prints nothing when common-terms.txt cannot be read', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'prose-'));
+  for (const name of ['prose.mjs', 'prose-check.mjs'])
+    copyFileSync(new URL(`./${name}`, import.meta.url), join(dir, name));
+  const doc = join(dir, 'doc.md');
+  writeFileSync(doc, 'The API returns a URL.\n');
+  const stdin = JSON.stringify({ tool_name: 'Write', tool_input: { file_path: doc, content: 'x' } });
+  const ran = spawnSync(process.execPath, [join(dir, 'prose-check.mjs')], { input: stdin, encoding: 'utf8' });
+  assert.deepEqual([ran.status, ran.stdout, ran.stderr], [0, '', '']);
 });

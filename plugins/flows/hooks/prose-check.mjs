@@ -12,7 +12,9 @@ try {
       .map((line) => line.replace(/#.*/, '').trim())
       .filter(Boolean),
   );
-} catch {}
+} catch {
+  process.exit(0);
+}
 
 const { code, stderr } = main({ stdin, readFile: (p) => readFileSync(p, 'utf8'), terms });
 if (stderr) process.stderr.write(`${stderr}\n`);

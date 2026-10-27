@@ -54,7 +54,8 @@ export function newRanges(fullText, { tool_name, tool_input }) {
   return ranges;
 }
 
-const SHORTHAND = /\b[QD]-?\d+\b|\bround \d+\b|\bmy call\b/gi;
+const LABELS = /\b[QD]-?\d+\b/g;
+const PHRASES = /\bround \d+\b|\bmy call\b/gi;
 const ABBREVIATION = /\b[A-Z][A-Z0-9]{1,5}s?\b/g;
 
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -90,9 +91,9 @@ export function check(fullText, ranges, { file, terms }) {
   const hits = [];
 
   if (file.split(/[\\/]/).pop() !== 'flow.md') {
-    for (const m of masked.matchAll(SHORTHAND)) {
+    for (const m of [...masked.matchAll(LABELS), ...masked.matchAll(PHRASES)]) {
       if (!inRange(m.index)) continue;
-      if (/^Q/i.test(m[0]) && /^ \d{4}\b/.test(masked.slice(m.index + m[0].length))) continue;
+      if (/^Q/.test(m[0]) && /^ \d{4}\b/.test(masked.slice(m.index + m[0].length))) continue;
       const label = new RegExp(`^[ \\t]*(?:(?:[-*+]|\\d+[.)]|#{1,6})[ \\t]+)?[*_]*${escape(m[0])}\\b`, 'im');
       if (label.test(masked)) continue;
       hits.push({ at: m.index, rule: 'shorthand', match: m[0], message: 'say what was decided instead of the label' });
