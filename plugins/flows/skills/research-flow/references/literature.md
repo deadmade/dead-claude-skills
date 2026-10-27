@@ -5,7 +5,8 @@ behind it.
 
 ## Agent prompt
 
-Launch one `general-purpose` agent in the background with this prompt, filled in:
+Launch one `general-purpose` agent on `sonnet` in the background with this prompt, filled in. It reads every paper
+itself and starts no agents of its own.
 
 ```
 Research the scientific literature on: <feature and the question it should answer, in one paragraph>.

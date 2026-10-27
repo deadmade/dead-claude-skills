@@ -17,7 +17,9 @@ passive lookups and a browser with an archive of everything it pulled.
 
 The opt-in [flows](plugins/flows/README.md) plugin ties the rest together: conductor skills (`/feature-flow`,
 `/fix-flow`, `/test-audit`, `/doc-audit`, `/self-review`, `/verify`, `/learn` and more) that run the other plugins' skills in order,
-with approval gates and a state file to resume from. Picking flows installs every plugin its conductors use.
+with approval gates and a state file to resume from. Each phase has a cap on the agents it starts (it asks before
+going past one, ultracode included), and every agent runs on a model chosen for its role rather than the one you
+picked. Picking flows installs every plugin its conductors use.
 flows also carries the skill packs they read by path from `plugins/flows/packs/` (superpowers, ponytail, paper-lookup,
 Cloudflare's security-audit and the mattpocock, pstack and Trail of Bits picks). The packs are not plugins: nothing in them loads on its own, so
 their skills, hooks and ponytail's band stay out of your sessions outside the conductors, and the installer removes
@@ -27,7 +29,8 @@ old installs of them.
 
 The installer (Node standard library only, written in TypeScript and attached to each release built to JS) shows one page per category where you pick what to install, remove or
 update, then applies only the changes. It pins the marketplace to its own release so plugins match the installer, and
-it always denies Claude reading `.env` files and credential dirs and keeps session transcripts (Claude Code deletes them after 30 days unless `cleanupPeriodDays` is set). Optional toggles add ccstatusline
+it always denies Claude reading `.env` files and credential dirs and keeps session transcripts (Claude Code deletes them after 30 days unless `cleanupPeriodDays` is set). It
+lets at most 8 workflow agents run at once (`CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS`, unless you set your own). Optional toggles add ccstatusline
 and dcg; the danger zone can strip all foreign plugins or reset `~/.claude` to a clean slate (after a backup).
 Everything ships as one version, cut with `npm run release -- patch` and `git push --follow-tags origin main`; the
 tag builds the installer and the binaries and publishes the GitHub release they're downloaded from. From a checkout,

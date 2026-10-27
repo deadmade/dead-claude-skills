@@ -56,11 +56,12 @@ and the claude-md-management plugin:
 
 ## Phase 3: Fan out
 
-One message, every agent in parallel:
+Every agent in parallel, in waves of at most 8, each started with its model (flow-rules **Agents**):
 
 - **Bug pass:** follow the upstream code-review.md, steps 2 to 6: the CLAUDE.md list, the summary, the five review
   angles, the confidence scoring, the cut below 80. Angle d (comments on previous PRs) runs only when `gh` or GitHub
-  MCP is available. Keep its false-positive list: it applies here too.
+  MCP is available. Keep its false-positive list: it applies here too. One `haiku` agent makes both the list and the
+  summary, and the issues to score are split over at most 3 `haiku` scorers, not one agent per issue.
 - **Spec and Standards:** follow the upstream spec-standards-review.md, steps 3 and 4, with the diff, spec and
   standards from Phases 1 and 2. Its tracker setup (`/setup-matt-pocock-skills`) isn't needed: Phase 2 found the
   spec.
@@ -70,7 +71,9 @@ One message, every agent in parallel:
   `claude-md-management:claude-md-improver` and runs its discovery, assessment and proposed diffs, but applies
   nothing. Give it the diff too, and have it lead with the statements in any CLAUDE.md that the diff made untrue.
   Its proposed diffs are findings like any other and get applied in Phase 5.
-- **Specialists**, by what the diff touches. Give each the diff command, the file list and the intent:
+- **Specialists**, by what the diff touches, on the model the **Agents** table gives a reviewer (the agents'
+  `model: inherit` would otherwise run them on the session's model). Give each the diff command, the file list and
+  the intent:
   - `flows:silent-failure-hunter`: try/catch, error returns, fallbacks, retries, default values on failure
   - `flows:pr-test-analyzer`: whenever non-test source changed
   - `flows:type-design-analyzer`: new or changed types, interfaces, schemas

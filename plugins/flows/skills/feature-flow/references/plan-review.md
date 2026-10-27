@@ -6,9 +6,10 @@ silently edited plan.
 
 ## Reviewers
 
-Spawn 2–3 `general-purpose` subagents in one message. Each gets: the spec, the plan, the grounding and prior-art
-sections of flow.md, the ADRs, its angle below, and the rubric. Spread the angles over `fable`, `opus` and
-`sonnet`, one angle per model; every angle below still runs, Simpler included.
+Spawn one `general-purpose` subagent per angle, all in one message. Each gets: the spec, the plan, the grounding
+and prior-art sections of flow.md, the ADRs, its angle below, and the rubric. Correctness runs on `fable`, Fit on
+`opus`, Simpler on `sonnet`. Fit follows `blast-radius` itself and never runs it as an `arena` (flow-rules
+**Agents**).
 
 | Angle           | Looks for                                                                                                                                                                                                                                                                                  |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -35,4 +36,5 @@ No praise, no summary of the plan, no style nits. "No findings" is a valid answe
 4. Log as "Plan review round N" in flow.md: findings, the user's decision on each, what changed.
 
 After the user decides, edit the plan. Re-run the review only if a decision changed the plan's shape (new task
-order, new module, new library). For anything smaller, check the edit yourself.
+order, new module, new library), and then only the angles the change touches. For anything smaller, check the edit
+yourself.

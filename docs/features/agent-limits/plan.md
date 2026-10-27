@@ -1,5 +1,16 @@
 # Plan: agent limits and per-role models for the flows
 
+## Decisions and status (2026-10-27)
+
+- The user's model is no ceiling; stronger models go to review only where the change calls for it.
+- The numbers below stand. Workflows may run a phase; limits, not bans.
+- test-audit gets no new gate. Its Requirements probe checks up to 10 requirements itself instead, because an agent
+  can't start tob's workflow.
+- The installer writes only the concurrency default, with no toggle.
+- Slice 1 is done: flow-rules **Agents**, the conductor edits, the installer default, docs, and the probes in
+  `docs/adr/0005-agent-limits-and-models.md`. Probe (b) passed, so slice 2 can land; slice 1 doesn't need it, since a
+  model named on the call wins over frontmatter. Still open: the end-to-end measurement (step 7) and slices 2 and 3.
+
 ## Goal
 
 When a flow runs, especially `/research-flow` under ultracode, it should not grow to 60–250 agents. Each agent should run on a model chosen for its role, not silently on the model the user selected. Nothing vendored is edited by hand. Every rule says whether the harness enforces it or it is advice. The user can override any of it.
@@ -7,15 +18,18 @@ When a flow runs, especially `/research-flow` under ultracode, it should not gro
 ## What exists today
 
 **No limits anywhere.**
+
 - Nothing in `plugins/flows/skills`, `references` or `agents` mentions a budget, concurrency or `effort`.
 - `installer/core/settings.ts:117` writes exactly one env var, `CLAUDE_CODE_TMUX_TRUECOLOR`.
 - `installer/core/settings.test.ts:185-187` asserts the env with `deepEqual`, so any new env key breaks that test.
 
 **One shared home for flow rules.**
+
 - `plugins/flows/references/flow-rules.md` has these sections: State (l.10), Running a flow (l.24), Homes and commits (l.94), Loading skills (l.106), and so on.
 - The only Workflow call is at l.123-125: `args: {path, spec, limit}`. No conductor says which `limit` to pass.
 
 **Fan-outs with no ceiling. All quotes below are verified.**
+
 - `pstack-picks/skills/why/SKILL.md:31` "Default to the full parallel investigation." and `:49` "Spawn one investigator per category that has a matching MCP, …"
 - `arena/SKILL.md:19` "Spawn more runners when the arena covers multiple design directions."
 - `blast-radius/SKILL.md:40` "For a big or wide change, run it as an `arena`."
@@ -32,6 +46,7 @@ When a flow runs, especially `/research-flow` under ultracode, it should not gro
 **tob workflow size.** `tob-picks/workflows/spec-compliance.js:310-314` sets `DEFAULT_LIMIT = 10` and `MAX_LIMIT = 30`. With a budget, the limit becomes `floor(remaining/70k)`. That is about 3 + docs + limit + 2 × divergences agents, so up to roughly 93 + docs. The script sets no model.
 
 **Models.**
+
 - Explicit names come from our own `scripts/sync-pstack.mjs:79-117` (the `CLAUDE_MODELS` constant), from `plan-review.md` (fable/opus/sonnet) and from upstream code-review (Haiku/Sonnet).
 - Superpowers uses only tiers: SDD `SKILL.md:139-176` says "Always specify the model explicitly … An omitted model inherits your session's model".
 - Model not set, so the session model applies: `prior-art.md:8`, `literature.md:8`, grilling fact agents, Explore fallbacks, the Evidence reviewer, self-review's spec/standards, security and CLAUDE.md agents, harden, test-audit probes, and every agent in spec-compliance.js.
@@ -40,6 +55,7 @@ When a flow runs, especially `/research-flow` under ultracode, it should not gro
 **Typical size today.** A `/research-flow` runs about 60–100 agents; the worst case is over 250. Most come from self-review's scorers, the SDD loop, doc-audit and test-audit through the tob Workflow, and plan-review re-reviews.
 
 **What Claude Code documents** (workflows.md, sub-agents.md, env-vars.md, plugins/components.md):
+
 - Workflow runs: 16 concurrent agents by default. `CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS` (1–256, v2.1.269+) changes that. There is a backstop of 1,000 agents per run.
 - No setting caps the total below 1,000.
 - `workflowSizeGuideline` (small <5, medium <10 is the default, large <50) is advice only, and a settings-file value shadows `/config`.
@@ -54,16 +70,17 @@ When a flow runs, especially `/research-flow` under ultracode, it should not gro
 
 ### 1. Where each piece lives
 
-| Piece | Lives in | Enforced or advice |
-|---|---|---|
-| Workflow concurrency cap | installer env default `CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS=8`, written with `??=` so a hand-set value wins | **Enforced** by the harness, for Workflow runs only, v2.1.269+ |
-| tob workflow size | `flow-rules.md` always passes `limit` (default 10); optionally a sync-tob REWRITES entry lowers `MAX_LIMIT` to 12 | Passing `limit` is advice to the main agent. The `MAX_LIMIT` rewrite is **enforced** |
-| Per-phase caps, batching, no nesting, ask past a cap | new `flow-rules.md` section "Agents: how many and on which model" | Advice. Ultracode may override it |
-| Model per role | the same section, a role → model table; every spawn names `model` | Advice: Claude must pass it. Once passed, it outranks `inherit` frontmatter (**enforced** order) |
-| Models on flows' own agents | frontmatter stamped by `sync-self-review.mjs` / `sync-tob.mjs` (slice 2) | **Enforced**, unless a per-call model or `_FORCE` overrides it |
-| Per-prompt spawn ceiling and model clamp | optional mod guard in `plugins/default/hooks/` (slice 3, only if the probe passes) | **Enforced**, if the probe passes |
+| Piece                                                | Lives in                                                                                                          | Enforced or advice                                                                               |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Workflow concurrency cap                             | installer env default `CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS=8`, written with `??=` so a hand-set value wins | **Enforced** by the harness, for Workflow runs only, v2.1.269+                                   |
+| tob workflow size                                    | `flow-rules.md` always passes `limit` (default 10); optionally a sync-tob REWRITES entry lowers `MAX_LIMIT` to 12 | Passing `limit` is advice to the main agent. The `MAX_LIMIT` rewrite is **enforced**             |
+| Per-phase caps, batching, no nesting, ask past a cap | new `flow-rules.md` section "Agents: how many and on which model"                                                 | Advice. Ultracode may override it                                                                |
+| Model per role                                       | the same section, a role → model table; every spawn names `model`                                                 | Advice: Claude must pass it. Once passed, it outranks `inherit` frontmatter (**enforced** order) |
+| Models on flows' own agents                          | frontmatter stamped by `sync-self-review.mjs` / `sync-tob.mjs` (slice 2)                                          | **Enforced**, unless a per-call model or `_FORCE` overrides it                                   |
+| Per-prompt spawn ceiling and model clamp             | optional mod guard in `plugins/default/hooks/` (slice 3, only if the probe passes)                                | **Enforced**, if the probe passes                                                                |
 
 The installer never writes `CLAUDE_CODE_SUBAGENT_MODEL`, `_FORCE`, `ultracode`, `disableWorkflows` or `workflowSizeGuideline`:
+
 - `_FORCE` would erase every per-role choice.
 - A global `SUBAGENT_MODEL` would change sessions that have nothing to do with flows.
 - `workflowSizeGuideline` stays the user's own knob; flows reads it as "use the smaller of this and our phase cap".
@@ -80,37 +97,37 @@ The installer never writes `CLAUDE_CODE_SUBAGENT_MODEL`, `_FORCE`, `ultracode`, 
 
 ### 3. Budget per conductor and phase
 
-| Conductor / phase | Today (typical / worst) | Cap (agents) | At once | Notes |
-|---|---|---|---|---|
-| FF/RF Phase 1 Ground | 7 / 15+ | 8 (FF 7) | 6 | how: 1 explainer, or ≤3 explorers + 1 explainer; why: ≤3 investigators (categories grouped) + 1 synthesizer, only when an existing concern moves; prior-art 1; literature 1 (RF), never one per paper |
-| Brainstorm builder check | 1 | 1 | 1 | |
-| Grill fact agents | 2–6 / no cap | 1 per round, ≤3 total | 1 | look the fact up inline first |
-| Plan review | 4 (+5 arena, +4 per re-review) | one per angle: FF 3, RF 4 | 4 | a re-review reruns only the angles the change touched; arena/architect only on the user's yes (+5) |
-| Execute (SDD) | 20–30 / 98 | the pack's own loop (≤12 per task), serial | 1 | batching.md for small same-shape tasks; never pipeline tasks |
-| /verify → /self-review | 18–30 | 14 | 8 (two waves) | 1 haiku setup (list + summary), 5 sonnet bug reviewers, ≤3 batched haiku scorers, 2 spec/standards, 1 security, 1 CLAUDE.md, ≤4 specialists; small diff: 0 |
-| /doc-audit | 3–10 / 93 | ≤4 checkers (claims batched) | 4 | tob Workflow only on yes, `limit` 10 (about 15–35 agents) |
-| /test-audit | 4 + Workflow 15–93 | 4 probes + ≤4 checkers | 4 | Requirements Workflow only on yes, with its cost stated (new gate) |
-| /harden | 11 hunters + 1 per candidate | ≤4 hunters (domain files batched) + ≤4 verifiers (≤5 candidates each, never a candidate it hunted) | 6 | more on yes; claude-security keeps its own Workflow and effort |
-| /implement, /fix-flow, /upgrade Ground | — | ≤4 | 4 | |
-| /learn standalone (recall) | no cap | ≤3 haiku slices | 3 | |
-| **Run ask point** | 60–100 / 250+ | ask at RF 60 / FF 50, Execute included | 8 per Workflow run (env) | expected typical after the change: about 40–55 |
+| Conductor / phase                      | Today (typical / worst)        | Cap (agents)                                                                                       | At once                  | Notes                                                                                                                                                                                                 |
+| -------------------------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| FF/RF Phase 1 Ground                   | 7 / 15+                        | 8 (FF 7)                                                                                           | 6                        | how: 1 explainer, or ≤3 explorers + 1 explainer; why: ≤3 investigators (categories grouped) + 1 synthesizer, only when an existing concern moves; prior-art 1; literature 1 (RF), never one per paper |
+| Brainstorm builder check               | 1                              | 1                                                                                                  | 1                        |                                                                                                                                                                                                       |
+| Grill fact agents                      | 2–6 / no cap                   | 1 per round, ≤3 total                                                                              | 1                        | look the fact up inline first                                                                                                                                                                         |
+| Plan review                            | 4 (+5 arena, +4 per re-review) | one per angle: FF 3, RF 4                                                                          | 4                        | a re-review reruns only the angles the change touched; arena/architect only on the user's yes (+5)                                                                                                    |
+| Execute (SDD)                          | 20–30 / 98                     | the pack's own loop (≤12 per task), serial                                                         | 1                        | batching.md for small same-shape tasks; never pipeline tasks                                                                                                                                          |
+| /verify → /self-review                 | 18–30                          | 14                                                                                                 | 8 (two waves)            | 1 haiku setup (list + summary), 5 sonnet bug reviewers, ≤3 batched haiku scorers, 2 spec/standards, 1 security, 1 CLAUDE.md, ≤4 specialists; small diff: 0                                            |
+| /doc-audit                             | 3–10 / 93                      | ≤4 checkers (claims batched)                                                                       | 4                        | tob Workflow only on yes, `limit` 10 (about 15–35 agents)                                                                                                                                             |
+| /test-audit                            | 4 + Workflow 15–93             | 4 probes + ≤4 checkers                                                                             | 4                        | Requirements Workflow only on yes, with its cost stated (new gate)                                                                                                                                    |
+| /harden                                | 11 hunters + 1 per candidate   | ≤4 hunters (domain files batched) + ≤4 verifiers (≤5 candidates each, never a candidate it hunted) | 6                        | more on yes; claude-security keeps its own Workflow and effort                                                                                                                                        |
+| /implement, /fix-flow, /upgrade Ground | —                              | ≤4                                                                                                 | 4                        |                                                                                                                                                                                                       |
+| /learn standalone (recall)             | no cap                         | ≤3 haiku slices                                                                                    | 3                        |                                                                                                                                                                                                       |
+| **Run ask point**                      | 60–100 / 250+                  | ask at RF 60 / FF 50, Execute included                                                             | 8 per Workflow run (env) | expected typical after the change: about 40–55                                                                                                                                                        |
 
 ### 4. Model and effort by role
 
 Ladder: haiku < sonnet < opus < fable. "Session" means the user's `/model`. The effort column applies only to Workflow `agent()` opts and to stamped frontmatter, because the Agent tool has no per-call effort.
 
-| Role | Model | Effort |
-|---|---|---|
-| Mechanical: self-review CLAUDE.md list/summary/scorer, recall slice, SDD "cheap" (plan text holds the full code) | haiku | low |
-| Gather and search: how explorers, why investigators, grill facts, prior-art, literature, Explore fallbacks, test-audit probes, harden hunters, doc-audit checkers, spec-compliance-checker | sonnet | medium |
-| Review: SDD task reviewer and re-review (superpowers' mid-tier floor), the four specialists (overriding `inherit`), spec/standards, security, RF Evidence angle | sonnet | medium (silent-failure-hunter high) |
-| SDD "standard" implementer | sonnet | medium |
-| SDD "most capable", fix rounds 4–5, final whole-branch review, harden verifiers, refuters | opus, or the session model if it is lower | high |
-| how explainer, why synthesizer | fable (as sync-pstack writes it) | — |
-| Plan-review panel | Correctness fable, Fit opus, Simpler sonnet, Evidence sonnet | — |
-| arena / architect / interrogate (only on yes) | as the pack writes them (model diversity is their point) | — |
-| code-simplifier | opus (its vendored pin) | medium (slice 2) |
-| spec-compliance.js discover/extract/undocumented/report | sonnet via `opts.model` only if a sync rewrite adds it (slice 2); otherwise the session model | upstream: discover low, refute medium |
+| Role                                                                                                                                                                                       | Model                                                                                         | Effort                                |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- | ------------------------------------- |
+| Mechanical: self-review CLAUDE.md list/summary/scorer, recall slice, SDD "cheap" (plan text holds the full code)                                                                           | haiku                                                                                         | low                                   |
+| Gather and search: how explorers, why investigators, grill facts, prior-art, literature, Explore fallbacks, test-audit probes, harden hunters, doc-audit checkers, spec-compliance-checker | sonnet                                                                                        | medium                                |
+| Review: SDD task reviewer and re-review (superpowers' mid-tier floor), the four specialists (overriding `inherit`), spec/standards, security, RF Evidence angle                            | sonnet                                                                                        | medium (silent-failure-hunter high)   |
+| SDD "standard" implementer                                                                                                                                                                 | sonnet                                                                                        | medium                                |
+| SDD "most capable", fix rounds 4–5, final whole-branch review, harden verifiers, refuters                                                                                                  | opus, or the session model if it is lower                                                     | high                                  |
+| how explainer, why synthesizer                                                                                                                                                             | fable (as sync-pstack writes it)                                                              | —                                     |
+| Plan-review panel                                                                                                                                                                          | Correctness fable, Fit opus, Simpler sonnet, Evidence sonnet                                  | —                                     |
+| arena / architect / interrogate (only on yes)                                                                                                                                              | as the pack writes them (model diversity is their point)                                      | —                                     |
+| code-simplifier                                                                                                                                                                            | opus (its vendored pin)                                                                       | medium (slice 2)                      |
+| spec-compliance.js discover/extract/undocumented/report                                                                                                                                    | sonnet via `opts.model` only if a sync rewrite adds it (slice 2); otherwise the session model | upstream: discover low, refute medium |
 
 **Ceiling:** none by default, because the user asked not to have everything run on their selected model. A ruling `models: ceiling` clamps every role to the session model. `models: session` restores today's behaviour. `CLAUDE_CODE_SUBAGENT_MODEL` with `_FORCE=1` forces one model everywhere; it is documented and flows does not fight it.
 

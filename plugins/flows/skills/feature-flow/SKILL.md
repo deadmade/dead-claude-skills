@@ -50,8 +50,8 @@ mattpocock and tob are its `-picks` folders). Only this differs:
 
 Ask nothing yet. In one message, start both:
 
-- **Codebase:** pstack `how` on the subsystems the feature touches (fallback: 1–3 Explore agents), and pstack `why`
-  when the feature moves an existing concern. Also read the domain docs that
+- **Codebase:** pstack `how` on the subsystems the feature touches (fallback: 1–3 Explore agents on `sonnet`), and
+  pstack `why` when the feature moves an existing concern, within flow-rules **Agents**. Also read the domain docs that
   `<packs>/mattpocock-picks/skills/setup-matt-pocock-skills/domain.md` lists (the glossary and the ADRs).
 - **Prior art:** one background `general-purpose` agent with the prompt in
   [references/prior-art.md](references/prior-art.md). Don't wait for it; Phase 2 starts with questions anyway.
@@ -112,8 +112,8 @@ execution method yet and don't invoke an execution skill: link the plan in flow.
 
 ## Phase 5: Evaluate the plan
 
-Follow [references/plan-review.md](references/plan-review.md): 2–3 reviewer subagents with different angles, then
-you synthesize and screen. Its reviewers run on `fable`, `opus` and `sonnet`, Fit uses pstack `blast-radius`, and
+Follow [references/plan-review.md](references/plan-review.md): one reviewer subagent per angle, then you synthesize
+and screen. Its reviewers run on `fable`, `opus` and `sonnet`, Fit uses pstack `blast-radius`, and
 the Simpler angle is ponytail `ponytail-review`. Present the findings, each with options and a recommendation. The
 user decides each one; you edit the plan, and the spec too if a decision changes it (say so: that edit reopens Gate 1
 for that item). Record a reopening on its Gate line in flow.md as `Reopened <date>: <why>`, and the re-approval date

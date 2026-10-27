@@ -87,6 +87,11 @@ Verdict: supported | not supported | inconclusive. Threats that showed up. The u
 | spec goal | plan task | file:line | test |
 | --------- | --------- | --------- | ---- |
 
+## Agents
+
+<!-- One line per phase: `<phase>: <n> (<model> <n>, …)`. Past 60 (research) or 50 (other build flows), ask first
+(flow-rules Agents). Deferred items, if any, go here too. -->
+
 ## Run verdict
 
 <!-- The user's, at Finish: worked as a whole: yes | no; clean: yes | no. -->
