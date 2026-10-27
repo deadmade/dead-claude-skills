@@ -1,6 +1,6 @@
 ---
 flow: feature
-phase: grill
+phase: evaluate
 ---
 
 # Writing style: flow
@@ -15,14 +15,14 @@ Started 2026-10-27 on branch `claude/relaxed-newton-cr62u9` (from `main` 753ba2c
 
 ## Artifacts
 
-- Spec: [spec.md](spec.md) (the user's draft of 2026-10-24, rewritten 2026-10-27 after the bake-off; not yet approved)
-- Plan:
+- Spec: [spec.md](spec.md) (the user's draft of 2026-10-24, rewritten 2026-10-27 after the bake-off; approved 2026-10-27)
+- Plan: [plan.md](plan.md) (8 tasks, written 2026-10-27)
 - ADRs:
 - Glossary: [GLOSSARY.md](../../../GLOSSARY.md) (writing skill, conversation shorthand, prose check, copyedit pass)
 
 ## Gates
 
-- Gate 1, spec approved:
+- Gate 1, spec approved: 2026-10-27, by the user ("I approve lets go"), after grill rounds 1–3.
 - Gate 2, plan approved:
 
 ## Skipped
@@ -83,6 +83,14 @@ Started 2026-10-27 on branch `claude/relaxed-newton-cr62u9` (from `main` 753ba2c
 - **The sample document** (`docs/features/web-mcp-search/spec.md`, 2,467 words; plan 5,305; flow 2,389): no sentence
   over 40 words (longest 36); 21 Q/D/round tags (`Q1` means a grill question at `:35` and a bench threshold at
   `:166`); hidden actors (`:118`, `:144`, `:161`); undefined CMP (`:68`) and BM25 (`:126`).
+
+- **Prompt hooks in a plugin, checked 2026-10-27** (Claude Code 2.1.311, a probe plugin in the scratchpad run with
+  `claude -p --plugin-dir`): a plugin `hooks.json` accepts `type: "prompt"` on PostToolUse; `if: "Write(**/*.md)"`
+  matches a file in a nested folder; with `continueOnBlock: true` the reason reaches Claude; a command hook's exit-2
+  stderr reaches Claude too. `"model": "haiku"` fails: the log shows `unrecognized_model` and the hook passes
+  silently; `"model": "claude-haiku-5-5"` works. `claude plugin validate` accepts the file.
+- **pstack upstream** HEAD was `519d36a`, the vendored commit, on 2026-10-27, so re-running the sync changes only
+  what this feature changes.
 
 ## Prior art
 

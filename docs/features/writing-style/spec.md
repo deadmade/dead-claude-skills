@@ -1,7 +1,6 @@
 # Writing style: spec
 
-Status: draft, revised 2026-10-27 after research, a measured comparison of checkers and two rounds of questions. Not
-yet approved.
+Status: approved 2026-10-27, after research, a measured comparison of checkers and three rounds of questions.
 
 ## Intent
 
