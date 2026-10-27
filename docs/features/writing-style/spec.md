@@ -1,6 +1,8 @@
 # Writing style: spec
 
-Status: approved 2026-10-27, after research, a measured comparison of checkers and three rounds of questions.
+Status: approved 2026-10-27, after research, a measured comparison of checkers and three rounds of questions. The
+copyedit pass's diff and four smaller points changed after the plan review; the user approved those changes the same
+day.
 
 ## Intent
 
@@ -186,11 +188,14 @@ shows to Claude. Without findings, or on any error, it exits 0 and prints nothin
 
 | Rule        | Flags                                                                                                                                 |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `shorthand` | Conversation references in the new text: `Q` or `D` followed by a number, `round` followed by a number, "my call", unless the file defines the label |
+| `shorthand` | Conversation references in the new text: `Q` or `D` followed by a number (not a quarter followed by a year, as in "Q1 2027"), `round` followed by a number, "my call", unless the file defines the label |
 | `undefined` | An abbreviation of two to six capitals in the new text that the file doesn't define before it, and that isn't on the common-terms list |
 
 The common-terms list (API, URL, JSON, CLI, MCP, PR, CI and the like) is a data file next to the script, so it grows
-without code changes. Reading the whole file is what this check adds over the model check: it sees definitions made
+without code changes. It also holds the capitals that aren't abbreviations in this repo's prose: PASS and FAIL, HEAD,
+emphasis words such as NOT and ONLY, units and file types. A capital word followed by a file extension (`SKILL.md`) is a
+file name, not an abbreviation. A definition counts in either form, `ABBR (words)` or `words (ABBR)`, in a table row
+(`| ABBR | words |`), or in code font. Reading the whole file is what this check adds over the model check: it sees definitions made
 anywhere earlier in the document.
 
 ### The model check
@@ -198,6 +203,10 @@ anywhere earlier in the document.
 A prompt hook (`type: "prompt"`) with `model` set to Haiku and `continueOnBlock: true`, so its reason goes back to
 Claude and the turn continues. Its prompt carries the rules below and the hook's input. It answers `ok: true` when it
 finds nothing worth fixing, and otherwise `ok: false` with at most 10 findings as its reason.
+
+The hook's input also carries the file as it was before the write (`tool_response.originalFile`), so the prompt tells
+Haiku to judge only the new text in `tool_input` and to ignore `tool_response`. If the sample review shows findings in
+old text, the `Edit` side moves to a command hook that sends Haiku only the `new_string`.
 
 | Rule             | Flags                                                                                                  | Lesson |
 | ---------------- | ------------------------------------------------------------------------------------------------------ | ------ |
@@ -218,9 +227,10 @@ fresh `general-purpose` agent copyedits it. Its prompt is the skill's text plus:
 who wasn't in the conversation. Don't change its decisions, requirements, quotes or code. Return the edited
 document."_
 
-- The conductor commits the document, writes the copyedited version over it, and commits again, so `git diff HEAD~1`
-  shows every change the pass made. These two commits are an explicit exception to flow-rules' "commit only when the
-  user asks". The gate message says the document was copyedited and gives that command.
+- The copyedit agent returns the edited text; it writes nothing itself. The conductor saves the document's current
+  version to the scratchpad, writes the copyedited version over the document, and shows
+  `git diff --no-index <saved copy> <document>` at the gate. Nothing is committed, so the pass works the same on any
+  branch and inside audits. The gate message says the document was copyedited.
 - The copyedit agent also returns a list of anything it removed rather than reworded. The conductor shows that list
   at the gate, so a lost requirement is visible before approval.
 - The pass runs each time the document goes to a gate, including after a revision round.
@@ -242,6 +252,10 @@ every phase, so a copyedit each time would cost more than it gives.
 
 - All of it ships in the flows plugin, because it improves every flow: `skills/writing/SKILL.md`, `hooks/hooks.json`,
   `hooks/check.mjs` with its test, and the common-terms list. There is no separate plugin.
+- Every flows user gets the hooks in every project, at the cost of a Haiku call per Markdown write. flows' description
+  in `.claude-plugin/marketplace.json` and its `plugin.json` say so, and flows' README says how to turn the hooks off.
+- `scripts/flows-uses.mjs` learns that a skill Claude may load on its own (no `disable-model-invocation`) is not a
+  conductor, so the writing skill needs no `uses.json`, and conductors may list it under `flows`.
 - No crate, binary, installer step or release workflow. `npm test` runs the script's test with the other hook tests.
 - flows' version already follows the one-version scheme.
 - flows' README describes the skill and the hooks. README.md, CLAUDE.md and THIRD_PARTY.md describe the change, the
@@ -253,8 +267,8 @@ every phase, so a copyedit each time would cost more than it gives.
 2. The skill passes a source check before it ships. A fresh agent compares it with the free sources (each lesson of
    _Style_ stated faithfully, no copied passages) and with `technical-writing` and `unslop` (nothing worth keeping
    lost). Its findings are fixed or answered.
-3. The checks, run in the exact shape the hooks use over `docs/features/web-mcp-search/plan.md` (which the comparison
-   didn't see) and its spec, produce findings that are mostly real: of 20 sampled findings, the user judges at least
+3. The checks, run in the exact shape the hooks use (a `Write` of each file and an `Edit` of one paragraph) over
+   `docs/features/web-mcp-search/plan.md` (which the comparison didn't see) and its spec, produce findings that are mostly real: of 20 sampled findings, the user judges at least
    15 worth fixing.
 4. In a session that writes a spec, the hooks' findings reach Claude and it revises without looping.
 5. The copyedit pass, run on one existing spec, produces a version the user finds easier to read, with no decision,
@@ -285,9 +299,12 @@ The user decided:
 - The hooks cover every Markdown file Claude writes.
 - Everything ships inside flows.
 - The skill is verified against the sources before it ships, and the hooks are gated by the sample review.
-- Accepted as recommended: the copyedit pass commits before and after; both checks run on plans and flow.md; no loop
-  counter unless criterion 4 shows looping; the sample review runs on `web-mcp-search/plan.md` and its spec; the
-  concern lines above.
+- Accepted as recommended: both checks run on plans and flow.md; no loop counter unless criterion 4 shows looping;
+  the sample review runs on `web-mcp-search/plan.md` and its spec; the concern lines above.
+- After the plan review: the copyedit pass shows a diff against a saved copy instead of committing (this replaced the
+  earlier "commit before and after"); the model check is told to ignore the old file, with a command hook as the
+  fallback; the descriptions state the hooks' cost; `flows-uses.mjs` learns non-conductor skills; the `undefined` rule
+  stays, with the common-terms and file-name fixes.
 
 Claude decided, open to change:
 

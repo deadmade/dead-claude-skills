@@ -23,6 +23,8 @@ Started 2026-10-27 on branch `claude/relaxed-newton-cr62u9` (from `main` 753ba2c
 ## Gates
 
 - Gate 1, spec approved: 2026-10-27, by the user ("I approve lets go"), after grill rounds 1–3.
+  Reopened 2026-10-27 for the copyedit pass (no commits; a diff against a saved copy) and four smaller points, plan
+  review round 1. Re-approved the same day ("yes to all").
 - Gate 2, plan approved:
 
 ## Skipped
@@ -281,6 +283,9 @@ edits find `new_string`; table and code-font definitions count; the copyedit age
 writes once; Task 3 adds an Edit run and takes findings from the hook events; the command hook uses exec form; the
 dropped-name guard extends `GUARD` instead of a new check; wording tests shrink to the two verbatim strings, the
 handler structure and equal prompt copies; the wall-clock test becomes a one-time measurement.
+
+The user's decision (2026-10-27): "yes to all". The spec and plan were revised the same day. The plan keeps its task
+order and modules (`flows-uses.mjs` joins Task 4), so no second review round; I checked the edits myself.
 
 ## Tasks
 
