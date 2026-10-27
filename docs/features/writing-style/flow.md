@@ -18,7 +18,7 @@ Started 2026-10-27 on branch `claude/relaxed-newton-cr62u9` (from `main` 753ba2c
 - Spec: [spec.md](spec.md) (the user's draft of 2026-10-24, rewritten 2026-10-27 after the bake-off; not yet approved)
 - Plan:
 - ADRs:
-- Glossary: [GLOSSARY.md](../../../GLOSSARY.md)
+- Glossary: [GLOSSARY.md](../../../GLOSSARY.md) (writing skill, conversation shorthand, prose check, copyedit pass)
 
 ## Gates
 
@@ -227,6 +227,11 @@ Started 2026-10-27 on branch `claude/relaxed-newton-cr62u9` (from `main` 753ba2c
   stands, with a verification step; the pstack copies stop being vendored and the sync rewrites the three references;
   the hooks cover every Markdown file Claude writes, not only `docs/`. To confirm: where the skill and hooks ship
   ("vendor the plugin in the stacks"), what "let it verify" checks, and the round 1 items the answer didn't name.
+
+- **Grill round 3** (2026-10-27, AskUserQuestion): placement "Inside flows"; verification "Source check + sample";
+  the five remaining round 1 recommendations "Yes, accept all". The spec was revised with every settled decision the
+  same day. New glossary terms: writing skill, conversation shorthand, prose check, copyedit pass. No ADR: the choice
+  of a model hook over linters is easy to reverse, and the spec's Approaches section records the trade-off.
 
 ## Plan review
 

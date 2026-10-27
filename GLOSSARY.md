@@ -91,3 +91,21 @@ _Avoid_: passage, summary
 **Search profile**:
 The browser profile web-mcp's searches run in, with cookies and settings of its own and never the user's.
 _Avoid_: session (one browser), user profile
+
+**Writing skill**:
+The one standard for prose Claude writes for a person, based on Williams and Bizup's _Style_; flows' `writing` skill.
+_Avoid_: style guide, unslop
+
+**Conversation shorthand**:
+A label only the session that coined it understands, such as a grill question number or a review round number.
+_Avoid_: tag, reference
+
+**Prose check**:
+A hook that reads the Markdown Claude has just written and returns findings for Claude to revise; the code check and
+the model check are the two kinds.
+_Avoid_: linter, lint
+
+**Copyedit pass**:
+A fresh agent's edit of a spec or audit report for a reader who wasn't in the conversation, run before the document
+reaches a gate.
+_Avoid_: review, rewrite
