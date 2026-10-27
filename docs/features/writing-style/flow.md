@@ -213,6 +213,13 @@ Started 2026-10-27 on branch `claude/relaxed-newton-cr62u9` (from `main` 753ba2c
   with `continueOnBlock: true` the reason goes back to Claude and the turn continues; matching hooks run in parallel;
   `if` holds one permission rule per handler. Whether plugin `hooks.json` accepts prompt hooks isn't stated.
 
+- **Grill round 1** (2026-10-27): eight questions asked (copyedit commits, the pstack writing skills, hook scope, checks
+  on plans and flow.md, loop guard, gate sample, plugin home, seam lines). The user answered with the goal instead:
+  "the generall goal of this was that either claude writes the md file and it is imediatly checked or that the main
+  session uses a subagent or something to respect the rules and write it. It was also the goal to replace the current
+  writing skills with this unified one". Settled by that: the unified skill replaces pstack `technical-writing` and
+  `unslop`. Re-asked in round 2: which write path, what the unified skill keeps from the two, how the pack copies go.
+
 ## Plan review
 
 ## Tasks
