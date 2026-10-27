@@ -4,9 +4,12 @@
 
 `plugins/opt-in/hallmark/skills/hallmark/` is vendored from [nutlope/hallmark](https://github.com/nutlope/hallmark)
 (MIT License, Copyright (c) 2026 Hallmark contributors; full text in `skills/hallmark/LICENSE`).
-It is synced by `scripts/sync-hallmark.mjs` (weekly via GitHub Actions); the only local change is a
-"WEB FRONTEND ONLY" prefix on the frontmatter `description`. The synced upstream commit is in
-`skills/hallmark/UPSTREAM`.
+It is synced by `scripts/sync-hallmark.mjs` (weekly via GitHub Actions), which prefixes the frontmatter `description`
+with "WEB FRONTEND ONLY" and ships only the skill: upstream's installers, its settings.json lint hook, Together AI image
+generation (`comp.md`, `imagegen.mjs`), the theme-picture renderer, its dev checks and fixtures and the Codex adapter are
+deleted, along with the sentences that point at them. The synced upstream commit is in `skills/hallmark/UPSTREAM`.
+`scripts/photos.json` indexes Wikimedia Commons photos (CC0, public domain, CC BY or CC BY-SA, each with its author and
+licence); none are vendored, and the skill credits each one a page uses.
 
 ## paper-lookup
 
