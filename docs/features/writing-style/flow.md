@@ -220,6 +220,14 @@ Started 2026-10-27 on branch `claude/relaxed-newton-cr62u9` (from `main` 753ba2c
   writing skills with this unified one". Settled by that: the unified skill replaces pstack `technical-writing` and
   `unslop`. Re-asked in round 2: which write path, what the unified skill keeps from the two, how the pack copies go.
 
+- **Grill round 2** (2026-10-27): the user answered "a, lgtm but let if verify. The goal is to convert the book on how
+  to write good to a skill so AI agents stop writing 10k slop files.. a, / let the hook cover all md files that are
+  wriiten / pls vendor the plugin in the stacks since its goal is to be an enhancement of all the flows". Settled:
+  the write path is hooks on every write plus the copyedit subagent at gates; the keep/drop list for the unified skill
+  stands, with a verification step; the pstack copies stop being vendored and the sync rewrites the three references;
+  the hooks cover every Markdown file Claude writes, not only `docs/`. To confirm: where the skill and hooks ship
+  ("vendor the plugin in the stacks"), what "let it verify" checks, and the round 1 items the answer didn't name.
+
 ## Plan review
 
 ## Tasks
