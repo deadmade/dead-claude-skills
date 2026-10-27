@@ -291,10 +291,11 @@ order and modules (`flows-uses.mjs` joins Task 4), so no second review round; I 
 ## Tasks
 
 - Task 1: base cf3ed1c, untracked at start: none; files clean; review clean after one fix round (2287a4c).
-- Task 2: base 2287a4c, untracked at start: none.
+- Task 2: base 3ce519e, untracked at start: none; files clean.
 
 ## Rulings
 
+- 2026-10-27, Task 2: probes and the sample run load a scratchpad copy of `plugins/flows` with `dependencies` removed, because on Claude Code 2.1.311 an unsatisfied dependency (graphify) disables flows under `--plugin-dir` — the copy is test scaffolding and changes nothing in the repo — if wrong, the measured hooks differ from the shipped ones only in the manifest.
 ## Deviations
 
 ## Walkthrough
