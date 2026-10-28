@@ -162,10 +162,14 @@ test("inline code doesn't pair across list items", () => {
 });
 
 test('an inline span ends at any line that starts a block', () => {
-  for (const next of ['# Head', '| a | b |', '1. item', '+ item']) {
-    const masked = mask(`a stray \` here\n${next} \`x\` tail`);
-    assert.ok(masked.includes('here') && masked.includes(next) && masked.includes('tail'), next);
-    assert.ok(!masked.includes('x'), next);
+  for (const eol of ['\n', '\r\n']) {
+    for (const next of ['# Head', '| a | b |', '1. item', '+ item']) {
+      const masked = mask(`a stray \` here${eol}${next} \`x\` tail`);
+      assert.ok(masked.includes('here') && masked.includes(next) && masked.includes('tail'), next);
+      assert.ok(!masked.includes('x'), next);
+    }
+    // mask blanks a quote line whole; only the stray backtick must not pair into it.
+    assert.ok(mask(`a stray \` here${eol}> \`x\` tail`).includes('here'));
   }
 });
 
@@ -173,17 +177,23 @@ test('mask can read code as a word', () => {
   assert.equal(mask('Run `npm test` now', { code: 'X' }), 'Run X          now');
   assert.equal(mask('Run `npm test` now'), 'Run            now');
   assert.equal(mask('`a`', { code: 'X' }), 'X  ');
+  const wrapped = 'Run `npm\r\ntest` now';
+  assert.equal(mask(wrapped, { code: 'X' }), 'Run X   \r\n      now');
+  assert.equal(mask(wrapped, { code: 'X' }).length, wrapped.length);
 });
 
 test('a label defined mid-line counts as defined', () => {
-  const marked = 'Everything marked _(my call)_ was decided by Claude.\n\nLater _(my call)_ again.';
-  assert.deepEqual(rules(run(marked), 'shorthand'), []);
-  const labelled = 'Everything labelled (D4) was decided by Claude.\n\nLater D4 again.';
-  assert.deepEqual(rules(run(labelled), 'shorthand'), []);
-  const gloss = 'Goals: **Q2 (latency):** p50 under 5 s. Others follow.\n\nSo Q2 holds.';
-  assert.deepEqual(rules(run(gloss), 'shorthand'), []);
-  assert.deepEqual(rules(run('We chose my call here.'), 'shorthand'), ['my call']);
-  assert.deepEqual(rules(run('We chose Q2 here.'), 'shorthand'), ['Q2']);
+  for (const eol of ['\n', '\r\n']) {
+    const text = (s) => s.replaceAll('\n', eol);
+    const marked = text('Everything marked _(my call)_ was decided by Claude.\n\nLater _(my call)_ again.');
+    assert.deepEqual(rules(run(marked), 'shorthand'), []);
+    const labelled = text('Everything labelled (D4) was decided by Claude.\n\nLater D4 again.');
+    assert.deepEqual(rules(run(labelled), 'shorthand'), []);
+    const gloss = text('Goals: **Q2 (latency):** p50 under 5 s. Others follow.\n\nSo Q2 holds.');
+    assert.deepEqual(rules(run(gloss), 'shorthand'), []);
+    assert.deepEqual(rules(run(text('We chose my call here.\n')), 'shorthand'), ['my call']);
+    assert.deepEqual(rules(run(text('We chose Q2 here.\n')), 'shorthand'), ['Q2']);
+  }
 });
 
 test('FLOWS_PROSE_CHECK=off turns the check off', () => {
