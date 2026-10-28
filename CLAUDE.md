@@ -159,3 +159,11 @@ plugins of ours that the manifest no longer lists.
 CI: `test.yml` (npm test, the installer typecheck and the dead-skills and md-pane mod tests, Linux and Windows; the skill scan, Linux) on every PR and push to main; `tui-review.yml` on
 PRs touching tui-review; `web-mcp.yml` on PRs touching web-mcp; `build-tui-review.yml`/`build-web-mcp.yml` on PRs touching the workflow and from `release.yml`; `sync-*.yml`
 weekly.
+
+`.github/rulesets/` holds the repo's rulesets, imported by hand (Settings → Rules → Rulesets → Import; GitHub doesn't
+read the folder, so re-import after changing one): main takes squash or rebase PRs once `test.yml`'s three jobs pass, and
+only admins create or move `v*` tags. Admins bypass both, which the release's direct push to main needs. Renaming a
+`test.yml` job or matrix entry changes its check name: update `main.json` and re-import it. The sync workflows open their
+PRs with a GitHub App's token (variable `SYNC_APP_CLIENT_ID`, secret `SYNC_APP_PRIVATE_KEY`; the App needs contents and
+pull requests write) so `test.yml` runs on them; without the App they fall back to `github.token` and their PRs wait on
+checks that never start.

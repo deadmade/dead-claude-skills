@@ -26,7 +26,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_BODY_FILE: /tmp/${{ matrix.plugin }}-pr-body.md
 
-      # A PR opened with the workflow's token starts no other workflow, so test.yml never sees it: check here.
+      # Checked here too: without the sync App, test.yml never runs on the PR.
       - name: Claude Code, for plugin validate
         run: npm install -g @anthropic-ai/claude-code
 
@@ -36,9 +36,19 @@ jobs:
       - name: Skill scan
         run: npm run scan-skills
 
+      # A PR opened with the workflow's token starts no other workflow; the sync App's lets test.yml run on it.
+      - name: Sync App token
+        id: app
+        if: vars.SYNC_APP_CLIENT_ID != ''
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.SYNC_APP_CLIENT_ID }}
+          private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+
       - name: Open pull request
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
+          token: ${{ steps.app.outputs.token || github.token }}
           branch: sync/${{ matrix.plugin }}
           delete-branch: true
           commit-message: 'Sync ${{ matrix.plugin }} to ${{ steps.sync.outputs.tag }}'
