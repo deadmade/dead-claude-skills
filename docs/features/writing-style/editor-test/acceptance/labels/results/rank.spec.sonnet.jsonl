@@ -1,0 +1,12 @@
+{"section": 1, "ranking": ["C","D","A","B"], "why": "C spells out what 'Grill Qn', 'plan review round n' and 'Dn' refer to, which a reader outside the conversation needs for the references throughout the spec.", "meaning_problems": {}}
+{"section": 2, "ranking": ["A","C","D","B"], "why": "A splits the two complaints (SearXNG dependency, weak results) into labelled bullets so the reader sees the structure at once; B runs them together in one dense paragraph.", "meaning_problems": {}}
+{"section": 3, "ranking": ["B","D","C","A"], "why": "B and D name the subject of each sentence (e.g. Consent-O-Matic's zip, Consent-O-Matic's choices, why each engine needs its own profile), where A leaves 'Its choices' and 'the pinned Chromium release zip' ambiguous in a very dense list.", "meaning_problems": {}}
+{"section": 4, "ranking": ["A","D","B","C"], "why": "A writes the thresholds out in words (p50 latency is at most 5 s), while C leans on bare symbols and fragments.", "meaning_problems": {}}
+{"section": 5, "ranking": ["A","B","C","D"], "why": "The four versions are identical.", "meaning_problems": {}}
+{"section": 6, "ranking": ["C","A","B","D"], "why": "C makes the last bullet a full sentence with a subject (web-mcp uses stealth plugins...); the others are otherwise the same.", "meaning_problems": {}}
+{"section": 7, "ranking": ["B","D","C","A"], "why": "B and D say the installer does the denying and use a plain active voice; A leaves the actor out.", "meaning_problems": {}}
+{"section": 8, "ranking": ["A","C","B","D"], "why": "D's 'Thresholds Q1-Q3 as proposed are fixed' reads awkwardly; A's parallel sentences are clearest.", "meaning_problems": {}}
+{"section": 9, "ranking": ["A","C","B","D"], "why": "A calls query, papers and max_passages 'parameters', and so makes clear what is kept; D is the most clipped.", "meaning_problems": {}}
+{"section": 10, "ranking": ["B","A","D","C"], "why": "B's 'Every engine uses a fixed English locale' states the rule in one clear sentence; C's opening fragment has no subject.", "meaning_problems": {}}
+{"section": 11, "ranking": ["C","A","D","B"], "why": "C is in full sentences with explicit subjects (web-mcp pulls, the installer uses); B is telegraphic and D's 'Installer:' lead-in is clipped.", "meaning_problems": {}}
+{"section": 12, "ranking": ["A","B","C","D"], "why": "The four versions are identical.", "meaning_problems": {}}

@@ -12,3 +12,6 @@ and `/copyedit`'s.
   guess" narrowed to meaning). Its rankings have four versions per section: original, plain, shipped, variant.
 - `criterion5/`: a `claude -p` session told to write a spec with "grill Q3" and "D2" labels and to revise after hook
   feedback: the check's one report (`hook-responses.json`) and the spec it ended with.
+- `labels/`: the variant guide plus a label rule (state what a conversation label stands for when the document itself
+  says it), in the guide (`labels/edit.md`) and the prompt's last clause. Fresh judges ranked four versions per
+  section: original, plain, the variant's edit from `variant/` (the same text) and this one's.
