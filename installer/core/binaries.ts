@@ -37,7 +37,7 @@ export function missingBinaries(platform: string, wanted: string[], onPath: (bin
   });
 }
 
-// The binaries releases ship, built per platform by .github/workflows/build-{tui-review,web-mcp}.yml and attached to the
+// The binaries releases ship, built per platform by .github/workflows/crates-build.yml and attached to the
 // vX.Y.Z release by release.yml. plugin: which plugin needs it; key: its userConfig key for the binary's path.
 export const BIN_PLUGINS: Record<string, { name: string; key: string }> = {
   'tui-review': { name: 'tui-review', key: 'binPath' },
