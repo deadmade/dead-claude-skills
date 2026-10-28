@@ -132,7 +132,8 @@ flows holds one standard for prose a person will read, and two ways to apply it.
 - **`/copyedit <file.md>`** has a fresh Opus agent revise a document by the book for a reader who wasn't in the
   conversation, then lets the edit through only when code shows that no heading, code block, code span, link, number,
   checkbox step or table row was lost. It shows the diff and commits nothing. Before a gate shows a spec, a plan or an
-  audit report, the conductors run it on that document.
+  audit report, the conductors run it on that document; when it refuses an edit, the gate shows the unedited
+  document and what the edit lost.
 
 ## Packs
 

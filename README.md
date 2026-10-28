@@ -21,7 +21,7 @@ with approval gates and a state file to resume from. Picking flows installs ever
 flows also sets the house standard for prose: a `writing` skill (Williams and Bizup's _Style_ in our own words), a
 code-only check on every Markdown write that flags conversation shorthand and undefined abbreviations
 (`FLOWS_PROSE_CHECK=off` turns it off), and `/copyedit`, which has an Opus editor revise a spec, plan or report before
-its gate and keeps the edit only when nothing was lost.
+its gate and keeps the edit only when nothing was lost (otherwise the gate shows the original and says why).
 flows also carries the skill packs they read by path from `plugins/flows/packs/` (superpowers, ponytail, paper-lookup
 and the mattpocock, pstack and Trail of Bits picks). The packs are not plugins: nothing in them loads on its own, so
 their skills, hooks and ponytail's band stay out of your sessions outside the conductors, and the installer removes

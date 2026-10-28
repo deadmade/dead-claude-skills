@@ -48,8 +48,9 @@ in the new text, with no model call. `FLOWS_PROSE_CHECK=off` turns it off.
 _Avoid_: lint, model check
 
 **Copyedit pass**:
-A run of `/copyedit` on a spec, plan or audit report before its gate: an Opus editor revises it by the writing skill's
-book, and code checks that nothing was lost.
+A run of `/copyedit` on a spec, plan or audit report before its gate: an Opus editor revises it by the `writing` skill's
+method (Williams and Bizup's _Style_), and code checks that nothing was lost. A refused edit leaves the document as it
+was, and the gate says so.
 _Avoid_: rewrite, polish
 
 **Release**:
