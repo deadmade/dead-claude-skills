@@ -1,6 +1,6 @@
 ---
 flow: feature
-phase: evaluate
+phase: execute
 ---
 
 # Writing style: flow
@@ -32,8 +32,12 @@ Started 2026-10-27 on branch `claude/relaxed-newton-cr62u9` (from `main` 753ba2c
   measures' scope, the off switch, the toggle); approved the same day ("a, all as recommended"). Reopened 2026-10-28
   for the third plan review (NixOS deferred, pstack pinned); approved the same day ("lets ignore nixos for now will
   come to fix that later. yes retire the two writing skills pls").
-- Gate 2, plan approved: 2026-10-27, by the user ("approve, subagent-driven"), after plan review round 1.
-  Execution: subagent-driven (my recommendation). Commits: one per task on `claude/relaxed-newton-cr62u9`.
+- Gate 2, plan approved: 2026-10-27, by the user ("approve, subagent-driven"), after plan review round 1; superseded
+  by the rewritten plan.
+- Gate 2, rewritten plan approved: 2026-10-28, by the user ("Mixed (Recommended)"), after plan review rounds 2, 3 and
+  3b. Execution: mixed. A subagent writes the code tasks (3, 7, 9, 10, 11, 12), I write the tasks that are mostly
+  `.md` (4, 5, 6, 8; subagents here can't write `.md` files), and every task gets a review. I run Task 13. One
+  commit per task on `claude/relaxed-newton-cr62u9`.
 
 ## Skipped
 
