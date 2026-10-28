@@ -132,7 +132,8 @@ fn task_entry(entry: &str) -> Option<(Vec<u32>, &str)> {
 /// Updates a task with one entry's text (after `Task <n>:`).
 fn apply(task: &mut LedgerTask, text: &str) {
     let lower = text.to_ascii_lowercase();
-    if lower.contains("security") {
+    // A security entry is a finding or note that starts with "security"; "review clean, no security findings" is not.
+    if lower.starts_with("security") {
         task.security.push(text.to_string());
     }
     if lower.starts_with("minor (deferred)") || lower.starts_with("parked") {
@@ -141,15 +142,25 @@ fn apply(task: &mut LedgerTask, text: &str) {
     }
     let state = if lower.starts_with("complete") {
         TaskState::Done
-    } else if lower.starts_with("fix round") {
-        task.fix_rounds += 1;
+    } else if let Some(after) = lower.strip_prefix("fix round") {
+        // `fix round 2/5 (...)` closes a round; `fix round 1 implemented <sha>` is a step inside one.
+        let token = after.split_whitespace().next().unwrap_or("");
+        if token
+            .split_once('/')
+            .is_some_and(|(r, cap)| r.parse::<u32>().is_ok() && cap.parse::<u32>().is_ok())
+        {
+            task.fix_rounds += 1;
+        }
         TaskState::Review
     } else if lower.starts_with("dispatched") {
         task.model = model_of(text).or(task.model.take());
         TaskState::Building
     } else if lower.starts_with("in progress") {
         TaskState::Building
-    } else if lower.starts_with("done") || lower.starts_with("review") {
+    } else if lower.starts_with("done")
+        || lower.starts_with("review")
+        || lower.starts_with("implemented")
+    {
         TaskState::Review
     } else if lower.starts_with("needs_context")
         || lower.starts_with("waiting")

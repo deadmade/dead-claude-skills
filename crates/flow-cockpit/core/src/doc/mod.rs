@@ -16,18 +16,30 @@ pub(crate) fn normalize(text: &str) -> String {
     text.trim_start_matches('\u{feff}').replace("\r\n", "\n")
 }
 
-/// Removes `<!-- ... -->` (also across lines). An unterminated comment is kept as it is, so no text is lost.
+/// Removes `<!-- ... -->` (also across lines) where it starts a line, as the templates write them. A `<!--` in prose,
+/// inline code or a code fence is text, and so is an unterminated comment: no text is lost.
 pub(crate) fn strip_comments(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
-    let mut rest = text;
-    while let Some(start) = rest.find("<!--") {
-        let Some(len) = rest[start + 4..].find("-->") else {
-            break;
-        };
-        out.push_str(&rest[..start]);
-        rest = &rest[start + 4 + len + 3..];
+    let mut in_fence = false;
+    let mut pos = 0;
+    while pos < text.len() {
+        let end = text[pos..].find('\n').map_or(text.len(), |i| pos + i + 1);
+        let line = &text[pos..end];
+        if is_fence(line) {
+            in_fence = !in_fence;
+        }
+        let open = pos + line.len() - line.trim_start().len();
+        if !in_fence
+            && text[open..].starts_with("<!--")
+            && let Some(len) = text[open + 4..].find("-->")
+        {
+            out.push_str(&text[pos..open]);
+            pos = open + 4 + len + 3;
+            continue;
+        }
+        out.push_str(line);
+        pos = end;
     }
-    out.push_str(rest);
     out
 }
 

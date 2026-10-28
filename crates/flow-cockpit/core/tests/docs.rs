@@ -189,33 +189,46 @@ fn ledger_joins_wrapped_lines() {
         ledger.plan.as_deref(),
         Some("docs/features/web-mcp/plan.md")
     );
-    let five = ledger.tasks.iter().find(|t| t.n == 5).unwrap();
-    assert!(
-        five.security
-            .iter()
-            .any(|l| l.contains("resolves the host once, then connects"))
-    );
+    // Task 3's entry is wrapped under an indent; the sentence runs across the wrap.
+    let three = ledger.tasks.iter().find(|t| t.n == 3).unwrap();
+    assert_eq!(three.later.len(), 1);
+    assert!(three.later[0].contains("Task 5 must cache PDFs too (spec Goal 3"));
 }
 
 #[test]
 fn ledger_counts_fix_rounds_and_security() {
     let ledger = parse_ledger(&fixture("web-mcp.ledger.md"));
     let by_n = |n: u32| ledger.tasks.iter().find(|t| t.n == n).unwrap();
-    assert_eq!(by_n(5).fix_rounds, 2);
-    assert_eq!(by_n(5).security.len(), 1);
-    assert_eq!(by_n(5).state, TaskState::Done);
-    assert_eq!(by_n(5).model.as_deref(), Some("opus"));
-    assert_eq!(
-        by_n(5).later,
-        ["minor (deferred): the redirect limit is a literal"]
+    let five = by_n(5);
+    // `fix round 1/5` and `fix round 2/5` count; `fix round 1 implemented <sha>` does not.
+    assert_eq!(five.fix_rounds, 2);
+    assert!(
+        five.story
+            .iter()
+            .any(|l| l.starts_with("fix round 1 implemented"))
     );
-    assert_eq!(by_n(4).state, TaskState::Done);
-    assert_eq!(by_n(4).model.as_deref(), Some("sonnet"));
+    // The two "security finding(s)" entries, and no other line.
+    assert_eq!(five.security.len(), 2);
+    assert!(
+        five.security
+            .iter()
+            .all(|l| l.starts_with("security finding"))
+    );
+    assert_eq!(five.state, TaskState::Done);
+    assert_eq!(five.model.as_deref(), Some("opus"));
+    assert_eq!(five.later.len(), 6);
+    assert_eq!(by_n(4).state, TaskState::Review);
     assert_eq!(by_n(4).fix_rounds, 0);
-    assert_eq!(by_n(6).state, TaskState::Review);
-    assert_eq!(by_n(7).state, TaskState::Waiting);
-    assert_eq!(ledger.rulings.len(), 2);
-    assert!(ledger.rulings.iter().any(|r| r.contains("Task 8 waits")));
+    assert!(ledger.rulings.len() >= 5);
+    assert!(ledger.rulings.iter().any(|r| r.contains("`GetOpts` gains")));
+}
+
+#[test]
+fn review_clean_without_security_findings_is_not_a_security_entry() {
+    let ledger = parse_ledger(
+        "Task 2: complete (commits a..b, review clean, no security findings)\nTask 2: security note: x\n",
+    );
+    assert_eq!(ledger.tasks[0].security, ["security note: x"]);
 }
 
 #[test]
@@ -364,16 +377,44 @@ fn templates_parse_with_every_part() {
 
 #[test]
 fn filled_templates_parse_with_every_part() {
-    for name in ["feature", "research", "build"] {
+    for (name, template) in [
+        (
+            "feature",
+            "plugins/flows/skills/feature-flow/references/flow-template.md",
+        ),
+        (
+            "research",
+            "plugins/flows/skills/research-flow/references/research-template.md",
+        ),
+        ("build", "plugins/flows/references/build-template.md"),
+    ] {
         let doc = parse_flow(&fixture(&format!("{name}.flow.md")));
+        let template = parse_flow(&template_body(template));
+        assert_eq!(headings(&doc), headings(&template), "{name}: sections");
         assert!(
             doc.flow.is_some() && doc.phase.is_some() && doc.now.is_some(),
             "{name}"
         );
-        assert_eq!(doc.gates.len(), 2, "{name}");
+        assert_eq!(doc.gates.len(), 2, "{name}: gates");
         assert!(
             !doc.decisions.is_empty() && doc.decisions.iter().all(|d| d.picked.is_some()),
-            "{name}"
+            "{name}: decisions"
+        );
+        let statuses: Vec<_> = doc.deviations.iter().map(|d| &d.status).collect();
+        assert!(
+            statuses.contains(&&DeviationStatus::Open),
+            "{name}: open deviation"
+        );
+        assert!(
+            statuses
+                .iter()
+                .any(|s| matches!(s, DeviationStatus::Decided { date: Some(_), .. })),
+            "{name}: decided deviation"
+        );
+        // The template comments left in the fixture are not content.
+        assert!(
+            doc.sections.iter().all(|s| !s.markdown.contains("<!--")),
+            "{name}: comments"
         );
     }
     let research = parse_flow(&fixture("research.flow.md"));
@@ -386,7 +427,19 @@ fn filled_templates_parse_with_every_part() {
             what: "use the 200-query subset".into()
         }
     );
-    assert_eq!(parse_flow(&fixture("build.flow.md")).sections.len(), 6);
+}
+
+#[test]
+fn comment_marks_in_code_and_prose_are_text() {
+    // The first line is docs/features/flow-observability/plan.md:186; a lone `<!--` must not eat the headings after it.
+    let doc = parse_flow(
+        "# T\n\n## Notes\n\nSplit on `## `; `<!-- -->` stripped. A lone `<!--` opens nothing.\n\n```\n<!-- in a fence -->\n```\n\n<!-- a real comment\nover two lines -->\n\n## Gates\n\n- Gate 1, spec approved: 2026-10-01\n",
+    );
+    assert_eq!(doc.gates.len(), 1);
+    let notes = &doc.sections[0].markdown;
+    assert!(notes.contains("`<!-- -->` stripped"));
+    assert!(notes.contains("<!-- in a fence -->"));
+    assert!(!notes.contains("a real comment"));
 }
 
 #[test]

@@ -54,7 +54,7 @@ Workspace: worktree `.claude/worktrees/web-search`, branch `worktree-web-search`
   searches compete with this search's pages. Engine **snippets and rank are dropped** (`Raw` keeps url, title,
   engine). Passages are deduplicated only by hash.
 - **What was measured before:** H3 was latency only (search p50 2,078 ms, 8 passages, ~16,000 chars). Result
-  _quality_ of `search` was never measured. H4 (embeddings vs BM25 on BEIR) didn't hold, so BM25 only.
+  *quality* of `search` was never measured. H4 (embeddings vs BM25 on BEIR) didn't hold, so BM25 only.
 - **Keyless pieces already exist:** papers (OpenAlex, arXiv, Crossref; `papers.rs`) and `lookup`; `userConfig`
   (`binPath`, `agentBrowserPath`) gives keys a path into the server's env.
 
@@ -166,7 +166,6 @@ extensions? yes".
 ## Plan review
 
 **Round 1 (2026-10-23).**
-
 - Reviewers: correctness, fit and simpler, in parallel; 42 findings merged into about 20, none dropped.
 - I checked two claims myself:
   - `installer/core/binaries.ts:31` lists docker for web-mcp;
@@ -203,7 +202,6 @@ extensions? yes".
 - The plan was rewritten (a new Task 7 stops the index; the module layout changed), so it is re-reviewed in round 2.
 
 **Round 2 (2026-10-23).**
-
 - Reviewers: correctness and fit, on the rewritten plan; 33 findings, none dropped.
 - Decisions:
   - Windows search browsers close after each search instead of staying warm, because agent-browser puts browsers
@@ -236,7 +234,6 @@ extensions? yes".
 ## Deviations
 
 **D-1 (Task 1, 2026-10-23): the spike can't run here, and Chrome for Testing doesn't start on NixOS.**
-
 - **What happened:**
   - The Claude Code Bash sandbox's seccomp filter forbids AF_UNIX sockets. On Linux the agent-browser 0.39.1
     daemon only listens on a Unix socket (`Failed to bind socket: Operation not permitted`).
