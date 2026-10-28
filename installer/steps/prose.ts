@@ -1,5 +1,5 @@
 // flows' prose environment for /copyedit: uv syncs the locked project into <CONFIG>/flows-prose/, or the folder goes.
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { proseDecision, proseDir, proseMarker, prosePython, proseSync } from '../core/prose.ts';
 import { ASSETS, CONFIG, done, failures } from '../context.ts';
 import { removeDir, writeAtomic } from '../system/files.ts';
@@ -12,7 +12,8 @@ const SMOKE = "import spacy; spacy.load('en_core_web_trf')";
 export async function applyProse({ toggle, flows, unticked }: { toggle: boolean; flows: boolean; unticked: boolean }) {
   const dir = proseDir(CONFIG);
   const python = prosePython(CONFIG, process.platform);
-  const decision = proseDecision({ toggle, flows, installed: existsSync(python) });
+  // Any folder counts here, so off also cleans one a failed first sync left without Python.
+  const decision = proseDecision({ toggle, flows, installed: existsSync(dir) });
   if (decision === 'sync') sync(dir, python);
   if (decision === 'remove') {
     const code = removeDir(dir);
@@ -25,6 +26,8 @@ export async function applyProse({ toggle, flows, unticked }: { toggle: boolean;
 }
 
 function sync(dir: string, python: string) {
+  // Ticking the toggle takes back the opt-out, whether or not the sync works.
+  removeDir(proseMarker(CONFIG));
   // No uv: the summary's "Missing on PATH" note names it.
   const uv = which('uv');
   if (!uv) return;
@@ -35,6 +38,5 @@ function sync(dir: string, python: string) {
   const smoke = startSync(python, ['-c', SMOKE], { stdio: 'inherit' });
   if (smoke.status !== 0)
     return failures.push(`prose: spaCy can't load en_core_web_trf (${errCode(smoke.error) ?? `exit ${smoke.status}`})`);
-  rmSync(proseMarker(CONFIG), { force: true });
   done.push(`prose: spaCy and en_core_web_trf ready in ${dir}`);
 }
