@@ -29,7 +29,9 @@ Started 2026-10-27 on branch `claude/relaxed-newton-cr62u9` (from `main` 753ba2c
   Deviations. Re-approved 2026-10-28 ("Large pls and I approve"): code check only at write time, the book's method in
   the writing skill, an Opus editor agent fed spaCy candidates (`en_core_web_trf`), Python set up by the installer.
 - Gate 1, reopened 2026-10-28 for the second plan review's decisions (NixOS, uv, the editor's hand-back, the
-  measures' scope, the off switch, the toggle); approved the same day ("a, all as recommended").
+  measures' scope, the off switch, the toggle); approved the same day ("a, all as recommended"). Reopened 2026-10-28
+  for the third plan review (NixOS deferred, pstack pinned); approved the same day ("lets ignore nixos for now will
+  come to fix that later. yes retire the two writing skills pls").
 - Gate 2, plan approved: 2026-10-27, by the user ("approve, subagent-driven"), after plan review round 1.
   Execution: subagent-driven (my recommendation). Commits: one per task on `claude/relaxed-newton-cr62u9`.
 
@@ -359,6 +361,34 @@ Three reviewers: Correctness (Fable), Fit (Opus, with pstack `blast-radius`), Si
   test environment comes from the real project files; a summary line when prose is ticked without flows.
 
 The decisions changed the plan's shape (task order, new modules), so the review runs again on the revised plan.
+
+### Plan review round 3 (2026-10-28, the plan revised for round 2)
+
+Same three angles and models. 31 findings; duplicates merged, none dropped.
+
+- **Blocking, NixOS:** nixpkgs' `en_core_web_trf` doesn't build (its runtime-deps check: spacy-curated-transformers
+  2.1.2 against `<1.0.0`). Tested here: with the check relaxed it builds, but `spacy.load` fails with `Error(s) in
+loading state_dict` (the weights are laid out for 0.x). The uv environment inside a `buildFHSEnv` installed and
+  loaded the model and parsed a passive correctly (in this container, not on NixOS). Decided: NixOS waits ("lets
+  ignore nixos for now will come to fix that later"); the toggle is hidden there.
+- **Blocking, pstack:** upstream `c742dd6` fails the sync's `GUARD` (`arena/SKILL.md:19,30`, `interrogate/SKILL.md:19`),
+  names the skipped `in-your-own-words`, and turns `interrogate` into adversaries that run code in worktrees. This
+  reverses round 2's "rides along". Decided: retire the two skills against `519d36a` ("yes retire the two writing
+  skills pls"); `sync-pstack.mjs` gains `--ref`; upstream's update gets its own PR.
+- **Fixes applied as recommended:** the toggle follows `web-builtins-off` (default on where offered unless the
+  marker, the effect gated on flows, the marker written whenever the user unticks, `remove` before `needs-flows`,
+  the state in `core/prose.ts`); a missing uv goes into `BINARIES`' "Missing on PATH" note, not a failure;
+  `hasBuild` shared with `BIN_TARGETS`; `removeDir` takes an injectable `rm`; CRLF test cases, and `/copyedit` keeps
+  the document's line endings; quoted paths and `git diff`'s exit code in `SKILL.md`; a per-run folder emptied first,
+  a missing edit as one lost line, `before/` and `after/` measures; `measure.mjs` holds the Python lookup, timeout and
+  fallback with tests; Python splits blocks itself and Node merges and formats; the totals cover the candidate kinds
+  only; one variable, `FLOWS_PROSE_PYTHON`, for the spaCy test; `loadTerms` shared; the pre-commit regex covers
+  `plugins/flows/skills/`; the `flows-uses` tests check what they claim; the density credit lands with the skill;
+  `/copyedit` in flow-rules' **State** list and `"general-purpose"` in its `uses.json`; Task 13 uses the Task 10
+  environment; a run with a Python that can't load the model.
+
+The revision changes the plan's shape a little (`measure.mjs`, the pinned sync), so one Correctness reviewer checks
+the changed tasks before Gate 2.
 
 ## Tasks
 

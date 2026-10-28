@@ -231,8 +231,7 @@ conductors, it runs only when called. It runs three steps.
    | 10 Shape     | A long opening before the subject, a long subject, words between subject and verb, a long list in a sentence |
 
    The phrase lists come from plainlanguage.gov (CC0) and Strunk (public domain). A noun counts as made from a verb by
-   its part of speech and its suffix; no word table ships. The script also prints the document's totals for these
-   measures, so the effect of an edit can be compared.
+   its part of speech and its suffix; no word table ships. The script also prints the document's totals for these kinds, so the effect of an edit can be compared.
 
 2. **Edit.** The skill first saves the document's current version to the scratchpad. A fresh `general-purpose` agent
    on Opus then gets the document, the candidate list and the editing guide, `skills/copyedit/references/edit.md`.
@@ -264,21 +263,22 @@ binaries ship for. It's a toggle on the tools page, on by default when flows is 
 about 1.5 GB. Ticking it is the consent; there is no second question. Once the user unticks it, it stays off on later
 runs.
 
-- **On NixOS,** uv's Python and PyTorch's Linux wheels don't run: they expect the system library layout other Linux
-  distributions have. nixpkgs packages spaCy and `en_core_web_trf` 3.8.0, so the repo's `flake.nix` gains a package,
-  `flows-prose`, whose `flows-prose-python` command is a Python with both. The installer checks for that command and,
-  when it's missing, prints the Nix command that installs it, as it does for other tools.
-- **Elsewhere,** the installer uses `uv` from PATH, and when it's missing prints the command that installs it, as it
-  does for graphify. A small Python project in `installer/assets/prose/`, a `pyproject.toml` and a `uv.lock`, pins
+- **uv** comes from PATH. When it's missing, the installer's "Missing on PATH" note prints the command that installs
+  it, as it does for graphify's uv.
+- **The environment.** A small Python project in `installer/assets/prose/`, a `pyproject.toml` and a `uv.lock`, pins
   CPython 3.13 (uv-managed, not the system one), spaCy 3.8, CPU-only PyTorch from PyTorch's own index, and
   `en_core_web_trf` 3.8.0 from its GitHub release wheel with its hash. On Linux, PyPI's default PyTorch wheel pulls in
   about 1.8 GB of CUDA libraries, so the CPU index is required. The installer runs `uv sync --frozen` into
   `~/.claude/flows-prose/`, with uv's cache and its Python inside that folder too, so unticking the toggle frees the
   whole 1.5 GB and never touches graphify's uv files.
+- **NixOS isn't supported yet.** uv's Python and PyTorch's Linux wheels expect the system library layout other Linux
+  distributions have, and nixpkgs' `en_core_web_trf` doesn't load (tested 2026-10-28: nixpkgs pairs it with a newer
+  spacy-curated-transformers, whose weight layout doesn't match). The installer hides the toggle on NixOS, so
+  `/copyedit` edits there without spaCy's measures. A later change adds NixOS; in a test, the same uv environment ran
+  inside an FHS environment (`buildFHSEnv`) and loaded the model.
 - **Installed** means the model loads: the installer's last check, and the summary line, run spaCy, not just look for
   the folder. The step runs last, after the settings, so cancelling the download leaves everything else applied.
-- **Finding it.** `/copyedit` runs `flows-prose-python` when it's on PATH, and otherwise the Python in
-  `~/.claude/flows-prose/`. Neither means spaCy's measures are skipped.
+- **Finding it.** `/copyedit` runs the Python in `~/.claude/flows-prose/`. Without it, spaCy's measures are skipped.
 
 The installer managing a Python toolchain is recorded in [ADR 0005](../../adr/0005-prose-python-environment.md).
 
@@ -289,8 +289,7 @@ The installer managing a Python toolchain is recorded in [ADR 0005](../../adr/00
 - When a document is copyedited: resolved in `flow-rules.md`; never seen by the hook or by each conductor's own gate
   text.
 - How a document is edited: resolved in `/copyedit` and its guide; the conductors run it and never restate its steps.
-- Where the Python environment is: resolved in the installer's prose step, `flake.nix`, and `/copyedit`'s measure
-  step; never seen by `measure.py`, the editor agent or the conductors.
+- Where the Python environment is: resolved in the installer's prose step and `/copyedit`'s measure step; never seen by `measure.py`, the editor agent or the conductors.
 - What the writing standard says: resolved in the `writing` skill and the editing guide; the conductors name them and
   never restate their rules.
 
@@ -303,8 +302,7 @@ The installer managing a Python toolchain is recorded in [ADR 0005](../../adr/00
   environment turns it off without turning off flows or other hooks; flows' README says so.
 - `scripts/flows-uses.mjs` learns that a skill Claude may load on its own (no `disable-model-invocation`) is not a
   conductor, so the writing skill needs no `uses.json`, and conductors may list it under `flows`.
-- The installer gets one step, one toggle and the prose environment's project files; `flake.nix` gets the
-  `flows-prose` package. No crate and no release change.
+- The installer gets one step, one toggle and the prose environment's project files. No crate and no release change.
 - `npm test` runs the check's and `/copyedit`'s Node tests. The spaCy measures are tested against a fixture when the
   environment exists, and skip otherwise.
 - flows' version already follows the one-version scheme.
@@ -319,9 +317,8 @@ The installer managing a Python toolchain is recorded in [ADR 0005](../../adr/00
 2. The skill and the editing guide pass a source check before they ship. A fresh agent compares them with the free
    sources (each lesson of _Style_ stated faithfully, no copied passages) and the skill with `technical-writing` and
    `unslop` (nothing worth keeping lost). Its findings are fixed or answered.
-3. The installer sets up the environment on Linux, and `measure.py` runs from it on a fixture; `nix build .#flows-prose`
-   builds and its `flows-prose-python` runs the same fixture. On Windows and on the user's NixOS machine the user runs
-   the installer once; until then, those are marked untested.
+3. The installer sets up the environment on Linux, and `measure.py` runs from it on a fixture. On Windows the user
+   runs the installer once; until then, Windows is marked untested. On NixOS the toggle is hidden.
 4. The editor test, re-run with the shipped pieces (the shipped `measure.py`, guide and `/copyedit` prompt) on the
    same two documents: `/copyedit`'s version has a better mean rank than the plain prompt's over the four blind
    rankings (two judges, two documents) and a worse one in none, and loses or changes no more than 1 of the 304
@@ -346,12 +343,14 @@ The user decided:
 - No hard limits on length either: "I dont mind a long text for a long feautre. I just dont want slop text".
 - The book's method inside the agents, tested before it was chosen; the editor with code candidates, as tested.
 - The measures in Python with spaCy, not Rust ("Let's just stay on python"), with the large model ("Large pls").
-- After the second plan review (2026-10-28, "a, all as recommended"): on NixOS the environment comes from a
-  `flake.nix` package built from nixpkgs; uv comes from PATH, with an install hint, not a pinned download; the core is
-  built before the Python half; the editor writes its version to a scratchpad file and code checks it before it
-  replaces the document; masking and phrase matching run in Node, shared with the check, and only the tested
-  candidate kinds ship, without a WordNet table; pstack's upstream update rides along with retiring its two writing
-  skills; `FLOWS_PROSE_CHECK=off` turns the check off; the toggle's behaviour above; an ADR for the Python toolchain.
+- After the second plan review (2026-10-28, "a, all as recommended"): uv comes from PATH, with an install hint, not a
+  pinned download; the core is built before the Python half; the editor writes its version to a scratchpad file and
+  code checks it before it replaces the document; masking and phrase matching run in Node, shared with the check, and
+  only the tested candidate kinds ship, without a WordNet table; `FLOWS_PROSE_CHECK=off` turns the check off; the
+  toggle's behaviour above; an ADR for the Python toolchain.
+- After the third plan review (2026-10-28): NixOS waits for a later change ("lets ignore nixos for now will come to
+  fix that later"); the two pstack writing skills are retired against the vendored commit, `519d36a`, and pstack's
+  upstream update gets its own PR ("yes retire the two writing skills pls").
 - A check on every write plus an editor before the gates, rather than an agent that writes every document.
 - The unified skill replaces pstack's `technical-writing` and `unslop`, keeping and dropping their rules as listed
   above; the pack stops vendoring them.
@@ -385,7 +384,7 @@ Claude decided, open to change:
 - The measures' thresholds, within the table above, and the candidate list's format.
 - How `/copyedit` finds the Claude config folder when `CLAUDE_CONFIG_DIR` is set, and the Python path inside the
   environment on Windows (`Scripts\python.exe`).
-- The nixpkgs attribute names for spaCy and the model, checked with `nix eval`.
+
 - How the sync transform rewrites the three "through unslop" lines, and the pstack-picks plugin description that names
   `unslop`.
 - The before/after examples in the skill, picked from existing flow documents.
