@@ -72,7 +72,7 @@
             enable = true;
             name = "installer tests";
             entry = "${installer-test}/bin/installer-test";
-            files = "^(installer/|scripts/|crates/|plugins/default/hooks/|plugins/flows/hooks/|\\.claude-plugin/marketplace\\.json$|package\\.json$)";
+            files = "^(installer/|scripts/|crates/|plugins/default/hooks/|plugins/flows/hooks/|plugins/flows/skills/|\\.claude-plugin/marketplace\\.json$|package\\.json$)";
             pass_filenames = false;
           };
         };

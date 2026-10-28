@@ -4,14 +4,9 @@ import { copyFileSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { check, main, mask, newRanges, report } from './prose.mjs';
+import { check, loadTerms, main, mask, newRanges, report } from './prose.mjs';
 
-const TERMS = new Set(
-  readFileSync(new URL('./common-terms.txt', import.meta.url), 'utf8')
-    .split('\n')
-    .map((line) => line.replace(/#.*/, '').trim())
-    .filter(Boolean),
-);
+const TERMS = loadTerms(readFileSync(new URL('./common-terms.txt', import.meta.url), 'utf8'));
 const all = (text) => [[0, text.length]];
 const run = (text, file = 'docs/x.md') => check(text, all(text), { file, terms: TERMS });
 const rules = (findings, rule) => findings.filter((f) => f.rule === rule).map((f) => f.match);
@@ -153,4 +148,57 @@ test('prose-check exits 0 and prints nothing when common-terms.txt cannot be rea
   const stdin = JSON.stringify({ tool_name: 'Write', tool_input: { file_path: doc, content: 'x' } });
   const ran = spawnSync(process.execPath, [join(dir, 'prose-check.mjs')], { input: stdin, encoding: 'utf8' });
   assert.deepEqual([ran.status, ran.stdout, ran.stderr], [0, '', '']);
+});
+
+test("inline code doesn't pair across list items", () => {
+  for (const eol of ['\n', '\r\n']) {
+    const text = ['- a `b` and a stray ` here', '- `pub const REST: Duration` (30 min)', ''].join(eol);
+    assert.deepEqual(rules(run(text), 'undefined'), [], JSON.stringify(eol));
+    const masked = mask(text);
+    assert.ok(!masked.includes('REST'));
+    assert.ok(masked.includes('(30 min)'));
+    assert.equal(masked.length, text.length);
+  }
+});
+
+test('an inline span ends at any line that starts a block', () => {
+  for (const next of ['# Head', '| a | b |', '1. item', '+ item']) {
+    const masked = mask(`a stray \` here\n${next} \`x\` tail`);
+    assert.ok(masked.includes('here') && masked.includes(next) && masked.includes('tail'), next);
+    assert.ok(!masked.includes('x'), next);
+  }
+});
+
+test('mask can read code as a word', () => {
+  assert.equal(mask('Run `npm test` now', { code: 'X' }), 'Run X          now');
+  assert.equal(mask('Run `npm test` now'), 'Run            now');
+  assert.equal(mask('`a`', { code: 'X' }), 'X  ');
+});
+
+test('a label defined mid-line counts as defined', () => {
+  const marked = 'Everything marked _(my call)_ was decided by Claude.\n\nLater _(my call)_ again.';
+  assert.deepEqual(rules(run(marked), 'shorthand'), []);
+  const labelled = 'Everything labelled (D4) was decided by Claude.\n\nLater D4 again.';
+  assert.deepEqual(rules(run(labelled), 'shorthand'), []);
+  const gloss = 'Goals: **Q2 (latency):** p50 under 5 s. Others follow.\n\nSo Q2 holds.';
+  assert.deepEqual(rules(run(gloss), 'shorthand'), []);
+  assert.deepEqual(rules(run('We chose my call here.'), 'shorthand'), ['my call']);
+  assert.deepEqual(rules(run('We chose Q2 here.'), 'shorthand'), ['Q2']);
+});
+
+test('FLOWS_PROSE_CHECK=off turns the check off', () => {
+  const stdin = JSON.stringify({ tool_name: 'Write', tool_input: { file_path: 'a.md', content: 'See Q4' } });
+  const readFile = () => 'See Q4';
+  assert.deepEqual(main({ stdin, readFile, terms: TERMS, env: { FLOWS_PROSE_CHECK: 'off' } }), {
+    code: 0,
+    stderr: '',
+  });
+  assert.equal(main({ stdin, readFile, terms: TERMS, env: {} }).code, 2);
+});
+
+test('loadTerms reads terms and skips comments', () => {
+  const lf = '# header\nAPI\n  URL  # inline\n\nSQL\n';
+  const expected = new Set(['API', 'URL', 'SQL']);
+  assert.deepEqual(loadTerms(lf), expected);
+  assert.deepEqual(loadTerms(lf.replaceAll('\n', '\r\n')), expected);
 });

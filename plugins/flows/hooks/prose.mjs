@@ -5,6 +5,14 @@
 const CLOSING = 'Fix what makes the prose worse for a reader. Leave a sentence as is when the finding is wrong.';
 const MAX_FINDINGS = 10;
 
+export const loadTerms = (text) =>
+  new Set(
+    text
+      .split('\n')
+      .map((line) => line.replace(/#.*/, '').trim())
+      .filter(Boolean),
+  );
+
 const blank = (s) => s.replace(/[^\r\n]/g, ' ');
 
 // Front matter and fenced code blocks, line by line so every length and newline survives.
@@ -35,9 +43,14 @@ function maskBlocks(text) {
   return lines.join('\n');
 }
 
-export function mask(text) {
+// An inline code span ends at a blank line or at a line that starts a new block.
+const INLINE_CODE =
+  /(`+)(?!`)(?:(?!\n[ \t\r]*\n|\n {0,3}(?:[-*+][ \t]|\d+[.)][ \t]|#{1,6}[ \t]|[|>]))[\s\S])*?(?<!`)\1(?!`)/g;
+
+// `code` reads each inline code span as that word, padded with spaces to the span's length.
+export function mask(text, { code } = {}) {
   return maskBlocks(text)
-    .replace(/(`+)(?!`)(?:(?!\n[ \t\r]*\n)[\s\S])*?(?<!`)\1(?!`)/g, blank)
+    .replace(INLINE_CODE, (m) => (code ? code.slice(0, m.length) + blank(m.slice(code.length)) : blank(m)))
     .replace(/\]\([^)\n]*\)/g, (m) => `]${blank(m.slice(1))}`)
     .replace(/^( {0,3}\[[^\]\n]+\]:)([^\r\n]*)/gm, (_, label, target) => label + blank(target))
     .replace(/^ {0,3}>[^\r\n]*/gm, blank);
@@ -94,7 +107,15 @@ export function check(fullText, ranges, { file, terms }) {
     for (const m of [...masked.matchAll(LABELS), ...masked.matchAll(PHRASES)]) {
       if (!inRange(m.index)) continue;
       if (/^Q/.test(m[0]) && /^ \d{4}\b/.test(masked.slice(m.index + m[0].length))) continue;
-      const label = new RegExp(`^[ \\t]*(?:(?:[-*+]|\\d+[.)]|#{1,6})[ \\t]+)?[*_]*${escape(m[0])}\\b`, 'im');
+      const word = escape(m[0]);
+      const label = new RegExp(
+        [
+          `^[ \\t]*(?:(?:[-*+]|\\d+[.)]|#{1,6})[ \\t]+)?[*_]*${word}\\b`,
+          `\\b(?:marked|labelled)[ \\t]+[*_(]*${word}\\b`,
+          `\\b${word}[*_]*[ \\t]*\\([^)\\n]*\\)[*_]*:`,
+        ].join('|'),
+        'im',
+      );
       if (label.test(masked)) continue;
       hits.push({ at: m.index, rule: 'shorthand', match: m[0], message: 'say what was decided instead of the label' });
     }
@@ -133,8 +154,9 @@ export function report(file, findings) {
   return [...lines, CLOSING].join('\n');
 }
 
-export function main({ stdin, readFile, terms }) {
+export function main({ stdin, readFile, terms, env = process.env }) {
   const ok = { code: 0, stderr: '' };
+  if (env.FLOWS_PROSE_CHECK === 'off') return ok;
   try {
     const input = JSON.parse(stdin);
     const file = input.tool_input?.file_path;

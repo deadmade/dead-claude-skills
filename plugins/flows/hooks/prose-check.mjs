@@ -1,17 +1,12 @@
 import { readFileSync } from 'node:fs';
-import { main } from './prose.mjs';
+import { loadTerms, main } from './prose.mjs';
 
 let stdin = '';
 for await (const chunk of process.stdin) stdin += chunk;
 
-let terms = new Set();
+let terms;
 try {
-  terms = new Set(
-    readFileSync(new URL('./common-terms.txt', import.meta.url), 'utf8')
-      .split('\n')
-      .map((line) => line.replace(/#.*/, '').trim())
-      .filter(Boolean),
-  );
+  terms = loadTerms(readFileSync(new URL('./common-terms.txt', import.meta.url), 'utf8'));
 } catch {
   process.exit(0);
 }
