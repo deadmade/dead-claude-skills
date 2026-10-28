@@ -23,6 +23,7 @@ jobs:
   # (`npm run release` pushed with --follow-tags) is left to its tag's run.
   version:
     runs-on: ubuntu-latest
+    environment: release
     permissions:
       contents: write
     outputs:
@@ -51,17 +52,18 @@ jobs:
             echo "cut=v$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
           fi
 
-      # Only admins and the repo's App may create a v* tag (.github/rulesets/release-tags.json).
-      - name: App token
+      # Only admins and the release App may create a v* tag (.github/rulesets/release-tags.json). Its key lives in the
+      # release environment, which only main and v* tags may use, and only jobs that install no packages read it.
+      - name: Release App token
         id: app
-        if: steps.tag.outputs.cut && vars.BOT_APP_CLIENT_ID
+        if: steps.tag.outputs.cut && vars.RELEASE_APP_CLIENT_ID
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          client-id: ${{ vars.BOT_APP_CLIENT_ID }}
-          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           permission-contents: write
 
-      # A tag pushed with the App's token starts its own run, which releases it. Without the App it goes out with the
+      # A tag pushed with the release App's token starts its own run, which releases it. Without the App it goes out with the
       # workflow's token, which starts no run, so this one releases it.
       - name: Push the tag
         id: push
@@ -120,7 +122,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.TAG }}
-          persist-credentials: false
 
       # Every artifact of this run: the tui-review and web-mcp archives, each with its .sha256.
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -151,17 +152,31 @@ jobs:
           tui-review-*: the binary behind tui-review, for each platform; the installer downloads yours.
           web-mcp-*: the binary behind the web-mcp plugin, for Windows and Linux x64; the installer downloads yours."
 
+  release-branch:
+    needs: [version, publish]
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAG }}
+          persist-credentials: false
+
       # The branch the installer points the marketplace at (RELEASE_BRANCH in installer/core/release.ts): Claude Code's
       # marketplace auto-update follows it, so plugins update without rerunning the installer. Moved once the release
-      # exists, and never back to an older one (a re-run of an old tag's run). Only admins and the repo's App may move it
-      # (.github/rulesets/release-branch.json); its token is made here, after npm ci, so no package script sees it.
-      - name: App token
+      # exists, and never back to an older one (a re-run of an old tag's run). Only admins and the release App may move it
+      # (.github/rulesets/release-branch.json); a job of its own, so its key never shares a runner with npm ci.
+      - name: Release App token
         id: app
-        if: vars.BOT_APP_CLIENT_ID
+        if: vars.RELEASE_APP_CLIENT_ID
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          client-id: ${{ vars.BOT_APP_CLIENT_ID }}
-          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-workflows: write
 

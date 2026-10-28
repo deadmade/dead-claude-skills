@@ -47,14 +47,14 @@ jobs:
       - name: Skill scan
         run: npm run scan-skills
 
-      # A PR opened with the workflow's token starts no other workflow; the repo's App's lets test.yml run on it.
+      # A PR opened with the workflow's token starts no other workflow; the sync App's lets test.yml run on it.
       - name: App token
         id: app
-        if: vars.BOT_APP_CLIENT_ID
+        if: vars.SYNC_APP_CLIENT_ID
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          client-id: ${{ vars.BOT_APP_CLIENT_ID }}
-          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          client-id: ${{ vars.SYNC_APP_CLIENT_ID }}
+          private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
 
