@@ -9,7 +9,7 @@ import { prosePython } from '../core/prose.ts';
 const WIN = process.platform === 'win32';
 const NEEDS_UV = "prose: needs uv on PATH; /copyedit runs without spaCy's measures until then";
 
-type Args = { toggle: boolean; flows: boolean; started: boolean };
+type Args = { toggle: boolean; flows: boolean; expected: boolean };
 
 // The step reads CONFIG when it loads, so each case runs it in its own node with PATH set to path (empty: no uv), and
 // returns the summary's done and failed lines.
@@ -51,7 +51,7 @@ const configDir = () => mkdtempSync(join(tmpdir(), 'dcs-prose-'));
 test('a sync decision removes the opt-out marker and notes the missing uv', () => {
   const config = configDir();
   writeFileSync(join(config, 'flows-prose.off'), '');
-  const r = applyProse(config, { toggle: true, flows: true, started: false });
+  const r = applyProse(config, { toggle: true, flows: true, expected: false });
   assert.ok(!existsSync(join(config, 'flows-prose.off')));
   assert.deepEqual(r, { done: [NEEDS_UV], failures: [] });
 });
@@ -59,14 +59,14 @@ test('a sync decision removes the opt-out marker and notes the missing uv', () =
 test('turning prose off removes a flows-prose folder that has no Python yet, and unticking writes the marker', () => {
   const config = configDir();
   mkdirSync(join(config, 'flows-prose', 'cache'), { recursive: true });
-  applyProse(config, { toggle: false, flows: true, started: true });
+  applyProse(config, { toggle: false, flows: true, expected: true });
   assert.ok(!existsSync(join(config, 'flows-prose')));
   assert.ok(existsSync(join(config, 'flows-prose.off')));
 });
 
 test('a toggle that stays on writes no marker', () => {
   const config = configDir();
-  applyProse(config, { toggle: true, flows: true, started: true });
+  applyProse(config, { toggle: true, flows: true, expected: true });
   assert.ok(!existsSync(join(config, 'flows-prose.off')));
 });
 
@@ -74,7 +74,7 @@ test("a marker that can't be written is a failure, not a crash", () => {
   const config = configDir();
   // A folder with a file in it where the marker goes: the rename onto it fails.
   mkdirSync(join(config, 'flows-prose.off', 'x'), { recursive: true });
-  const r = applyProse(config, { toggle: false, flows: true, started: true });
+  const r = applyProse(config, { toggle: false, flows: true, expected: true });
   assert.equal(r.failures.length, 1, JSON.stringify(r));
   assert.match(r.failures[0], /^prose: couldn't write .*flows-prose\.off: E[A-Z]+$/);
 });
@@ -84,7 +84,7 @@ test('a failed uv sync is a failure with its exit code', () => {
   const uv = fakeUv();
   const r = applyProse(
     config,
-    { toggle: true, flows: true, started: false },
+    { toggle: true, flows: true, expected: false },
     { path: uv.bin, env: { FAKE_UV_ENV: uv.envFile, FAKE_UV_EXIT: '3' } },
   );
   assert.deepEqual(r, { done: [], failures: ['prose: uv sync failed (exit 3)'] });
@@ -95,7 +95,7 @@ test("a sync that leaves no Python is the can't-load failure", () => {
   const uv = fakeUv();
   const r = applyProse(
     config,
-    { toggle: true, flows: true, started: false },
+    { toggle: true, flows: true, expected: false },
     { path: uv.bin, env: { FAKE_UV_ENV: uv.envFile } },
   );
   assert.deepEqual(r.done, []);
@@ -114,7 +114,7 @@ test(
     writeFileSync(python, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
     const r = applyProse(
       config,
-      { toggle: true, flows: true, started: false },
+      { toggle: true, flows: true, expected: false },
       { path: uv.bin, env: { FAKE_UV_ENV: uv.envFile } },
     );
     const dir = join(config, 'flows-prose');

@@ -8,8 +8,8 @@ import { log } from '../ui/ui.ts';
 
 const SMOKE = "import spacy; spacy.load('en_core_web_trf')";
 
-// toggle: the prose toggle after the screens; flows: flows is selected; started: the toggle when the screens opened.
-export async function applyProse({ toggle, flows, started }: { toggle: boolean; flows: boolean; started: boolean }) {
+// toggle: the prose toggle after the screens; flows: flows is selected; expected: the toggle's default with that flows.
+export async function applyProse({ toggle, flows, expected }: { toggle: boolean; flows: boolean; expected: boolean }) {
   const dir = proseDir(CONFIG);
   const python = prosePython(CONFIG, process.platform);
   // Any folder counts here, so off also cleans one a failed first sync left without Python.
@@ -22,7 +22,7 @@ export async function applyProse({ toggle, flows, started }: { toggle: boolean; 
   }
   if (decision === 'needs-flows') done.push('prose: needs flows, nothing set up');
   // Off by default from the next run on, until the user ticks it again.
-  if (proseUnticked({ started, toggle })) {
+  if (proseUnticked({ expected, toggle })) {
     const marker = proseMarker(CONFIG);
     try {
       writeAtomic(marker, '');

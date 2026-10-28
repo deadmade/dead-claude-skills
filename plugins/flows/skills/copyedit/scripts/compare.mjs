@@ -2,7 +2,16 @@
 // nothing was lost. `node compare.mjs <saved> <edited> <document>`: prints the lost items and exits 1 (so too when the
 // document no longer matches the saved copy), or copies the edited text over the document in the saved copy's line
 // endings, prints the check's new findings and exits 0. Any other failure exits 2 and leaves the document as it was.
-import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { check, loadTerms, report } from '../../../hooks/prose.mjs';
 
@@ -67,7 +76,6 @@ function items(text) {
     checkboxes: lines.flatMap((l) => /^\s*(?:[-*+]|\d+[.)]) \[([ xX])\]/.exec(l)?.[1].toLowerCase() ?? []).join(''),
     tables: tables.map((t) => `${t.rows}×${t.cols}`),
     quotes: quotes(lines),
-    paragraphs: paragraphs.length,
     words: paragraphs.join(' ').match(WORD)?.length ?? 0,
   };
 }
@@ -125,13 +133,10 @@ export function lost(saved, edited) {
   if (a.checkboxes !== b.checkboxes) out.push(`checkbox steps: ${boxes(b.checkboxes)}, was ${boxes(a.checkboxes)}`);
   if (a.tables.join() !== b.tables.join())
     out.push(`tables (rows×columns): ${b.tables.join(', ') || 'none'}, was ${a.tables.join(', ')}`);
-  // Prose without a number in it is compared by amount: an edit that keeps under 60% of the words or under 75% of
-  // the paragraphs and list items dropped some, or the editor's output was cut short.
+  // Prose without a number in it is compared by amount: an edit that keeps under 60% of the words dropped some, or the
+  // editor's output was cut short. Paragraphs and list items aren't counted: merging them, or turning a list into
+  // prose, is allowed.
   if (b.words * 5 < a.words * 3) out.push(`prose: ${b.words} words, was ${a.words} (an edit keeps at least 60%)`);
-  if (b.paragraphs * 4 < a.paragraphs * 3)
-    out.push(
-      `prose blocks: ${b.paragraphs}, was ${a.paragraphs} (paragraphs and list items; an edit keeps at least 75%)`,
-    );
   return out;
 }
 
@@ -167,11 +172,14 @@ if (import.meta.main ?? process.argv[1] === import.meta.filename) {
       // The saved copy's last newline, or its absence, stays.
       edited = edited.replace(/\n*$/, /\r?\n$/.test(saved) ? '\n' : '');
       const text = report(docPath, newFindings(saved, edited, { file: docPath, terms }));
-      // Written next to the document and renamed over it, so a failed write leaves the document whole.
-      const temp = join(dirname(docPath), `.${basename(docPath)}.${process.pid}.copyedit`);
+      // Written next to the document and renamed over it, so a failed write leaves the document whole. A symlinked
+      // document is edited where it points, and keeps its mode.
+      const real = realpathSync(docPath);
+      const temp = join(dirname(real), `.${basename(real)}.${process.pid}.copyedit`);
       try {
         writeFileSync(temp, saved.includes('\r\n') ? edited.replace(/\n/g, '\r\n') : edited);
-        renameSync(temp, docPath);
+        chmodSync(temp, statSync(real).mode & 0o7777);
+        renameSync(temp, real);
       } catch (err) {
         rmSync(temp, { force: true });
         throw err;

@@ -479,11 +479,13 @@ state.chosen)` runs first (`install.ts:225`); the marker would never be written.
   earlier on its line, instead of requiring the "(" as the fix asked, so an inline list like "1) reads, 2) checks"
   stays an enumerator that a list may replace. "(default = 60)" and "(Task 11)" are now checked. If wrong, an inline
   list inside parentheses counts as numbers, and an edit that turns it into a list is refused.
-- 2026-10-28, self-review fixes: compare.mjs's new floors refuse an edit that keeps under 60% of the prose words or
-  75% of the paragraphs and list items, so merging two paragraphs of a two-paragraph document is refused too, and the
-  document stays as it was. The rewrap probe used for "0 of 92" deleted the blank line before some paragraphs; with
-  that fixed, the stricter compare still refuses 0 of 92 honest rewraps and passes all six stored acceptance edits.
-  If wrong, a short document's honest merge needs a manual edit.
+- 2026-10-28, self-review fixes: compare.mjs refuses an edit that keeps under 60% of the prose words, as the fix
+  asked, but not the asked-for floor of 75% of the paragraphs and list items: the re-review showed it refused
+  merging short paragraphs and turning a list into prose, which the guide allows (2 of the 23 specs and plans when their largest
+  list became prose), while the word floor already catches dropped paragraphs and cut-off output. The rewrap probe
+  used for "0 of 92" deleted the blank line before some paragraphs; with that fixed, the stricter compare still
+  refuses 0 of 92 honest rewraps and passes all six stored acceptance edits. If wrong, an edit that drops a few short
+  paragraphs among many passes compare.mjs and shows only in the diff.
 
 ## Deviations
 

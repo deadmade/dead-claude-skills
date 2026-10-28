@@ -1,7 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  lstatSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { mask } from '../plugins/flows/hooks/prose.mjs';
@@ -133,11 +142,10 @@ test('lost refuses an edit that drops most of the prose', () => {
   for (const eol of EOLS) {
     const out = lost(eol(doc), eol('# T\n\nOne fact here.\n')).join('\n');
     assert.match(out, /prose: 3 words, was 9/);
-    assert.match(out, /prose blocks: 1, was 3/);
   }
 });
 
-test('lost holds the prose to 60% of its words and 75% of its paragraphs and list items', () => {
+test('lost holds the prose to 60% of its words and lets paragraphs and lists merge', () => {
   const doc = [
     '# T',
     '',
@@ -155,12 +163,12 @@ test('lost holds the prose to 60% of its words and 75% of its paragraphs and lis
   ].join('\n');
   for (const eol of EOLS) {
     const check = (edited) => lost(eol(doc), eol(edited)).join('\n');
-    // Four blocks to three is 75%: it passes; to two (merged into one paragraph each) it doesn't.
-    assert.equal(check(doc.replace('\n\nThe last paragraph closes it.', ' The last paragraph closes it.')), '');
+    // Paragraphs and list items merged into one paragraph each keep every word: it passes.
     const merged = doc
       .replace('more or less.\n\n- The first item', 'more or less. The first item')
+      .replace('.\n- The second item', '. The second item')
       .replace('\n\nThe last paragraph closes it.', ' The last paragraph closes it.');
-    assert.match(check(merged), /prose blocks: 2, was 4/);
+    assert.equal(check(merged), '');
     // 30 words: 18 is 60% and passes, 17 doesn't.
     const words = (first) =>
       doc
@@ -256,6 +264,30 @@ test("the CLI keeps the original's final newline", () => {
   assert.equal(run(DOC, edited).doc, DOC.replace('Nothing else.', 'There is nothing else.'));
   assert.equal(run(DOC.trimEnd(), edited + '\n\n').doc, DOC.replace('Nothing else.\n', 'There is nothing else.'));
 });
+
+// Symlinks need a privilege on Windows, and its file modes don't carry the POSIX bits.
+test(
+  'the CLI edits a symlinked document where it points and keeps its mode',
+  { skip: process.platform === 'win32' },
+  () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ce-'));
+    const real = join(dir, 'AGENTS.md');
+    const link = join(dir, 'CLAUDE.md');
+    writeFileSync(join(dir, 'saved.md'), DOC);
+    writeFileSync(real, DOC);
+    chmodSync(real, 0o600);
+    symlinkSync('AGENTS.md', link);
+    const edited = DOC.replace('Nothing else.', 'There is nothing else.');
+    writeFileSync(join(dir, 'edited.txt'), edited);
+    const r = spawnSync(process.execPath, [COMPARE, join(dir, 'saved.md'), join(dir, 'edited.txt'), link], {
+      encoding: 'utf8',
+    });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.ok(lstatSync(link).isSymbolicLink());
+    assert.equal(readFileSync(real, 'utf8'), edited);
+    assert.equal(statSync(real).mode & 0o777, 0o600);
+  },
+);
 
 test('the CLI refuses an edit when the document changed since it was saved, and leaves it', () => {
   const edited = DOC.replace('Nothing else.', 'There is nothing else.');

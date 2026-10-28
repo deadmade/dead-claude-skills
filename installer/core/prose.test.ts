@@ -95,14 +95,14 @@ test('proseWanted: only with flows, so prose ticked without flows asks for no uv
   assert.deepEqual(uv(true), ['uv']);
 });
 
-test('proseUnticked: only a toggle that started on and ends off', () => {
-  assert.equal(proseUnticked({ started: true, toggle: false }), true);
-  assert.equal(proseUnticked({ started: true, toggle: true }), false);
-  assert.equal(proseUnticked({ started: false, toggle: false }), false);
-  assert.equal(proseUnticked({ started: false, toggle: true }), false);
+test('proseUnticked: only a toggle that ends off where its default is on', () => {
+  assert.equal(proseUnticked({ expected: true, toggle: false }), true);
+  assert.equal(proseUnticked({ expected: true, toggle: true }), false);
+  assert.equal(proseUnticked({ expected: false, toggle: false }), false);
+  assert.equal(proseUnticked({ expected: false, toggle: true }), false);
 });
 
-test('proseFollow: ticking flows turns prose to its default, never against the user', () => {
+test('proseFollow: flipping flows sets prose to its default until the user flips prose', () => {
   const F = 'flows@m';
   const base = {
     key: F,
@@ -118,11 +118,30 @@ test('proseFollow: ticking flows turns prose to its default, never against the u
   assert.equal(proseFollow({ ...base, optedOut: true }), false, 'the opt-out marker holds');
   assert.equal(proseFollow({ ...base, offered: false }), false, 'not offered here');
   assert.equal(proseFollow({ ...base, key: 'dcg' }), false, 'another row');
-  assert.equal(proseFollow({ ...base, chosen: { [F]: false, prose: false } }), false, 'unticking flows');
-  assert.equal(proseFollow({ ...base, chosen: { [F]: false, prose: true } }), true, 'unticking flows keeps prose');
+  assert.equal(proseFollow({ ...base, chosen: { [F]: false, prose: true } }), false, 'unticking flows unticks prose');
   assert.equal(
-    proseFollow({ ...base, optedOut: true, chosen: { [F]: true, prose: true } }),
+    proseFollow({ ...base, installed: true, chosen: { [F]: false, prose: true } }),
     true,
-    'never turns it off',
+    'unless it is installed: the step then removes it',
   );
+  assert.equal(
+    proseFollow({ ...base, touched: { [F]: true, prose: true }, chosen: { [F]: false, prose: true } }),
+    true,
+    'a prose the user ticked stays',
+  );
+});
+
+test('unticking prose after ticking flows on the screens counts as unticked', () => {
+  const F = 'flows@m';
+  const state = { installed: false, optedOut: false, offered: true };
+  const followed = proseFollow({
+    key: F,
+    flows: F,
+    chosen: { [F]: true, prose: false },
+    touched: { [F]: true },
+    ...state,
+  });
+  assert.equal(followed, true);
+  const expected = proseDefault({ ...state, flows: true });
+  assert.equal(proseUnticked({ expected, toggle: false }), true);
 });

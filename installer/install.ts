@@ -158,7 +158,7 @@ const chosen: Record<string, boolean> = {
     ? current['web-builtins-off']
     : unavailable('web-builtins-off', process.platform, process.arch, VERSION, nixos) === undefined,
 };
-// On by default with flows where offered, until the user unticks it once (the flows-prose.off marker). Ticking flows
+// On by default with flows where offered, until the user unticks it once (the flows-prose.off marker). Flipping flows
 // on the screens sets it the same way (data.follow).
 const proseStart = {
   ...prose,
@@ -295,7 +295,11 @@ if (browser.path) await configureAgentBrowser(browser.path);
 if (clean) done.push(...clearTargets(CONFIG));
 // The global instructions moved into a dead-skills SessionStart hook; the old file would duplicate them.
 remove(RULES, RULES);
-await applyProse({ toggle: on('prose'), flows: selected.includes(FLOWS), started: started.prose });
+await applyProse({
+  toggle: on('prose'),
+  flows: selected.includes(FLOWS),
+  expected: proseDefault({ ...proseStart, flows: selected.includes(FLOWS) }),
+});
 
 // prose needs uv only with flows: without it the step sets nothing up.
 const wanted = [

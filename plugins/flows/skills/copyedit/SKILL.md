@@ -67,7 +67,8 @@ The editor writes a `.txt` file because subagents may not be allowed to write Ma
 node "${CLAUDE_SKILL_DIR}/../copyedit/scripts/compare.mjs" "<run folder>/saved.md" "<run folder>/edited.txt" "<document>"
 ```
 
-- **Exit 1:** it printed what the edit lost, one item per line. Show those lines and stop. The document is unchanged.
+- **Exit 1:** it printed what the edit lost, one item per line, or that the document changed since step 1 saved it.
+  Show those lines and stop. The document is unchanged.
 - **Exit 2:** it failed for another reason and printed it. Show that line and stop. The document is unchanged.
 - **Exit 0:** it copied the edit over the document, in the document's own line endings, and printed the write-time
   check's findings that the saved version didn't have. Show:
@@ -77,7 +78,7 @@ node "${CLAUDE_SKILL_DIR}/../copyedit/scripts/compare.mjs" "<run folder>/saved.m
   - the new findings, if any, for whoever owns the document to fix;
   - the measures before and after: run step 2's command again, with the same timeout and `"<run folder>/after/"` as its last argument,
     show its skip line if it printed one, and show `before/totals.json` and `after/totals.json` as one table, a row
-    per figure with its before and after values.
+    per figure with its before and after values. If either run exited 2, show its line instead of the table.
 
 Don't commit. Whoever ran `/copyedit` decides what to keep; the saved copy stays in the run folder until the next run
 on the same document.

@@ -51,11 +51,12 @@ export const proseDefault = ({
 // Whether the environment is wanted: prose is set up only with flows. flows: flows is selected after the screens.
 export const proseWanted = ({ toggle, flows }: { toggle: boolean; flows: boolean }) => toggle && flows;
 
-// The user unticked the toggle in this run: it was on when the screens opened (started) and is off after them.
-export const proseUnticked = ({ started, toggle }: { started: boolean; toggle: boolean }) => started && !toggle;
+// The user unticked the toggle: it is off after the screens where its default (expected: proseDefault with flows as
+// selected after them) is on. A toggle the user didn't flip ends at that default, so only theirs counts.
+export const proseUnticked = ({ expected, toggle }: { expected: boolean; toggle: boolean }) => expected && !toggle;
 
-// The prose toggle after the user flips row key on the screens (flows: flows' row key). Ticking flows sets it to its
-// default with flows, unless the user unticked it in this run (touched: the rows they flipped); it never turns it off.
+// The prose toggle after the user flips row key on the screens (flows: flows' row key). Until the user flips prose
+// itself (touched: the rows they flipped), flipping flows sets it to its default with flows as now ticked.
 export const proseFollow = ({
   key,
   flows,
@@ -70,7 +71,7 @@ export const proseFollow = ({
   installed: boolean;
   optedOut: boolean;
   offered: boolean;
-}) => !!chosen.prose || (key === flows && !!chosen[flows] && !touched.prose && proseDefault({ ...state, flows: true }));
+}) => (key === flows && !touched.prose ? proseDefault({ ...state, flows: !!chosen[flows] }) : !!chosen.prose);
 
 export type ProseDecision = 'remove' | 'sync' | 'needs-flows' | 'none';
 
