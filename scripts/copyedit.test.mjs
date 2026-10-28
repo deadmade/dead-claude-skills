@@ -304,3 +304,93 @@ test('formatCandidates sorts by line', () => {
   );
   assert.equal(formatCandidates([]), '');
 });
+
+const MEASURE_PY = join(import.meta.dirname, '../plugins/flows/skills/copyedit/scripts/measure.py');
+const SPACY_KINDS = [
+  'nominalization',
+  'passive',
+  'abstract subject',
+  'no link to the previous sentence',
+  'long opener',
+  'long subject',
+  'subject-verb gap',
+  'list in a sentence',
+];
+
+test(
+  'measure.py finds the tested kinds',
+  { skip: !process.env.FLOWS_PROSE_PYTHON && 'FLOWS_PROSE_PYTHON is not set' },
+  () => {
+    const sample = readFileSync(join(import.meta.dirname, 'fixtures/prose-sample.md'), 'utf8');
+    const lines = sample.split('\n');
+    // The kind each marker names, on the first line of text after it.
+    const expected = [];
+    lines.forEach((line, i) => {
+      const kind = /^<!-- expect: (.+) -->$/.exec(line)?.[1];
+      if (!kind) return;
+      let at = i + 1;
+      while (!lines[at].trim()) at++;
+      expected.push({ line: at + 1, kind });
+    });
+    assert.deepEqual(expected.map((e) => e.kind).sort(), [...SPACY_KINDS].sort());
+    const fence = [lines.indexOf('```text') + 1, lines.indexOf('```', lines.indexOf('```text') + 1) + 1];
+
+    const results = EOLS.map((eol) => {
+      const run = spawnSync(process.env.FLOWS_PROSE_PYTHON, [MEASURE_PY], {
+        input: mask(eol(sample), { code: 'X' }),
+        encoding: 'utf8',
+        timeout: 300000,
+      });
+      assert.equal(run.status, 0, run.stderr);
+      return JSON.parse(run.stdout);
+    });
+    const [{ candidates, totals }] = results;
+    for (const { line, kind } of expected)
+      assert.equal(
+        candidates.filter((c) => c.line === line && c.kind === kind).length,
+        1,
+        `one ${kind} on line ${line}: ${JSON.stringify(candidates.filter((c) => c.line === line))}`,
+      );
+    for (const c of candidates) {
+      assert.deepEqual(Object.keys(c).sort(), ['kind', 'line', 'note', 'text']);
+      assert.ok(SPACY_KINDS.includes(c.kind), c.kind);
+      assert.ok(c.line < fence[0] || c.line > fence[1], `candidate in the fenced block: ${JSON.stringify(c)}`);
+    }
+    assert.ok(
+      candidates.some((c) => c.kind === 'passive' && c.text === 'were fetched' && c.note === 'no agent: who fetches?'),
+      'the passive names its verb',
+    );
+    assert.deepEqual(Object.keys(totals).sort(), [
+      '% abstract subjects',
+      '% adjacent sentences sharing a content word',
+      '% lists in a sentence',
+      '% long openers (over 8 words)',
+      '% long subjects (over 7 words)',
+      '% passive sentences',
+      '% sentences with no link to the previous sentence',
+      '% subject-verb gaps (over 4 words)',
+      'nominalizations per 100 words',
+      'sentences',
+      'words',
+    ]);
+    assert.ok(totals.words > 100 && totals.sentences > 8, JSON.stringify(totals));
+    assert.deepEqual(results[1], results[0], 'CRLF text gives the same result');
+  },
+);
+
+test(
+  "measure.py exits 1 on input that isn't UTF-8 and 3 with one line when spaCy can't load",
+  { skip: !process.env.FLOWS_PROSE_PYTHON && 'FLOWS_PROSE_PYTHON is not set' },
+  () => {
+    const bad = spawnSync(process.env.FLOWS_PROSE_PYTHON, [MEASURE_PY], { input: Buffer.from([0xff, 0xfe, 0x41]) });
+    assert.equal(bad.status, 1);
+    // -S leaves out site-packages, so spaCy can't import.
+    const unloaded = spawnSync(process.env.FLOWS_PROSE_PYTHON, ['-S', MEASURE_PY], {
+      input: 'Text.',
+      encoding: 'utf8',
+    });
+    assert.equal(unloaded.status, 3);
+    assert.match(unloaded.stderr, /^measure\.py: can't load spaCy's en_core_web_trf: .+\n$/);
+    assert.equal(unloaded.stdout, '');
+  },
+);

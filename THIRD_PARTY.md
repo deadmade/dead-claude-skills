@@ -134,6 +134,22 @@ form, each row naming its source:
 - Strunk, _The Elements of Style_ (1920, public domain, [Project Gutenberg #37134](https://www.gutenberg.org/ebooks/37134)):
   rules 11 and 13.
 
+## copyedit's spaCy environment (installer)
+
+`installer/assets/prose/` pins, in a uv project and its `uv.lock`, the Python environment that `/copyedit`'s
+`plugins/flows/skills/copyedit/scripts/measure.py` runs in. Nothing in it is vendored: uv downloads it at install time
+into the user's Claude config folder:
+
+- CPython 3.13, a uv-managed build ([python-build-standalone](https://github.com/astral-sh/python-build-standalone)),
+  under the Python Software Foundation License.
+- [spaCy](https://github.com/explosion/spaCy) 3.8 (MIT License, Copyright (C) 2016-2024 ExplosionAI GmbH, 2016 spaCy
+  GmbH, 2015 Matthew Honnibal).
+- [`en_core_web_trf`](https://github.com/explosion/spacy-models) 3.8.0, spaCy's English transformer pipeline (MIT
+  License, Copyright 2021 ExplosionAI GmbH; the wheel's `LICENSES_SOURCES` lists the training corpora it credits).
+- [PyTorch](https://github.com/pytorch/pytorch), CPU build (BSD-3-Clause, Copyright (c) Facebook, Inc. and its
+  contributors, with bundled third-party code under its own licenses).
+- Their dependencies, each under its own license.
+
 ## ponytail
 
 `plugins/flows/packs/ponytail/` is vendored from [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) (MIT

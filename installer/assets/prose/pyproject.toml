@@ -1,0 +1,18 @@
+[project]
+name = "flows-prose"
+version = "0"
+requires-python = "==3.13.*"
+dependencies = ["spacy>=3.8,<3.9", "en_core_web_trf", "torch"]
+
+[tool.uv]
+package = false
+environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'", "sys_platform == 'win32' and platform_machine == 'AMD64'"]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+en_core_web_trf = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_trf-3.8.0/en_core_web_trf-3.8.0-py3-none-any.whl" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
