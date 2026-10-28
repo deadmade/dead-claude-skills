@@ -40,7 +40,8 @@ one at a time, with a recommendation each. More: the design isn't done; offer `/
 ## Phase 2: Plan
 
 - **A plan** (tasks with steps): check it against the code from Phase 1; stale paths or names are fixed in place. A
-  task without a **Files** list gets one written before the Gate.
+  task without a **Files** list gets one written before the Gate. Every task also gets, right below its heading,
+  `**Does:** <one plain sentence for a reader who doesn't know the code>` and `**Depends on:** Task <n>, … | none`.
 - **A spec or ticket:** follow superpowers `writing-plans` on it. For a spec too big for one branch, first offer
   mattpocock `to-tickets` and plan only the first ticket.
 
@@ -48,7 +49,7 @@ Either way, each seam answer from Phase 1 goes verbatim into the plan's **Global
 
 **Gate:** read back the Global Constraints and each task's **Files** list (the deviation contract), then the user
 approves the plan and picks the execution method (subagent-driven, or native = `executing-plans`), with your
-recommendation. Record both.
+recommendation. Record both as flow.md gate lines (`- Gate 1, <what>: <date>`).
 
 ## Phase 3: Execute
 

@@ -9,6 +9,7 @@ with the title and `flow:` filled in. Keep the frontmatter first. The conductor 
 ---
 flow: implement | fix | upgrade
 phase: <first phase>
+now: <one plain sentence: where the run stands and what comes next>
 ---
 
 # <Title>: flow
@@ -23,11 +24,19 @@ phase: <first phase>
 
 ## Gates
 
+<!-- One line per gate: `- Gate <n>, <what>: <date>[, <extra>]`. The date stays empty while the gate is open; a
+reopening is appended as `Reopened <date>: <why>`. A plan gate adds `, execution: subagent-driven | native`. -->
+
 ## Skipped
 
 ## Findings
 
 <!-- What grounding found: file:line, root cause, breaking changes. -->
+
+## Options
+
+<!-- One `### <decision>` heading per decision, then `Picked: <the choice in plain words>`; below it, the options
+offered and the recommendation. -->
 
 ## Tasks
 
@@ -40,8 +49,8 @@ phase: <first phase>
 
 ## Deviations
 
-<!-- Decisions that go to the user: what, why the plan doesn't hold, options with a recommendation, the
-user's decision. -->
+<!-- Decisions that go to the user, one per `### <deviation>` heading, then `Status: open` or
+`Status: decided <date>: <what>`; below it, why the plan doesn't hold and the options with a recommendation. -->
 
 ## Verify
 

@@ -117,6 +117,45 @@ export function checkOverrides(root) {
   return problems;
 }
 
+// The parts of flow.md, plans and audit reports the flow cockpit reads: each must stay in the templates and the
+// conductor text that make a run write them.
+const TEMPLATE_FILES = [
+  `${FLOWS}/skills/feature-flow/references/flow-template.md`,
+  `${FLOWS}/skills/research-flow/references/research-template.md`,
+  `${FLOWS}/references/build-template.md`,
+];
+const RULES_FILE = `${FLOWS}/references/flow-rules.md`;
+const PLAN_FILES = ['feature-flow', 'implement', 'upgrade'].map((n) => `${FLOWS}/skills/${n}/SKILL.md`);
+const GATE_LINE = '- Gate <n>, <what>:';
+export function checkTemplates(root) {
+  const problems = [];
+  const need = (file, parts) => {
+    const text = readFileSync(join(root, file), 'utf8').replace(/\r\n/g, '\n');
+    for (const [what, has] of parts)
+      if (!(typeof has === 'string' ? text.includes(has) : has.test(text))) problems.push(`${file}: lacks ${what}`);
+  };
+  for (const file of TEMPLATE_FILES)
+    need(file, [
+      ['`now:` after `phase:` in the frontmatter', /\nphase: [^\n]*\nnow: /],
+      [`the gate line shape \`${GATE_LINE}\``, GATE_LINE],
+      ['`Picked:`', 'Picked:'],
+      ['`Status:`', 'Status: open'],
+    ]);
+  need(RULES_FILE, [
+    ['the `Waiting for you` rule', 'Waiting for you'],
+    [`the gate line shape \`${GATE_LINE}\``, GATE_LINE],
+    ['`Status: decided`', 'Status: decided'],
+    ['`Picks:`', 'Picks:'],
+    ['`Fixed <date>`', 'Fixed <date>'],
+  ]);
+  for (const file of PLAN_FILES)
+    need(file, [
+      ['`**Does:**`', '**Does:**'],
+      ['`**Depends on:**`', '**Depends on:**'],
+    ]);
+  return problems;
+}
+
 // Every `<packs>/…` or `${CLAUDE_PLUGIN_ROOT}/packs/…` path a conductor names must exist. A path ends at whitespace,
 // a backtick, a quote or a bracket; one with a placeholder (`<pack>`, `…`, `*`) is skipped.
 // shortcut: bare names (`references/x.md`) and paths broken across a line aren't seen; name the full pack path instead.

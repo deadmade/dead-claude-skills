@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import {
   checkOverrides,
   checkPackPaths,
+  checkTemplates,
   checkUses,
   expectedDeps,
   FLOWS,
@@ -60,7 +61,12 @@ for (const dir of pluginDirs) {
 }
 
 // --- flows: each conductor's uses.json, and what is generated from them (scripts/flows-uses.mjs) ---
-problems.push(...checkUses('.', { plugins: market }), ...checkOverrides('.'), ...checkPackPaths('.'));
+problems.push(
+  ...checkUses('.', { plugins: market }),
+  ...checkOverrides('.'),
+  ...checkPackPaths('.'),
+  ...checkTemplates('.'),
+);
 const uses = readUses('.');
 const flowsManifest = `${FLOWS}/.claude-plugin/plugin.json`;
 const regen = 'run node scripts/flows-uses.mjs';

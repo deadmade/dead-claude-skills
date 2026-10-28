@@ -14,8 +14,13 @@ sentence, so an upstream change to an overridden or pasted rule is noticed at it
 upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it after every phase, with links to every
   artifact. It is how the next session resumes. feature-flow and research-flow have their own templates; the others
   use [build-template.md](build-template.md).
-- A flow.md started before the **Tasks** and **Rulings** sections or the **Run verdict** line existed gets them added
-  when it is resumed; none is required of it.
+- **`now:`** (frontmatter, one plain sentence) says where the run stands and what comes next. Rewrite it after every
+  phase and at every stop where you wait for the user; at such a stop it starts with `Waiting for you`, which is what
+  the flow cockpit reads as the run's status. A conductor called inline writes into its caller's `now:`.
+- A flow.md started before the **Tasks** and **Rulings** sections, the **Run verdict** line or `now:` existed gets
+  them added when it is resumed; none is required of it.
+- The user reads specs, plans and flow.md in the flow cockpit, which draws Mermaid: use a diagram where it explains
+  something better than prose; never required.
 - **Audits** (`/test-audit`, `/doc-audit`, `/harden`) write `docs/audits/<YYYY-MM-DD>-<flow>-<scope>.md`: the scope
   line, the findings table, the user's pick per finding, and what was fixed.
 - `/verify`, `/understand` and `/learn` keep no state file of their own; called from a build flow, they write their
@@ -34,7 +39,9 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
   <!-- overrides superpowers/skills/executing-plans/SKILL.md: "Use superpowers:finishing-a-development-branch." -->
   <!-- overrides superpowers/skills/subagent-driven-development/references/final-review.md: "Use superpowers:finishing-a-development-branch." -->
 - **Gates:** a gate passes only on the user's explicit approval of the artifact it names, recorded with the date in
-  the state file. "Sounds good" to an idea isn't approval of a document. Nothing past a gate starts before it passes.
+  the state file as a line `- Gate <n>, <what>: <date>[, <extra>]`, the date empty while the gate is open; a
+  reopening is appended as `Reopened <date>: <why>`. "Sounds good" to an idea isn't approval of a document. Nothing
+  past a gate starts before it passes.
 - The user may skip a phase by saying so ("skip grilling"); record it. Never skip one on your own, and never skip a
   gate.
 - Options always come with a recommendation and its reason.
@@ -44,11 +51,11 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
   task's files aren't deviations. This holds in every build flow (`/feature-flow`, `/research-flow`, `/implement`,
   `/fix-flow`, `/upgrade`) and in `/harden`'s fixes.
   - **The fifth stop.** A deviation is never ruled on, by the coordinating session or by a subagent. The coordinating
-    session writes it under **Deviations** in flow.md (what, why the plan doesn't hold, options with a
-    recommendation) and asks the user with AskUserQuestion; the build waits for the answer. A decision that changes
+    session writes it under **Deviations** in flow.md as `### <deviation>` with `Status: open` (then what, why the plan
+    doesn't hold, options with a recommendation), sets `now:` to `Waiting for you: …`, and asks the user with AskUserQuestion; the build waits for the answer. A decision that changes
     the plan needs the user's approval of that change before work continues. Only the main session can ask: a
     subagent that meets a deviation stops and reports `NEEDS_CONTEXT` with the decision, the options and its
-    recommendation, and the coordinating session asks. This is a fifth stop next to the four that
+    recommendation, and the coordinating session asks. The answer is recorded as `Status: decided <date>: <what>`. This is a fifth stop next to the four that
     `subagent-driven-development` and `executing-plans` name. For deviations it overrides their continuous execution
     and their rulings, and a plan correction that is a deviation goes to the user too.
     <!-- overrides superpowers/skills/subagent-driven-development/SKILL.md: "Continuous execution: Do not pause to check in with your human partner between tasks." -->
@@ -139,7 +146,8 @@ review).
     marketplace: the folder the plugin's marketplace `source` names, then `skills/<name>/SKILL.md`)
   - a conductor of this plugin: `${CLAUDE_SKILL_DIR}/../<name>/SKILL.md`
 - **Calling another conductor** (`/fix-flow` → `/verify`): read its SKILL.md and run it inline. Skip its start and
-  resume step (the caller hands it the input), keep its gates, then return to the caller's next phase.
+  resume step (the caller hands it the input), keep its gates, then return to the caller's next phase. Its `now:`
+  goes into the caller's flow.md.
 
 ## ponytail at chosen steps
 
@@ -217,4 +225,5 @@ One ranked table, most severe first:
 
 Every finding has evidence produced in this run: a command and its output, a quote with its line, a failing test.
 Nothing from memory. Then the user picks by number (`1,3`, `all high`, `none`). Fix only those, then re-run the check
-that found each one and show it passes. Record picks and results in the report file.
+that found each one and show it passes. Record picks and results in the report file as `Picks: <finding numbers> |
+none`, then one line `Fixed <date>: <number>` per pick once its check passes.

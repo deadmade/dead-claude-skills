@@ -11,6 +11,7 @@ frontmatter first.
 ---
 flow: research
 phase: ground
+now: <one plain sentence: where the run stands and what comes next>
 ---
 
 # <Feature>: research flow
@@ -28,8 +29,11 @@ phase: ground
 
 ## Gates
 
+<!-- One line per gate: `- Gate <n>, <what>: <date>[, <extra>]`. The date stays empty while the gate is open; a
+reopening is appended as `Reopened <date>: <why>`. A plan gate adds `, execution: subagent-driven | native`. -->
+
 - Gate 1, spec and hypothesis approved:
-- Gate 2, plan approved: <date>, execution: subagent-driven | native
+- Gate 2, plan approved:
 
 ## Skipped
 
@@ -49,7 +53,8 @@ phase: ground
 
 ## Options
 
-<!-- Each decision: options offered, evidence rows, recommendation, what the user picked. -->
+<!-- One `### <decision>` heading per decision, then `Picked: <the choice in plain words>`; below it, the options
+offered, the evidence rows and the recommendation. -->
 
 ## Hypothesis
 
@@ -70,8 +75,8 @@ phase: ground
 
 ## Deviations
 
-<!-- Decisions that go to the user: what, why the plan doesn't hold, options with a recommendation, the
-user's decision. -->
+<!-- Decisions that go to the user, one per `### <deviation>` heading, then `Status: open` or
+`Status: decided <date>: <what>`; below it, why the plan doesn't hold and the options with a recommendation. -->
 
 ## Results
 

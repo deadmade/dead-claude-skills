@@ -25,7 +25,7 @@ Claude proposes and recommends; the user decides.
 [flow-rules.md](../../references/flow-rules.md) applies: read it first. Packs: `${CLAUDE_PLUGIN_ROOT}/packs` (pstack,
 mattpocock and tob are its `-picks` folders). Only this differs:
 
-- After every phase update `docs/features/<slug>/flow.md` (`flow: feature`, `phase:`).
+- After every phase update `docs/features/<slug>/flow.md` (`flow: feature`, `phase:`, `now:`).
 - Nothing is planned before Gate 1 and nothing is built before Gate 2.
 - Every claim about another project or a library cites a source fetched in this session (rules in
   [references/prior-art.md](references/prior-art.md)).
@@ -67,7 +67,8 @@ doesn't need to offer recon of the codebase, and the web recon is already runnin
 - **Options.** Brainstorming wants the user describing before seeing options; keep that. Once the "how it gets made"
   question comes up, present the approaches from the prior-art report: per option, the shape in two lines, who does
   it this way (links), trade-offs for _this_ codebase, rough effort. End with your recommendation and why. The user
-  picks; record the choice and the rejected options in flow.md under **Options**.
+  picks; record the choice and the rejected options in flow.md under **Options**, one `### <decision>` with
+  `Picked: <the choice in plain words>`.
 - **Seams.** Read mattpocock `codebase-design` and pstack `principle-redesign-from-first-principles` and
   `principle-boundary-discipline`. For each cross-cutting concern the feature adds (who the caller is, a tenant, a
   permission, a setting), the approaches message names the seam where it is resolved and the modules that never see
@@ -106,7 +107,8 @@ approve the spec. Record it.
 ## Phase 4: Plan
 
 Follow superpowers `writing-plans` on the approved spec. Copy each seam line from the spec verbatim into the plan's
-**Global Constraints**. Let it run its own self-review. When it reaches its **Execution Handoff**, don't ask for an
+**Global Constraints**. Every task gets, right below its heading, `**Does:** <one plain sentence for a reader who
+doesn't know the code>` and `**Depends on:** Task <n>, … | none`. Let it run its own self-review. When it reaches its **Execution Handoff**, don't ask for an
 execution method yet and don't invoke an execution skill: link the plan in flow.md and go to Phase 5.
 <!-- overrides superpowers/skills/writing-plans/SKILL.md: "Otherwise, ask them to review the plan and choose an execution method before implementation." -->
 

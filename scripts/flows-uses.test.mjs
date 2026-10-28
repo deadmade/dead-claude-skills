@@ -1,11 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import {
   checkOverrides,
   checkPackPaths,
+  checkTemplates,
   checkUses,
   expectedDeps,
   packs,
@@ -167,3 +168,65 @@ test('checkPackPaths: a missing path fails, naming file and line', () => {
     'plugins/flows/skills/fix/SKILL.md:2: <packs>/q/x.md does not exist',
   ]);
 });
+
+// checkTemplates: the parts the flow cockpit reads must stay in the templates and the conductor text.
+const TEMPLATES = [
+  'plugins/flows/skills/feature-flow/references/flow-template.md',
+  'plugins/flows/skills/research-flow/references/research-template.md',
+  'plugins/flows/references/build-template.md',
+];
+const RULES = 'plugins/flows/references/flow-rules.md';
+const PLANNERS = ['feature-flow', 'implement', 'upgrade'].map((n) => `plugins/flows/skills/${n}/SKILL.md`);
+
+// A copy of the real files with `needle` taken out of `file`.
+function without(file, needle) {
+  const fx = mkdtempSync(join(tmpdir(), 'ct-'));
+  for (const f of [...TEMPLATES, RULES, ...PLANNERS]) {
+    mkdirSync(dirname(join(fx, f)), { recursive: true });
+    cpSync(join(ROOT, f), join(fx, f));
+  }
+  const text = readFileSync(join(fx, file), 'utf8');
+  assert.ok(text.includes(needle), `${file} has ${needle}`);
+  writeFileSync(join(fx, file), text.split(needle).join('<removed>'));
+  return checkTemplates(fx);
+}
+
+test('checkTemplates on the real repo returns []', () => {
+  assert.deepEqual(checkTemplates(ROOT), []);
+});
+
+for (const t of TEMPLATES) {
+  for (const [what, needle] of [
+    ['now:', 'now: <'],
+    ['the Gates line shape', '- Gate <n>, <what>:'],
+    ['Picked:', 'Picked:'],
+    ['Status:', 'Status: open'],
+  ]) {
+    test(`checkTemplates names ${t} without ${what}`, () => {
+      const problems = without(t, needle);
+      assert.equal(problems.length, 1, problems.join('\n'));
+      assert.ok(problems[0].startsWith(t), problems[0]);
+    });
+  }
+}
+
+for (const [what, needle] of [
+  ['the Waiting for you rule', 'Waiting for you'],
+  ['Picks:', 'Picks:'],
+  ['Fixed', 'Fixed <date>'],
+]) {
+  test(`checkTemplates names flow-rules without ${what}`, () => {
+    const problems = without(RULES, needle);
+    assert.ok(problems.length >= 1 && problems.every((p) => p.startsWith(RULES)), problems.join('\n'));
+  });
+}
+
+for (const f of PLANNERS) {
+  for (const needle of ['**Does:**', '**Depends on:**']) {
+    test(`checkTemplates names ${f} without ${needle}`, () => {
+      const problems = without(f, needle);
+      assert.equal(problems.length, 1, problems.join('\n'));
+      assert.ok(problems[0].startsWith(f) && problems[0].includes(needle), problems[0]);
+    });
+  }
+}
