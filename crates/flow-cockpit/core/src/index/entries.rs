@@ -24,7 +24,9 @@ use crate::doc::{
 const LOOSE_SECS: i64 = 7 * 24 * 3600;
 /// A transcript's head is read for its cwd and first prompt: at most this many lines and bytes.
 const HEAD_LINES: usize = 40;
-const HEAD_BYTES: u64 = 1024 * 1024;
+const HEAD_BYTES: u64 = 8 * 1024 * 1024;
+/// A head line longer than this is skipped.
+const MAX_LINE: u64 = 1024 * 1024;
 const PROMPT_CHARS: usize = 200;
 const AUDIT_CONDUCTORS: [&str; 3] = ["test-audit", "doc-audit", "harden"];
 
@@ -129,21 +131,59 @@ pub(crate) fn mtime(path: &Path) -> Option<Timestamp> {
         .map(timestamp)
 }
 
-/// The session's working directory (the first `cwd` in its first 40 lines), start time and first prompt.
+/// Reads and drops the rest of the current line; returns how many bytes that was.
+fn skip_line(reader: &mut BufReader<File>) -> u64 {
+    let mut skipped = 0;
+    loop {
+        let Ok(buf) = reader.fill_buf() else {
+            return skipped;
+        };
+        if buf.is_empty() {
+            return skipped;
+        }
+        let (used, done) = buf
+            .iter()
+            .position(|&b| b == b'\n')
+            .map_or((buf.len(), false), |i| (i + 1, true));
+        reader.consume(used);
+        skipped += used as u64;
+        if done {
+            return skipped;
+        }
+    }
+}
+
+/// The session's working directory (the first `cwd` in its first 40 lines), start time and first prompt. A line over
+/// 1 MiB is skipped, and the read stops once it has a `cwd` and a user entry or has gone through 8 MiB.
 pub(crate) fn read_head(path: &Path) -> Option<Head> {
     let file = File::open(path).ok()?;
-    let mut reader = BufReader::new(file.take(HEAD_BYTES));
-    let mut main = Vec::new();
+    let mut reader = BufReader::new(file);
+    let mut main: Vec<Value> = Vec::new();
     let mut line = Vec::new();
+    let (mut spent, mut has_cwd, mut has_prompt) = (0, false, false);
     for _ in 0..HEAD_LINES {
         line.clear();
-        if reader.read_until(b'\n', &mut line).ok()? == 0 {
+        let n = (&mut reader)
+            .take(MAX_LINE)
+            .read_until(b'\n', &mut line)
+            .ok()?;
+        if n == 0 {
             break;
         }
-        if let Ok(entry) = serde_json::from_slice::<Value>(&line)
+        spent += n as u64;
+        if !line.ends_with(b"\n") && n as u64 == MAX_LINE {
+            // A line over the cap (a pasted image): skip the rest of it and go on with the next.
+            spent += skip_line(&mut reader);
+        } else if let Ok(entry) = serde_json::from_slice::<Value>(&line)
             && entry.is_object()
         {
+            has_cwd |= entry.get("cwd").is_some();
+            has_prompt |= entry.get("type").and_then(Value::as_str) == Some("user")
+                && entry.get("isMeta").and_then(Value::as_bool) != Some(true);
             main.push(entry);
+        }
+        if (has_cwd && has_prompt) || spent >= HEAD_BYTES {
+            break;
         }
     }
     let first = |key: &str| {
@@ -403,4 +443,26 @@ pub(crate) fn derive(
         }))
         .collect();
     Derived { entries, linked }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn long_first_line_does_not_hide_the_cwd() {
+        let path =
+            std::env::temp_dir().join(format!("flow-cockpit-head-{}.jsonl", std::process::id()));
+        let image = "A".repeat(2 * 1024 * 1024);
+        let text = format!(
+            "{{\"type\":\"user\",\"message\":{{\"role\":\"user\",\"content\":[{{\"type\":\"image\",\"data\":\"{image}\"}}]}}}}\n\
+             {{\"type\":\"user\",\"message\":{{\"role\":\"user\",\"content\":\"Hello\"}},\"timestamp\":\"2026-01-01T00:00:00Z\",\"cwd\":\"/x/y\"}}\n"
+        );
+        fs::write(&path, text).unwrap();
+        let head = read_head(&path);
+        fs::remove_file(&path).ok();
+        let head = head.unwrap();
+        assert_eq!(head.cwd, Path::new("/x/y"));
+        assert_eq!(head.first_prompt.as_deref(), Some("Hello"));
+    }
 }

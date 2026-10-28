@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeSet, HashMap};
 use std::fs::{self, File};
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
@@ -20,7 +20,9 @@ pub struct LinkCache {
 struct Cached {
     size: u64,
     mtime: Option<SystemTime>,
-    slugs: Vec<String>,
+    /// Just after the last line that ended in a newline: a scan of a grown file starts here.
+    offset: u64,
+    slugs: BTreeSet<String>,
 }
 
 impl LinkCache {
@@ -30,46 +32,61 @@ impl LinkCache {
         self.bytes_read
     }
 
-    /// The flow slugs the transcript at `path` edited or wrote, from the cache when the file is unchanged.
+    /// The flow slugs the transcript at `path` edited or wrote, from the cache when the file is unchanged. A file that
+    /// grew (its mtime not moved back) is read from where the last scan stopped; one that shrank, in full.
     pub(crate) fn slugs(&mut self, path: &Path) -> Vec<String> {
         let Ok(meta) = fs::metadata(path) else {
             self.files.remove(path);
             return Vec::new();
         };
         let (size, mtime) = (meta.len(), meta.modified().ok());
-        if let Some(hit) = self.files.get(path)
-            && hit.size == size
-            && hit.mtime == mtime
-        {
-            return hit.slugs.clone();
+        let (mut start, mut slugs) = (0, BTreeSet::new());
+        if let Some(hit) = self.files.get(path) {
+            if hit.size == size && hit.mtime == mtime {
+                return hit.slugs.iter().cloned().collect();
+            }
+            if size >= hit.offset && mtime >= hit.mtime {
+                start = hit.offset;
+                slugs.clone_from(&hit.slugs);
+            }
         }
-        let slugs = scan(path, &mut self.bytes_read);
+        let offset = scan(path, start, &mut slugs, &mut self.bytes_read);
+        let out = slugs.iter().cloned().collect();
         self.files.insert(
             path.to_path_buf(),
             Cached {
                 size,
                 mtime,
-                slugs: slugs.clone(),
+                offset,
+                slugs,
             },
         );
-        slugs
+        out
     }
 }
 
-/// Reads the file line by line. Only a line that names `flow.md` is parsed; a line cut short at the end of a file still
-/// being written does not parse and is skipped.
-fn scan(path: &Path, bytes_read: &mut u64) -> Vec<String> {
-    let Ok(file) = File::open(path) else {
-        return Vec::new();
+/// Reads the file from `start` line by line into `slugs` and returns the offset after its last complete line. Only a
+/// line that names `flow.md` is parsed; a line cut short at the end of a file still being written does not parse, and
+/// the next scan reads it again.
+fn scan(path: &Path, start: u64, slugs: &mut BTreeSet<String>, bytes_read: &mut u64) -> u64 {
+    let Ok(mut file) = File::open(path) else {
+        return start;
     };
+    if file.seek(SeekFrom::Start(start)).is_err() {
+        return start;
+    }
     let mut reader = BufReader::with_capacity(256 * 1024, file);
-    let mut slugs = BTreeSet::new();
+    let mut offset = start;
     let mut line = Vec::new();
     loop {
         line.clear();
-        match reader.read_until(b'\n', &mut line) {
+        let n = match reader.read_until(b'\n', &mut line) {
             Ok(0) | Err(_) => break,
-            Ok(n) => *bytes_read += n as u64,
+            Ok(n) => n as u64,
+        };
+        *bytes_read += n;
+        if line.ends_with(b"\n") {
+            offset += n;
         }
         if !contains(&line, b"flow.md") {
             continue;
@@ -78,7 +95,7 @@ fn scan(path: &Path, bytes_read: &mut u64) -> Vec<String> {
             slugs.extend(edited_slugs(&entry));
         }
     }
-    slugs.into_iter().collect()
+    offset
 }
 
 fn contains(haystack: &[u8], needle: &[u8]) -> bool {

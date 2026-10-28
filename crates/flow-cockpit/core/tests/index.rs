@@ -41,7 +41,13 @@ fn copy_tree(from: &Path, to: &Path, root: &str) {
     fs::create_dir_all(to).unwrap();
     for entry in fs::read_dir(from).unwrap() {
         let entry = entry.unwrap();
-        let target = to.join(entry.file_name());
+        // `.claude` and `.superpowers` are git-ignored here, so the fixture keeps them as `_claude` and `_superpowers`.
+        let name = match entry.file_name().to_string_lossy().as_ref() {
+            "_claude" => ".claude".to_string(),
+            "_superpowers" => ".superpowers".to_string(),
+            other => other.to_string(),
+        };
+        let target = to.join(name);
         if entry.file_type().unwrap().is_dir() {
             copy_tree(&entry.path(), &target, root);
             continue;
@@ -409,9 +415,8 @@ fn rebuild_project_touches_one_project() {
     assert_eq!(run(&solo_runs, "fresh").phase, "build");
 }
 
-#[test]
-fn second_link_scan_reads_under_2mb() {
-    let w = World::new("big");
+/// A 50 MB transcript in alpha that ends with a Write of login's flow.md.
+fn write_big(w: &World) -> PathBuf {
     let big = w.path("claude/projects/-work-alpha/s-big.jsonl");
     let cwd = w.path("work/alpha").to_string_lossy().replace('\\', "\\\\");
     let filler = "x".repeat(1024 * 1024);
@@ -435,7 +440,13 @@ fn second_link_scan_reads_under_2mb() {
     .unwrap();
     drop(file);
     touch(&big, ago(HOUR));
+    big
+}
 
+#[test]
+fn second_link_scan_reads_under_2mb() {
+    let w = World::new("big");
+    write_big(&w);
     let mut index = w.index();
     let mut cache = LinkCache::default();
     index.scan_links(&mut cache);
@@ -448,4 +459,92 @@ fn second_link_scan_reads_under_2mb() {
     index.scan_links(&mut cache);
     let second = cache.bytes_read() - first;
     assert!(second < 2 * 1024 * 1024, "second scan read {second}");
+}
+
+#[test]
+fn grown_transcript_scans_only_its_tail() {
+    let w = World::new("tail");
+    let big = write_big(&w);
+    let fresh = w.path("work/alpha/docs/features/fresh");
+    fs::create_dir_all(&fresh).unwrap();
+    fs::write(fresh.join("flow.md"), "---\nflow: fix\nphase: build\n---\n").unwrap();
+
+    let mut index = w.index();
+    let mut cache = LinkCache::default();
+    index.scan_links(&mut cache);
+    let first = cache.bytes_read();
+    let alpha = project(&index, "alpha");
+    let before = index.flow_run(&alpha.id, "fresh").unwrap().sessions;
+    assert_eq!(before, Vec::<String>::new());
+
+    // The live session writes about 1 KB more: an edit of the other run's flow.md.
+    let cwd = w.path("work/alpha").to_string_lossy().replace('\\', "\\\\");
+    let pad = "y".repeat(900);
+    let mut file = OpenOptions::new().append(true).open(&big).unwrap();
+    writeln!(
+        file,
+        r#"{{"type":"assistant","message":{{"role":"assistant","content":[{{"type":"text","text":"{pad}"}},{{"type":"tool_use","id":"t10","name":"Edit","input":{{"file_path":"{cwd}/docs/features/fresh/flow.md","old_string":"a","new_string":"b"}}}}]}},"timestamp":"2026-01-19T09:40:00.000Z"}}"#
+    )
+    .unwrap();
+    drop(file);
+
+    index.scan_links(&mut cache);
+    let second = cache.bytes_read() - first;
+    assert!(second < 2 * 1024 * 1024, "second scan read {second}");
+    let fresh_run = index.flow_run(&alpha.id, "fresh").unwrap();
+    assert_eq!(fresh_run.sessions, ["s-big"]);
+    let login = index.flow_run(&alpha.id, "login").unwrap();
+    assert!(login.sessions.contains(&"s-big".to_string()));
+}
+
+#[test]
+fn refresh_moves_statuses_and_cutoffs_with_the_clock() {
+    let w = World::new("refresh");
+    touch(&w.path("claude/projects/-work-alpha/s-link.jsonl"), ago(60));
+    let mut index = w.scanned();
+    let alpha = project(&index, "alpha");
+    let login_status = |index: &Index| run(&runs(index, &alpha), "login").status;
+    assert_eq!(login_status(&index), Status::Working);
+
+    let later = |secs: i64| Timestamp::from_second(now().as_second() + secs).unwrap();
+    index.refresh(later(3 * 60));
+    assert_eq!(login_status(&index), Status::Idle);
+
+    index.refresh(later(4 * DAY));
+    assert_eq!(login_status(&index), Status::Stale);
+    assert!(loose(&index, &alpha).contains(&"s-wt".to_string()));
+
+    index.refresh(later(8 * DAY));
+    assert_eq!(loose(&index, &alpha), Vec::<String>::new());
+}
+
+#[test]
+fn rebuild_finds_a_session_in_a_worktree_made_since() {
+    let w = World::new("newwt");
+    let mut index = w.index();
+    let alpha = project(&index, "alpha");
+
+    let worktree = w.path("work/alpha/.worktrees/w");
+    fs::create_dir_all(&worktree).unwrap();
+    let folder: String = worktree
+        .to_string_lossy()
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+        .collect();
+    let dir = w.path("claude/projects").join(folder);
+    fs::create_dir_all(&dir).unwrap();
+    let cwd = worktree.to_string_lossy().replace('\\', "\\\\");
+    let session = dir.join("s-new.jsonl");
+    fs::write(
+        &session,
+        format!(
+            r#"{{"type":"user","message":{{"role":"user","content":"New worktree."}},"timestamp":"2026-01-20T11:00:00.000Z","cwd":"{cwd}"}}"#
+        ) + "\n",
+    )
+    .unwrap();
+    touch(&session, ago(60));
+
+    index.rebuild_project(&alpha.id, now());
+    assert!(loose(&index, &alpha).contains(&"s-new".to_string()));
+    assert!(project(&index, "alpha").roots.contains(&worktree));
 }

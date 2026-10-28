@@ -38,7 +38,7 @@ struct ProjectData {
 pub struct Index {
     home: Home,
     config: Config,
-    /// The `now` of the last build; a link scan derives statuses against it.
+    /// The clock: set by `build`, `rebuild_project` and `refresh`; a link scan derives statuses against it.
     now: Timestamp,
     resolver: Resolver,
     projects: BTreeMap<String, ProjectData>,
@@ -87,9 +87,11 @@ impl Index {
     /// Reads one project's folders and sessions again, and nothing of any other project. A session in a folder no
     /// session of this project was in before is found by the next [`Index::build`].
     pub fn rebuild_project(&mut self, id: &str, now: Timestamp) {
-        let Some(project) = self.projects.get(id) else {
+        // The roots first: a worktree made since the last read has its own session folder.
+        let Some(project) = self.projects.get_mut(id) else {
             return;
         };
+        project.roots = roots_of(&project.checkouts);
         let mut dirs: BTreeSet<PathBuf> = self
             .sessions
             .values()
@@ -115,7 +117,19 @@ impl Index {
         for dir in &dirs {
             self.load_dir(dir, Some(id), &mut reuse);
         }
+        self.now = now;
         self.reload(id, now);
+    }
+
+    /// Moves the clock to `now` and derives every project's statuses and loose-session cut-off again from what the
+    /// index holds. Reads nothing from disk, so a poll can call it every tick: a session that stopped writing goes
+    /// from Working to Idle, and a quiet run to Stale, without any file changing.
+    pub fn refresh(&mut self, now: Timestamp) {
+        self.now = now;
+        let ids: Vec<String> = self.projects.keys().cloned().collect();
+        for id in ids {
+            self.derive_project(&id, now);
+        }
     }
 
     #[must_use]
