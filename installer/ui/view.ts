@@ -7,12 +7,13 @@ type Style = Parameters<typeof styleText>[0];
 type Color = Exclude<Style, readonly unknown[]>;
 type Size = { columns: number; rows: number };
 
-// The installer's choices: the screen it shows, where the cursor is, and what is ticked.
+// The installer's choices: the screen it shows, where the cursor is, what is ticked and which rows the user flipped.
 export interface State {
   screen: 'start' | 'category' | 'updates' | 'review';
   cursor: number;
   page: number;
   chosen: Record<string, boolean>;
+  touched: Record<string, boolean>;
   skip: Record<string, boolean>;
   result?: 'apply' | 'quit' | 'ask-quit';
 }
@@ -37,6 +38,8 @@ export interface Data {
   hidden: { key: string; why?: string }[];
   retired?: string[];
   sweep?: string[];
+  // The choices after the user flips row key, for rows that follow another (ticking flows ticks prose).
+  follow?: (key: string, chosen: Record<string, boolean>, touched: Record<string, boolean>) => Record<string, boolean>;
 }
 type Row =
   | { kind: 'page'; i: number }
@@ -115,6 +118,7 @@ export const initial = (chosen: Record<string, boolean>): State => ({
   cursor: 0,
   page: 0,
   chosen,
+  touched: {},
   skip: {},
 });
 
@@ -216,8 +220,11 @@ export function move(s: State, key: string, data: Data): State {
       return { ...s, result: 'quit' };
     case 'back':
       return back;
-    case 'item':
-      return { ...s, chosen: { ...s.chosen, [row.key]: !s.chosen[row.key] } };
+    case 'item': {
+      const chosen = { ...s.chosen, [row.key]: !s.chosen[row.key] };
+      const touched = { ...s.touched, [row.key]: true };
+      return { ...s, chosen: data.follow?.(row.key, chosen, touched) ?? chosen, touched };
+    }
     case 'update':
       return { ...s, skip: { ...s.skip, [row.id]: !s.skip[row.id] } };
     default:

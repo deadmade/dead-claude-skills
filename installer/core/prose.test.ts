@@ -1,7 +1,20 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
-import { proseDecision, proseDefault, proseDir, proseMarker, prosePython, proseState, proseSync } from './prose.ts';
+import { missingBinaries } from './binaries.ts';
+import {
+  type ProseDecision,
+  proseDecision,
+  proseDefault,
+  proseDir,
+  proseFollow,
+  proseMarker,
+  prosePython,
+  proseState,
+  proseSync,
+  proseUnticked,
+  proseWanted,
+} from './prose.ts';
 
 const CFG = join('home', '.claude');
 
@@ -62,4 +75,54 @@ test('proseDecision: remove, sync, needs-flows or none', () => {
   assert.equal(d(true, false, false), 'needs-flows');
   assert.equal(d(false, true, false), 'none');
   assert.equal(d(false, false, false), 'none');
+});
+
+test('proseDecision follows proseWanted', () => {
+  for (const toggle of [true, false])
+    for (const flows of [true, false]) {
+      const d: ProseDecision = proseDecision({ toggle, flows, installed: false });
+      assert.equal(d === 'sync', proseWanted({ toggle, flows }));
+    }
+});
+
+test('proseWanted: only with flows, so prose ticked without flows asks for no uv', () => {
+  assert.equal(proseWanted({ toggle: true, flows: true }), true);
+  assert.equal(proseWanted({ toggle: true, flows: false }), false);
+  assert.equal(proseWanted({ toggle: false, flows: true }), false);
+  const uv = (flows: boolean) =>
+    missingBinaries('linux', proseWanted({ toggle: true, flows }) ? ['prose'] : [], () => false).map((m) => m.binary);
+  assert.deepEqual(uv(false), []);
+  assert.deepEqual(uv(true), ['uv']);
+});
+
+test('proseUnticked: only a toggle that started on and ends off', () => {
+  assert.equal(proseUnticked({ started: true, toggle: false }), true);
+  assert.equal(proseUnticked({ started: true, toggle: true }), false);
+  assert.equal(proseUnticked({ started: false, toggle: false }), false);
+  assert.equal(proseUnticked({ started: false, toggle: true }), false);
+});
+
+test('proseFollow: ticking flows turns prose to its default, never against the user', () => {
+  const F = 'flows@m';
+  const base = {
+    key: F,
+    flows: F,
+    chosen: { [F]: true, prose: false },
+    touched: { [F]: true },
+    installed: false,
+    optedOut: false,
+    offered: true,
+  };
+  assert.equal(proseFollow(base), true, 'ticking flows ticks prose');
+  assert.equal(proseFollow({ ...base, touched: { [F]: true, prose: true } }), false, 'unticked in this run');
+  assert.equal(proseFollow({ ...base, optedOut: true }), false, 'the opt-out marker holds');
+  assert.equal(proseFollow({ ...base, offered: false }), false, 'not offered here');
+  assert.equal(proseFollow({ ...base, key: 'dcg' }), false, 'another row');
+  assert.equal(proseFollow({ ...base, chosen: { [F]: false, prose: false } }), false, 'unticking flows');
+  assert.equal(proseFollow({ ...base, chosen: { [F]: false, prose: true } }), true, 'unticking flows keeps prose');
+  assert.equal(
+    proseFollow({ ...base, optedOut: true, chosen: { [F]: true, prose: true } }),
+    true,
+    'never turns it off',
+  );
 });

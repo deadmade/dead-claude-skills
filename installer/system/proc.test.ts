@@ -3,10 +3,17 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
-import { claude, onPath, safeArg, startSync, which } from './proc.ts';
+import { claude, exitReason, onPath, safeArg, startSync, which } from './proc.ts';
 
 const M = 'dead-claude-skills';
 const WIN = process.platform === 'win32';
+
+test('exitReason names the error, then the signal, then the exit code', () => {
+  const e = Object.assign(new Error('x'), { code: 'ENOENT' });
+  assert.equal(exitReason({ error: e, status: null, signal: null }), 'ENOENT');
+  assert.equal(exitReason({ status: null, signal: 'SIGKILL' }), 'signal SIGKILL');
+  assert.equal(exitReason({ status: 3, signal: null }), 'exit 3');
+});
 
 test('safeArg rejects shell metacharacters', () => {
   assert.equal(safeArg(`graphify@${M}`), `graphify@${M}`);

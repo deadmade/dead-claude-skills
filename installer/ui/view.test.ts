@@ -95,6 +95,20 @@ test('enter on an item toggles it, again undoes it; enter on ← Back returns', 
   assert.deepEqual([back.screen, back.cursor, back.chosen[azure]], ['start', 0, true]);
 });
 
+test('enter on an item records it as touched and lets data.follow link other rows', () => {
+  const calls: [string, Record<string, boolean>, Record<string, boolean>][] = [];
+  const linked: Data = {
+    ...data,
+    follow: (key, ch, touched) => {
+      calls.push([key, ch, touched]);
+      return { ...ch, dcg: false };
+    },
+  };
+  const s = ['return', 'down', 'return'].reduce((st, k) => move(st, k, linked), initial(chosen));
+  assert.deepEqual(calls, [[azure, { ...chosen, [azure]: true }, { [azure]: true }]]);
+  assert.deepEqual([s.chosen[azure], s.chosen.dcg, s.touched], [true, false, { [azure]: true }]);
+});
+
 test('updates rows toggle skip; removing the plugin hides the Updates row', () => {
   const s = press(initial(chosen), 'down', 'down', 'return', 'down', 'return');
   assert.equal(s.screen, 'updates');

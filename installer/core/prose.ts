@@ -48,9 +48,44 @@ export const proseDefault = ({
   flows: boolean;
 }) => installed || (offered && flows && !optedOut);
 
+// Whether the environment is wanted: prose is set up only with flows. flows: flows is selected after the screens.
+export const proseWanted = ({ toggle, flows }: { toggle: boolean; flows: boolean }) => toggle && flows;
+
+// The user unticked the toggle in this run: it was on when the screens opened (started) and is off after them.
+export const proseUnticked = ({ started, toggle }: { started: boolean; toggle: boolean }) => started && !toggle;
+
+// The prose toggle after the user flips row key on the screens (flows: flows' row key). Ticking flows sets it to its
+// default with flows, unless the user unticked it in this run (touched: the rows they flipped); it never turns it off.
+export const proseFollow = ({
+  key,
+  flows,
+  chosen,
+  touched,
+  ...state
+}: {
+  key: string;
+  flows: string;
+  chosen: Record<string, boolean>;
+  touched: Record<string, boolean>;
+  installed: boolean;
+  optedOut: boolean;
+  offered: boolean;
+}) => !!chosen.prose || (key === flows && !!chosen[flows] && !touched.prose && proseDefault({ ...state, flows: true }));
+
+export type ProseDecision = 'remove' | 'sync' | 'needs-flows' | 'none';
+
 // What the prose step does with the screens' result. flows: flows is selected after the screens.
-export function proseDecision({ toggle, flows, installed }: { toggle: boolean; flows: boolean; installed: boolean }) {
-  if (installed && !(toggle && flows)) return 'remove';
-  if (toggle && flows) return 'sync';
+export function proseDecision({
+  toggle,
+  flows,
+  installed,
+}: {
+  toggle: boolean;
+  flows: boolean;
+  installed: boolean;
+}): ProseDecision {
+  const wanted = proseWanted({ toggle, flows });
+  if (installed && !wanted) return 'remove';
+  if (wanted) return 'sync';
   return toggle ? 'needs-flows' : 'none';
 }

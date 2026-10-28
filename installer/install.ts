@@ -5,7 +5,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { missingBinaries } from './core/binaries.ts';
 import { HINTS, TOGGLES, categorize, unavailable } from './core/options.ts';
-import { proseDefault, proseState } from './core/prose.ts';
+import { proseDefault, proseFollow, proseState, proseWanted } from './core/prose.ts';
 import {
   type Marketplace,
   type PluginJson,
@@ -158,12 +158,13 @@ const chosen: Record<string, boolean> = {
     ? current['web-builtins-off']
     : unavailable('web-builtins-off', process.platform, process.arch, VERSION, nixos) === undefined,
 };
-// On by default with flows where offered, until the user unticks it once (the flows-prose.off marker).
-chosen.prose = proseDefault({
+// On by default with flows where offered, until the user unticks it once (the flows-prose.off marker). Ticking flows
+// on the screens sets it the same way (data.follow).
+const proseStart = {
   ...prose,
   offered: unavailable('prose', process.platform, process.arch, VERSION, nixos) === undefined,
-  flows: chosen[FLOWS],
-});
+};
+chosen.prose = proseDefault({ ...proseStart, flows: chosen[FLOWS] });
 
 // Options that can't work here stay off the pages, unless they're on already: hiding never removes anything.
 const hidden = [...opts, ...TOGGLES]
@@ -217,6 +218,10 @@ const data: Data = {
     ...new Set([...foreignPlugins(installedIds, managed), ...duplicates(installedIds, managed)]),
     ...foreignMarketplaces(marketplaces.map((m) => m.name)).map((n) => `marketplace ${n}`),
   ],
+  follow: (key, picked, touched) => ({
+    ...picked,
+    prose: proseFollow({ key, flows: FLOWS, chosen: picked, touched, ...proseStart }),
+  }),
 };
 
 // What the screens start from: chosen holds their result after them.
@@ -290,12 +295,13 @@ if (browser.path) await configureAgentBrowser(browser.path);
 if (clean) done.push(...clearTargets(CONFIG));
 // The global instructions moved into a dead-skills SessionStart hook; the old file would duplicate them.
 remove(RULES, RULES);
-await applyProse({ toggle: on('prose'), flows: selected.includes(FLOWS), unticked: started.prose && !on('prose') });
+await applyProse({ toggle: on('prose'), flows: selected.includes(FLOWS), started: started.prose });
 
 // prose needs uv only with flows: without it the step sets nothing up.
 const wanted = [
   ...selected.map(nameOf),
-  ...TOGGLES.filter((k) => on(k) && (k !== 'prose' || selected.includes(FLOWS))),
+  ...TOGGLES.filter((k) => k !== 'prose' && on(k)),
+  ...(proseWanted({ toggle: on('prose'), flows: selected.includes(FLOWS) }) ? ['prose'] : []),
 ];
 const missing = missingBinaries(process.platform, wanted, onPath);
 

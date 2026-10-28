@@ -12,6 +12,10 @@ export function safeArg(s: string) {
 
 export const errCode = (e: Error | undefined) => (e as NodeJS.ErrnoException | undefined)?.code;
 
+// How a finished program failed: the error that kept it from starting, the signal that killed it, or its exit code.
+export const exitReason = (r: { error?: Error; status: number | null; signal: NodeJS.Signals | null }) =>
+  errCode(r.error) ?? (r.signal ? `signal ${r.signal}` : `exit ${r.status}`);
+
 const isFile = (f: string) => statSync(f, { throwIfNoEntry: false })?.isFile() ?? false;
 // What Windows can start: npm's global folder also holds an extensionless sh script next to claude.cmd.
 const STARTABLE = ['.exe', '.com', '.cmd', '.bat'];
