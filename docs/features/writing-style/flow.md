@@ -475,6 +475,15 @@ state.chosen)` runs first (`install.ts:225`); the marker would never be written.
   environment's layout must touch both files.
 - 2026-10-28, Phase 7: the subagent method's final whole-branch review is served by `/verify`'s `/self-review` over
   the same branch, not run twice. If wrong, one review seat fewer looked at the whole diff.
+- 2026-10-28, self-review fixes: compare.mjs treats a bare "N)" as a number only when it closes a parenthesis opened
+  earlier on its line, instead of requiring the "(" as the fix asked, so an inline list like "1) reads, 2) checks"
+  stays an enumerator that a list may replace. "(default = 60)" and "(Task 11)" are now checked. If wrong, an inline
+  list inside parentheses counts as numbers, and an edit that turns it into a list is refused.
+- 2026-10-28, self-review fixes: compare.mjs's new floors refuse an edit that keeps under 60% of the prose words or
+  75% of the paragraphs and list items, so merging two paragraphs of a two-paragraph document is refused too, and the
+  document stays as it was. The rewrap probe used for "0 of 92" deleted the blank line before some paragraphs; with
+  that fixed, the stricter compare still refuses 0 of 92 honest rewraps and passes all six stored acceptance edits.
+  If wrong, a short document's honest merge needs a manual edit.
 
 ## Deviations
 
