@@ -1,0 +1,110 @@
+{
+  "plan": "docs/features/flow-observability/plan.md",
+  "rulings": [
+    "Ruling: Task 5 keeps every existing flow.md section (Tasks, Rulings, Deviations, Plan review) while converting to the new format, and the controller writes flow.md only between tasks — the plan has both writers — costs a merge by hand if a line lands mid-task.",
+    "Ruling: the brief clause and Global Constraints are delivered verbatim in `rules.md` in this workspace, which every implementer and reviewer prompt names as its first read, instead of pasting them into each prompt — same text, one copy — costs a subagent that skips the file (reviewers check the clause was applied).",
+    "Ruling: Task 9 Step 5's \"ask Claude to add a view\" runs as `claude -p` with `--plugin-dir` in the worktree — no interactive session from here — costs not seeing the live reload by eye; the user sees it at the slice checkpoint.",
+    "Ruling: ts-rs 12 writes type-only `.ts` bindings, not `.d.ts` — accepted as the \"generated .d.ts\" of Global Constraints, since `--print-types` (Task 6) concatenates them into one declaration file — costs a rename step there if tsc objects.",
+    "Ruling: copied real fixtures under crates/flow-cockpit/core/tests/fixtures/docs/ are excluded from treefmt and the flake `vendored` list (both files already in Task 2's list) — a fixture prettier rewrites no longer tests the real shape (it already unindented the ledger's wrapped line) — costs those fixtures staying unformatted.",
+    "Ruling: a user entry opens a turn only when it is not `isMeta` and its text (a string, or the text blocks of an array) doesn't start with `<` — the brief's rule read literally turns real meta entries into prompts (20 of 54 in this project) and drops image prompts, while the spec groups turns by the user's prompts — costs a fix round on Task 3.",
+    "Ruling: status precedence Done > Waiting > Working > Stale > Idle — the spec lists Waiting first and a run waiting on the user stays theirs to act on — costs a 4-day-old wait never reading Stale.",
+    "Ruling: Config::parse/load (Result<_, String>), Default on LinkCache and LinkCache::bytes_read() are implied by the brief (Config from config.toml; the 2 MB test measures bytes), not deviations — none crosses to the views — costs three public items the plan didn't name.",
+    "Ruling: core/tests/index.rs (not on the Files list) accepted — same as docs.rs and activity.rs in Tasks 2-3 — costs nothing.",
+    "Ruling: the 1 MiB whole-head cap and `rebuild_project` listing dirs from the old roots enter the fix round — both make a session vanish, against spec:29 (\"any Claude session's activity can be found\") — costs a larger fix round. Folders matching no root wait for Task 6 (call `build` when a new folder appears in claude_projects).",
+    "Ruling: design/docs.json (raw docs for the Docs tab) is part of \"its JSON\" in the listed design folder — costs nothing.",
+    "Task 2: finding (from Task 5): parse_ledger glues `Ruling:` and `Note` lines into the task entry above them instead of `rulings` — fix after the Task 5 stop."
+  ],
+  "tasks": [
+    {
+      "fix_rounds": 0,
+      "later": [
+        "minor (deferred): implement/SKILL.md:52 \"Record both as … gate lines\" reads as two lines; say the execution method is the `, execution: …` extra (same in upgrade/SKILL.md:41)",
+        "minor (deferred): checkTemplates accepts a part anywhere in the file, not only in the template comment",
+        "minor (deferred): several edited prose lines run past the 120-column wrap (flow-rules fifth stop, feature-flow Phase 4, fix-flow and upgrade gate lines)"
+      ],
+      "model": "sonnet",
+      "n": 1,
+      "security": [],
+      "state": "Done",
+      "story": [
+        "dispatched (base 7bfc93e, implementer sonnet)",
+        "DONE 1803f42; files check clean (11 files, all listed; no untracked); review dispatched (sonnet, package review-7bfc93e..1803f42.diff)",
+        "review Approved (spec ✅, no deviations; Gate 2 `, execution: …` extra after the date matches the brief's `[, <extra>]`)",
+        "complete (1803f42)"
+      ]
+    },
+    {
+      "fix_rounds": 1,
+      "later": [
+        "minor (deferred): text before the first `## ` dropped from sections (flow.rs:85)",
+        "minor (deferred): frontmatter placeholders (`phase: <…>`, `now: <…>`) read as values",
+        "minor (deferred): a date inside the Reopened reason counts as re-approval (flow.rs:178)",
+        "minor (deferred): list_items drops old deviations titled \"None…\" (flow.rs:292)",
+        "minor (deferred): any ledger entry containing \"security\" lands in `security` (ledger.rs:135) — re-check on the real excerpt",
+        "minor (deferred): old_flow_md_files_load doesn't pin language-skills' approved date or web-mcp's open Gate 1",
+        "minor (deferred): ledger security rule `starts_with(\"security\")` misses \"review: security finding …\" shapes"
+      ],
+      "model": "sonnet",
+      "n": 2,
+      "security": [],
+      "state": "Done",
+      "story": [
+        "dispatched (base 1803f42, implementer sonnet)",
+        "DONE_WITH_CONCERNS f006c24; files check clean (all listed, no untracked); review dispatched (opus, package review-1803f42..f006c24.diff without fixtures/lock)",
+        "fix round 1 (resume implementer)",
+        "fix round 1 implemented 595cbca (4 fixes; the ledger fixture wrap in Task 3 is the implementer's own wrap of a real single line); re-review dispatched",
+        "fix round 1/5 (4 addressed, 0 open; commits f006c24..595cbca)",
+        "complete (595cbca)"
+      ]
+    },
+    {
+      "fix_rounds": 1,
+      "later": [
+        "minor (deferred): failures map could be a HashSet; tests index turns[0] directly; agent started/ended taken from any entry kind",
+        "minor (deferred): `<` check runs on the joined text of an array prompt (reminder block first hides the prompt); \"[Request interrupted by user]\" entries open turns if they exist"
+      ],
+      "model": "sonnet",
+      "n": 3,
+      "security": [],
+      "state": "Done",
+      "story": [
+        "dispatched (base 595cbca, implementer sonnet)",
+        "DONE ff27fd2; files check clean (all listed, no untracked); review dispatched (sonnet, package review-595cbca..ff27fd2.diff)",
+        "fix round 1 (resume implementer)",
+        "fix round 1 implemented 83976f1 (Text.agent, subagent replies in turns, isMeta/array prompts); re-review dispatched",
+        "fix round 1/5 (2 addressed, 0 open; commits ff27fd2..83976f1)",
+        "complete (83976f1)"
+      ]
+    },
+    {
+      "fix_rounds": 1,
+      "later": [
+        "minor (deferred): encode/slug near-duplicate; Index::doc re-implements entries::read_text; no negative cache for other projects' sessions in rebuild_project",
+        "minor (deferred): tail scan resumes from a stale offset after truncate-and-regrow; read_head early stop on an empty cwd or a tool_result user entry; skip_line reads a huge newline-less line through once; a failed File::open in scan still caches size/mtime"
+      ],
+      "model": "sonnet",
+      "n": 4,
+      "security": [],
+      "state": "Done",
+      "story": [
+        "dispatched (base 83976f1, implementer sonnet)",
+        "DONE_WITH_CONCERNS bfe40bb; files check clean (all listed, no untracked); review dispatched (opus, package review-83976f1..bfe40bb.diff)",
+        "fix round 1 (resume implementer)",
+        "fix round 1 implemented b1f0975 (fixtures as _claude/_superpowers, tail scan, refresh, rebuild sets now + roots first, per-line head cap); files check incl. ignored clean; clean-export index tests 17/17 (docs.rs needs the repo by design); re-review dispatched",
+        "fix round 1/5 (6 addressed, 0 open; commits bfe40bb..b1f0975)",
+        "complete (b1f0975)"
+      ]
+    },
+    {
+      "fix_rounds": 0,
+      "later": [],
+      "model": "opus",
+      "n": 5,
+      "security": [],
+      "state": "Building",
+      "story": [
+        "dispatched Steps 1-2 only (base b1f0975, implementer opus; no commit — Step 3 stop is the controller's, Step 4 commit after approval)"
+      ]
+    }
+  ]
+}

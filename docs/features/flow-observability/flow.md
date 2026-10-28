@@ -1,6 +1,7 @@
 ---
 flow: feature
 phase: execute
+now: The flow run view mockup is approved; the build goes on with Task 6, the app shell.
 ---
 
 # Flow observability: flow
@@ -26,11 +27,11 @@ phase: execute
 
 ## Gates
 
-- Gate 1, spec approved: 2026-10-28 ("yes, approved"). Reopened 2026-10-28: plan review round 1 changed the capture
+- Gate 1, spec approved: 2026-10-28, "yes, approved". Reopened 2026-10-28: plan review round 1 changed the capture
   events, the status rules, the audit `Picks:`/`Fixed` lines, the Windows delivery and added slices (spec items
   marked **(review 1)**); round 2 added the `Waiting for you` prefix and the Windows hiding in slice 1
-  (**(review 2)**). Re-approved 2026-10-28 ("Approve the spec").
-- Gate 2, plan approved: 2026-10-28 ("Approve, subagent-driven"), execution: subagent-driven
+  (**(review 2)**). Re-approved 2026-10-28, "Approve the spec".
+- Gate 2, plan approved: 2026-10-28, execution: subagent-driven, "Approve, subagent-driven"
 
 ## Skipped
 
@@ -183,9 +184,15 @@ Checked in this session (2026-10-28):
 
 ## Options
 
-**Surface and shape (2026-10-28).** Offered, with evidence: E2, E10 back an at-a-glance state view with detail one
-step away; E4, E5 warn against always-on detail; E6 says showing more pays off for people working with the agents,
-not people who only watch. Nothing in the literature compares surfaces.
+### Surface and shape
+
+Picked: Claude Code stays in the user's terminal, and a separate desktop window (Tauri) draws what the sessions and
+their subagents do, from captured events, flow.md, the SDD ledgers and transcripts; watching only, no interacting
+with Claude.
+
+Offered 2026-10-28, with evidence: E2, E10 back an at-a-glance state view with detail one step away; E4, E5 warn
+against always-on detail; E6 says showing more pays off for people working with the agents, not people who only
+watch. Nothing in the literature compares surfaces.
 
 - Diagrams in the docs only, viewed in existing Markdown renderers (S). Kept as a slice, not the whole answer.
 - Own desktop window, Tauri (L).
@@ -201,11 +208,19 @@ not people who only watch. Nothing in the literature compares surfaces.
   capturing what claude code and the subagents to do just visulize everything that happens with the flows and keep
   the actually interacting with claude out of it for now". No answering questions, no starting flows, no typing.
 
-**Language (2026-10-28):** Rust core, TypeScript views (user). Rust extensions considered: a 15-line serde cdylib
-built in 6.4 s clean, 0.75 s release / 0.32 s debug incremental on this machine (24 cores), so compile time isn't the
-objection; drawing in the webview, no stable plugin ABI, a toolchain on every machine and a longer agent loop are.
+### Language
 
-**Spike (throwaway, agreed 2026-10-28):** "Lets create a prototype for that. So my inial idea was to have a drop down
+Picked: Rust core, TypeScript views (user, 2026-10-28).
+
+Rust extensions considered: a 15-line serde cdylib built in 6.4 s clean, 0.75 s release / 0.32 s debug incremental on
+this machine (24 cores), so compile time isn't the objection; drawing in the webview, no stable plugin ABI, a
+toolchain on every machine and a longer agent loop are.
+
+### Spike
+
+Picked: a throwaway clickable prototype from real data, agreed 2026-10-28.
+
+"Lets create a prototype for that. So my inial idea was to have a drop down
 to select the projects im working on. And a list of flows that currently run or have run with filter and sort. I can
 see on which steps they are, are they waiting, what kind of flow was it etc. When I click of them I get the detailed
 view with task list chat out put etc". Built as a clickable page in the brainstorm companion from real data (a
@@ -245,20 +260,51 @@ What the spike showed (2026-10-28):
   interface spec, no plain "what it does" line; ledger lines and rulings are compressed technical prose; transcripts
   are long by nature). Restyling can't make that glanceable; it needs a distilling step, written by the flows or by a
   model in the app.
+- For the real app: rendered Markdown from transcripts and build logs is untrusted (web pages end up in them), so it
+  needs a sanitiser before it reaches the DOM; the prototype doesn't have one.
+
+### Readable documents or model summaries
+
+Picked: better source documents, which the viewer draws as UI by their structure; Haiku summaries not picked.
+
 - User, 2026-10-28, on "flows write it" vs "Haiku summarises": "instead of just rendering markdown could we just
   enhance whats written. I will change the flow.md and shit a bit better etc". Direction: better source documents
   (the user reworks them), and a viewer that recognises their structure and draws it as UI instead of rendering
   Markdown as is. Haiku summaries not picked.
+
+### Which documents get the readable format
+
+Picked: flow.md and the plan; the build log stays as it is for now.
+
 - 2026-10-28, which documents get the readable format: offered flow.md only / flow.md + plan / + build log
   (recommended flow.md + plan). User: "2". The plan's part (one plain line per task, dependencies) goes in through a
   conductor override of `writing-plans`; the build log stays as it is for now.
-- For the real app: rendered Markdown from transcripts and build logs is untrusted (web pages end up in them), so it
-  needs a sanitiser before it reaches the DOM; the prototype doesn't have one.
 
 ### Mod or no mod
 
 Picked: no mod. The capture and transcripts cover agent state, questions and permission prompts; a mod is revisited
 only if a gap shows (plan review round 1, 2026-10-28).
+
+### Flow run view
+
+Picked: the mockup in `crates/flow-cockpit/design/run-view.html` after three reworks, approved 2026-10-28 ("its
+fucking awesome!!! lets goo"): an app window on one grid; Build is a phase track and one-line task rail beside the
+selected task, with folds styled as rows; Decisions and Docs are master and detail; installed fonts; the Night City
+palette unchanged.
+
+Mockup round 1 (2026-10-28, `crates/flow-cockpit/design/run-view.html`): the user likes the theme and the colouring,
+and hates the alignment: "it 100% looks like ai and kinda lazy", "also half the screen is empty" (a centred capped
+column at ~1880 px). Fonts: installed ones, no bundled or downloaded font. Reworking it as an app window that fills
+the width on one grid, with fewer boxes; not picked yet.
+
+Mockup round 2 (2026-10-28): "definetly a good step up but now its just bam 3 or 4 walls of text. Its overwhelming a
+bit but definetly the right direction"; the user asked Claude to analyse it. Reworking for one focal point per
+screen: the selected task on Build, phases as one line, one-line task rows, decisions as expandable lists, no task
+rail on Decisions and Docs.
+
+Mockup round 3 (2026-10-28): "Rest awesome except the decissions tab". The user moved the chapters to the right on
+Docs, with the documents on the left. Two changes asked: the clickable inline links in Build ("the build log, 1
+entry") don't fit the scheme; Decisions should be decisions and deviations on the left with the text in the middle.
 
 ## Plan review
 
@@ -297,9 +343,68 @@ again in Task 13 with the missing installer files; capture drops `last_message`;
 
 ## Tasks
 
+Task 1: base 7bfc93e, untracked at start: none; head 1803f42, files check clean; review approved, 3 minors deferred
+Task 2: base 1803f42, untracked at start: none; head 595cbca, files check clean; review: 1 fix round (4 Important addressed), 7 minors deferred
+Task 3: base 595cbca, untracked at start: none; head 83976f1, files check clean; review: 1 fix round (2 Important addressed), 4 minors deferred
+Task 4: base 83976f1, untracked at start: none; head b1f0975, files check clean (ignored included); review: 1 fix round (1 Critical, 2 Important, 3 decided addressed), 7 minors deferred
+Task 5: base b1f0975, untracked at start: none; mockup approved after 3 reworks
+
 ## Rulings
 
+- 2026-10-28, setup: Task 5 keeps every existing flow.md section while converting; the controller writes flow.md only
+  between tasks — both write flow.md — costs a manual merge if a line lands mid-task.
+- 2026-10-28, setup: the brief clause and Global Constraints go verbatim into the build workspace's `rules.md`, which
+  every implementer and reviewer prompt names first — one copy of the same text — costs a subagent that skips it.
+- 2026-10-28, setup: Task 9 Step 5 runs as `claude -p --plugin-dir` — no interactive session from the controller —
+  costs not seeing the live reload by eye until the slice checkpoint.
+- 2026-10-28, Task 2: ts-rs 12 writes type-only `.ts` bindings, taken as the "generated `.d.ts`" since
+  `--print-types` joins them into one declaration file — costs a rename there if tsc objects.
+- 2026-10-28, Task 2: the copied real fixtures in `core/tests/fixtures/` are excluded from treefmt — a reformatted copy
+  no longer tests the real shape — costs those fixtures staying unformatted.
+- 2026-10-28, Task 3: a user entry opens a turn only when it isn't `isMeta` and its text (a string or an array's text
+  blocks) doesn't start with `<` — the literal rule made real meta entries into prompts and dropped image prompts —
+  costs a fix round.
+- 2026-10-28, Task 4: status precedence is Done, Waiting, Working, Stale, Idle — the spec lists Waiting first and a run
+  waiting on the user stays theirs to act on — costs a wait of 4 days never reading Stale.
+- 2026-10-28, Task 4: `Config::parse`/`load`, `Default` on `LinkCache` and `LinkCache::bytes_read()` are implied by the
+  brief, not deviations — none crosses to the views — costs three public items the plan didn't name.
+- 2026-10-28, Task 4: a per-line head cap and `rebuild_project` recomputing roots first join the fix round — both made
+  a session vanish, against "any Claude session's activity can be found" — costs a larger fix round; folders that match
+  no root wait for Task 6, which calls `build` when a new folder appears in `~/.claude/projects`.
+
 ## Deviations
+
+### Task 3 transcript fixtures are hand-written, not trimmed real ones
+
+The plan asked for trimmed real transcripts. Copying them into the public repo was blocked, so the implementer reads
+real transcripts only for their JSON shapes and field names and writes the fixture lines with invented text.
+
+Status: decided 2026-10-28: hand-written in the real shape
+
+### Subagent text replies have no place in the activity model
+
+The plan's `Text` carries no agent, so Task 3 dropped every subagent reply, final reports included; only their tool
+calls showed.
+
+Status: decided 2026-10-28: `Text` gains `agent: Option<String>`, and subagent replies land in the turn open at their
+time
+
+### Status never decays without a file change
+
+Status was derived only when a project's files changed, so a run whose Claude session stopped stayed Working.
+
+Status: decided 2026-10-28: `Index::refresh(now)` re-derives every status from cached facts without reading the disk;
+Task 6's poll calls it each tick
+
+## Follow-ups
+
+- **Headless browsers break on this machine** (seen 2026-10-28 in Task 5; the user asked to fix it later):
+  - The Chrome that agent-browser installs (Chrome for Testing) doesn't start here: it lacks libglib on NixOS. That
+    leaves hallmark's `sloplint --render` without a browser; the implementer pointed puppeteer-core at Helium by hand.
+  - Headless Helium reloads any page that links the Google Fonts stylesheet ("Execution context was destroyed"),
+    traced to that one `<link>`.
+  - web-mcp's `browser` on the same page showed the first screenshot, then the tab was on `about:blank` after a
+    scroll and `document.body` was null; likely the same cause.
 
 ## Walkthrough
 
