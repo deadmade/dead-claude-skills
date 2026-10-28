@@ -88,7 +88,7 @@ never cut a fact, a number, a name or a decision: concision removes words, not c
 - Diagnose: how many words come before the subject, how long is the subject, and what stands between the subject and
   its verb? Does the sentence run on, clause after clause?
 - Revise: get to the subject quickly and from the subject to the verb quickly; break a sprawling sentence in two. Put
-  four or more parallel items in a list, and items that share attributes in a table.
+  four or more parallel items in a list. Don't build a table: keep the document's tables as they are and add none.
 
 **Elegance (Lesson 11).** Not a goal here: clarity comes first.
 

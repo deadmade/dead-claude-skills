@@ -53,6 +53,7 @@ node "${CLAUDE_SKILL_DIR}/../copyedit/scripts/compare.mjs" "<run folder>/saved.m
 ```
 
 - **Exit 1:** it printed what the edit lost, one item per line. Show those lines and stop. The document is unchanged.
+- **Exit 2:** it failed for another reason and printed it. Show that line and stop. The document is unchanged.
 - **Exit 0:** it copied the edit over the document, in the document's own line endings, and printed the write-time
   check's findings that the saved version didn't have. Show:
   - the diff: `git diff --no-index "<run folder>/saved.md" "<document>"` (it exits 1 when the files differ, which is

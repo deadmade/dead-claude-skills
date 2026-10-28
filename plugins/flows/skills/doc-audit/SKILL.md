@@ -19,8 +19,8 @@ is the bug.
 | 5 Prose     | `flows:writing`                             | wording findings, changed docs only            |
 | 6 Report    | flow-rules **Reports**                      | `docs/audits/…-doc-audit-<scope>.md`. **Gate** |
 
-[flow-rules.md](../../references/flow-rules.md) applies: read it first. Packs: `${CLAUDE_PLUGIN_ROOT}/packs` (tob and
-pstack are its `-picks` folders).
+[flow-rules.md](../../references/flow-rules.md) applies: read it first. Packs: `${CLAUDE_PLUGIN_ROOT}/packs` (tob is
+its `tob-picks` folder).
 
 ## Phase 1: Scope
 

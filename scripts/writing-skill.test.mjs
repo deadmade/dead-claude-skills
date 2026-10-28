@@ -27,7 +27,8 @@ test('the writing skill is model-invocable and states the rule', () => {
 
 test('copyedit is a conductor', () => {
   const text = read('plugins/flows/skills/copyedit/SKILL.md');
-  assert.match(parts(text)[0], /^disable-model-invocation: true$/m);
+  for (const t of [text, text.replace(/\n/g, '\r\n')])
+    assert.match(parts(t)[0], /^disable-model-invocation: true\r?$/m);
   const marketplace = JSON.parse(read('.claude-plugin/marketplace.json'));
   const uses = readUses(ROOT);
   assert.ok(uses.copyedit, 'copyedit has a uses.json');

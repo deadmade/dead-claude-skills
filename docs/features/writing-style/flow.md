@@ -435,6 +435,14 @@ state.chosen)` runs first (`install.ts:225`); the marker would never be written.
   re-run of the editor test (criterion 4) shows it, since it uses the shipped guide.
 - 2026-10-28, Task 5: "four or more parallel items" is the spec's own count, not technical-writing-density's (which
   gives none); Prior art above credits the count to it by mistake. Kept as the spec states it.
+- 2026-10-28, Tasks 5–6: when `/copyedit` refuses an edit (something was lost, or compare.mjs failed), the flow goes
+  on to its gate with the unedited document and `/copyedit`'s lines, and the gate message says the copyedit was
+  refused; the plan didn't decide this, and stopping the whole flow over an editor's slip costs more than showing the
+  original. If wrong, a refusal should stop the flow and ask the user instead.
+- 2026-10-28, Task 5: compare.mjs counts every token with a digit (`v0.3.0`, `x64`, `Q11`) as a number to keep, and
+  checkbox states and table columns as well as counts, after the review showed versions and labels could vanish
+  unnoticed; its line-joining uses prose.mjs's block-start rule, which took honest rewraps of this repo's specs and
+  plans from 27 of 92 refused to 0. The guide no longer asks for tables, which compare.mjs refuses by design.
 
 ## Deviations
 

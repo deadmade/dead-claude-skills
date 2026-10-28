@@ -36,6 +36,10 @@ const DOC = [
   '',
 ].join('\n');
 
+const crlf = (text) => text.replaceAll('\n', '\r\n');
+// Each case runs on LF text and on CRLF text.
+const EOLS = [(t) => t, crlf];
+
 test('lost names a dropped heading, code block, link target, number, checkbox step and table row', () => {
   const edited = DOC.replace('## Notes\n\nNothing else.\n', '')
     .replace('```bash\nnpm ci\n```\n', '')
@@ -44,9 +48,31 @@ test('lost names a dropped heading, code block, link target, number, checkbox st
     .replace('- [x] Read the output.\n', '')
     .replace('| b    | 2     |\n', '')
     .replace('`agent-browser`', 'the browser');
-  const out = lost(DOC, edited).join('\n');
-  for (const what of ['## Notes', 'npm ci', 'https://example.com/releases', '30', 'checkbox', 'table', 'agent-browser'])
-    assert.ok(out.includes(what), `${what} in:\n${out}`);
+  for (const eol of EOLS) {
+    const out = lost(eol(DOC), eol(edited)).join('\n');
+    for (const what of [
+      '## Notes',
+      'npm ci',
+      'https://example.com/releases',
+      '30',
+      'checkbox',
+      'tables',
+      'agent-browser',
+    ])
+      assert.ok(out.includes(what), `${what} in:\n${out}`);
+  }
+});
+
+test('lost names a dropped version or label, a flipped checkbox and a dropped column', () => {
+  const doc = '# T\n\nPinned at v0.3.0 for x64, decided in Q11.\n\n- [x] Done.\n\n| a | b |\n| - | - |\n| 1 | 2 |\n';
+  for (const eol of EOLS) {
+    const out = (edited) => lost(eol(doc), eol(edited)).join('\n');
+    assert.match(out(doc.replace('v0.3.0', 'v0.4.0')), /number: v0\.3\.0/);
+    assert.match(out(doc.replace(' for x64', '')), /number: x64/);
+    assert.match(out(doc.replace(', decided in Q11', '')), /number: Q11/);
+    assert.match(out(doc.replace('[x]', '[ ]')), /checkbox steps: 1 \(0 ticked\), was 1 \(1 ticked\)/);
+    assert.match(out(doc.replace('| a | b |\n| - | - |\n| 1 | 2 |', '| a |\n| - |\n| 1 |')), /tables/);
+  }
 });
 
 test('lost accepts rewording, rewrapping and CRLF', () => {
@@ -57,32 +83,53 @@ test('lost accepts rewording, rewrapping and CRLF', () => {
     .replace('Run `npm test`.', 'Run `npm\ntest` first.')
     .replace('Nothing else.', 'There is nothing else.');
   assert.deepEqual(lost(DOC, edited), []);
-  assert.deepEqual(lost(DOC.replaceAll('\n', '\r\n'), edited), []);
-  assert.deepEqual(lost(DOC, edited.replaceAll('\n', '\r\n')), []);
+  assert.deepEqual(lost(crlf(DOC), edited), []);
+  assert.deepEqual(lost(DOC, crlf(edited)), []);
 });
 
-test('lost flags reordered headings', () => {
+test('lost accepts a code span wrapped onto a line that starts with a dash or a digit', () => {
+  const saved = '# T\n\nRun `cargo clippy --all-targets\n-- -D warnings` and `npm test` within\n500 ms.\n';
+  const edited = '# T\n\nRun `cargo clippy --all-targets -- -D warnings` and `npm test` within 500 ms.\n';
+  for (const eol of EOLS) {
+    assert.deepEqual(lost(eol(saved), eol(edited)), []);
+    assert.deepEqual(lost(eol(edited), eol(saved)), []);
+  }
+});
+
+test('lost accepts a fenced block unindented from a list, and a renumbered list', () => {
+  const saved = '# T\n\n1. Run:\n\n   ```bash\n   npm ci\n   ```\n\n1. Check.\n1. Ship.\n';
+  const edited = '# T\n\n1. Run:\n\n```bash\nnpm ci\n```\n\n2. Check.\n3. Ship.\n';
+  for (const eol of EOLS) assert.deepEqual(lost(eol(saved), eol(edited)), []);
+});
+
+test('lost flags reordered and added headings', () => {
   const edited = DOC.replace('## Steps', '## Tmp').replace('## Notes', '## Steps').replace('## Tmp', '## Notes');
-  assert.match(lost(DOC, edited).join('\n'), /order/);
+  for (const eol of EOLS) {
+    assert.match(lost(eol(DOC), eol(edited)).join('\n'), /reordered/);
+    assert.match(lost(eol(DOC), eol(DOC.replace('## Notes', '## Extra\n\n## Notes'))).join('\n'), /added/);
+  }
 });
 
 test('newFindings ignores labels the original already had', () => {
   const terms = new Set();
-  const saved = 'We settled Q3 last week.\n';
-  const edited = 'We settled Q3 last week, and D2 too.\n';
-  const found = newFindings(saved, edited, { file: 'spec.md', terms });
-  assert.deepEqual(
-    found.map((f) => f.match),
-    ['D2'],
-  );
+  for (const eol of EOLS) {
+    const saved = eol('We settled Q3 last week.\n');
+    const edited = eol('We settled Q3 last week, and D2 too.\n');
+    const found = newFindings(saved, edited, { file: 'spec.md', terms });
+    assert.deepEqual(
+      found.map((f) => f.match),
+      ['D2'],
+    );
+  }
 });
 
-// Runs the CLI in a fresh folder; returns its result and the document afterwards.
-function run(saved, edited) {
+// Runs the CLI in a fresh folder; returns its result and the document afterwards. `saved` undefined leaves no saved
+// copy.
+function run(saved, edited, doc = saved ?? DOC) {
   const dir = mkdtempSync(join(tmpdir(), 'ce-'));
   const paths = { saved: join(dir, 'saved.md'), edited: join(dir, 'edited.txt'), doc: join(dir, 'doc.md') };
-  writeFileSync(paths.saved, saved);
-  writeFileSync(paths.doc, saved);
+  if (saved !== undefined) writeFileSync(paths.saved, saved);
+  writeFileSync(paths.doc, doc);
   if (edited !== undefined) writeFileSync(paths.edited, edited);
   const r = spawnSync(process.execPath, [COMPARE, paths.saved, paths.edited, paths.doc], { encoding: 'utf8' });
   return { ...r, doc: readFileSync(paths.doc, 'utf8') };
@@ -111,22 +158,35 @@ test('the CLI refuses an edit that lost something, and leaves the document', () 
   assert.equal(r.doc, DOC);
 });
 
+test('the CLI exits 2 on any other failure and leaves the document', () => {
+  const r = run(undefined, DOC, 'untouched\n');
+  assert.equal(r.status, 2);
+  assert.match(r.stdout, /unchanged/);
+  assert.equal(r.doc, 'untouched\n');
+});
+
 test("the CLI copies a good edit in the original's line endings", () => {
-  const crlf = DOC.replaceAll('\n', '\r\n');
   const edited = DOC.replace('Nothing else.', 'There is nothing else.');
-  const r = run(crlf, edited);
+  const r = run(crlf(DOC), edited);
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.equal(r.doc, edited.replaceAll('\n', '\r\n'));
-  const lf = run(DOC, edited);
-  assert.equal(lf.doc, edited);
+  assert.equal(r.doc, crlf(edited));
+  assert.equal(run(DOC, edited).doc, edited);
+  assert.equal(run(DOC, crlf(edited)).doc, edited);
+});
+
+test("the CLI keeps the original's final newline", () => {
+  const edited = DOC.replace('Nothing else.\n', 'There is nothing else.');
+  assert.equal(run(DOC, edited).doc, DOC.replace('Nothing else.', 'There is nothing else.'));
+  assert.equal(run(DOC.trimEnd(), edited + '\n\n').doc, DOC.replace('Nothing else.\n', 'There is nothing else.'));
 });
 
 test('the CLI reports only new findings', () => {
-  const saved = '# T\n\nWe settled Q3 last week.\n';
-  const r = run(saved, '# T\n\nWe settled Q3 last week, and D2 too.\n');
-  assert.equal(r.status, 0);
-  assert.match(r.stdout, /D2/);
-  assert.doesNotMatch(r.stdout, /Q3/);
+  for (const eol of EOLS) {
+    const r = run(eol('# T\n\nWe settled Q3 last week.\n'), eol('# T\n\nWe settled Q3 last week, and D2 too.\n'));
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /D2/);
+    assert.doesNotMatch(r.stdout, /Q3/);
+  }
 });
 
 const PHRASES_TSV = join(import.meta.dirname, '../plugins/flows/skills/copyedit/data/phrases.tsv');
