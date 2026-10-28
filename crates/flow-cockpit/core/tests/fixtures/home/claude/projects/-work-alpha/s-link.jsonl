@@ -1,0 +1,2 @@
+{"type":"user","message":{"role":"user","content":"Build the login form."},"timestamp":"2026-01-19T10:00:00.000Z","cwd":"{ROOT}/work/alpha","sessionId":"s-link"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Writing the flow file."},{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"{ROOT}/work/alpha/docs/features/login/flow.md","old_string":"a","new_string":"b"}}]},"timestamp":"2026-01-19T10:00:05.000Z","cwd":"{ROOT}/work/alpha","sessionId":"s-link"}

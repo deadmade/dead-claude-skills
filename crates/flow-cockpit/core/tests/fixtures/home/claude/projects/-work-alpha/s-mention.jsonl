@@ -1,0 +1,2 @@
+{"type":"user","message":{"role":"user","content":"Read docs/features/login/flow.md and summarise it."},"timestamp":"2026-01-19T11:00:00.000Z","cwd":"{ROOT}/work/alpha","sessionId":"s-mention"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"t2","name":"Read","input":{"file_path":"{ROOT}/work/alpha/docs/features/login/flow.md"}},{"type":"text","text":"I read docs/features/login/flow.md."}]},"timestamp":"2026-01-19T11:00:05.000Z","cwd":"{ROOT}/work/alpha","sessionId":"s-mention"}

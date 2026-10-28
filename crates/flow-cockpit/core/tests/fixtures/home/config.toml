@@ -1,0 +1,2 @@
+trusted = ['{ROOT}/work/alpha']
+hidden = ['secret']

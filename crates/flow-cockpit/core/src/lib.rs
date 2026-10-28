@@ -4,3 +4,4 @@ pub mod activity;
 #[cfg(test)]
 mod bindings;
 pub mod doc;
+pub mod index;
