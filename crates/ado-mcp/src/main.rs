@@ -9,6 +9,7 @@ mod remote;
 mod search;
 mod tools;
 mod wi;
+mod wiki;
 
 use rmcp::{ServiceExt, transport::stdio};
 

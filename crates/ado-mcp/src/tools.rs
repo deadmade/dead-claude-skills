@@ -19,6 +19,7 @@ use crate::pr::{
 };
 use crate::search::{self, SearchArgs};
 use crate::wi::{self, WiCommentArgs, WiCreateArgs, WiQueryArgs, WiUpdateArgs, WiViewArgs};
+use crate::wiki::{self, WikiArgs};
 
 /// The tools that change something on the server. Claude Code prompts on every call to these.
 pub(crate) const WRITES: [&str; 12] = [
@@ -44,6 +45,7 @@ Azure DevOps clone, pass project: project_list names them (wi_view takes the wor
 - There is no diff tool. To read a pull request's patch, run a local `git diff` against the target branch \
 (pr_files lists the changed files).\n\
 - search finds work items, wiki pages and code in repos that aren't cloned; for the clone itself, search locally.\n\
+- wiki reads the project's wiki pages; repo_file reads files of repos that aren't cloned.\n\
 - Tools that default to the current branch take a `branch` argument. In a git worktree, pass your own branch: \
 the project folder's branch is not necessarily yours.\n\
 - Every write tool (pr_create, pr_update, pr_comment, pr_reply, pr_thread_status, pr_vote, pr_complete, wi_create, \
@@ -275,6 +277,14 @@ impl Server {
     )]
     async fn search(&self, Parameters(a): Parameters<SearchArgs>) -> CallToolResult {
         reply(search::search(&self.ctx, &a).await)
+    }
+
+    #[tool(
+        description = "Read a wiki page (path) as markdown, or list the wiki's pages without path. One wiki per project is picked automatically.",
+        annotations(read_only_hint = true)
+    )]
+    async fn wiki(&self, Parameters(a): Parameters<WikiArgs>) -> CallToolResult {
+        reply(wiki::wiki(&self.ctx, &a).await)
     }
 }
 

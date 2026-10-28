@@ -1,0 +1,10 @@
+{
+  "path": "/Getting Started",
+  "order": 0,
+  "gitItemPath": "/Getting-Started.md",
+  "subPages": [],
+  "url": "https://ado.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/wiki/wikis/7d1e5c3a-2b4f-4a69-8e0d-91c6f2a4b375/pages/%2FGetting%20Started",
+  "remoteUrl": "https://ado.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_wiki/wikis/7d1e5c3a-2b4f-4a69-8e0d-91c6f2a4b375?pagePath=%2FGetting%20Started",
+  "id": 51,
+  "content": "# Getting Started\n\nClone the repo and run `make`.\nSee [Deploy](/Runbooks/Deploy)."
+}

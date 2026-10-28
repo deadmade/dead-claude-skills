@@ -1,0 +1,16 @@
+{
+  "value": [
+    {
+      "id": "7d1e5c3a-2b4f-4a69-8e0d-91c6f2a4b375",
+      "versions": [{ "version": "wikiMaster" }],
+      "url": "https://ado.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/wiki/wikis/7d1e5c3a-2b4f-4a69-8e0d-91c6f2a4b375",
+      "remoteUrl": "https://ado.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_wiki/wikis/7d1e5c3a-2b4f-4a69-8e0d-91c6f2a4b375",
+      "type": "projectWiki",
+      "name": "My Proj.wiki",
+      "projectId": "b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455",
+      "repositoryId": "7d1e5c3a-2b4f-4a69-8e0d-91c6f2a4b375",
+      "mappedPath": "/"
+    }
+  ],
+  "count": 1
+}

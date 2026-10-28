@@ -1,0 +1,27 @@
+{
+  "value": [
+    {
+      "id": "7d1e5c3a-2b4f-4a69-8e0d-91c6f2a4b375",
+      "versions": [{ "version": "wikiMaster" }],
+      "url": "https://ado.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/wiki/wikis/7d1e5c3a-2b4f-4a69-8e0d-91c6f2a4b375",
+      "remoteUrl": "https://ado.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_wiki/wikis/7d1e5c3a-2b4f-4a69-8e0d-91c6f2a4b375",
+      "type": "projectWiki",
+      "name": "My Proj.wiki",
+      "projectId": "b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455",
+      "repositoryId": "7d1e5c3a-2b4f-4a69-8e0d-91c6f2a4b375",
+      "mappedPath": "/"
+    },
+    {
+      "id": "c84f0b2e-6a1d-4f73-b5e9-3d2a7c1f8e60",
+      "versions": [{ "version": "main" }],
+      "url": "https://ado.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/wiki/wikis/c84f0b2e-6a1d-4f73-b5e9-3d2a7c1f8e60",
+      "remoteUrl": "https://ado.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_wiki/wikis/c84f0b2e-6a1d-4f73-b5e9-3d2a7c1f8e60",
+      "type": "codeWiki",
+      "name": "Docs",
+      "projectId": "b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455",
+      "repositoryId": "3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01",
+      "mappedPath": "/docs"
+    }
+  ],
+  "count": 2
+}

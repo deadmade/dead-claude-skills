@@ -17,7 +17,7 @@ anyhow = "1"
 base64 = "0.23"
 reqwest = { version = "=0.13.5", default-features = false, features = ["rustls-no-provider", "json"] }
 rustls = { version = "0.23", default-features = false, features = ["std"] }
-azure_devops_rust_api = { version = "=0.39.1", default-features = false, features = ["git", "build", "pipelines", "policy", "wit", "core", "ims", "search"] }
+azure_devops_rust_api = { version = "=0.39.1", default-features = false, features = ["git", "build", "pipelines", "policy", "wit", "core", "ims", "search", "wiki"] }
 azure_core = "=1.1.0"
 # Already in the tree through azure_core; implementing its `Policy` needs the macro.
 async-trait = "0.1"

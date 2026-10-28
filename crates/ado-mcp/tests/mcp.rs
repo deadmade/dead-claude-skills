@@ -25,6 +25,10 @@ fn initialize_has_instructions() {
     let instructions = result["instructions"].as_str().unwrap();
     assert!(instructions.contains("git diff"), "{instructions}");
     assert!(instructions.contains("branch"), "{instructions}");
+    assert!(
+        instructions.contains("- wiki reads the project's wiki pages; repo_file reads files of repos that aren't cloned."),
+        "{instructions}"
+    );
     assert!(instructions.chars().count() < 4096);
     assert!(result["capabilities"]["tools"].is_object(), "{result}");
 }
@@ -59,7 +63,7 @@ fn plain_http_url_is_refused() {
     );
 }
 
-const READS: [&str; 13] = [
+const READS: [&str; 14] = [
     "pipeline_log",
     "pipeline_runs",
     "pipeline_view",
@@ -73,6 +77,7 @@ const READS: [&str; 13] = [
     "search",
     "wi_query",
     "wi_view",
+    "wiki",
 ];
 const WRITES: [&str; 12] = [
     "pipeline_cancel",
@@ -154,6 +159,7 @@ fn errors_are_tool_errors_without_pat() {
         ("repo_list", json!({})),
         ("project_list", json!({})),
         ("search", json!({"kind": "code", "text": "x"})),
+        ("wiki", json!({})),
     ];
     let mut called: Vec<&str> = calls.iter().map(|c| c.0).collect();
     called.sort_unstable();

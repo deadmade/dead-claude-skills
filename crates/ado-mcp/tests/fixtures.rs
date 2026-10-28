@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use azure_devops_rust_api::{build, git, ims, pipelines, policy, search, wit};
+use azure_devops_rust_api::{build, git, ims, pipelines, policy, search, wiki, wit};
 use serde::de::DeserializeOwned;
 
 fn fits<T: DeserializeOwned>(body: &[u8]) -> Result<(), String> {
@@ -71,6 +71,10 @@ const TABLE: &[(&str, Check)] = &[
     ("wi-batch.json", fits::<wit::models::WorkItemList>),
     ("wi.json", fits::<wit::models::WorkItem>),
     ("wiql.json", fits::<wit::models::WorkItemQueryResult>),
+    ("wiki-page.json", fits::<wiki::models::WikiPage>),
+    ("wiki-tree.json", fits::<wiki::models::WikiPage>),
+    ("wikis-one.json", fits::<wiki::models::WikiV2List>),
+    ("wikis.json", fits::<wiki::models::WikiV2List>),
 ];
 
 /// Fixtures no crate model reads: the hand-written calls (`connectionData`, `/vsts/info`, `repo_file`'s items), an

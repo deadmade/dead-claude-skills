@@ -130,6 +130,22 @@ fn maps_403_search_scope() {
 }
 
 #[test]
+fn maps_403_wiki_scope() {
+    let fx = Fixture::start();
+    fx.route(ROUTE, vec![projects()]);
+    fx.route(
+        "/tfs/Coll/p1/_apis/wiki/wikis",
+        vec![Resp::new(403, "application/json", r#"{"message":"no"}"#)],
+    );
+    let (err, text) = ado(&fx, &[]).call("wiki", json!({"project": "P"}));
+    assert!(err, "{text}");
+    assert_eq!(
+        text,
+        "the PAT may not do this: it needs the Wiki (Read) scope"
+    );
+}
+
+#[test]
 fn retry_after_once() {
     let fx = Fixture::start();
     fx.route(
