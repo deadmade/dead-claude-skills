@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { mask } from '../plugins/flows/hooks/prose.mjs';
 import { lost, newFindings } from '../plugins/flows/skills/copyedit/scripts/compare.mjs';
 import { findPhrases, formatCandidates, loadPhrases } from '../plugins/flows/skills/copyedit/scripts/phrases.mjs';
+import { findPython, measure } from '../plugins/flows/skills/copyedit/scripts/measure.mjs';
 
 const COMPARE = join(import.meta.dirname, '../plugins/flows/skills/copyedit/scripts/compare.mjs');
 
@@ -469,3 +470,182 @@ test(
     assert.equal(run.stdout, '');
   },
 );
+
+const MEASURE_MJS = join(import.meta.dirname, '../plugins/flows/skills/copyedit/scripts/measure.mjs');
+
+const MEASURED = [
+  '# Notes',
+  '',
+  'There is a reason we did it in order to learn, and `in order to` is code.',
+  '',
+  'The cache files were fetched before the run. It failed to stop.',
+  '',
+].join('\n');
+
+// A spawnSync stand-in: records each call and answers with `result`.
+function stubSpawn(result) {
+  const calls = [];
+  const spawn = (command, args, options) => {
+    calls.push({ command, args, options });
+    return { status: 0, signal: null, stdout: '', stderr: '', ...result };
+  };
+  return { spawn, calls };
+}
+
+// measure() on MEASURED (or its CRLF form) in a fresh folder; returns its result and the files it wrote.
+function measureIn(options, text = MEASURED) {
+  const dir = mkdtempSync(join(tmpdir(), 'measure-'));
+  writeFileSync(join(dir, 'doc.md'), text);
+  const out = join(dir, 'before');
+  const result = measure(join(dir, 'doc.md'), out, options);
+  return {
+    result,
+    candidatesFile: readFileSync(join(out, 'candidates.txt'), 'utf8'),
+    totalsFile: JSON.parse(readFileSync(join(out, 'totals.json'), 'utf8')),
+  };
+}
+
+const PHRASE_ONLY = [
+  { line: 3, kind: 'wordy', text: 'There is', note: '(omit)' },
+  { line: 3, kind: 'wordy', text: 'in order to', note: 'to' },
+  { line: 5, kind: 'negative', text: 'failed to', note: "didn't" },
+];
+const PHRASE_KEYS = [
+  'negative phrases per 100 words',
+  'redundant phrases per 100 words',
+  'words',
+  'wordy phrases per 100 words',
+];
+
+// Skips still write the phrase candidates and the word-based totals.
+function assertPhrasesOnly({ result, candidatesFile, totalsFile }) {
+  assert.deepEqual(result.candidates, PHRASE_ONLY);
+  assert.equal(candidatesFile, formatCandidates(PHRASE_ONLY) + '\n');
+  assert.deepEqual(Object.keys(totalsFile).sort(), PHRASE_KEYS);
+  assert.deepEqual(totalsFile, result.totals);
+  // 28 words, the heading's and the "X" for the code span among them; "There is" counts as a wordy phrase.
+  assert.equal(totalsFile.words, 28);
+  assert.equal(totalsFile['wordy phrases per 100 words'], 7.1);
+  assert.equal(totalsFile['negative phrases per 100 words'], 3.6);
+  assert.equal(totalsFile['redundant phrases per 100 words'], 0);
+}
+
+test('measure merges phrase and spaCy candidates', () => {
+  const spacy = {
+    candidates: [
+      { line: 3, kind: 'abstract subject', text: 'There is', note: "'There' as the subject" },
+      { line: 5, kind: 'passive', text: 'were fetched', note: 'no agent: who fetches?' },
+    ],
+    totals: { words: 22, sentences: 3, '% passive sentences': 33.3 },
+  };
+  for (const eol of EOLS) {
+    const { spawn, calls } = stubSpawn({ stdout: JSON.stringify(spacy) + '\n' });
+    const { result, candidatesFile, totalsFile } = measureIn({ python: '/env/bin/python', spawn }, eol(MEASURED));
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].command, '/env/bin/python');
+    assert.equal(calls[0].args.length, 1);
+    assert.match(calls[0].args[0], /measure\.py$/);
+    assert.equal(calls[0].options.input, mask(eol(MEASURED), { code: 'X' }));
+    assert.equal(calls[0].options.timeout, 540000);
+    // The phrase list's "There is" gives way to spaCy's abstract subject on the same line.
+    const expected = [
+      spacy.candidates[0],
+      { line: 3, kind: 'wordy', text: 'in order to', note: 'to' },
+      spacy.candidates[1],
+      { line: 5, kind: 'negative', text: 'failed to', note: "didn't" },
+    ];
+    assert.deepEqual(result, {
+      candidates: expected,
+      totals: {
+        words: 22,
+        sentences: 3,
+        '% passive sentences': 33.3,
+        // Node's figures count every phrase, "There is" too, per Node's 28 words; spaCy's word count wins.
+        'wordy phrases per 100 words': 7.1,
+        'redundant phrases per 100 words': 0,
+        'negative phrases per 100 words': 3.6,
+      },
+    });
+    assert.equal(candidatesFile, formatCandidates(expected) + '\n');
+    assert.deepEqual(totalsFile, result.totals);
+  }
+});
+
+test('measure skips spaCy without a Python', () => {
+  for (const eol of EOLS) {
+    const { spawn, calls } = stubSpawn({});
+    const run = measureIn({ python: undefined, spawn }, eol(MEASURED));
+    assert.equal(calls.length, 0);
+    assert.equal(run.result.skipped, 'no environment');
+    assertPhrasesOnly(run);
+  }
+});
+
+test("measure reports exit 3's line", () => {
+  for (const status of [3, 1]) {
+    const stderr = `FutureWarning: something\nmeasure.py: can't load spaCy's en_core_web_trf: OSError: no model\n`;
+    const { spawn } = stubSpawn({ status, stderr });
+    const run = measureIn({ python: '/env/bin/python', spawn });
+    assert.equal(
+      run.result.skipped,
+      `exit ${status}: measure.py: can't load spaCy's en_core_web_trf: OSError: no model`,
+    );
+    assertPhrasesOnly(run);
+  }
+});
+
+test('measure reports a timeout', () => {
+  const error = Object.assign(new Error('spawnSync /env/bin/python ETIMEDOUT'), { code: 'ETIMEDOUT' });
+  const { spawn, calls } = stubSpawn({ status: null, signal: 'SIGTERM', error });
+  const run = measureIn({ python: '/env/bin/python', timeoutMs: 2000, spawn });
+  assert.equal(calls[0].options.timeout, 2000);
+  assert.equal(run.result.skipped, 'timed out after 2 s');
+  assertPhrasesOnly(run);
+
+  const killed = measureIn({ python: '/env/bin/python', spawn: stubSpawn({ status: null, signal: 'SIGKILL' }).spawn });
+  assert.equal(killed.result.skipped, 'killed by SIGKILL');
+  assertPhrasesOnly(killed);
+});
+
+test('findPython per platform', () => {
+  const linux = join('/c', 'flows-prose', 'env', 'bin', 'python');
+  const win = join('/c', 'flows-prose', 'env', 'Scripts', 'python.exe');
+  const has = (path) => (p) => p === path;
+  assert.equal(findPython({ config: '/c', platform: 'linux', exists: has(linux) }), linux);
+  assert.equal(findPython({ config: '/c', platform: 'darwin', exists: has(linux) }), linux);
+  assert.equal(findPython({ config: '/c', platform: 'win32', exists: has(win) }), win);
+  assert.equal(findPython({ config: '/c', platform: 'win32', exists: has(linux) }), undefined);
+  assert.equal(findPython({ config: '/c', platform: 'linux', exists: () => false }), undefined);
+});
+
+test('the measure CLI prints the skip line and writes both files', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'measure-cli-'));
+  writeFileSync(join(dir, 'doc.md'), MEASURED);
+  const r = spawnSync(process.execPath, [MEASURE_MJS, join(dir, 'doc.md'), join(dir, 'before')], {
+    encoding: 'utf8',
+    env: { ...process.env, CLAUDE_CONFIG_DIR: join(dir, 'config') },
+  });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout, "spaCy's measures were skipped: no environment\n");
+  assert.equal(readFileSync(join(dir, 'before', 'candidates.txt'), 'utf8'), formatCandidates(PHRASE_ONLY) + '\n');
+  assert.equal(JSON.parse(readFileSync(join(dir, 'before', 'totals.json'), 'utf8')).words, 28);
+});
+
+test("measure reports a Python that won't start or answers with something other than JSON", () => {
+  const error = Object.assign(new Error('spawnSync /env/bin/python ENOENT'), { code: 'ENOENT' });
+  const missing = measureIn({ python: '/env/bin/python', spawn: stubSpawn({ status: null, error }).spawn });
+  assert.equal(missing.result.skipped, "can't start /env/bin/python: spawnSync /env/bin/python ENOENT");
+  assertPhrasesOnly(missing);
+
+  const garbled = measureIn({ python: '/env/bin/python', spawn: stubSpawn({ stdout: 'Traceback' }).spawn });
+  assert.match(garbled.result.skipped, /^unreadable output: /);
+  assertPhrasesOnly(garbled);
+});
+
+test('measure leaves HTML comments out of the phrases and the word count', () => {
+  const commented = MEASURED + '<!-- overrides pack/SKILL.md: "There is a reason, in order to\nwin." -->\n';
+  for (const eol of EOLS) {
+    const run = measureIn({ python: undefined, spawn: stubSpawn({}).spawn }, eol(commented));
+    assertPhrasesOnly(run);
+  }
+});

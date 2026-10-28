@@ -135,6 +135,13 @@ flows holds one standard for prose a person will read, and two ways to apply it.
   audit report, the conductors run it on that document; when it refuses an edit, the gate shows the unedited
   document and what the edit lost.
 
+  Before the edit, code lists candidate problems for the editor to judge: wordy phrases, redundant pairs and
+  negatives from a phrase list, and, when the installer's prose environment exists, spaCy's measures (nominalizations,
+  passives, abstract subjects, sentences with no link to the one before, long openers and subjects, subject-verb gaps
+  and lists in a sentence). Without the environment, `/copyedit` says that spaCy's measures were skipped and why, and
+  the editor gets the phrase candidates alone. After the edit it measures again and shows both sets of figures in one
+  table.
+
 ## Packs
 
 flows carries the skill packs its conductors run, in `packs/`: superpowers, ponytail, mattpocock-picks, pstack-picks,

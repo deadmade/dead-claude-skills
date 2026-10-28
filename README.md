@@ -31,8 +31,9 @@ old installs of them.
 
 The installer (Node standard library only, written in TypeScript and attached to each release built to JS) shows one page per category where you pick what to install, remove or
 update, then applies only the changes. It pins the marketplace to its own release so plugins match the installer, and
-it always denies Claude reading `.env` files and credential dirs and keeps session transcripts (Claude Code deletes them after 30 days unless `cleanupPeriodDays` is set). Optional toggles add ccstatusline
-and dcg; the danger zone can strip all foreign plugins or reset `~/.claude` to a clean slate (after a backup).
+it always denies Claude reading `.env` files and credential dirs and keeps session transcripts (Claude Code deletes them after 30 days unless `cleanupPeriodDays` is set). Optional toggles add ccstatusline,
+dcg and, with flows, the spaCy environment that `/copyedit` measures documents with (about 1.7 GB in
+`~/.claude/flows-prose/`, set up with uv from PATH; Linux and Windows x64, not NixOS yet). The danger zone can strip all foreign plugins or reset `~/.claude` to a clean slate (after a backup).
 Everything ships as one version, cut with `npm run release -- patch` and `git push --follow-tags origin main`; the
 tag builds the installer and the binaries and publishes the GitHub release they're downloaded from. From a checkout,
 `npm ci` once, then `node installer/install.ts` runs the installer (Node 26 or newer) and `npm run typecheck` checks it.

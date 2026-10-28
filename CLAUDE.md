@@ -23,6 +23,11 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   users run `npx --allow-remote=root <release>/latest/download/installer.tgz` (npm 12 refuses tarball URLs without the
   flag). npx caches by URL and keeps running the first installer it fetched (`--prefer-online` too), so each run reads
   the tag `latest/` redirects to and, when it is newer, hands over to that release's versioned URL (`newerInstaller`).
+  The prose step (`steps/prose.ts`, its decisions in `core/prose.ts`) runs last. When flows is selected and the Tools
+  page's prose toggle is on, it runs `uv sync --frozen` on the locked project in `installer/assets/prose/` (CPython
+  3.13, spaCy 3.8, CPU-only PyTorch, `en_core_web_trf`) into `<config>/flows-prose/`, about 1.7 GB, where
+  `/copyedit`'s `scripts/measure.mjs` finds its Python. To change a pin, edit `pyproject.toml` there and run `uv lock`
+  in that folder. NixOS isn't supported yet: the toggle is hidden there.
 - `plugins/` is grouped by how a plugin gets installed: `default/` (the bundle, dead-skills, on every machine),
   `flows` (the conductors), both plain plugins at the top, then `shared/` (what flows pulls in) and `opt-in/` (extras
   nothing else depends on; `opt-in/mcp/` holds the MCP configs, `opt-in/implementation/` the language, database and LSP
@@ -142,6 +147,8 @@ plugins of ours that the manifest no longer lists.
   (`--test-coverage-lines` in `package.json` and `flake.nix`; raise it, never lower it), and `installer/modules.test.ts`
   loads every module so none hides from it. `system/` tests use the real OS: Windows-only cases skip elsewhere. Parsers of what other tools write test against captured output in `core/fixtures/`,
   not shapes we assume. A test for a bug not fixed yet is marked `todo`, so it shows failing without blocking.
+- `/copyedit`'s spaCy tests (`scripts/copyedit.test.mjs`) run only with `FLOWS_PROSE_PYTHON=<python>`, a Python that
+  loads spaCy and `en_core_web_trf`, such as the prose step's `~/.claude/flows-prose/env/bin/python`.
 - `npm ci` once, then `npm run typecheck`: `tsc --noEmit` over `installer/` (sources and tests, strict).
 - tui-review: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/tui-review`.
 - web-mcp: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/web-mcp`.

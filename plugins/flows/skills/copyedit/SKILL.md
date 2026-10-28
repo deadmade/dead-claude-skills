@@ -24,13 +24,26 @@ first, so nothing from an earlier run is mistaken for this one's, then save the 
 rm -rf "<run folder>" && mkdir -p "<run folder>" && cp "<document>" "<run folder>/saved.md"
 ```
 
-## 2. Edit
+## 2. Measure
+
+Code lists the candidate problems the editor should judge first: wordy phrases, redundant pairs and negatives from
+`data/phrases.tsv`, and, when the installer's prose environment (spaCy) exists, the eight kinds `scripts/measure.py`
+finds. Run it with the Bash tool's timeout at 600000 ms:
+
+```bash
+node "${CLAUDE_SKILL_DIR}/../copyedit/scripts/measure.mjs" "<document>" "<run folder>/before/"
+```
+
+It writes `before/candidates.txt` and `before/totals.json`. When spaCy's measures didn't run, it prints one line
+saying so and why; show that line. The phrase candidates are in the file either way.
+
+## 3. Edit
 
 Start one fresh agent with the Agent tool: `subagent_type: "general-purpose"`, `model: "opus"`. Its prompt is exactly
 the text below, with `<doc>` the document's absolute path, `<guide>` the absolute path of
-`"${CLAUDE_SKILL_DIR}/../copyedit/references/edit.md"`, `<candidates>` the candidates file and `<out>` the absolute
-path of `<run folder>/edited.txt`. Include the bracketed paragraph, without its brackets, only when there is a
-candidates file that lists at least one candidate.
+`"${CLAUDE_SKILL_DIR}/../copyedit/references/edit.md"`, `<candidates>` the absolute path of
+`<run folder>/before/candidates.txt` and `<out>` the absolute path of `<run folder>/edited.txt`. Include the
+bracketed paragraph, without its brackets, only when the candidates file lists at least one candidate.
 
 ```
 You are a copy editor. Edit the Markdown document <doc> so it reads clearly to a smart reader who was not in the conversation that produced it.
@@ -46,7 +59,7 @@ Read only the files named here. Write the whole edited document to <out> and wri
 
 The editor writes a `.txt` file because subagents may not be allowed to write Markdown files.
 
-## 3. Check and show
+## 4. Check and show
 
 ```bash
 node "${CLAUDE_SKILL_DIR}/../copyedit/scripts/compare.mjs" "<run folder>/saved.md" "<run folder>/edited.txt" "<document>"
@@ -59,7 +72,10 @@ node "${CLAUDE_SKILL_DIR}/../copyedit/scripts/compare.mjs" "<run folder>/saved.m
   - the diff: `git diff --no-index "<run folder>/saved.md" "<document>"` (it exits 1 when the files differ, which is
     expected);
   - the editor's `Removed:` line;
-  - the new findings, if any, for whoever owns the document to fix.
+  - the new findings, if any, for whoever owns the document to fix;
+  - the measures before and after: run step 2's command again with `"<run folder>/after/"` as its last argument,
+    show its skip line if it printed one, and show `before/totals.json` and `after/totals.json` as one table, a row
+    per figure with its before and after values.
 
 Don't commit. Whoever ran `/copyedit` decides what to keep; the saved copy stays in the run folder until the next run
 on the same document.
