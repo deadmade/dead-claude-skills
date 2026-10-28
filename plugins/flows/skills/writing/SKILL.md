@@ -16,34 +16,35 @@ leave it when it doesn't.
 
 Write first, then revise: read each sentence and paragraph against the diagnoses below, and fix what they find.
 
-## Understanding style (Lesson 1)
+## The reader decides what is clear (Lesson 1)
 
-Readers judge prose by how it feels to read. When a sentence is hard to follow, they blame the writer, so the work of
-being understood is the writer's.
+Readers judge prose by how it feels to read, and writers are poor judges of their own: they already know what they
+meant. So the work of being understood falls on the writer, and the test of a sentence is the reader's experience of
+it, not the writer's.
 
-## Clarity (Lessons 3 to 6)
-
-**Characters as subjects (Lesson 4).** Each sentence tells a story about someone or something: a person, a program, a
-component, the user. Make those characters the grammatical subjects. Read the first seven or eight words: if the
-subject is an abstraction ("the implementation of", "there is", "it is … that"), find the character and start with
-it.
+## Clarity: tell a story of characters doing things (Lessons 3 to 6)
 
 **Actions as verbs (Lesson 3).** Put the actions in verbs, not in nouns made from verbs: "decide", not "make a
-decision"; "remove", not "the removal of". Look for those nouns after weak verbs such as make, perform, have, provide
-and occur.
+decision"; "remove", not "the removal of". Look for those nouns after weak verbs such as be, make, perform, have,
+provide and occur.
 
 - Before: "The removal doesn't depend on the bench." (`docs/features/web-mcp-search/spec.md`, commit `8281c59`)
-- After: "We remove SearXNG whatever the bench shows."
+- After: "We remove SearXNG whatever the search-quality benchmark shows."
 
 Keep a noun when it names a thing the text keeps returning to ("the installation folder"), or when it sums up the
 previous sentence ("These failures…").
 
+**Characters as subjects (Lesson 4).** Each sentence tells a story about someone or something: a person, a program, a
+component, the user. Make those characters the grammatical subjects. Read the first seven or eight words. If the
+subject is an abstraction ("the implementation of the check"), find the character and start with it. If it is empty
+("there is", "it is … that"), start with the character and its verb instead.
+
 **Passive voice (Lesson 4).** Use the active voice when the reader needs to know who acts. Keep the passive when the
 actor is unknown, obvious or unimportant, or when it keeps the paragraph's topic first.
 
-- Before: "The browser is set as `executablePath`." The reader learns which browser and who sets it two sentences
-  later. (`docs/features/web-mcp-search/spec.md`, commit `8281c59`)
-- After: "web-mcp sets the first browser it finds as `executablePath`."
+- Before: "The browser is set as `executablePath`, never the user's installed branded Chrome" (`docs/features/web-mcp-search/spec.md`,
+  commit `8281c59`). The bullet never says who sets it.
+- After: "web-mcp passes the browser it picked as `executablePath`, never the user's installed branded Chrome."
 
 **Old before new (Lesson 5).** Begin a sentence with something the reader already knows, from the sentence before or
 the paragraph's topic, and end it with what is new. Keep a paragraph's subjects on its few main characters, so the
@@ -52,49 +53,52 @@ reader follows one thread instead of a new topic each sentence.
 **Emphasis at the end (Lesson 6).** The end of a sentence is where readers look for the point. Don't let a sentence
 trail off into a qualification, an afterthought or a weak phrase; move context to the front.
 
-- Before: "nixpkgs' Helium dies 10 s after agent-browser starts it otherwise." (`docs/features/web-mcp-search/spec.md`,
-  commit `8281c59`)
-- After: "Without it, nixpkgs' Helium dies 10 s after agent-browser starts it."
+- Before: "running Helium without `exec`: nixpkgs' Helium dies 10 s after agent-browser starts it otherwise"
+  (`docs/features/web-mcp-search/spec.md`, commit `8281c59`)
+- After: "running Helium without `exec`. Started with `exec`, nixpkgs' Helium dies 10 s after agent-browser starts
+  it."
 
-## The whole document (Lessons 7 and 8)
+## The whole document: the problem, then the point (Lessons 7 and 8)
 
 **Motivation (Lesson 7).** Open with the problem: a condition and what it costs the reader. Then state what the
 document decides or shows. A reader should know from the opening why to read on.
 
-**Global coherence (Lesson 8).** State each document's, section's and paragraph's point early, in a short plain
-sentence, and let the rest support it. Use the key terms of that point in what follows, so a reader can skim the
+**Global coherence (Lesson 8).** State each section's and paragraph's point early, in a short plain sentence, and
+let the rest support it; a document's point comes at the end of its introduction, right after the problem. Use the key terms of that point in what follows, so a reader can skim the
 openings and get the argument. A paragraph without a point needs one or can go.
 
-## Concision (Lesson 9)
+## Concision: cut what does no work (Lesson 9)
 
 Cut:
 
 - words that mean little or nothing: "basically", "actually", "really", "kind of";
+- modifiers that don't change the meaning: "extremely important" is "important";
 - redundant pairs: "each and every", "full and complete";
 - words implied by others: "final outcome", "future plans";
 - a phrase where a word will do: "in the event that" → "if", "due to the fact that" → "because";
-- negatives that have an affirmative form: "not many" → "few", "not the same" → "different";
+- negatives that have an affirmative form: "not many" → "few", "not the same" → "different" (only when the
+  meaning holds: "must not include" isn't "must omit");
 - comments about the writing itself: "in this section we will…", "it is important to note that".
 
 Keep a hedge where a claim isn't always true; cut it where it only protects the writer.
 
-Before cutting, apply the density test (from [technical-writing-density](https://github.com/mlwelles/technical-writing-density)):
-does removing this lose a reason, a constraint or a disambiguation that matters to the topic and prevents a likely
-misreading? If so, keep it, even if the sentence gets longer. Keep the details that matter, not every one you can
-think of. Short is not the goal; nothing needless is.
+Before cutting, apply the density test, after [technical-writing-density](https://github.com/mlwelles/technical-writing-density):
+would a careful reader misread the topic without these words, because they carry a reason, a limit or a distinction
+that matters to it? Then they stay, and the sentence is longer for it. Keep the few that matter, not every caveat
+you can list. The aim is not short text; it is text with nothing needless in it.
 
-## Shape (Lesson 10)
+## Shape: reach the subject and verb fast (Lesson 10)
 
 Reach the subject quickly and the verb right after it: no long opening clause, no long subject, no long interruption
-between subject and verb. Break a sentence that sprawls clause after clause into two.
+between subject and verb, or between the verb and its object. Break a sentence that sprawls clause after clause into two.
 
 **Lists for lists.** Four or more parallel items go into a list, or into a table when they share attributes.
 
-- Before: "Order: `WEB_MCP_CHROME`; else the newest Chrome for Testing from `agent-browser install` if it starts
-  (…); else `helium`; else `chromium`." (`docs/features/web-mcp-search/spec.md`, commit `8281c59`)
+- Before: "Order _(…)_: `WEB_MCP_CHROME`; else the newest Chrome for Testing from `agent-browser install` if it starts
+  (…); else `helium`, then `chromium` on PATH." (`docs/features/web-mcp-search/spec.md`, commit `8281c59`)
 - After: a numbered list with one browser per item.
 
-## The reader who wasn't there
+## Write for the reader who wasn't there
 
 You know things the reader doesn't, and it is hard to imagine not knowing them (Pinker calls this the curse of
 knowledge). The worst case in this repo is conversation shorthand.
@@ -110,36 +114,37 @@ such as a flow's `flow.md`, are where those numbers belong.
 
 Spell out an abbreviation at first use unless every reader of this document knows it.
 
-## Exact words
+## Exact words: one reading per sentence
 
 These keep a technical document from being read two ways.
 
-- **The codebase is the word list.** Write the real file, function, flag and command names, not a synonym or a
-  description of them.
+- **Use the code's own names.** Call files, functions, flags and commands what the code calls them; a synonym
+  sends the reader looking for something that doesn't exist.
 - **One name per thing.** Once something has a name, use that name every time.
-- **"This" and "it" point at one obvious thing.** When in doubt, repeat the noun.
-- **"Only" and "not" sit next to the word they change.** "Fails only on growth" and "only fails on growth" say
-  different things.
+- **"This" and "it" point at one obvious thing.** If two things could be meant, name the one you mean.
+- **"Only" and "not" sit next to the word they change.** "The check runs only on Markdown" and "only the check
+  runs on Markdown" say different things.
 - **Code goes in code font.**
 - **Headings state the point**, not just the topic.
 - **A README or guide picks one mode:** a tutorial, a how-to, a reference or an explanation. Split and link instead
   of mixing them.
 
-## Plain speech
+## Plain speech: say what happens
 
-- **Whole sentences.** Don't compress: keep the articles and verbs, and spell out arrows and symbols. "Parser rejects
-  bad date → exit 2" becomes "The parser rejects a bad date and exits with code 2."
-- **Say what a thing does, not how it feels.** Name the mechanism or the number: not "SQL you can read" but
-  "`.toSQL()` returns the exact string sent to the database".
-- **The plain word, not a metaphor noun.** "Base", not "substrate"; "way", not "vector"; "add", not "wedge in".
+- **Whole sentences.** Don't compress prose into notes: keep the articles and verbs, and write out arrows and
+  symbols. "Hash mismatch → abort" becomes "When the hash doesn't match, the installer stops." List items and table
+  cells may be fragments.
+- **Say what a thing does, not how it feels.** Name the mechanism or the number: not "a snappy search" but "a search
+  that answers in under 5 s".
+- **The plain word, not a metaphor noun.** "Base", not "substrate"; "add", not "wedge in"; "way", not "vector".
 - **No chatbot phrases or flattery.** No "I hope this helps", no "Great question".
 
-## The ethics of style (Lesson 12)
+## The Ethics of Style (Lesson 12)
 
 Write as you would want to be written to. Don't make a claim stronger or weaker than the evidence, and don't hide
 what is uncertain or who decided.
 
-## Left out
+## What this standard leaves out
 
 Lessons 2 (correctness) and 11 (elegance) aren't part of this standard. There are no limits on length, no banned
 words and no rules against em dashes, semicolons or colons: a long document for a long feature is fine when every
