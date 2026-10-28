@@ -344,6 +344,9 @@ order and modules (`flows-uses.mjs` joins Task 4), so no second review round; I 
   test"): a test of an editor agent that applies the book's diagnosis against a plain editing prompt and no edit,
   scored by code measures of the book's lessons, facts kept, known problems left, and blind judges.
 
+- 2026-10-28, Options: the candidate measures stay in Python (spaCy), not a Rust port on Harper's tagger and chunker
+  (user: "Let's just stay on python").
+
 ## Walkthrough
 
 | spec goal | plan task | file:line | test |
