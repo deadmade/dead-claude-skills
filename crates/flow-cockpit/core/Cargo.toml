@@ -1,0 +1,15 @@
+[package]
+name = "flow-cockpit-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Core of the flow cockpit: reads flow runs, plans, audits and build logs into typed data."
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+ts-rs = "=12.0.1"
+
+[lints]
+workspace = true

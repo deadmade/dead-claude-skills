@@ -100,6 +100,8 @@ for (const dir of [...pluginDirs, ...packs('.').map((p) => `${PACKS}/${p}`)]) {
 const CRATES = [
   { cargo: 'crates/tui-review/Cargo.toml', lock: 'crates/tui-review/Cargo.lock', name: 'tui-review' },
   { cargo: 'crates/web-mcp/Cargo.toml', lock: 'crates/web-mcp/Cargo.lock', name: 'web-mcp' },
+  // A workspace: [workspace.package] carries the version; the lock lists each member.
+  { cargo: 'crates/flow-cockpit/Cargo.toml', lock: 'crates/flow-cockpit/Cargo.lock', name: 'flow-cockpit-core' },
 ];
 for (const { cargo, lock, name } of CRATES) {
   const crate = /^version = "(.*)"/m.exec(readFileSync(cargo, 'utf8'))?.[1];
