@@ -1,0 +1,7 @@
+[
+  {
+    "hook": "PostToolUse:Write",
+    "exit_code": 2,
+    "output": "docs/spec.md:9:66 shorthand: \"Q3\" \u2192 say what was decided instead of the label\ndocs/spec.md:9:117 shorthand: \"D2\" \u2192 say what was decided instead of the label\ndocs/spec.md:11:102 shorthand: \"D4\" \u2192 say what was decided instead of the label\ndocs/spec.md:34:130 shorthand: \"D3\" \u2192 say what was decided instead of the label\ndocs/spec.md:39:28 undefined: \"NDJSON\" \u2192 spell it out at first use: <words> (NDJSON)\ndocs/spec.md:39:68 shorthand: \"Q5\" \u2192 say what was decided instead of the label\ndocs/spec.md:40:24 undefined: \"CSV\" \u2192 spell it out at first use: <words> (CSV)\ndocs/spec.md:40:30 shorthand: \"D1\" \u2192 say what was decided instead of the label\ndocs/spec.md:46:3 shorthand: \"D1\" \u2192 say what was decided instead of the label\ndocs/spec.md:46:61 shorthand: \"Q1\" \u2192 say what was decided instead of the label\nFix what makes the prose worse for a reader. Leave a sentence as is when the finding is wrong.\n"
+  }
+]

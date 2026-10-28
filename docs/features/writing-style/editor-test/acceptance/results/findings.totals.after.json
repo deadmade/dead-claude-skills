@@ -1,0 +1,16 @@
+{
+  "words": 2416,
+  "wordy phrases per 100 words": 0,
+  "redundant phrases per 100 words": 0,
+  "negative phrases per 100 words": 0,
+  "sentences": 170,
+  "nominalizations per 100 words": 0,
+  "% passive sentences": 11.8,
+  "% abstract subjects": 1.8,
+  "% sentences with no link to the previous sentence": 17.1,
+  "% long openers (over 8 words)": 16.5,
+  "% long subjects (over 7 words)": 2.9,
+  "% subject-verb gaps (over 4 words)": 0.6,
+  "% lists in a sentence": 1.2,
+  "% adjacent sentences sharing a content word": 46
+}
