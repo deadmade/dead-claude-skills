@@ -152,10 +152,18 @@ fn code_hit(r: &CodeResult) -> String {
     )
 }
 
-/// The page path the wiki tool takes, from a hit's git file path: `.md` cut, then in each segment `-` read as a space
-/// and percent-decoded (the wiki stores a literal `-` as `%2D`). A segment that isn't UTF-8 decoded keeps it raw.
-fn page_path(file_path: &str) -> String {
-    let raw = file_path.strip_suffix(".md").unwrap_or(file_path);
+/// The page path the wiki tool takes, from a hit's git file path: a code wiki's folder `mapped` (any case) cut from
+/// the front, `.md` cut, then in each segment `-` read as a space and percent-decoded (the wiki stores a literal `-`
+/// as `%2D`). A segment that isn't UTF-8 decoded keeps it raw.
+fn page_path(file_path: &str, mapped: Option<&str>) -> String {
+    let folder = mapped.map_or("", |m| m.trim_end_matches('/'));
+    let rest = file_path
+        .get(..folder.len())
+        .filter(|head| !folder.is_empty() && head.eq_ignore_ascii_case(folder))
+        .map(|_| &file_path[folder.len()..])
+        .filter(|rest| rest.starts_with('/'))
+        .unwrap_or(file_path);
+    let raw = rest.strip_suffix(".md").unwrap_or(rest);
     let pages: Option<Vec<String>> = raw
         .split('/')
         .map(|s| {
@@ -179,7 +187,10 @@ fn wiki_hit(r: &WikiResult) -> String {
             .as_ref()
             .and_then(|w| w.name.as_deref())
             .unwrap_or("?"),
-        r.path.as_deref().map_or_else(|| "?".to_owned(), page_path)
+        r.path.as_deref().map_or_else(
+            || "?".to_owned(),
+            |p| page_path(p, r.wiki.as_ref().and_then(|w| w.mapped_path.as_deref()))
+        )
     );
     let content = r
         .hits
@@ -380,15 +391,28 @@ mod tests {
 
     #[test]
     fn page_path_undoes_file_names() {
-        assert_eq!(page_path("/Runbooks/Deploy.md"), "/Runbooks/Deploy");
-        assert_eq!(page_path("/Getting-Started.md"), "/Getting Started");
+        assert_eq!(page_path("/Runbooks/Deploy.md", None), "/Runbooks/Deploy");
+        assert_eq!(page_path("/Getting-Started.md", None), "/Getting Started");
         assert_eq!(
-            page_path("/Q%2DA/Pre%2Dflight-Check.md"),
+            page_path("/Q%2DA/Pre%2Dflight-Check.md", None),
             "/Q-A/Pre-flight Check"
         );
-        assert_eq!(page_path("/Q%2DA/Read-me"), "/Q-A/Read me");
+        assert_eq!(page_path("/Q%2DA/Read-me", None), "/Q-A/Read me");
         // Not UTF-8 once decoded: the raw path, `.md` cut.
-        assert_eq!(page_path("/Bad%FF-Name.md"), "/Bad%FF-Name");
+        assert_eq!(page_path("/Bad%FF-Name.md", None), "/Bad%FF-Name");
+    }
+
+    #[test]
+    fn page_path_drops_the_mapped_folder() {
+        let p = |path, mapped| page_path(path, Some(mapped));
+        assert_eq!(p("/docs/Runbooks/Deploy.md", "/docs"), "/Runbooks/Deploy");
+        assert_eq!(p("/Docs/Runbooks/Deploy.md", "/docs/"), "/Runbooks/Deploy");
+        assert_eq!(p("/src/My-Docs/A-B.md", "/src/my-docs"), "/A B");
+        // Not under the folder, or no folder: as it is.
+        assert_eq!(p("/docsx/a.md", "/docs"), "/docsx/a");
+        assert_eq!(p("/docs.md", "/docs"), "/docs");
+        assert_eq!(p("/Runbooks/Deploy.md", "/"), "/Runbooks/Deploy");
+        assert_eq!(p("/Runbooks/Deploy.md", ""), "/Runbooks/Deploy");
     }
 
     #[test]

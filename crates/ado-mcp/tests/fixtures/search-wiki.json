@@ -1,5 +1,5 @@
 {
-  "count": 2,
+  "count": 3,
   "results": [
     {
       "fileName": "Deploy.md",
@@ -54,6 +54,29 @@
         {
           "fieldReferenceName": "title",
           "highlights": ["<highlighthit>Deploy</highlighthit> Checklist"]
+        }
+      ]
+    },
+    {
+      "fileName": "Rollback.md",
+      "path": "/docs/Runbooks/Rollback.md",
+      "collection": { "name": "Coll" },
+      "project": {
+        "id": "5e0d7c21-8a4f-4b39-9c62-d1f3a7e8b240",
+        "name": "Shop",
+        "visibility": null
+      },
+      "wiki": {
+        "id": "a7c3e9f1-5b2d-4c8e-9f6a-1d3b5e7c9a20",
+        "mappedPath": "/docs",
+        "name": "Docs",
+        "version": "main"
+      },
+      "contentId": "4c8e2a6f0b3d7e1a5c9f2b6d0e4a8c3f7b1d5e99",
+      "hits": [
+        {
+          "fieldReferenceName": "content",
+          "highlights": ["Roll back the <highlighthit>deploy</highlighthit> first"]
         }
       ]
     }

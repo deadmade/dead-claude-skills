@@ -364,10 +364,11 @@ fn wiki_hits() {
         "search",
         json!({"kind": "wiki", "text": "deploy", "project": "My Proj"}),
     );
-    // The content hit, not the file-name hit; a page without a content hit (file name, title) gets no snippet.
+    // The content hit, not the file-name hit; a page without a content hit (file name, title) gets no snippet. A code
+    // wiki's page path leaves out the folder it is published from.
     assert_eq!(
         text,
-        "2 hits\nShop/Shop.wiki:/Runbooks/Deploy\n  Run the deploy job & watch the gates\nShop/Shop.wiki:/Runbooks/Deploy Checklist"
+        "3 hits\nShop/Shop.wiki:/Runbooks/Deploy\n  Run the deploy job & watch the gates\nShop/Shop.wiki:/Runbooks/Deploy Checklist\nShop/Docs:/Runbooks/Rollback\n  Roll back the deploy first"
     );
     let body = &bodies(&fx, PROJ_WIKI)[0];
     assert_eq!(body["filters"], json!({"Project": ["My Proj"]}));
