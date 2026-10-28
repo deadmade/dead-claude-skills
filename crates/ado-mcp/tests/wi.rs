@@ -150,6 +150,8 @@ fn view_all_links() {
         "3f2c9a14",
         "098a279a",
         "proxy.log",
+        "1c6f0e2d",
+        "request.har",
         "%2F",
     ] {
         assert!(!text.contains(leak), "{leak} in {text}");

@@ -141,8 +141,8 @@ fn git_artifact(url: &str, kind: &str) -> Option<String> {
     (!proj.is_empty() && !repo.is_empty() && !rest.is_empty()).then(|| rest.to_owned())
 }
 
-/// The links after parent, children and PRs: work item links grouped by the server's name for them, commits and
-/// branches by name, and hyperlinks and attachments only counted, since their URLs stay out of the reply.
+/// The links after parent, children and PRs: work item links grouped by the server's name for them, commits by short
+/// sha, branches by name, and hyperlinks and attachments only counted, since their URLs stay out of the reply.
 fn other_links(w: &WorkItem) -> Vec<String> {
     let mut named: Vec<(&str, Vec<String>)> = Vec::new();
     let (mut commits, mut branches) = (Vec::new(), Vec::new());
@@ -153,22 +153,18 @@ fn other_links(w: &WorkItem) -> Vec<String> {
             "Hyperlink" => hyperlinks += 1,
             "AttachedFile" => files += 1,
             "ArtifactLink" => {
-                let sha = git_artifact(url, "Commit")
-                    .filter(|s| s.bytes().all(|b| b.is_ascii_hexdigit()));
-                let branch = || {
-                    git_artifact(url, "Ref")?
-                        .strip_prefix("GB")
-                        .filter(|n| !n.is_empty())
-                        .map(str::to_owned)
-                };
-                if let Some(sha) = sha {
+                if let Some(sha) = git_artifact(url, "Commit")
+                    && sha.bytes().all(|b| b.is_ascii_hexdigit())
+                {
                     commits.push(sha.get(..8).unwrap_or(&sha).to_owned());
-                } else if let Some(name) = branch() {
-                    branches.push(name);
+                } else if let Some(r) = git_artifact(url, "Ref")
+                    && let Some(name) = r.strip_prefix("GB").filter(|n| !n.is_empty())
+                {
+                    branches.push(name.to_owned());
                 }
             }
             PARENT | CHILD => {}
-            _ if url.contains("/_apis/wit/workItems/") => {
+            _ if url.to_ascii_lowercase().contains("/_apis/wit/workitems/") => {
                 let Some(id) = last_id(url) else { continue };
                 // Without a name, the rel's last word: `System.LinkTypes.Related` reads `Related`.
                 let name = r
@@ -866,6 +862,37 @@ mod tests {
             ["Dependency-Forward: #5", "attachments: 1"]
         );
         assert_eq!(other_links(&item_with(&[])), Vec::<String>::new());
+    }
+
+    /// A work item url in any case; a short sha whole; a branch decoded as UTF-8, a byte that isn't as U+FFFD.
+    #[test]
+    fn other_links_case_short_sha_and_utf8() {
+        let w = item_with(&[
+            rel(
+                "System.LinkTypes.Related",
+                "http://dev.example/tfs/Coll/_apis/wit/workitems/6",
+                &json!({"name": "Related"}),
+            ),
+            rel(
+                "ArtifactLink",
+                &format!("vstfs:///Git/Commit/{IDS}abc12"),
+                &json!({}),
+            ),
+            rel(
+                "ArtifactLink",
+                &format!("vstfs:///Git/Ref/{IDS}GBf%C3%BCr"),
+                &json!({}),
+            ),
+            rel(
+                "ArtifactLink",
+                &format!("vstfs:///Git/Ref/{IDS}GB%FF"),
+                &json!({}),
+            ),
+        ]);
+        assert_eq!(
+            other_links(&w),
+            ["Related: #6", "commits: abc12", "branches: für, \u{FFFD}"]
+        );
     }
 
     #[test]
