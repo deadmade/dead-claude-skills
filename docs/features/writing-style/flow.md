@@ -1,6 +1,6 @@
 ---
 flow: feature
-phase: plan
+phase: evaluate
 ---
 
 # Writing style: flow
@@ -332,6 +332,8 @@ order and modules (`flows-uses.mjs` joins Task 4), so no second review round; I 
   after Claude Code repeats the prompt twice, and appears in the stream only in Claude's own text and the final `result`.
 - Task 3: base 1ba2a0e, untracked at start: none. Sample review gate missed: the model check found 6 problems in about
   7,800 words. Execution stopped after Task 3; see Deviations.
+- 2026-10-28: the plan was rewritten for the re-approved design (Tasks 1 and 2 kept as built; Tasks 3–12 new). The
+  first plan's Task 3 (the sample review) is the gate that missed, recorded above.
 
 ## Rulings
 

@@ -307,8 +307,9 @@ about 1.5 GB.
 3. The installer sets up the environment on Linux, and `measure.py` runs from it on a fixture. On Windows the user
    runs the installer once and the same command; until then, Windows is marked untested.
 4. The editor test, re-run with the shipped pieces (the shipped `measure.py`, guide and `/copyedit` prompt) on the
-   same two documents: `/copyedit` ranks ahead of the plain prompt in both judges' blind rankings of both documents,
-   and loses or changes no more than 1 of the 304 claims.
+   same two documents: `/copyedit`'s version has a better mean rank than the plain prompt's over the four blind
+   rankings (two judges, two documents) and a worse one in none, and loses or changes no more than 1 of the 304
+   claims. In the test, the book with candidates averaged 1.94 against 2.64, and tied once.
 5. In a session that writes a spec, the check's findings reach Claude and it revises without looping.
 
 ## Decisions
