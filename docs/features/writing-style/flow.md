@@ -470,6 +470,12 @@ state.chosen)` runs first (`install.ts:225`); the marker would never be written.
   fixed script path, the document on stdin) and is suppressed for that one file. If wrong, the first two would show
   as a stack trace instead of a skip line.
 
+- 2026-10-28, preflight: `measure.mjs`'s `findPython` repeats `installer/core/prose.ts`'s two-line `prosePython` path
+  rule, because the plugin ships without the installer's TypeScript; the plan mandates both. If wrong, a change to the
+  environment's layout must touch both files.
+- 2026-10-28, Phase 7: the subagent method's final whole-branch review is served by `/verify`'s `/self-review` over
+  the same branch, not run twice. If wrong, one review seat fewer looked at the whole diff.
+
 ## Deviations
 
 - 2026-10-27, Task 3 (sample review gate): the Haiku hook found too little to be worth its cost. A recount of the
@@ -497,7 +503,14 @@ state.chosen)` runs first (`install.ts:225`); the marker would never be written.
 
 ## Walkthrough
 
-| spec goal | plan task | file:line | test |
-| --------- | --------- | --------- | ---- |
+| spec goal                                                       | plan task  | file:line                                                                                                                                                                                                                                                                                    | test                                                                                                                                                                                                                               |
+| --------------------------------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 One rule, stated first                                        | 4          | `plugins/flows/skills/writing/SKILL.md:8`                                                                                                                                                                                                                                                    | `scripts/writing-skill.test.mjs:14` (the rule verbatim in the first paragraph)                                                                                                                                                     |
+| 2 One writing skill, replacing `technical-writing` and `unslop` | 4, 6, 7    | `plugins/flows/skills/writing/SKILL.md:1`; `scripts/flows-uses.mjs:16` (non-conductor skills); `doc-audit/uses.json:5`, `integrate/uses.json:3`; `scripts/sync-pstack.mjs:29-32,75-77`                                                                                                       | `scripts/flows-uses.test.mjs:81,93`; `scripts/sync-lib.test.mjs:68`; check-repo (`checkUses`); source checks recorded under Rulings                                                                                                |
+| 3 A check on every write                                        | 1–3        | `plugins/flows/hooks/hooks.json:10,16`; `plugins/flows/hooks/prose.mjs:51,100,157`                                                                                                                                                                                                           | `plugins/flows/hooks/prose.test.mjs:14,19,26,199`; acceptance criterion 5                                                                                                                                                          |
+| 4 An editor that applies the book                               | 5, 6, 9–12 | `plugins/flows/skills/copyedit/SKILL.md:27,40,62`; `references/edit.md:14`; `scripts/compare.mjs:79`; `scripts/phrases.mjs:35`; `scripts/measure.mjs:54`; `scripts/measure.py:208`; `plugins/flows/references/flow-rules.md:38`; `installer/core/prose.ts:52`, `installer/steps/prose.ts:12` | `scripts/copyedit.test.mjs:44-115,217-253,322,533,574`; `scripts/writing-skill.test.mjs` (copyedit is a conductor; flow-rules runs it); `installer/core/prose.test.ts:8`; `installer/steps/prose.test.ts`; acceptance criteria 3–4 |
+
+Every goal has code and tests; no code lacks a goal (the installer's prose step and the pstack `--ref` serve goals 4
+and 2).
 
 ## Run verdict
