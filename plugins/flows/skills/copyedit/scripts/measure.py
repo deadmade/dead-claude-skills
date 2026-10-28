@@ -6,9 +6,11 @@ stdout: {"candidates": [{"line", "kind", "text", "note"}], "totals": {...}}, lin
 
 The measures and thresholds are those of the writing-style editor test (docs/features/writing-style/editor-test/
 scripts/metrics.py and prototype/parse_check.py), without WordNet: a noun counts as made from a verb by its part of
-speech and its suffix.
+speech and its suffix. "nominalizations per 100 words" counts the nominalization candidates, not every such noun,
+so it isn't comparable with the editor test's figure.
 
-Exit 1 on input that isn't UTF-8, 3 with one line on stderr when spaCy or the model can't load.
+Exit 1 with one line on stderr on input that isn't UTF-8 or when measuring fails, 3 with one line when spaCy or the
+model can't load.
 """
 import bisect
 import json
@@ -16,8 +18,12 @@ import re
 import sys
 import warnings
 
-# Nouns made from verbs: a NOUN whose lemma has one of these suffixes and at least 5 letters.
-NOM_SUFFIX = ("tion", "sion", "ment", "ance", "ence", "al", "ing", "ure", "ancy", "ency", "ity", "sis", "age", "ery")
+# Nouns made from verbs: a NOUN whose lemma has one of these suffixes and at least 5 letters. Two lists, since without
+# WordNet the prototype's 14 also catch plain nouns (message, package, feature): they stay only after a light verb,
+# where the context keeps false hits rare; a subject needs one of the editor test's 7 (metrics.py).
+LIGHT_VERB_SUFFIX = ("tion", "sion", "ment", "ance", "ence", "al", "ing", "ure", "ancy", "ency", "ity", "sis", "age",
+                     "ery")
+SUBJECT_SUFFIX = ("tion", "sion", "ment", "ance", "ence", "ancy", "ency")
 # A verb that carries little when its object is such a noun ("make a decision"), and one that carries little when
 # such a noun is its subject ("the installation happens"). "carry" counts with "out", "take" with "place".
 LIGHT = {"make", "give", "take", "have", "do", "perform", "conduct", "provide", "reach", "achieve", "effect",
@@ -36,19 +42,33 @@ LIST_MARK = re.compile(r"[ \t]*(?:[-*+]|\d{1,9}[.)])(?:[ \t]+\[[ xX]\])?(?:[ \t]
 RULE = re.compile(r"[ \t]*(?:([-*_=])[ \t]*)(?:\1[ \t]*){2,}$")  # thematic break or setext underline
 TABLE_SEPARATOR = re.compile(r"[ \t]*\|?(?:[ \t]*:?-+:?[ \t]*\|)+(?:[ \t]*:?-+:?[ \t]*)?$")
 CELL = re.compile(r"(?:\\\||[^|])+")
+COMMENT = re.compile(r" {0,3}<!--")
 
 
 def blocks(text):
     """The document's blocks, each a list of (offset, text) pieces: a paragraph's lines, a heading, a list item and
     its continuation lines, a table cell. Blank lines, rules, headings, list markers and table rows start a new one."""
-    out, current, current_kind = [], None, None
+    out, current = [], None
     offset = 0
+    item_indent = None  # a paragraph indented this far after a list item belongs to the item
+    in_comment = False
     for raw in text.split("\n"):
         start, offset = offset, offset + len(raw) + 1
         line = raw.rstrip("\r")
+        if in_comment:  # an HTML comment is never prose
+            in_comment = "-->" not in line
+            continue
+        comment = COMMENT.match(line)
+        if comment:
+            in_comment = "-->" not in line[comment.end():]
+            current = None
+            continue
         if not line.strip() or RULE.match(line):
             current = None
             continue
+        indent = len(line) - len(line.lstrip())
+        if item_indent is not None and current is None and indent < item_indent and not LIST_MARK.match(line):
+            item_indent = None
         heading = HEADING.match(line)
         if heading:
             body = CLOSING_HASHES.sub("", line[heading.end():])
@@ -62,13 +82,13 @@ def blocks(text):
             continue
         item = LIST_MARK.match(line)
         if item:
-            current, current_kind = [], "item"
-            out.append((current_kind, current))
+            current, item_indent = [], indent + 2
+            out.append(("item", current))
             current.append((start + item.end(), line[item.end():]))
             continue
         if current is None:
-            current, current_kind = [], "para"
-            out.append((current_kind, current))
+            current = []
+            out.append(("item" if item_indent is not None else "para", current))
         current.append((start, line))
     return out
 
@@ -100,9 +120,9 @@ def content(tokens):
             and len(t.text) > 2}
 
 
-def is_nominalization(t):
+def is_nominalization(t, suffixes=SUBJECT_SUFFIX):
     lemma = t.lemma_.lower()
-    return t.pos_ == "NOUN" and len(lemma) >= 5 and lemma.endswith(NOM_SUFFIX)
+    return t.pos_ == "NOUN" and len(lemma) >= 5 and lemma.endswith(suffixes)
 
 
 def span_text(doc, tokens):
@@ -124,7 +144,7 @@ def clip(tokens, n=12):
 def nominalizations(doc, sent):
     found = []
     for t in sent:
-        if not is_nominalization(t):
+        if not is_nominalization(t, LIGHT_VERB_SUFFIX):
             continue
         h = t.head
         verb = h.lemma_.lower()
@@ -132,7 +152,7 @@ def nominalizations(doc, sent):
             if verb == "carry" and not any(c.lower_ == "out" for c in h.children):
                 continue
             found.append((h, span_text(doc, [h, t]), f"the action is in the noun '{t.text}' after '{h.text}'"))
-        elif t.dep_ in ("nsubj", "nsubjpass") and verb in WEAK:
+        elif t.dep_ in ("nsubj", "nsubjpass") and verb in WEAK and is_nominalization(t):
             if verb == "take" and not any(c.lower_ == "place" for c in h.children):
                 continue
             dets = [c for c in t.children if c.dep_ == "det" and c.i < t.i]
@@ -216,6 +236,7 @@ def measure(nlp, text):
                 add(offsets, token, kind, text, note)
 
             noms = nominalizations(doc, s)
+            nom_tokens = {token.i for token, _, _ in noms}
             m["noms"] += len(noms)
             for token, text, note in noms:
                 add(offsets, token, "nominalization", text, note)
@@ -243,7 +264,7 @@ def measure(nlp, text):
                 if subj.dep_ == "expl":
                     flag("abstract", subj, "abstract subject", f"{subj.text} {root.text}",
                          f"'{subj.text}' as the subject")
-                elif is_nominalization(subj):
+                elif is_nominalization(subj) and subj.i not in nom_tokens:
                     flag("abstract", st[0], "abstract subject", clip(st), f"the subject '{subj.text}' is an action")
                 opening = [t for t in s if t.i <= root.i]
             else:
@@ -293,7 +314,12 @@ def main():
         line = f"measure.py: can't load spaCy's en_core_web_trf: {type(e).__name__}: {e}".splitlines()[0]
         print(line, file=sys.stderr)
         return 3
-    sys.stdout.write(json.dumps(measure(nlp, text)) + "\n")
+    try:
+        result = measure(nlp, text)
+    except Exception as e:
+        print(f"measure.py: {type(e).__name__}: {e}".splitlines()[0], file=sys.stderr)
+        return 1
+    sys.stdout.write(json.dumps(result) + "\n")
     return 0
 
 

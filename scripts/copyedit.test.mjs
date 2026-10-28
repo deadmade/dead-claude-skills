@@ -356,6 +356,15 @@ test(
       assert.ok(SPACY_KINDS.includes(c.kind), c.kind);
       assert.ok(c.line < fence[0] || c.line > fence[1], `candidate in the fenced block: ${JSON.stringify(c)}`);
     }
+    const items = [
+      lines.findIndex((l) => l.startsWith('- The list item')) + 1,
+      lines.indexOf('- Another item follows it.') + 1,
+    ];
+    assert.deepEqual(
+      candidates.filter((c) => c.kind === 'list in a sentence' && c.line >= items[0] && c.line <= items[1]),
+      [],
+      'no list in a sentence inside a list item, its second paragraph included',
+    );
     assert.ok(
       candidates.some((c) => c.kind === 'passive' && c.text === 'were fetched' && c.note === 'no agent: who fetches?'),
       'the passive names its verb',
@@ -392,5 +401,71 @@ test(
     assert.equal(unloaded.status, 3);
     assert.match(unloaded.stderr, /^measure\.py: can't load spaCy's en_core_web_trf: .+\n$/);
     assert.equal(unloaded.stdout, '');
+  },
+);
+
+const measurePy = (text, args = []) =>
+  spawnSync(process.env.FLOWS_PROSE_PYTHON, [...args, MEASURE_PY], {
+    input: mask(text, { code: 'X' }),
+    encoding: 'utf8',
+    timeout: 300000,
+  });
+
+test(
+  'measure.py skips HTML comments and flags only nouns made from verbs as actions',
+  { skip: !process.env.FLOWS_PROSE_PYTHON && 'FLOWS_PROSE_PYTHON is not set' },
+  () => {
+    const doc = [
+      '<!-- overrides pack/SKILL.md: "The marker was written before the run, and there are three reasons." -->',
+      '',
+      '<!--',
+      'There are many reasons for the delay in the schedule, and they were all written down.',
+      '-->',
+      '',
+      'The package is large. The message explains the fix.',
+      '',
+      'The installation of the cache occurs on update.',
+      '',
+    ].join('\n');
+    for (const eol of EOLS) {
+      const run = measurePy(eol(doc));
+      assert.equal(run.status, 0, run.stderr);
+      const { candidates, totals } = JSON.parse(run.stdout);
+      assert.deepEqual(
+        candidates.filter((c) => c.line <= 5),
+        [],
+        'nothing in the HTML comments',
+      );
+      assert.equal(totals.sentences, 3, JSON.stringify(totals));
+      const actions = (line) =>
+        candidates.filter((c) => c.line === line && ['nominalization', 'abstract subject'].includes(c.kind));
+      assert.deepEqual(actions(7), [], 'package and message are not actions');
+      assert.deepEqual(
+        actions(9).map((c) => c.kind),
+        ['nominalization'],
+        `one candidate for "the installation occurs": ${JSON.stringify(actions(9))}`,
+      );
+    }
+  },
+);
+
+test(
+  'measure.py exits 1 with one line when measuring fails after the model loaded',
+  { skip: !process.env.FLOWS_PROSE_PYTHON && 'FLOWS_PROSE_PYTHON is not set' },
+  () => {
+    // A stand-in spaCy whose model has no pipe(), so measure() raises after the load.
+    const run = spawnSync(
+      process.env.FLOWS_PROSE_PYTHON,
+      [
+        '-c',
+        'import runpy, sys, types; sys.modules["spacy"] = types.SimpleNamespace(load=lambda name: object()); ' +
+          'sys.argv = [sys.argv[1]]; runpy.run_path(sys.argv[0], run_name="__main__")',
+        MEASURE_PY,
+      ],
+      { input: 'The cache files were fetched before the run.\n', encoding: 'utf8' },
+    );
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /^measure\.py: .+\n$/);
+    assert.equal(run.stdout, '');
   },
 );

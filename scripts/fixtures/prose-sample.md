@@ -44,6 +44,9 @@ delay, and the installer, after it has checked every file in the lock, writes th
 ```
 
 - The list item checks Python, spaCy, PyTorch, the model and the cache before it starts.
+
+  Its second paragraph checks Python, spaCy, PyTorch, the model and the cache again.
+
 - Another item follows it.
 
 | Step  | What happens                                     |
