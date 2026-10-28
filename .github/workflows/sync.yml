@@ -1,0 +1,94 @@
+name: Sync
+
+# Every vendored upstream, one job each (scripts/sync-sources.mjs lists them, scripts/sync.mjs runs one): sync, check,
+# open or update its sync/<name> PR, open an issue per new upstream skill, and keep a "Sync <name> failing" issue open
+# while it fails. A PR that changes the sync code runs every source as a dry run: no PR, no issues.
+on:
+  schedule:
+    - cron: '0 6 * * 1' # Mondays 06:00 UTC
+  workflow_dispatch:
+    inputs:
+      source:
+        description: 'One source to sync (a name from scripts/sync-sources.mjs); empty for all'
+        type: string
+        default: ''
+  pull_request:
+    paths:
+      - '.github/workflows/sync.yml'
+      - 'scripts/sync*.mjs'
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  list:
+    runs-on: ubuntu-latest
+    outputs:
+      sources: ${{ steps.list.outputs.sources }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Sources
+        id: list
+        env:
+          SOURCE: ${{ inputs.source }}
+        run: echo "sources=$(node scripts/sync.mjs --list "$SOURCE")" >> "$GITHUB_OUTPUT"
+
+  sync:
+    needs: list
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        source: ${{ fromJSON(needs.list.outputs.sources) }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      PUBLISH: ${{ github.event_name != 'pull_request' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # sync-agent-browser.mjs imports installer/core/binaries.ts, so it needs a Node that strips types.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+
+      - name: Sync
+        id: run
+        run: node scripts/sync.mjs run ${{ matrix.source }}
+
+      - name: Issues for new upstream skills
+        if: ${{ !cancelled() && env.PUBLISH == 'true' }}
+        run: node scripts/sync.mjs issues ${{ matrix.source }}
+
+      # A PR opened with the workflow's token starts no other workflow, so test.yml never sees it: check here.
+      - name: Claude Code, for plugin validate
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Repo checks
+        run: node scripts/check-repo.mjs
+
+      - name: Skill scan
+        if: steps.run.outputs.scan == 'true'
+        run: npm run scan-skills
+
+      - name: Open pull request
+        if: env.PUBLISH == 'true'
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          branch: ${{ steps.run.outputs.branch }}
+          delete-branch: true
+          commit-message: ${{ steps.run.outputs.commit-message }}
+          title: ${{ steps.run.outputs.title }}
+          body-path: ${{ steps.run.outputs.body-path }}
+          add-paths: ${{ steps.run.outputs.paths }}
+
+      - name: Report the failure
+        if: failure() && env.PUBLISH == 'true'
+        run: node scripts/sync.mjs failed ${{ matrix.source }} "$RUN_URL"
+
+      - name: Close a failure report
+        if: success() && env.PUBLISH == 'true'
+        run: node scripts/sync.mjs passed ${{ matrix.source }} "$RUN_URL"
