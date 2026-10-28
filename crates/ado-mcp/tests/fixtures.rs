@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use azure_devops_rust_api::{build, git, ims, pipelines, policy, wit};
+use azure_devops_rust_api::{build, git, ims, pipelines, policy, search, wit};
 use serde::de::DeserializeOwned;
 
 fn fits<T: DeserializeOwned>(body: &[u8]) -> Result<(), String> {
@@ -51,6 +51,10 @@ const TABLE: &[(&str, Check)] = &[
     ("pr.json", fits::<git::models::GitPullRequest>),
     ("repo.json", fits::<git::models::GitRepository>),
     ("repos.json", fits::<git::models::GitRepositoryList>),
+    (
+        "search-wi.json",
+        fits::<search::models::WorkItemSearchResponse>,
+    ),
     ("timeline.json", fits::<build::models::Timeline>),
     ("wi-batch.json", fits::<wit::models::WorkItemList>),
     ("wi.json", fits::<wit::models::WorkItem>),

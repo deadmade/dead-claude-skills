@@ -1,0 +1,83 @@
+{
+  "count": 3,
+  "results": [
+    {
+      "project": {
+        "name": "My Proj",
+        "id": "b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455"
+      },
+      "fields": {
+        "system.id": "101",
+        "system.workitemtype": "Bug",
+        "system.title": "Login fails",
+        "system.assignedto": "Jane Roe <jane@example.com>",
+        "system.state": "Active",
+        "system.tags": "auth",
+        "system.rev": "4",
+        "system.createddate": "2026-03-01T09:14:40.033Z",
+        "system.changeddate": "2026-03-05T17:55:36.953Z"
+      },
+      "hits": [
+        {
+          "fieldReferenceName": "system.title",
+          "highlights": ["<highlighthit>Login</highlighthit> fails"]
+        },
+        {
+          "fieldReferenceName": "system.description",
+          "highlights": ["fix <highlighthit>login</highlighthit> &lt;T&gt;"]
+        }
+      ],
+      "url": "https://ado.example/tfs/Coll/_apis/wit/workItems/101"
+    },
+    {
+      "project": {
+        "name": "My Proj",
+        "id": "b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455"
+      },
+      "fields": {
+        "system.id": "102",
+        "system.workitemtype": "Task",
+        "system.title": "Add a login test",
+        "system.assignedto": "",
+        "system.state": "New",
+        "system.tags": "",
+        "system.rev": "1",
+        "system.createddate": "2026-03-02T10:00:00.000Z",
+        "system.changeddate": "2026-03-02T10:00:00.000Z"
+      },
+      "hits": [
+        {
+          "fieldReferenceName": "system.title",
+          "highlights": ["Add a <highlighthit>login</highlighthit> test"]
+        }
+      ],
+      "url": "https://ado.example/tfs/Coll/_apis/wit/workItems/102"
+    },
+    {
+      "project": {
+        "name": "Tools",
+        "id": "0c7e3f52-9a1d-4b6e-8f20-71d4c5a9e3b8"
+      },
+      "fields": {
+        "system.id": "103",
+        "system.workitemtype": "User Story",
+        "system.title": "Single sign-on",
+        "system.assignedto": "Bob Builder <bob@example.com>",
+        "system.state": "Closed",
+        "system.tags": "login; sso",
+        "system.rev": "9",
+        "system.createddate": "2026-02-11T08:30:00.000Z",
+        "system.changeddate": "2026-02-20T16:45:12.500Z"
+      },
+      "hits": [
+        {
+          "fieldReferenceName": "system.tags",
+          "highlights": ["<highlighthit>login</highlighthit>; sso"]
+        }
+      ],
+      "url": "https://ado.example/tfs/Coll/_apis/wit/workItems/103"
+    }
+  ],
+  "infoCode": 0,
+  "facets": null
+}

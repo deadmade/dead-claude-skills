@@ -16,6 +16,7 @@ use crate::pr::{
     self, PrCommentArgs, PrCompleteArgs, PrCreateArgs, PrFilesArgs, PrListArgs, PrReplyArgs,
     PrThreadStatusArgs, PrThreadsArgs, PrUpdateArgs, PrViewArgs, PrVoteArgs,
 };
+use crate::search::{self, SearchArgs};
 use crate::wi::{self, WiCommentArgs, WiCreateArgs, WiQueryArgs, WiUpdateArgs, WiViewArgs};
 
 /// The tools that change something on the server. Claude Code prompts on every call to these.
@@ -41,6 +42,7 @@ work inside a clone without extra arguments (pass project, and repo for the pr_*
 Azure DevOps clone, pass project: project_list names them (wi_view takes the work item's own, wi_update needs none).\n\
 - There is no diff tool. To read a pull request's patch, run a local `git diff` against the target branch \
 (pr_files lists the changed files).\n\
+- search finds work items, wiki pages and code in repos that aren't cloned; for the clone itself, search locally.\n\
 - Tools that default to the current branch take a `branch` argument. In a git worktree, pass your own branch: \
 the project folder's branch is not necessarily yours.\n\
 - Every write tool (pr_create, pr_update, pr_comment, pr_reply, pr_thread_status, pr_vote, pr_complete, wi_create, \
@@ -256,6 +258,14 @@ impl Server {
     )]
     async fn project_list(&self) -> CallToolResult {
         reply(pipeline::project_list(&self.ctx).await)
+    }
+
+    #[tool(
+        description = "Search the collection's work items, code or wiki with the server's own search (ranked). kind and text are required; project (and repo, for code) narrow it.",
+        annotations(read_only_hint = true)
+    )]
+    async fn search(&self, Parameters(a): Parameters<SearchArgs>) -> CallToolResult {
+        reply(search::search(&self.ctx, &a).await)
     }
 }
 

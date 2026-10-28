@@ -113,6 +113,19 @@ fn maps_403_scope() {
     );
 }
 
+/// Search needs the scope of what it searches.
+#[test]
+fn maps_403_search_scope() {
+    let fx = Fixture::start();
+    fx.route(
+        "/tfs/Coll/_apis/search/workitemsearchresults",
+        vec![Resp::new(403, "application/json", r#"{"message":"no"}"#)],
+    );
+    let (err, text) = ado(&fx, &[]).call("search", json!({"kind": "wi", "text": "x"}));
+    assert!(err, "{text}");
+    assert!(text.contains("Code, Work Items or Wiki (Read)"), "{text}");
+}
+
 #[test]
 fn retry_after_once() {
     let fx = Fixture::start();

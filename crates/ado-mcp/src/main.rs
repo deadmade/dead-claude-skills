@@ -5,6 +5,7 @@ mod out;
 mod pipeline;
 mod pr;
 mod remote;
+mod search;
 mod tools;
 mod wi;
 

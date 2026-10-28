@@ -15,7 +15,7 @@ use azure_core::http::headers::{
 };
 use azure_core::http::policies::{Policy, PolicyResult};
 use azure_core::http::{Context, Request, RetryOptions, Transport};
-use azure_devops_rust_api::{Credential, build, git, ims, pipelines, policy, wit};
+use azure_devops_rust_api::{Credential, build, git, ims, pipelines, policy, search, wit};
 use base64::Engine as _;
 use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderMap, HeaderValue, RETRY_AFTER};
 use reqwest::{Client, Method};
@@ -220,6 +220,7 @@ pub(crate) struct Api {
     pub wit: wit::Client,
     pub core: azure_devops_rust_api::core::Client,
     pub ims: ims::Client,
+    pub search: search::Client,
 }
 
 impl Api {
@@ -279,6 +280,7 @@ impl Api {
             wit: area!(wit),
             core: area!(azure_devops_rust_api::core),
             ims: area!(ims),
+            search: area!(search),
             client,
             org_url: cfg.org_url.clone(),
             org,
@@ -498,6 +500,7 @@ fn scope(path: &str) -> Option<&'static str> {
         Some("wit") => Some("Work Items"),
         Some("build" | "pipelines") => Some("Build"),
         Some("projects" | "identities" | "connectionData") => Some("Project and Team (Read)"),
+        Some("search") => Some("Code, Work Items or Wiki (Read), for what you searched"),
         _ => None,
     }
 }

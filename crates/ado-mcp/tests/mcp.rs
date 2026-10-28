@@ -59,7 +59,7 @@ fn plain_http_url_is_refused() {
     );
 }
 
-const READS: [&str; 11] = [
+const READS: [&str; 12] = [
     "pipeline_log",
     "pipeline_runs",
     "pipeline_view",
@@ -69,6 +69,7 @@ const READS: [&str; 11] = [
     "pr_view",
     "project_list",
     "repo_list",
+    "search",
     "wi_query",
     "wi_view",
 ];
@@ -150,6 +151,7 @@ fn errors_are_tool_errors_without_pat() {
         ("pipeline_log", json!({"run": 1})),
         ("repo_list", json!({})),
         ("project_list", json!({})),
+        ("search", json!({"kind": "wi", "text": "x"})),
     ];
     let mut called: Vec<&str> = calls.iter().map(|c| c.0).collect();
     called.sort_unstable();
