@@ -1,0 +1,1 @@
+{"id": "spec-38", "plain": "kept", "book": "changed", "bookcand": "kept", "booksonnet": "kept", "detail": "book: \"The user solves no CAPTCHA, answers no prompt and clicks nothing.\" Original is \"No CAPTCHA solving, no prompts, nothing the user has to click\". Book narrows it to what the user does and drops the general no-CAPTCHA-solving and no-prompts commitment."}

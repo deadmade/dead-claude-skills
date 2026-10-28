@@ -1,8 +1,9 @@
 # Writing style: spec
 
-Status: approved 2026-10-27, after research, a measured comparison of checkers and three rounds of questions. The
-copyedit pass's diff and four smaller points changed after the plan review; the user approved those changes the same
-day.
+Status: approved 2026-10-27, after research, a measured comparison of checkers and three rounds of questions.
+Revised and approved again 2026-10-28, after the Haiku hook failed its sample review and a second test measured an
+editor that applies the book: the write-time check is code only, and an Opus editor, fed candidates that spaCy
+measures, copyedits documents before the user reads them.
 
 ## Intent
 
@@ -29,11 +30,13 @@ word that carries a reason, a constraint or a disambiguation that matters to the
 2. **One writing skill.** It summarizes the lessons of _Style_ that matter for technical documents, in our own words,
    in about three pages. It replaces the two writing skills flows uses today, pstack's `technical-writing` and
    `unslop`, and keeps what they add that _Style_ lacks. Claude reads it whenever it writes prose a person will read.
-3. **Checks on every write.** When Claude writes or edits any Markdown file, two hooks check the new text and return
-   their findings to Claude, which revises. A short script checks what code can decide reliably; Claude Haiku checks
-   what needs judgment.
-4. **A copyedit pass at the gates.** Before a flow shows the user a spec or an audit report, a fresh agent copyedits it
-   against the skill. It catches what a check of one edit can't see: a whole document read as a reader would.
+3. **A check on every write.** When Claude writes or edits any Markdown file, a short script checks the new text for
+   conversation shorthand and undefined abbreviations, and Claude revises. Only the writer can fix shorthand, because
+   only the writer knows what the labels mean.
+4. **An editor that applies the book.** `/copyedit` measures a document against the book's lessons in code, then a
+   fresh Opus agent judges each candidate the code found, runs the book's diagnoses on the rest, and returns the edited
+   document. The flows run it before a gate shows the user a spec, a plan or an audit report; the user can run it on
+   any Markdown file.
 
 ## Non-goals
 
@@ -41,6 +44,7 @@ word that carries a reason, a constraint or a disambiguation that matters to the
 - No banned-word lists. The checks say what to write instead; they don't list AI vocabulary.
 - No grammar, spelling or usage checking (Williams' Lesson 2). Claude rarely breaks those rules, and the comparison
   below showed that tools which check them mostly flag product names and identifiers.
+- No model call on every write. The measured model check found too little to be worth its wait and its context.
 - No rewriting of existing documents. The rule applies to what Claude writes from now on.
 
 ## Anti-goals
@@ -48,7 +52,8 @@ word that carries a reason, a constraint or a disambiguation that matters to the
 The feature fails, even if it works, when:
 
 - it turns documents into choppy, telegraphic prose that drops reasons and caveats;
-- the checks nag so often that Claude rewrites good sentences to silence them, or loops on its own fixes;
+- the check nags so often that Claude rewrites good sentences to silence it, or loops on its own fixes;
+- the editor loses a fact, a condition or a decision while it rewrites;
 - it changes the user's quoted words.
 
 ## Approaches
@@ -71,13 +76,21 @@ The published linters failed the second anti-goal: about 97% of what they flagge
 match patterns for passive voice or negatives were mostly wrong in every tool. Shorthand, though, was caught reliably
 by a pattern (22 of 25) and by Haiku (29 of 29), and only Haiku caught any problem that needs understanding the text.
 
-The user chose Haiku plus a small code check, and asked for the best result rather than the easiest build: size and
-implementation language were not criteria. A local model was considered and left out; prompt hooks call only Claude
-models, and a small local model's precision is unmeasured.
+The user first chose Haiku plus a small code check, and asked for the best result rather than the easiest build:
+size and implementation language were not criteria. Built as a hook, the Haiku check failed its sample review. It
+found 6 problems in about 7,800 words of real flow documents. A recount of the comparison showed why: 27 of Haiku's 31
+catches were shorthand, and it caught only 4 of the 16 other problems.
 
-For how a document reaches the rules, three paths were weighed: hooks on every write plus a fresh agent at the gates;
-a fresh agent writing every flow document; hooks only. The user chose the first. A writer agent for every flow.md
-update would be slow, and the main session would have to pass every decision across.
+A second test measured editors instead of checkers. Four editors rewrote the same spec and a findings report, and two
+judges ranked the versions blind, section by section. The editors were Opus with a plain prompt, Opus with the book's
+method, Opus with the book's method plus a list of candidates that code measured, and Sonnet with the book's method.
+Opus with the book and the candidates ranked best in all four rankings. It fixed 12 of the 16 known problems that
+aren't shorthand, against 6 for the plain prompt, and lost none of the 304 claims the two documents make. No editor
+could repair shorthand, because none of them was there. The evidence is in [flow.md](flow.md#editor-test-2026-10-27-after-the-missed-sample-gate).
+
+So code checks shorthand at write time, while the writer still knows what the labels mean, and the editor does the
+rest on whole documents. The measures stay in Python with spaCy rather than a Rust port, at the user's choice, with the
+large transformer model the test used.
 
 ## The skill
 
@@ -160,124 +173,143 @@ was checked against: Gopen and Swan's "The Science of Scientific Writing" (1990)
   to write "through unslop" (`blast-radius`, `recall`, `show-me-your-work`); the sync's transform points those lines at
   flows' `writing` skill, so no vendored text names a skill that is gone.
 
-## The checks
+## The check
 
-Both checks run as `PostToolUse` hooks of the flows plugin, on `Write` and `Edit` of any Markdown file (`*.md`).
-Claude Code runs matching hooks in parallel, so a write waits only for the slower one.
+The check runs as a `PostToolUse` hook of the flows plugin, on `Write` and `Edit` of any Markdown file (`*.md`).
 
-- Each check sees only the new text: a `Write`'s content, an `Edit`'s `new_string`. Old prose doesn't trigger findings
-  on every edit.
+- It sees only the new text: a `Write`'s content, an `Edit`'s `new_string`. Old prose doesn't trigger findings on
+  every edit.
 - In `flow.md` files the shorthand rule is off. The flow templates structure flow.md by `Round N` and the grilling
   pack numbers its questions, and flow.md is the log where those numbers belong. The templates and the pack stay as
   they are; the skill tells Claude not to carry the numbers into specs and reports.
-- Neither check looks inside code (fenced or inline), front matter, link targets or block quotes, so the user's quoted
+- It doesn't look inside code (fenced or inline), front matter, link targets or block quotes, so the user's quoted
   words stay as they are.
 - Each finding names the place, the problem and a replacement, because feedback with a concrete alternative is what
   helps a model revise.
 - Each report ends with: _"Fix what makes the prose worse for a reader. Leave a sentence as is when the finding is
   wrong."_ Claude doesn't need to silence every finding.
-- The write has already happened when the checks run, so nothing is blocked.
-- There is no counter against loops. Checking only new text and the closing line are the guard; success criterion 4
+- The write has already happened when the check runs, so nothing is blocked.
+- There is no counter against loops. Checking only new text and the closing line are the guard; success criterion 5
   tests it in a real session, and a counter is added only if that test shows looping.
 
-### The code check
+The script is `plugins/flows/hooks/prose-check.mjs`, with its logic in `prose.mjs`: Node, no dependencies, run as a
+command hook. It reads the hook's JSON on stdin and the whole file from disk. With findings, it prints at most 10 to
+stderr and exits 2, which Claude Code shows to Claude. Without findings, or on any error, it exits 0 and prints
+nothing.
 
-A Node script with no dependencies, `plugins/flows/hooks/check.mjs`, run as a command hook. It reads the hook's JSON
-on stdin and the whole file from disk. With findings, it prints at most 10 to stderr and exits 2, which Claude Code
-shows to Claude. Without findings, or on any error, it exits 0 and prints nothing.
-
-| Rule        | Flags                                                                                                                                 |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Rule        | Flags                                                                                                                                                                                                    |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `shorthand` | Conversation references in the new text: `Q` or `D` followed by a number (not a quarter followed by a year, as in "Q1 2027"), `round` followed by a number, "my call", unless the file defines the label |
-| `undefined` | An abbreviation of two to six capitals in the new text that the file doesn't define before it, and that isn't on the common-terms list |
+| `undefined` | An abbreviation of two to six capitals in the new text that the file doesn't define before it, and that isn't on the common-terms list                                                                   |
 
 The common-terms list (API, URL, JSON, CLI, MCP, PR, CI and the like) is a data file next to the script, so it grows
 without code changes. It also holds the capitals that aren't abbreviations in this repo's prose: PASS and FAIL, HEAD,
 emphasis words such as NOT and ONLY, units and file types. A capital word followed by a file extension (`SKILL.md`) is a
 file name, not an abbreviation. A definition counts in either form, `ABBR (words)` or `words (ABBR)`, in a table row
-(`| ABBR | words |`), or in code font. Reading the whole file is what this check adds over the model check: it sees definitions made
-anywhere earlier in the document.
+(`| ABBR | words |`), or in code font. The check reads the whole file, so it sees definitions made anywhere earlier in
+the document.
 
-### The model check
+The sample review found two defects to fix: an abbreviation inside code font was flagged, and a label defined in the
+middle of a line ("everything marked _(my call)_ was decided by Claude") wasn't recognized as defined.
 
-A prompt hook (`type: "prompt"`) with `model` set to Haiku and `continueOnBlock: true`, so its reason goes back to
-Claude and the turn continues. Its prompt carries the rules below and the hook's input. It answers `ok: true` when it
-finds nothing worth fixing, and otherwise `ok: false` with at most 10 findings as its reason.
+## The editor
 
-The hook's input also carries the file as it was before the write (`tool_response.originalFile`), so the prompt tells
-Haiku to judge only the new text in `tool_input` and to ignore `tool_response`. If the sample review shows findings in
-old text, the `Edit` side moves to a command hook that sends Haiku only the `new_string`.
+A skill named `copyedit` in flows, `plugins/flows/skills/copyedit/SKILL.md`, run as `/copyedit <file>`. Like the
+conductors, it runs only when called. It runs three steps.
 
-| Rule             | Flags                                                                                                  | Lesson |
-| ---------------- | ------------------------------------------------------------------------------------------------------ | ------ |
-| `nominalization` | An action buried in a noun: "make a decision", "The removal doesn't depend on…"                        | 3      |
-| `hidden actor`   | A passive that hides an actor the reader needs                                                         | 4      |
-| `wordy`          | A phrase with a shorter equivalent, a redundant pair or modifier, a negative with an affirmative form | 9      |
-| `list`           | Four or more parallel items in running prose that would read better as a list                         | —      |
-| `sprawl`         | A sentence the reader has to reread to parse                                                           | 10     |
-| `unclear`        | A pronoun without a clear antecedent, or a term used before it is explained                            | 5, 8   |
+1. **Measure.** A Python script, `skills/copyedit/scripts/measure.py`, parses the document's prose with spaCy and
+   `en_core_web_trf` and lists candidate problems by line. It masks code, front matter, link targets and block quotes
+   first, as the check does.
 
-It leaves shorthand and abbreviations to the code check. It doesn't flag a passive that keeps the paragraph's topic,
-or a long sentence that reads easily.
+   | Lesson       | Candidates                                                                                                   |
+   | ------------ | ------------------------------------------------------------------------------------------------------------ |
+   | 3 Actions    | Nouns made from verbs, especially after a weak verb ("make", "perform", "provide", "occur")                  |
+   | 4 Characters | Passive sentences; subjects that are abstractions or "there is" / "it is"                                    |
+   | 5 Cohesion   | A sentence that opens with nothing from the sentence before it, in the same paragraph                        |
+   | 6 Emphasis   | A sentence that ends on a weak phrase ("as well", "in this case")                                            |
+   | 9 Concision  | Wordy phrases, redundant pairs and modifiers, negatives with a positive form, words that narrate the writing |
+   | 10 Shape     | A long opening before the subject, a long subject, words between subject and verb, a sentence over 35 words  |
 
-## The copyedit pass
+   The phrase lists come from plainlanguage.gov (CC0) and Strunk (public domain). The nouns that have verbs come from
+   a table generated once from WordNet, whose license allows that with its notice. The script also prints the
+   document's totals for these measures, so the effect of an edit can be compared.
 
-`plugins/flows/references/flow-rules.md` gets one rule: before a gate shows the user a `spec.md` or an audit report, a
-fresh `general-purpose` agent copyedits it. Its prompt is the skill's text plus: _"Copyedit this document for a reader
-who wasn't in the conversation. Don't change its decisions, requirements, quotes or code. Return the edited
-document."_
+2. **Edit.** A fresh `general-purpose` agent on Opus gets the document, the candidate list and the editing guide,
+   `skills/copyedit/references/edit.md`. The guide is the book's method as diagnoses: for each lesson, what to look for
+   and how to revise. The agent judges each candidate (many passives and long openers are fine), runs the diagnoses on
+   the sentences the list doesn't name, and returns the whole edited document as text, plus a list of anything it
+   removed rather than reworded. It keeps every fact, number, quote, code span, link and heading. It leaves
+   conversation labels alone: it can't know what they meant.
+3. **Show.** The skill saves the document's current version to the scratchpad, writes the edited version over it, and
+   shows `git diff --no-index <saved copy> <document>`, the removed-text list, and the measures before and after.
+   Nothing is committed, so it works the same on any branch and inside audits.
 
-- The copyedit agent returns the edited text; it writes nothing itself. The conductor saves the document's current
-  version to the scratchpad, writes the copyedited version over the document, and shows
-  `git diff --no-index <saved copy> <document>` at the gate. Nothing is committed, so the pass works the same on any
-  branch and inside audits. The gate message says the document was copyedited.
-- The copyedit agent also returns a list of anything it removed rather than reworded. The conductor shows that list
-  at the gate, so a lost requirement is visible before approval.
-- The pass runs each time the document goes to a gate, including after a revision round.
+Without the Python environment, step 1 is skipped and says so; the editor still applies the book without a list. The
+test ranked that variant second, ahead of the plain prompt.
 
-Plans and flow.md files get only the hooks. Plans are written for the implementing agents, and flow.md changes after
-every phase, so a copyedit each time would cost more than it gives.
+`plugins/flows/references/flow-rules.md` gets one rule: before a gate shows the user a `spec.md`, a `plan.md` or an
+audit report, the conductor runs `/copyedit` on it, each time the document goes to a gate. The gate message says the
+document was copyedited. flow.md files get only the check; they change after every phase.
+
+## Installing the measures
+
+The installer sets up a Python environment for `measure.py` on Linux x64 and Windows x64, the platforms the other
+binaries ship for. It's a toggle on the tools page, on by default when flows is installed, because the environment is
+about 1.5 GB.
+
+- **uv.** The installer uses `uv` from PATH when it's there (graphify needs it too) and otherwise downloads Astral's
+  release into `~/.claude/bin`, pinned with its sha256 like agent-browser. A weekly workflow bumps the pin, as
+  `sync-agent-browser.yml` does.
+- **The environment.** A small Python project in `installer/assets/prose/`, a `pyproject.toml` and a `uv.lock`, pins
+  CPython 3.13 (uv-managed, not the system one), spaCy 3.8, CPU-only PyTorch from PyTorch's own index, and
+  `en_core_web_trf` 3.8.0 from its GitHub release wheel with its hash. On Linux, PyPI's default PyTorch wheel pulls in
+  about 1.8 GB of CUDA libraries, so the CPU index is required. The installer runs `uv sync --frozen` into
+  `~/.claude/flows-prose/`.
+- **Finding it.** `/copyedit` runs the environment's Python from that folder. A missing folder means the measure step
+  is skipped.
 
 ## Where each concern is resolved
 
-- Which files are checked: resolved in flows' `hooks/hooks.json` (matchers and `if` filters) and in `check.mjs` (the
-  flow.md exception); never seen by the skill, the copyedit pass or the conductors.
-- The model and its settings: resolved in `hooks/hooks.json`; never seen by `check.mjs` or the skill.
-- When a document is copyedited: resolved in `flow-rules.md`; never seen by the hooks or by each conductor's own gate
+- Which files are checked: resolved in flows' `hooks/hooks.json` (matchers and `if` filters) and in `prose.mjs` (the
+  flow.md exception); never seen by the skill, the editor or the conductors.
+- When a document is copyedited: resolved in `flow-rules.md`; never seen by the hook or by each conductor's own gate
   text.
-- What the writing standard says: resolved in the `writing` skill; the conductors and the copyedit pass name the
-  skill and never restate its rules.
+- How a document is edited: resolved in `/copyedit` and its guide; the conductors run it and never restate its steps.
+- Where the Python environment is: resolved in the installer's prose step and in `/copyedit`'s measure step; never
+  seen by `measure.py`, the editor agent or the conductors.
+- What the writing standard says: resolved in the `writing` skill and the editing guide; the conductors name them and
+  never restate their rules.
 
 ## Where it lives
 
-- All of it ships in the flows plugin, because it improves every flow: `skills/writing/SKILL.md`, `hooks/hooks.json`,
-  `hooks/check.mjs` with its test, and the common-terms list. There is no separate plugin.
-- Every flows user gets the hooks in every project, at the cost of a Haiku call per Markdown write. flows' description
-  in `.claude-plugin/marketplace.json` and its `plugin.json` say so, and flows' README says how to turn the hooks off.
+- The plugin parts ship in flows, because they improve every flow: `skills/writing/`, `skills/copyedit/` with its
+  script, data and guide, `hooks/hooks.json`, `hooks/prose.mjs` and `prose-check.mjs` with their test, and the
+  common-terms list. There is no separate plugin.
+- Every flows user gets the check in every project. It costs no model call. flows' README says how to turn it off.
 - `scripts/flows-uses.mjs` learns that a skill Claude may load on its own (no `disable-model-invocation`) is not a
   conductor, so the writing skill needs no `uses.json`, and conductors may list it under `flows`.
-- No crate, binary, installer step or release workflow. `npm test` runs the script's test with the other hook tests.
+- The installer gets one step and one toggle, the prose environment's project files and the uv pin; the repo gets the
+  pin's sync workflow. No crate and no release change.
+- `npm test` runs the check's test, and tests for the parts of `measure.py` that need no spaCy. The spaCy measures
+  are tested against a fixture when the environment exists, and skip otherwise.
 - flows' version already follows the one-version scheme.
-- flows' README describes the skill and the hooks. README.md, CLAUDE.md and THIRD_PARTY.md describe the change, the
-  credit to technical-writing-density, and the two pstack skills no longer vendored.
+- flows' README describes the skill, the check and `/copyedit`. README.md, CLAUDE.md and THIRD_PARTY.md describe the
+  change, the credit to technical-writing-density, the phrase and WordNet data, and the two pstack skills no longer
+  vendored.
 
 ## Success criteria
 
-1. The code check's tests pass, with one fixture per rule: text it must flag and text it must not.
-2. The skill passes a source check before it ships. A fresh agent compares it with the free sources (each lesson of
-   _Style_ stated faithfully, no copied passages) and with `technical-writing` and `unslop` (nothing worth keeping
-   lost). Its findings are fixed or answered.
-3. The checks, run in the exact shape the hooks use (a `Write` of each file and an `Edit` of one paragraph) over
-   `docs/features/web-mcp-search/plan.md` (which the comparison didn't see) and its spec, produce findings that are mostly real: of 20 sampled findings, the user judges at least
-   15 worth fixing.
-4. In a session that writes a spec, the hooks' findings reach Claude and it revises without looping.
-5. The copyedit pass, run on one existing spec, produces a version the user finds easier to read, with no decision,
-   requirement or quote lost.
-
-Criterion 3 is a gate. The checks are built and run from the command line first; the hooks are switched on only after
-the user has reviewed the sample. On a miss, the rules with the most wrong findings are tuned or dropped and the sample
-is run again. The same run shows whether the code check catches anything the model check misses; if it catches
-nothing, the code check is dropped.
+1. The check's tests pass, with one fixture per rule: text it must flag and text it must not, including the two
+   defects the sample review found.
+2. The skill and the editing guide pass a source check before they ship. A fresh agent compares them with the free
+   sources (each lesson of _Style_ stated faithfully, no copied passages) and the skill with `technical-writing` and
+   `unslop` (nothing worth keeping lost). Its findings are fixed or answered.
+3. The installer sets up the environment on Linux, and `measure.py` runs from it on a fixture. On Windows the user
+   runs the installer once and the same command; until then, Windows is marked untested.
+4. The editor test, re-run with the shipped pieces (the shipped `measure.py`, guide and `/copyedit` prompt) on the
+   same two documents: `/copyedit` ranks ahead of the plain prompt in both judges' blind rankings of both documents,
+   and loses or changes no more than 1 of the 304 claims.
+5. In a session that writes a spec, the check's findings reach Claude and it revises without looping.
 
 ## Decisions
 
@@ -292,18 +324,21 @@ The user decided:
 - The skill follows the book's lessons.
 - Free public sources are read before anything is built (done; see [flow.md](flow.md#prior-art)).
 - The best result counts, not the easiest build. This replaced the earlier "checker in Rust, not npm".
-- Haiku plus a code check, chosen after the comparison above.
-- Hooks on every write plus a copyedit agent at the gates, rather than an agent that writes every document.
+- Haiku plus a code check, chosen after the comparison above; then, after the sample review, no model on every write
+  (2026-10-27, "Clearly haiku failed").
+- No hard limits on length either: "I dont mind a long text for a long feautre. I just dont want slop text".
+- The book's method inside the agents, tested before it was chosen; the editor with code candidates, as tested.
+- The measures in Python with spaCy, not Rust ("Let's just stay on python"), with the large model ("Large pls").
+- A check on every write plus an editor before the gates, rather than an agent that writes every document.
 - The unified skill replaces pstack's `technical-writing` and `unslop`, keeping and dropping their rules as listed
   above; the pack stops vendoring them.
 - The hooks cover every Markdown file Claude writes.
 - Everything ships inside flows.
-- The skill is verified against the sources before it ships, and the hooks are gated by the sample review.
-- Accepted as recommended: both checks run on plans and flow.md; no loop counter unless criterion 4 shows looping;
-  the sample review runs on `web-mcp-search/plan.md` and its spec; the concern lines above.
-- After the plan review: the copyedit pass shows a diff against a saved copy instead of committing (this replaced the
-  earlier "commit before and after"); the model check is told to ignore the old file, with a command hook as the
-  fallback; the descriptions state the hooks' cost; `flows-uses.mjs` learns non-conductor skills; the `undefined` rule
+- The skill is verified against the sources before it ships.
+- Accepted as recommended: the check runs on plans and flow.md; no loop counter unless criterion 5 shows looping; the
+  concern lines above.
+- After the first plan review: the copyedit pass shows a diff against a saved copy instead of committing (this
+  replaced the earlier "commit before and after"); `flows-uses.mjs` learns non-conductor skills; the `undefined` rule
   stays, with the common-terms and file-name fixes.
 
 Claude decided, open to change:
@@ -313,16 +348,21 @@ Claude decided, open to change:
 - No fixed sentence-length limit: the model judges sprawl, because no sentence in the sample passed 40 words and the
   published 25- and 30-word limits flagged sentences that read well.
 - Shorthand stays allowed in flow.md, and the flow templates and grilling pack stay unchanged.
-- The copyedit pass covers specs and audit reports, not plans or flow.md, and lists what it removed.
+- The copyedit pass covers specs, plans and audit reports, not flow.md, and lists what it removed. Plans were left
+  out before; the user reads them at Gate 2 too.
+- The editor runs on Opus: Sonnet's edit was the weakest in the test.
+- The editor leaves conversation labels alone instead of guessing what they meant.
+- Python setup: a toggle on by default with flows; uv from PATH or a pinned download; a uv project with a lock in
+  `installer/assets/prose/`; CPython 3.13 managed by uv; the environment in `~/.claude/flows-prose/`.
 - Density's test is paraphrased with credit, not vendored, because it is one paragraph and needs no sync.
 
 ## Left to the builder
 
 - The common-terms list, and what counts as "the file defines the label".
-- How the code check finds the new text of an `Edit` in the file, for line numbers.
-- The model check's prompt, within the rules above.
-- Whether a plugin's `hooks.json` accepts `type: "prompt"`, and which `if` pattern matches Markdown files at any
-  depth: the hooks docs don't say. Check both before relying on them.
+- The measures' thresholds, within the table above, and the candidate list's format.
+- How `/copyedit` finds the Claude config folder when `CLAUDE_CONFIG_DIR` is set, and the Python path inside the
+  environment on Windows (`Scripts\python.exe`).
+- Which file of uv's release archive `downloadBin` extracts, and whether its one-file extraction fits.
 - How the sync transform rewrites the three "through unslop" lines, and the pstack-picks plugin description that names
   `unslop`.
 - The before/after examples in the skill, picked from existing flow documents.

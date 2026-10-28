@@ -1,0 +1,141 @@
+{"id": "spec-1", "section": "Header", "claim": "The spec's status is \"grilled\", in rounds 1 and 2 on 2026-10-23."}
+{"id": "spec-2", "section": "Header", "claim": "The spec was approved on 2026-10-23 at Gate 1."}
+{"id": "spec-3", "section": "Header", "claim": "The decision record for this spec is ADR 0004 (browser search)."}
+{"id": "spec-4", "section": "Header", "claim": "Choices the user made are quoted or marked \"(user)\"; everything marked \"(my call)\" was decided by Claude and is open to change."}
+{"id": "spec-5", "section": "Intent", "claim": "The user likes web-mcp but not its search."}
+{"id": "spec-6", "section": "Intent", "claim": "Running SearXNG in Docker on every machine is annoying, and when SearXNG isn't running, `search` fails outright."}
+{"id": "spec-7", "section": "Intent", "claim": "On 2026-10-22 both test searches on this machine answered \"SearXNG is not reachable\"."}
+{"id": "spec-8", "section": "Intent", "claim": "The user said the results could be \"drastically improved\"."}
+{"id": "spec-9", "section": "Intent", "claim": "Today SearXNG scrapes Bing and Yahoo, which serve one index."}
+{"id": "spec-10", "section": "Intent", "claim": "Today web-mcp throws away the engines' rank and snippets and ranks passages against the whole archive."}
+{"id": "spec-11", "section": "Intent", "claim": "The user rejected every keyed or hosted option and Claude's own WebSearch: paid APIs \"cost money\", free ones \"dont allow scraping\", and a scraper \"is the same problem like searxng\"."}
+{"id": "spec-12", "section": "Intent", "claim": "The user wants a \"claude browser\" where Claude queries, with complete isolation, doesn't mind a window opening briefly as long as results are good, and wants to be a \"normal\" user."}
+{"id": "spec-13", "section": "Intent", "claim": "`search` opens the search engines' own result pages in a browser that belongs to web-mcp, reads them like a person would, and builds its answer from that."}
+{"id": "spec-14", "section": "Intent", "claim": "Slower is fine: the user accepted 3–5 s per search (\"I rather be bit slower and lose all the headache with the limitations etc\")."}
+{"id": "spec-15", "section": "Goals", "claim": "Goal 1: no SearXNG, no keys, no Docker."}
+{"id": "spec-16", "section": "Goals", "claim": "`search` must work on any machine where the installer set up agent-browser and its Chrome; `browser` and the fetch fallback already do today."}
+{"id": "spec-17", "section": "Goals", "claim": "SearXNG goes away completely, including the installer's Docker step (user: \"searxng goes away completly!\")."}
+{"id": "spec-18", "section": "Goals", "claim": "(my call, from \"completely\") Removing SearXNG does not depend on the bench: if a threshold misses, the browser search is tuned; SearXNG is not kept as a fallback."}
+{"id": "spec-19", "section": "Goals", "claim": "Goal 2: each web search opens the result pages of several engines in parallel in web-mcp's own browser."}
+{"id": "spec-20", "section": "Goals", "claim": "The search reads each result's URL, title and snippet off the rendered page."}
+{"id": "spec-21", "section": "Goals", "claim": "The web engines are Google, Bing, DuckDuckGo and Brave, all opened in parallel on every search (grill Q1, user: \"these four should be alright\")."}
+{"id": "spec-22", "section": "Goals", "claim": "No engine that only resells another engine's results is used (user: \"We dont need engines that just use another engine\"), so Startpage and Yahoo are out."}
+{"id": "spec-23", "section": "Goals", "claim": "DuckDuckGo stays even though its links are largely sourced from Bing, because it has its own crawler (grill Q11, user: \"has its own crawler stay\")."}
+{"id": "spec-24", "section": "Goals", "claim": "Goal 3, isolation, is the user's requirement."}
+{"id": "spec-25", "section": "Goals", "claim": "The browser has a persistent profile of its own kept by web-mcp; it is never the user's Chrome, profile, cookies or Google account and is never attached to it (`--auto-connect` and `--cdp` are not used)."}
+{"id": "spec-26", "section": "Goals", "claim": "(my call) The profile is persistent so it keeps cookies and consent choices like a normal user's browser."}
+{"id": "spec-27", "section": "Goals", "claim": "There is one profile per engine, per user and machine, not per project (plan review round 1, D1, user: \"then lets go with A\")."}
+{"id": "spec-28", "section": "Goals", "claim": "Reason for one profile per engine: Chrome can't open one profile twice, the engines run in parallel, and one Chrome can't be headless for some engines and headed for others."}
+{"id": "spec-29", "section": "Goals", "claim": "Each engine's Chrome stays open for about 2 minutes after its last search, then closes itself."}
+{"id": "spec-30", "section": "Goals", "claim": "Searches that arrive while an engine's Chrome is busy wait their turn per engine instead of failing."}
+{"id": "spec-31", "section": "Goals", "claim": "On Windows, each engine's Chrome closes right after its search instead of staying warm (plan review round 2, user: \"A\")."}
+{"id": "spec-32", "section": "Goals", "claim": "Reason for closing on Windows: there agent-browser shows browsers with extensions on the visible desktop, so a warm one would linger as a window."}
+{"id": "spec-33", "section": "Goals", "claim": "The search browser starts with every `AGENT_BROWSER_*` environment variable removed and in its own folder (plan review round 1, D4: yes)."}
+{"id": "spec-34", "section": "Goals", "claim": "Neither the user's agent-browser settings nor a project's `agent-browser.json` can attach the search browser to the user's Chrome or change its profile."}
+{"id": "spec-35", "section": "Goals", "claim": "(my call, after the builder check) Only `search` uses the persistent profile; the `browser` tool and the fetch fallback keep their throwaway sessions."}
+{"id": "spec-36", "section": "Goals", "claim": "Reason: otherwise a page Claude opens, prompt-injected ones included, could set cookies or change consent in the profile every later search uses."}
+{"id": "spec-37", "section": "Goals", "claim": "agent-browser 0.39.1 (checked in its README at v0.39.1) has `--profile <path>` (persistent custom profile directory), `--headed`, `--user-agent` and `tab new`."}
+{"id": "spec-38", "section": "Goals", "claim": "Goal 4: a normal user with no chores: no CAPTCHA solving, no prompts, nothing the user has to click."}
+{"id": "spec-39", "section": "Goals", "claim": "A window may open briefly (user)."}
+{"id": "spec-40", "section": "Goals", "claim": "Consent banners are handled by an extension, not by web-mcp's own code (user: \"could we install extensions that do it automaticly?\")."}
+{"id": "spec-41", "section": "Goals", "claim": "The extension is Consent-O-Matic, from Aarhus University, MIT licensed."}
+{"id": "spec-42", "section": "Goals", "claim": "Consent-O-Matic's README says it answers more than 200 CMPs; its `rules/` folder has `bing.json` and five Google rules (`google_consentdomain_1/2`, `google_cwiz`, `google_eomdialog`, `google_popup`), checked 2026-10-23."}
+{"id": "spec-43", "section": "Goals", "claim": "The extension is loaded with agent-browser's `--extension <path>`, which works headless and headed (0.39.1 README)."}
+{"id": "spec-44", "section": "Goals", "claim": "The search profile is declared in one config file (grill Q12, user: \"is there no way to just say profile has x extensions?\")."}
+{"id": "spec-45", "section": "Goals", "claim": "Chrome has no per-profile extension list short of admin policies (root or the registry)."}
+{"id": "spec-46", "section": "Goals", "claim": "agent-browser's config file takes every flag as a camelCase key, so it can name the profile directory, the extensions, the `executablePath`, the user agent and `headed`."}
+{"id": "spec-47", "section": "Goals", "claim": "web-mcp keeps one config file beside the search profile and passes it with `--config` on every call to a search session."}
+{"id": "spec-48", "section": "Goals", "claim": "A call without `--config` relaunches agent-browser's default browser and the page is lost (spike, D-1)."}
+{"id": "spec-49", "section": "Goals", "claim": "`--config` replaces `~/.agent-browser/config.json` and a project `agent-browser.json` (findings.md)."}
+{"id": "spec-50", "section": "Goals", "claim": "Search calls still run with the search folder as working directory."}
+{"id": "spec-51", "section": "Goals", "claim": "`args` holds no commas, because agent-browser splits it on commas and newlines."}
+{"id": "spec-52", "section": "Goals", "claim": "On Linux, `executablePath` for Helium is a small `#!/bin/sh` wrapper that web-mcp writes beside the profile, running Helium without `exec`."}
+{"id": "spec-53", "section": "Goals", "claim": "Reason for the Helium wrapper: nixpkgs' Helium otherwise dies 10 s after agent-browser starts it (findings.md, upstream #1157)."}
+{"id": "spec-54", "section": "Goals", "claim": "web-mcp itself downloads the pinned Consent-O-Matic Chromium release zip (v1.1.5 today) on the first search, checks its sha256 and unpacks it into the search profile's folder."}
+{"id": "spec-55", "section": "Goals", "claim": "The installer has no step for downloading the extension (grill Q12: yes)."}
+{"id": "spec-56", "section": "Goals", "claim": "The browser is set as `executablePath` and is never the user's installed branded Chrome, because since Chrome 137 branded Chrome ignores extensions loaded from a folder (Chromium PSA) (grill Q12: yes)."}
+{"id": "spec-57", "section": "Goals", "claim": "Browser order (D-1, user: \"there is helium\", \"let's continue\"): `WEB_MCP_CHROME`; else the newest Chrome for Testing from `agent-browser install` if it starts (`--version`, checked once per process; it doesn't on NixOS); else `helium`, then `chromium` on PATH."}
+{"id": "spec-58", "section": "Goals", "claim": "When no browser is found, the search fails with a message naming `WEB_MCP_CHROME`."}
+{"id": "spec-59", "section": "Goals", "claim": "Consent-O-Matic is not loaded for Bing: with it, Bing's result page dies (spike, D-1)."}
+{"id": "spec-60", "section": "Goals", "claim": "`open` reporting success proves nothing (it succeeds for a blank page); an engine's outcome comes only from parsing its page."}
+{"id": "spec-61", "section": "Goals", "claim": "(my call) Consent-O-Matic's choices are \"reject\" for everything."}
+{"id": "spec-62", "section": "Goals", "claim": "(left to the builder, check first) How Consent-O-Matic's preferences are preset without the onboarding page it shows on install."}
+{"id": "spec-63", "section": "Goals", "claim": "(my call, after the builder check) \"Normal browser\" settings are allowed: a regular Chrome user agent (headless Chrome otherwise announces itself as `HeadlessChrome`), a real window size and `Accept-Language`; anything beyond that is the stealth anti-goal."}
+{"id": "spec-64", "section": "Goals", "claim": "Headless or headed is a fixed setting per engine, not a runtime retry (grill Q2, user: \"lets first try headless during implementation. The engines that fail get no headless the rest stays headless\")."}
+{"id": "spec-65", "section": "Goals", "claim": "Every engine starts headless; one that is blocked headless during implementation is switched to headed for good, and the plan records which."}
+{"id": "spec-66", "section": "Goals", "claim": "Goal 5: one engine failing never fails the search."}
+{"id": "spec-67", "section": "Goals", "claim": "\"Blocked\" means a CAPTCHA or \"unusual traffic\" page, or a consent wall that doesn't clear; only blocked earns the rest (plan review round 1, D3: yes)."}
+{"id": "spec-68", "section": "Goals", "claim": "An engine's own \"no results\" page is an empty answer, not a block."}
+{"id": "spec-69", "section": "Goals", "claim": "A network error, a timeout or an unrecognised page skips that engine for this search only, with no rest."}
+{"id": "spec-70", "section": "Goals", "claim": "A blocked engine is skipped and rests for 30 minutes."}
+{"id": "spec-71", "section": "Goals", "claim": "The rest is shared by every web-mcp process on the machine (grill Q3: yes)."}
+{"id": "spec-72", "section": "Goals", "claim": "The answer's source line names the engines used and the ones skipped, each with its reason."}
+{"id": "spec-73", "section": "Goals", "claim": "Only when every engine fails does `search` fail, and its error names each engine's reason."}
+{"id": "spec-74", "section": "Goals", "claim": "Goal 6, better ranking, has its prior art in flow.md#prior-art."}
+{"id": "spec-75", "section": "Goals", "claim": "Fusion: the engines' lists are fused with reciprocal rank fusion, and URLs are normalised before merging."}
+{"id": "spec-76", "section": "Goals", "claim": "Snippets as evidence: each result's snippet is a passage of this search, like a fetched page's passages."}
+{"id": "spec-77", "section": "Goals", "claim": "FreshPrompt found that more snippets meant better answers."}
+{"id": "spec-78", "section": "Goals", "claim": "Fetching: the top pages by fused rank are fetched, as today; (my call) the default count stays 5 and the bench may raise it."}
+{"id": "spec-79", "section": "Goals", "claim": "Scope: passages are ranked only among this search's snippets and pages; archived passages from earlier searches are no longer ranked at all, but the archive is still written (grill Q4: yes)."}
+{"id": "spec-80", "section": "Goals", "claim": "The persistent passage index (`.web/index/`) is no longer written since nothing reads it; an existing one stays on disk untouched (plan review round 1, D2: A)."}
+{"id": "spec-81", "section": "Goals", "claim": "The final order combines BM25 with the fused engine rank (my call); the exact formula is left to the builder and tuned on the bench."}
+{"id": "spec-82", "section": "Goals", "claim": "Goal 7: scholarly engines go through the browser (user: \"we dont need an api. We have the browser\")."}
+{"id": "spec-83", "section": "Goals", "claim": "`papers: true` also opens Google Scholar and Semantic Scholar result pages."}
+{"id": "spec-84", "section": "Goals", "claim": "(my call, offered to the user) OpenAlex, arXiv and Crossref stay as APIs, for clean DOI, abstract and PDF data."}
+{"id": "spec-85", "section": "Goals", "claim": "Paper results are merged by DOI or arXiv id, as `papers::merge` does today, then by normalised title."}
+{"id": "spec-86", "section": "Goals", "claim": "Scholar and Semantic Scholar follow the same block-and-rest rule as the web engines."}
+{"id": "spec-87", "section": "Goals", "claim": "Goal 8, filters without SearXNG, is my call."}
+{"id": "spec-88", "section": "Goals", "claim": "`since` (day, week, month, year) maps to each engine's own date filter; an engine without one is skipped for that search and named."}
+{"id": "spec-89", "section": "Goals", "claim": "`engines` picks which engines to open, from `google`, `bing`, `duckduckgo`, `brave`, `scholar`, `semanticscholar`; an unknown name is refused with the known list."}
+{"id": "spec-90", "section": "Goals", "claim": "(my call, after the builder check) Engines belong to a mode: `scholar` and `semanticscholar` are valid only with `papers: true`, web engines only without it; a mismatch is refused with the mode's list."}
+{"id": "spec-91", "section": "Goals", "claim": "`since` applies to both the engines' date filters and OpenAlex's and arXiv's publication-date filters."}
+{"id": "spec-92", "section": "Goals", "claim": "Crossref is asked only for DOI lookups, as today, so `since` doesn't reach it (plan review round 2, user: \"A\")."}
+{"id": "spec-93", "section": "Goals", "claim": "`category` is removed; site-scoped searches use `site:` in the query, which every engine understands, and the tool description says so."}
+{"id": "spec-94", "section": "Goals", "claim": "Goal 9, measured not claimed, is my call; the user's first web-mcp round was benchmark-driven."}
+{"id": "spec-95", "section": "Goals", "claim": "A search-quality bench runs a fixed query set through the new search, and through the new search limited to `engines: bing` as the baseline."}
+{"id": "spec-96", "section": "Goals", "claim": "There is no SearXNG run in the bench; the user said \"we dont need that. As long as SearXNG is gone its alright. After all just using bing should be the same\"."}
+{"id": "spec-97", "section": "Goals", "claim": "(my call) The bing-only run stands in for today's Bing+Yahoo."}
+{"id": "spec-98", "section": "Goals", "claim": "The query set is about 30 queries covering coding and docs, general web and fresh facts, and papers, each with a labelled answer or expected source."}
+{"id": "spec-99", "section": "Goals", "claim": "The bench reports answer recall: the share of queries whose returned passages contain the labelled answer."}
+{"id": "spec-100", "section": "Goals", "claim": "The bench reports per-engine block rate."}
+{"id": "spec-101", "section": "Goals", "claim": "The bench reports p50 and p95 latency."}
+{"id": "spec-102", "section": "Goals", "claim": "Thresholds are set at Gate 1."}
+{"id": "spec-103", "section": "Goals", "claim": "Goal 10: the built-in WebSearch and WebFetch are denied once web-mcp's browser works, not once SearXNG answers."}
+{"id": "spec-104", "section": "Goals", "claim": "\"Works\" means agent-browser is present and `agent-browser install` succeeded."}
+{"id": "spec-105", "section": "Goals", "claim": "Every SearXNG mention is removed from the shipped code and docs: README, plugin and marketplace `description`s, `.mcp.json`, tool descriptions, GLOSSARY, CLAUDE.md."}
+{"id": "spec-106", "section": "Goals", "claim": "Earlier flows' docs stay as history and keep their SearXNG mentions."}
+{"id": "spec-107", "section": "Hypothesis", "claim": "The thresholds were fixed in the grill."}
+{"id": "spec-108", "section": "Hypothesis", "claim": "Q1 (quality): answer recall of the new `search` is at least 0.10 above its own bing-only run, and at least 0.70 absolute."}
+{"id": "spec-109", "section": "Hypothesis", "claim": "Q2 (speed): p50 at most 5 s, p95 at most 10 s."}
+{"id": "spec-110", "section": "Hypothesis", "claim": "Q3 (reliability): at least one web engine answers on at least 95% of queries."}
+{"id": "spec-111", "section": "Hypothesis", "claim": "Q3 (reliability): no engine's block rate is above 20% over a run of the whole set, with the profile already warm."}
+{"id": "spec-112", "section": "Non-goals", "claim": "Any API key, paid API or hosted search API for any source is a non-goal; the three existing paper APIs stay."}
+{"id": "spec-113", "section": "Non-goals", "claim": "Claude Code's built-in WebSearch as a backend is a non-goal."}
+{"id": "spec-114", "section": "Non-goals", "claim": "SearXNG in any form, local or remote, is a non-goal."}
+{"id": "spec-115", "section": "Non-goals", "claim": "macOS or ARM support is a non-goal."}
+{"id": "spec-116", "section": "Non-goals", "claim": "Automatic CAPTCHA solving or captcha services are a non-goal."}
+{"id": "spec-117", "section": "Anti-goals", "claim": "It is a failure if the user has to click, solve or confirm anything during a search."}
+{"id": "spec-118", "section": "Anti-goals", "claim": "It is a failure if web-mcp touches the user's own Chrome, profile or accounts."}
+{"id": "spec-119", "section": "Anti-goals", "claim": "It is a failure if one blocked engine makes `search` fail or hang past its deadline."}
+{"id": "spec-120", "section": "Anti-goals", "claim": "Stealth plugins, injected scripts that patch browser fingerprints (such as `navigator.webdriver`) and rotating identities to hide the automation are failures: the point is to be a normal browser, not a disguised bot (my call, from \"just want to be a normal user\")."}
+{"id": "spec-121", "section": "Installer", "claim": "The installer stops setting up SearXNG and leaves an existing `searxng` container and its `settings.yml` alone; there is no cleanup step (grill Q5, user: \"no - I havent really installed it on many\")."}
+{"id": "spec-122", "section": "Installer", "claim": "The installer denies the built-in WebSearch and WebFetch once agent-browser is present and `agent-browser install` succeeded; if that fails they stay allowed (grill Q6: yes)."}
+{"id": "spec-123", "section": "Bench", "claim": "Claude writes the ~30 queries with their labelled answers; the user skims them once before the first run, then they are fixed (grill Q8: yes)."}
+{"id": "spec-124", "section": "Bench", "claim": "Thresholds Q1–Q3 as proposed are fixed (grill Q9: yes)."}
+{"id": "spec-125", "section": "Tool interface", "claim": "The `search` tool keeps its name and its `query`, `papers` and `max_passages` parameters."}
+{"id": "spec-126", "section": "Tool interface", "claim": "`engines` and `since` work as in goal 8 and `category` is removed."}
+{"id": "spec-127", "section": "Tool interface", "claim": "No new tools are added (grill Q10: yes)."}
+{"id": "spec-128", "section": "Locale", "claim": "The locale is English, fixed, for every engine (Google `hl=en`, and each engine's own equivalent) (user: \"english pls\")."}
+{"id": "spec-129", "section": "Locale", "claim": "The locale doesn't depend on the machine's locale or IP region."}
+{"id": "spec-130", "section": "Locale", "claim": "A query written in German still finds German pages."}
+{"id": "spec-131", "section": "Constraints", "claim": "The work is in the Rust crate `crates/web-mcp`, with agent-browser pinned at 0.39.1 in `installer/assets/agent-browser.json`."}
+{"id": "spec-132", "section": "Constraints", "claim": "agent-browser is driven as a child process (`browser.rs`, one `--json` call or batch per action)."}
+{"id": "spec-133", "section": "Constraints", "claim": "The targets are Windows and Linux x64."}
+{"id": "spec-134", "section": "Constraints", "claim": "The engine parsers are parsers of what other tools write and test against captured result pages in fixtures (CLAUDE.md's rule), not assumed shapes."}
+{"id": "spec-135", "section": "Constraints", "claim": "Everything pulled lands in `$CLAUDE_PROJECT_DIR/.web/` before Claude sees it, including each engine's result listing, as today's search listing is archived."}
+{"id": "spec-136", "section": "Constraints", "claim": "Page content stays marked untrusted."}
+{"id": "spec-137", "section": "Constraints", "claim": "Installer changes use Node's standard library only, with new logic in `core/` or `system/` and a test next to it."}
+{"id": "spec-138", "section": "Constraints", "claim": "Several web-mcp processes may run at once, one per Claude session, and agent-browser sessions are global per user (`browser.rs:236`)."}
+{"id": "spec-139", "section": "Left to the builder", "claim": "The per-engine result URLs and parsers, block detection, deadlines, the rest period and the headed retry are left to the builder."}
+{"id": "spec-140", "section": "Left to the builder", "claim": "The fusion and the final scoring formula are left to the builder, tuned on the bench."}
+{"id": "spec-141", "section": "Left to the builder", "claim": "How Consent-O-Matic's preferences are preset, and where `agent-browser install` puts Chrome for Testing on each OS, are left to the builder."}

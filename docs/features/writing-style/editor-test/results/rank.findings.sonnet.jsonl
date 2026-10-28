@@ -1,0 +1,16 @@
+{"section": 1, "ranking": ["E", "C", "D", "B", "A"], "why": "E tells the reader what R3/R9 labels mean and keeps the setup list unambiguous; A is terse with undefined cwd/labels.", "meaning_problems": {}}
+{"section": 2, "ranking": ["A", "B", "C", "D", "E"], "why": "Heading only, identical in all five.", "meaning_problems": {}}
+{"section": 3, "ranking": ["A", "D", "B", "E", "C"], "why": "A keeps the CfT 'starts' condition explicit and separates Windows UA, version sources and the check cleanly; C's 'first that exists' misstates the CfT rule.", "meaning_problems": {"C": "Says 'first of these that exists' instead of 'if its --version starts', blurring that CfT must actually run; also 'no spawn' is cryptic."}}
+{"section": 4, "ranking": ["A", "D", "C", "E", "B"], "why": "A names `install` explicitly as the subject of the no-hash claim; B/E leave 'It checks no hash' ambiguous.", "meaning_problems": {}}
+{"section": 5, "ranking": ["A", "D", "B", "C", "E"], "why": "A and D label cause/measured/consequences and keep R9 distinct; E crams consequences into one dense bullet.", "meaning_problems": {}}
+{"section": 6, "ranking": ["B", "D", "E", "C", "A"], "why": "B/D open with 'Helium loads' (A's 'It' is vaguer) and read most plainly.", "meaning_problems": {}}
+{"section": 7, "ranking": ["D", "E", "A", "B", "C"], "why": "D nests URL/sha/size, expands MV3 and states what the defaults do; C is most compressed ('all match', no gloss).", "meaning_problems": {}}
+{"section": 8, "ranking": ["D", "C", "E", "B", "A"], "why": "D/C expand CDP and say 'this tab'; A's 'hides it' is ambiguous about which tab.", "meaning_problems": {}}
+{"section": 9, "ranking": ["B", "A", "D", "C", "E"], "why": "B is explicit about who fetches rules and about the Bing-without-extension check; E is fragmentary ('the retry has the warm-profile ~5 s').", "meaning_problems": {}}
+{"section": 10, "ranking": ["D", "E", "B", "C", "A"], "why": "D states which files were planted and what each did before the contradiction; A is terse about args and Accept-Language.", "meaning_problems": {}}
+{"section": 11, "ranking": ["B", "A", "C", "E", "D"], "why": "B splits the close/open failure into sub-bullets (symptom, cause, consequence); D is telegraphic with verbless fragments.", "meaning_problems": {}}
+{"section": 12, "ranking": ["A", "D", "C", "B", "E"], "why": "Near-identical; A's phrasing for Brave and the verification note is slightly clearer.", "meaning_problems": {}}
+{"section": 13, "ranking": ["A", "B", "C", "D", "E"], "why": "A says it was the residential line that was flagged and is the most explicit; E is telegraphic.", "meaning_problems": {}}
+{"section": 14, "ranking": ["D", "A", "C", "E", "B"], "why": "D/A are clearest on setup and name what was not separated ('two causes'/'two differences'); B is terse.", "meaning_problems": {}}
+{"section": 15, "ranking": ["A", "E", "B", "D", "C"], "why": "A phrases the DuckDuckGo and Brave notes most clearly and explicit about classifying both stages; C is terse ('call both Captcha') and D splits a code span.", "meaning_problems": {}}
+{"section": 16, "ranking": ["B", "E", "D", "A", "C"], "why": "B bullets the scrubbed values and spells out why each fixture was not obtained; C has a broken, dense scrubbing paragraph.", "meaning_problems": {}}

@@ -1,0 +1,47 @@
+{"id": "G1", "plain": "fixed", "book": "fixed", "bookcand": "remains", "booksonnet": "fixed", "note": "plain/book/booksonnet say at the spot that it was rounds of questions to the user; bookcand keeps 'grilled in rounds 1-2' and only its legend paragraph explains it"}
+{"id": "G2", "plain": "fixed", "book": "fixed", "bookcand": "fixed", "booksonnet": "remains", "note": "close: plain and bookcand attribute it only through the 'for two reasons' frame under 'The user ... not its search'; book states it outright"}
+{"id": "G3", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "remains", "note": "all four name the installer (fixing 'It') but keep 'already ... today'"}
+{"id": "G4", "plain": "remains", "book": "remains", "bookcand": "fixed", "booksonnet": "remains", "note": "book glosses the bench (goal 9) but keeps 'The removal'; bookcand rewrites to 'SearXNG goes whatever the ... bench (goal 9) shows'"}
+{"id": "G5", "plain": "remains", "book": "remains", "bookcand": "fixed", "booksonnet": "remains", "note": ""}
+{"id": "G6", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "fixed", "note": "booksonnet drops the label and keeps the user quote; the legends in book/bookcand don't count"}
+{"id": "G7", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "fixed", "note": ""}
+{"id": "G8", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "remains", "note": "booksonnet drops D1 but keeps 'round 1' and the quoted 'A'"}
+{"id": "G9", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "remains", "note": ""}
+{"id": "G10", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "fixed", "note": "close: booksonnet says 'user agreed in plan review round 1', the decision number gone and the meaning in plain words"}
+{"id": "G11", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "remains", "note": ""}
+{"id": "G12", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "remains", "note": ""}
+{"id": "G13", "plain": "remains", "book": "fixed", "bookcand": "fixed", "booksonnet": "fixed", "note": ""}
+{"id": "G14", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "fixed", "note": ""}
+{"id": "G15", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "remains", "note": "bookcand's legend defines D-1 but the spot still reads '(spike, D-1)'"}
+{"id": "G16", "plain": "remains", "book": "remains", "bookcand": "fixed", "booksonnet": "remains", "note": "all four move 'otherwise' to the front; only bookcand introduces Helium there ('when the browser is Helium (see the browser order below)'), the others still name Helium before the order"}
+{"id": "G17", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "remains", "note": ""}
+{"id": "G18", "plain": "fixed", "book": "fixed", "bookcand": "fixed", "booksonnet": "fixed", "note": ""}
+{"id": "G19", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "fixed", "note": "booksonnet's 'user agreed in the grill': Q12 gone and the meaning given; 'the grill' stays as jargon, judged under G41"}
+{"id": "G20", "plain": "fixed", "book": "fixed", "bookcand": "fixed", "booksonnet": "fixed", "note": "close for plain: still passive, but turned into a heading whose sub-bullets answer which browser right away"}
+{"id": "G21", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "fixed", "note": ""}
+{"id": "G22", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "remains", "note": "booksonnet's 'spike D-1' is still the label"}
+{"id": "G23", "plain": "remains", "book": "fixed", "bookcand": "fixed", "booksonnet": "fixed", "note": "plain gives the chain its own bullet but keeps the semicolon prose with nested parentheses"}
+{"id": "G24", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "remains", "note": ""}
+{"id": "G25", "plain": "fixed", "book": "fixed", "bookcand": "fixed", "booksonnet": "fixed", "note": "booksonnet moves the sentence to goal 5, meaning kept"}
+{"id": "G26", "plain": "fixed", "book": "fixed", "bookcand": "fixed", "booksonnet": "fixed", "note": ""}
+{"id": "G27", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "remains", "note": ""}
+{"id": "G28", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "fixed", "note": ""}
+{"id": "G29", "plain": "fixed", "book": "fixed", "bookcand": "fixed", "booksonnet": "remains", "note": "plain/book/bookcand put the 30-minute rest before 'only a block earns the rest'; booksonnet keeps the original order"}
+{"id": "G30", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "fixed", "note": "same call as G10"}
+{"id": "G31", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "fixed", "note": ""}
+{"id": "G32", "plain": "remains", "book": "fixed", "bookcand": "fixed", "booksonnet": "remains", "note": "close for book: active, with reciprocal rank fusion as the subject rather than web-mcp"}
+{"id": "G33", "plain": "remains", "book": "fixed", "bookcand": "remains", "booksonnet": "remains", "note": "bookcand's 'fuses ... with reciprocal rank fusion' still repeats"}
+{"id": "G34", "plain": "fixed", "book": "remains", "bookcand": "remains", "booksonnet": "remains", "note": "close: plain's 'FreshPrompt found that' marks it as a study; 'In FreshPrompt, ...' in the other three leaves the name bare"}
+{"id": "G35", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "fixed", "note": ""}
+{"id": "G36", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "remains", "note": "booksonnet drops D2 but keeps the quoted 'A'"}
+{"id": "G37", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "remains", "note": ""}
+{"id": "G38", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "remains", "note": ""}
+{"id": "G39", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "remains", "note": ""}
+{"id": "G40", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "remains", "note": "booksonnet removes the 'proposed' contradiction but 'Gate 1' stays unexplained"}
+{"id": "G41", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "remains", "note": ""}
+{"id": "G42", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "fixed", "note": ""}
+{"id": "G43", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "fixed", "note": ""}
+{"id": "G44", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "fixed", "note": ""}
+{"id": "G45", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "fixed", "note": ""}
+{"id": "G46", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "fixed", "note": ""}
+{"id": "G47", "plain": "remains", "book": "remains", "bookcand": "remains", "booksonnet": "remains", "note": "'the headed retry' is unchanged in all four"}

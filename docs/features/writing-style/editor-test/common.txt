@@ -1,0 +1,6 @@
+Rules for every edit:
+- Keep every fact, decision, number, name, date, version, quote (text in quotation marks attributed to someone stays word for word), code span, code block, link and link target. Nothing the document says may be lost or changed in meaning.
+- Keep every heading and the order of sections. Inside a section you may rewrite, reorder, merge or split sentences, and turn prose into a list or a list into prose.
+- Don't add content the original doesn't support. Don't add a summary, an introduction or a conclusion the original lacks.
+- Write the whole edited document (not a diff, not a summary of changes) to the output path with the Write tool, then reply with only "done" and the output path.
+- Read only the files named in this prompt. Don't open other files or the web.
