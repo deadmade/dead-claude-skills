@@ -106,7 +106,7 @@ the measures; Task 13 is acceptance.
 2. An editor result that drops a section, a code block, a checkbox step or a table row, or is empty, missing or left
    over from an earlier run: `/copyedit` writes nothing and names what was lost. Pinned in Task 5.
 3. The installer re-run with the environment current: no download beyond uv's own check; the toggle unticked, before
-   or after an install: the marker keeps it off; flows deselected: the folder is removed without the marker. Pinned
+   or after an install: the marker keeps it off (`unticked` compares the screens' start with their result); flows deselected: the folder is removed without the marker. Pinned
    in Task 11.
 4. A Windows delete that fails on a locked file: one failure line, and the summary still prints. Pinned in Task 11.
 5. `/copyedit` without the environment, or with one whose model doesn't load, or that times out: the phrase
@@ -286,10 +286,9 @@ Finding[]`: the check's findings on the edited text whose `rule` and `match` occ
     its `SKILL.md`.
 
 - [ ] **Step 1: Write the failing tests** in `scripts/copyedit.test.mjs`: `lost names a dropped heading, code block,
-    link target, number, checkbox step and table row`; `lost accepts rewording, rewrapping and CRLF`; `lost flags
-    reordered headings`; `newFindings ignores labels the original already had` (a saved copy with `Q3`; an edit
-      keeping `Q3` and adding `D2` reports only `D2`); `the CLI refuses a missing edit` (exit 1, one line, the document
-      unchanged); `the CLI copies a good edit in the original's line endings` (a CRLF saved copy and an LF edit give a
+  link target, number, checkbox step and table row`; `lost accepts rewording, rewrapping and CRLF`; `lost flags
+  reordered headings`; `newFindings ignores labels the original already had` (a saved copy with `Q3`; an edit
+      keeping `Q3` and adding `D2` reports only `D2`); `the CLI refuses a missing edit` and `the CLI refuses an empty edit` (zero bytes, and whitespace only; exit 1, one line, the document unchanged); `the CLI copies a good edit in the original's line endings` (a CRLF saved copy and an LF edit give a
       CRLF document). In `writing-skill.test.mjs`: `copyedit is a conductor` (`disable-model-invocation: true`, its
       `uses.json` passes `checkUses`).
 
@@ -364,11 +363,11 @@ Finding[]`: the check's findings on the edited text whose `rule` and `match` occ
 
 - [ ] **Step 4: Edit the conductors.** doc-audit Phase 5 runs `flows:writing` over the changed docs; integrate Phase 2
       passes title and body through it. In both `uses.json`, replace the pstack writing entries with `"flows":
-    ["writing"]` (integrate keeps `"pstack-picks": ["blast-radius"]`). Run `node scripts/flows-uses.mjs`, then update
+  ["writing"]` (integrate keeps `"pstack-picks": ["blast-radius"]`). Run `node scripts/flows-uses.mjs`, then update
       the `/integrate` row's text in flows' README by hand.
 
 - [ ] **Step 5: Run the tests.** Run: `node --test scripts/writing-skill.test.mjs scripts/flows-uses.test.mjs && node
-    scripts/check-repo.mjs`. Expected: PASS, then "repo checks passed" (check-repo also fails if a `uses.json` still
+  scripts/check-repo.mjs`. Expected: PASS, then "repo checks passed" (check-repo also fails if a `uses.json` still
       names a removed pstack skill after Task 7).
 
 - [ ] **Step 6: Commit**
@@ -397,13 +396,12 @@ Finding[]`: the check's findings on the edited text whose `rule` and `match` occ
 
 - Consumes: `flows:writing` from Task 4.
 - Produces: `sparseClone(url, patterns, { ref })` where `ref` may be a branch, a tag, or a 40-hex commit; a commit is
-  fetched with `git fetch --depth 1 origin <commit>` and checked out, since `clone --branch` takes only names.
+  fetched with `git fetch origin <commit>`, with `--depth` as the clone's `depth` option sets it, and checked out, since `clone --branch` takes only names.
   `node scripts/sync-pstack.mjs --ref <commit>` syncs that commit; without it, upstream's default branch as today, so
   the weekly workflow is unchanged.
 
 - [ ] **Step 1: Write the failing test** in `sync-lib.test.mjs`: `sparseClone checks out a commit` against a local
-      bare repository with two commits (the test builds it with `git init`); `ref` = the first commit's hash gives that
-      commit's file contents. Run `node --test scripts/sync-lib.test.mjs`: FAIL.
+      bare repository with two commits (the test builds it with `git init` and commits with `-c user.name=t -c user.email=t@t`, since CI has no identity) cloned over `file://` so `--depth` and `--filter` apply; `ref` = the first commit's hash gives that commit's file contents. Run `node --test scripts/sync-lib.test.mjs`: FAIL.
 
 - [ ] **Step 2: Implement** the commit `ref` and `--ref`. Run the test: PASS.
 
@@ -486,9 +484,9 @@ Phrase[]): Candidate[]`, `Candidate = { line: number, kind: string, text: string
 (<note>)` per line).
 
 - [ ] **Step 1: Write the failing tests** in `scripts/copyedit.test.mjs`: `findPhrases finds wordy, redundant and
-    negative phrases` ("in order to" → `wordy` with note "to"; "each and every" → `redundant`; "not many" →
+  negative phrases` ("in order to" → `wordy` with note "to"; "each and every" → `redundant`; "not many" →
       `negative`; nothing inside a longer word or inside code; the right line in CRLF text); `loadPhrases reads the
-    TSV`; `formatCandidates sorts by line`.
+  TSV`; `formatCandidates sorts by line`.
 
 - [ ] **Step 2: Run them to verify they fail.** Run: `node --test scripts/copyedit.test.mjs`. Expected: FAIL,
       `Cannot find module` for `phrases.mjs`.
@@ -562,8 +560,7 @@ UV_PYTHON_INSTALL_DIR=<scratchpad>/flows-prose/python uv sync --frozen --managed
 
 - [ ] **Step 2: Write the failing test** in `scripts/copyedit.test.mjs`: `measure.py finds the tested kinds`, skipped
       unless `FLOWS_PROSE_PYTHON` is set; it masks `scripts/fixtures/prose-sample.md`, pipes it to
-      `$FLOWS_PROSE_PYTHON measure.py`, and asserts one candidate of each spaCy kind on the line the fixture marks with
-      `<!-- expect: <kind> -->`, none in the fixture's fenced block, and the totals' keys. Run it with
+      `$FLOWS_PROSE_PYTHON measure.py`, and asserts one candidate of each spaCy kind on the line after each `<!-- expect: <kind> -->` marker (each marker on its own line with a blank line after it, so it is its own block and never part of a parsed sentence), none in the fixture's fenced block, and the totals' keys. Run it with
       `FLOWS_PROSE_PYTHON=<scratchpad>/flows-prose/env/bin/python`. Expected: FAIL, no `measure.py`.
 
 - [ ] **Step 3: Write `measure.py`.** Port `editor-test/scripts/metrics.py`'s measures and thresholds and the
@@ -608,7 +605,7 @@ UV_PYTHON_INSTALL_DIR=<scratchpad>/flows-prose/python uv sync --frozen --managed
   - `proseState({ config, platform, exists }): { installed: boolean, optedOut: boolean }`, with `exists` injected
     (`existsSync` in production, a set in tests): `installed` is whether `prosePython` exists, `optedOut` whether the
     marker does.
-  - `proseDefault({ installed, optedOut, offered }): boolean` → `installed || (offered && !optedOut)`, `offered` being
+  - `proseDefault({ installed, optedOut, offered, flows }): boolean` → `installed || (offered && flows && !optedOut)`, `flows` being whether flows is selected when the screens open, `offered` being
     `unavailable('prose', …) === undefined`, as `web-builtins-off` does (`install.ts:150-154`).
   - `proseDecision({ toggle, flows, installed }): 'sync' | 'remove' | 'needs-flows' | 'none'`, in this order of
     precedence: `remove` when installed and toggle or flows is off; `sync` when toggle and flows are on;
@@ -620,14 +617,14 @@ force: true, maxRetries: 5 })`; the error code on failure, never a throw).
 - `steps/prose.ts` exports `applyProse({ toggle, flows, unticked }): Promise<void>`.
 
 - [ ] **Step 1: Write the failing tests.** `core/prose.test.ts`: `prosePython per platform`; `proseSync keeps uv's
-    files inside flows-prose`; `proseState reads the python and the marker`; `proseDefault` over its cases;
+  files inside flows-prose`; `proseState reads the python and the marker`; `proseDefault` over its cases (off without flows, off when opted out, on when installed);
       `proseDecision` over its cases, including installed + toggle on + flows off → `remove`. `binaries.test.ts`:
       `uv is reported once for graphify and prose`; `hasBuild`. `options.test.ts`: `prose is a tools toggle, hidden
-    on NixOS and off linux-x64 and win32-x64`. `files.test.ts`: `removeDir removes a tree` and `removeDir returns
-    the code instead of throwing` (with a stub `rm` that throws `EBUSY`).
+  on NixOS and off linux-x64 and win32-x64`. `files.test.ts`: `removeDir removes a tree` and `removeDir returns
+  the code instead of throwing` (with a stub `rm` that throws `EBUSY`).
 
 - [ ] **Step 2: Run them to verify they fail.** Run: `node --test installer/core/prose.test.ts
-    installer/core/binaries.test.ts installer/core/options.test.ts installer/system/files.test.ts`. Expected: FAIL,
+  installer/core/binaries.test.ts installer/core/options.test.ts installer/system/files.test.ts`. Expected: FAIL,
       `core/prose.ts` not found and the new cases.
 
 - [ ] **Step 3: Implement.** The step, by `proseDecision`:
@@ -640,9 +637,9 @@ force: true, maxRetries: 5 })`; the error code on failure, never a throw).
   - Whenever `unticked`, write the marker (the user turned the toggle off, before or after an install).
 
   In `install.ts`: `const prose = proseState({ config: CONFIG, platform: process.platform, exists: existsSync })`;
-  `current.prose = prose.installed`; `chosen.prose = proseDefault({ ...prose, offered })`; `unavailable` gets
+  `current.prose = prose.installed`; `chosen.prose = proseDefault({ ...prose, offered, flows: chosen[FLOWS] })`, set after `chosen` is built; `unavailable` gets
   `existsSync('/etc/NIXOS')`; `wanted` gains `prose` when it is on and flows is selected; call `applyProse` last,
-  before the summary, with `unticked: chosen.prose && !on('prose')` (the value the screens started from).
+  before the summary, with `unticked: started.prose && !on('prose')`, where `const started = { ...chosen }` is taken next to `initial({ ...chosen })` (`install.ts:211`): after `Object.assign(chosen, state.chosen)` (`:225`) `chosen` holds the screens' result, so comparing it with itself would never write the marker.
 
 - [ ] **Step 4: Run the checks.** Run: `node --test "installer/**/*.test.ts"` with the coverage flags of
       `package.json:9`, then `npm ci && npm run typecheck`. Expected: every test passes, coverage at or above the
@@ -650,8 +647,8 @@ force: true, maxRetries: 5 })`; the error code on failure, never a throw).
 
 - [ ] **Step 5: Run the step for real on Linux** against a scratchpad config folder:
       `CLAUDE_CONFIG_DIR=<scratchpad>/cfg node --input-type=module -e "import('./installer/steps/prose.ts').then(m =>
-    m.applyProse({ toggle: true, flows: true, unticked: false }))"`, twice, then with `toggle: false, unticked:
-    true`.
+  m.applyProse({ toggle: true, flows: true, unticked: false }))"`, twice, then with `toggle: false, unticked:
+  true`.
 
   Expected: the first run syncs and the smoke test loads the model; the second downloads nothing; the third removes
   `<scratchpad>/cfg/flows-prose/` and writes `flows-prose.off`.
@@ -675,24 +672,22 @@ force: true, maxRetries: 5 })`; the error code on failure, never a throw).
 
 **Interfaces:**
 
-- Consumes: `mask` (Task 3), `findPhrases`, `formatCandidates` (Task 9), `measure.py` (Task 10), the environment's
+- Consumes: `mask` (Task 3), `loadPhrases` (reading `data/phrases.tsv`), `findPhrases`, `formatCandidates` (Task 9), `measure.py` (Task 10), the environment's
   layout (Task 11).
 - Produces: `measure.mjs`: `findPython({ config, platform, exists }): string | undefined` (the environment's Python);
-  `measure(file: string, outdir: string, { python, timeoutMs = 600000, spawn }): { candidates: Candidate[], totals,
-skipped?: string }`, which masks, finds the phrases, runs `python measure.py` with the timeout when `python` is
-  set, merges the candidates, and writes `<outdir>/candidates.txt` and `<outdir>/totals.json`. `skipped` says why
-  spaCy's measures didn't run: no environment, exit 3 with its stderr line, exit 1, or the timeout. CLI: `node
+  `measure(file: string, outdir: string, { python, timeoutMs = 540000, spawn }): { candidates: Candidate[], totals,
+skipped?: string }`, which masks, counts the words itself (so `totals.json` has the per-100-word figures when spaCy is skipped), finds the phrases, writes the phrase candidates, runs `python measure.py` with the timeout when `python` is set, merges the candidates, and writes `<outdir>/candidates.txt` and `<outdir>/totals.json`. `skipped` says why spaCy's measures didn't run: no environment, exit 3 with its stderr line, exit 1, or the timeout. The timeout sits below the Bash tool's 600000 ms, so `measure.mjs` reports it before the tool kills it. CLI: `node
 measure.mjs <file> <outdir>` prints `skipped` when set.
 
 - [ ] **Step 1: Write the failing tests** in `scripts/copyedit.test.mjs`, with a stub `spawn`: `measure merges phrase
-    and spaCy candidates`; `measure skips spaCy without a Python`; `measure reports exit 3's line`; `measure
-    reports a timeout`; `findPython per platform`. Each skip still writes the phrase candidates.
+  and spaCy candidates`; `measure skips spaCy without a Python`; `measure reports exit 3's line`; `measure
+  reports a timeout`; `findPython per platform`. Each skip still writes the phrase candidates.
 
 - [ ] **Step 2: Run them to verify they fail.** Run: `node --test scripts/copyedit.test.mjs`. Expected: FAIL,
       `Cannot find module` for `measure.mjs`.
 
 - [ ] **Step 3: Write `measure.mjs` and step 2 of `SKILL.md`**: `node "${CLAUDE_SKILL_DIR}/../copyedit/scripts/measure.mjs"
-    <file> <run folder>/before/`, with the Bash tool's timeout at 600000 ms; show its skip line if any; pass
+  <file> <run folder>/before/`, with the Bash tool's timeout at 600000 ms; show its skip line if any; pass
       `before/candidates.txt` as `<candidates>`. After the copy in step 4, run it again into `<run folder>/after/` and
       show both totals as a table.
 
@@ -727,7 +722,7 @@ measure.mjs <file> <outdir>` prints `skipped` when set.
 **Interfaces:** none.
 
 - [ ] **Step 1: Spec success criterion 3.** Run `FLOWS_PROSE_PYTHON=<scratchpad>/flows-prose/env/bin/python node
-    --test scripts/copyedit.test.mjs` on the Task 10 environment. Expected: every test passes, none skipped. Record
+  --test scripts/copyedit.test.mjs` on the Task 10 environment. Expected: every test passes, none skipped. Record
       Windows as untested until the user runs the installer there, and NixOS as not supported yet.
 
 - [ ] **Step 2: Spec success criterion 4.** Run `/copyedit` as shipped, with the Task 10 environment, on scratchpad
@@ -741,9 +736,9 @@ measure.mjs <file> <outdir>` prints `skipped` when set.
 
 - [ ] **Step 3: Spec success criterion 5.** In a scratchpad folder, run
       `claude -p "Write a short spec for adding a --json flag to a CLI tool, as docs/spec.md, in the style a long design
-    session would leave: refer to decisions as grill Q3 and D2. Revise the file after any hook feedback." --plugin-dir
-    <dependency-free copy of plugins/flows> --permission-mode acceptEdits --output-format stream-json --verbose <
-    /dev/null` (the copy as in flow.md **Rulings**).
+  session would leave: refer to decisions as grill Q3 and D2. Revise the file after any hook feedback." --plugin-dir
+  <dependency-free copy of plugins/flows> --permission-mode acceptEdits --output-format stream-json --verbose <
+  /dev/null` (the copy as in flow.md **Rulings**).
 
   Expected: check findings appear, Claude revises, and the run ends with no more than three rounds of findings on the
   same file. More than three is looping: record it under **Deviations** for a counter.

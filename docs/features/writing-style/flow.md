@@ -390,6 +390,22 @@ loading state_dict` (the weights are laid out for 0.x). The uv environment insid
 The revision changes the plan's shape a little (`measure.mjs`, the pinned sync), so one Correctness reviewer checks
 the changed tasks before Gate 2.
 
+### Plan review round 3b (2026-10-28, Correctness on the changed tasks)
+
+One Fable reviewer. Every round-3 decision landed; no NixOS or upstream-pstack remnants; the `file:line` references
+and Task 7's expected results checked out (a commit fetch with `--depth 1` then `checkout` works on git 2.43). Seven
+findings, all applied:
+
+- **Blocking:** `unticked: chosen.prose && !on('prose')` was always false, since `Object.assign(chosen,
+state.chosen)` runs first (`install.ts:225`); the marker would never be written. Now compared against a copy taken
+  before the screens.
+- `proseDefault` now needs flows, as the spec and ADR say ("on by default when flows is selected"); without it every
+  run without flows showed a prose change and a "needs flows" line.
+- `measure.mjs`'s timeout is 540000 ms, below the Bash tool's 600000, so its timeout fallback can run.
+- A test for an empty edit; the commit fetch honours `depth`, and its test commits with an explicit identity over
+  `file://`; the fixture's markers sit on their own lines, outside parsed sentences; `measure.mjs` consumes
+  `loadPhrases` and counts words itself.
+
 ## Tasks
 
 - Task 1: base cf3ed1c, untracked at start: none; files clean; review clean after one fix round (2287a4c).
