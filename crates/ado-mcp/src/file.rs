@@ -9,8 +9,6 @@ use crate::out::{REPLY_MAX, args, more};
 
 /// Lines per call.
 const PAGE: usize = 200;
-/// Characters per call, held under `REPLY_MAX` so the more line always fits.
-const PAGE_CHARS: usize = REPLY_MAX - 1000;
 const NEEDS_REPO: &str = "pass repo (repo_list names them)";
 
 #[derive(Deserialize, JsonSchema)]
@@ -44,8 +42,9 @@ struct Meta {
     is_binary: Option<bool>,
 }
 
-/// The lines `{n:>5}  {line}` from line `start` on, at most `max_lines` and `max_chars` (the first row always shows),
-/// and the line the next page starts at when lines were left out. A line over `max_chars` is cut, marked with `…`.
+/// The lines `{n:>5}  {line}` from line `start` on: at most `max_lines`, and with a line end each, at most
+/// `max_chars` characters. Then the line the next page starts at when lines were left out. A line too long for the
+/// budget alone is cut, marked with `…`.
 fn numbered(
     content: &str,
     start: usize,
@@ -55,9 +54,12 @@ fn numbered(
     let mut out = String::new();
     let (mut shown, mut used) = (0, 0);
     for (i, line) in content.lines().enumerate().skip(start.saturating_sub(1)) {
-        let row = match line.char_indices().nth(max_chars) {
-            Some((at, _)) => format!("{:>5}  {}…", i + 1, &line[..at]),
-            None => format!("{:>5}  {line}", i + 1),
+        let head = format!("{:>5}  ", i + 1);
+        // Room for the `…` and the line end.
+        let room = max_chars.saturating_sub(head.len() + 2);
+        let row = match line.char_indices().nth(room) {
+            Some((at, _)) => format!("{head}{}…", &line[..at]),
+            None => format!("{head}{line}"),
         };
         let n = row.chars().count() + 1;
         if shown == max_lines || (shown > 0 && used + n > max_chars) {
@@ -80,12 +82,9 @@ pub(crate) async fn repo_file(ctx: &Ctx, a: &RepoFileArgs) -> Result<String, Api
     if project.is_some() && repo.is_none() {
         return Err(ApiError::local(NEEDS_REPO));
     }
-    let s = ctx.scope(project, repo, None).await?;
-    let repo_id = s
-        .repo_id
-        .as_deref()
-        .ok_or_else(|| ApiError::local(NEEDS_REPO))?;
+    let first = ctx.scope(project, repo, None).await?;
     let branch = given(a.branch.as_deref());
+    let what = branch.map_or_else(|| a.path.clone(), |b| format!("{} on {b}", a.path));
     // Without a version the server reads the default branch.
     let mut query = vec![
         ("path", a.path.clone()),
@@ -97,17 +96,27 @@ pub(crate) async fn repo_file(ctx: &Ctx, a: &RepoFileArgs) -> Result<String, Api
         query.push(("versionDescriptor.version", b.to_owned()));
         query.push(("versionDescriptor.versionType", "branch".to_owned()));
     }
-    let items = format!(
-        "{}/_apis/git/repositories/{}/items",
-        seg(&s.project_id),
-        seg(repo_id)
-    );
-    // A 404 means the path isn't there, so no `retry_stale`.
+    // A 404 may be a repo id gone stale: the scope is looked up again once before it reads as a missing path.
     let item: Item = ctx
-        .api
-        .get(&items, &query, V71_PREVIEW)
-        .await
-        .map_err(|e| e.with_what(&a.path))?;
+        .retry_stale(&first.key, || async {
+            let s = ctx.scope(project, repo, None).await?;
+            // Defensive: the refusal above leaves no scope without a repo.
+            let repo_id = s
+                .repo_id
+                .as_deref()
+                .ok_or_else(|| ApiError::local(NEEDS_REPO))?;
+            let items = format!(
+                "{}/_apis/git/repositories/{}/items",
+                seg(&s.project_id),
+                seg(repo_id)
+            );
+            // Labelled here, not after the retry: a scope's own 404 keeps its wording.
+            ctx.api
+                .get(&items, &query, V71_PREVIEW)
+                .await
+                .map_err(|e| e.with_what(&what))
+        })
+        .await?;
     if item.is_folder == Some(true) {
         return Err(ApiError::local(format!("{} is a folder", a.path)));
     }
@@ -115,18 +124,24 @@ pub(crate) async fn repo_file(ctx: &Ctx, a: &RepoFileArgs) -> Result<String, Api
         return Err(ApiError::local(format!("{} is a binary file", a.path)));
     }
     let content = item.content.unwrap_or_default();
+    let n = content.lines().count();
+    if n == 0 {
+        return Ok(format!("{} is empty", a.path));
+    }
+    let path = args(&[("path", Some(&a.path))]);
+    let scope = args(&[("project", project), ("repo", repo), ("branch", branch)]);
+    let call = |next: usize| more(&format!("repo_file{path} start={next}{scope}"));
+    // The page gets what the more line leaves; no next start is wider than the line count.
+    let budget = REPLY_MAX.saturating_sub(call(n).chars().count() + 1);
     let start = a.start.unwrap_or(1).max(1) as usize;
-    let (mut text, next) = numbered(&content, start, PAGE, PAGE_CHARS);
+    let (mut text, next) = numbered(&content, start, PAGE, budget);
     if text.is_empty() {
-        let n = content.lines().count();
         let s = if n == 1 { "" } else { "s" };
         return Ok(format!("no lines from {start}; {} has {n} line{s}", a.path));
     }
     if let Some(next) = next {
-        let path = args(&[("path", Some(&a.path))]);
-        let scope = args(&[("project", project), ("repo", repo), ("branch", branch)]);
         text.push('\n');
-        text.push_str(&more(&format!("repo_file{path} start={next}{scope}")));
+        text.push_str(&call(next));
     }
     Ok(text)
 }
@@ -161,7 +176,9 @@ mod tests {
         let content = format!("{}\nnext", "é".repeat(50_000));
         let (text, next) = numbered(&content, 1, 200, 39_000);
         assert_eq!(next, Some(2));
-        assert_eq!(text, format!("    1  {}…", "é".repeat(39_000)));
+        // The cut row and its line end fit the budget: 7 for the number, 1 for the `…`.
+        assert_eq!(text, format!("    1  {}…", "é".repeat(39_000 - 9)));
+        assert_eq!(text.chars().count(), 39_000 - 1);
         // Alone at the end of the file, a cut line leaves nothing to page to.
         let (_, next) = numbered(&"é".repeat(50_000), 1, 200, 39_000);
         assert_eq!(next, None);

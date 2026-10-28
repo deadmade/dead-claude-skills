@@ -42,6 +42,14 @@ fn queries(fx: &Fixture) -> Vec<Vec<(String, String)>> {
         .collect()
 }
 
+/// How often the repo was looked up by name.
+fn scope_lookups(fx: &Fixture) -> usize {
+    fx.requests()
+        .iter()
+        .filter(|r| r.path.split('?').next() == Some(REPO))
+        .count()
+}
+
 fn values<'a>(q: &'a [(String, String)], k: &str) -> Vec<&'a str> {
     q.iter()
         .filter(|(n, _)| n == k)
@@ -150,6 +158,89 @@ fn missing() {
     let (err, text) = read(&fx, gone, json!({"path": "/nope.cs"}));
     assert!(err, "{text}");
     assert_eq!(text, "not found: /nope.cs");
+    // Looked up again once, in case the repo id went stale.
+    assert_eq!(scope_lookups(&fx), 2);
+    assert_eq!(queries(&fx).len(), 2);
+}
+
+/// The repo was deleted and recreated: the first GET 404s on the cached id, the scope is looked up again and the
+/// second GET reads the file under the new id.
+#[test]
+fn stale_repo_id() {
+    let fx = Fixture::start();
+    let repo = |id: &str| {
+        let mut v: Value = serde_json::from_slice(&fixture("repo.json").body).unwrap();
+        v["id"] = json!(id);
+        Resp::json(&v)
+    };
+    fx.route(REPO, vec![repo("old-repo"), repo("new-repo")]);
+    let base = format!("/tfs/Coll/{PROJ}/_apis/git/repositories");
+    fx.route(
+        &format!("{base}/old-repo/items"),
+        vec![Resp::new(404, "text/plain", "gone")],
+    );
+    fx.route(
+        &format!("{base}/new-repo/items"),
+        vec![fixture("item.json")],
+    );
+    let (err, text) = env(&fx).call(
+        "repo_file",
+        json!({"project": "My Proj", "repo": "R", "path": "/src/Program.cs"}),
+    );
+    assert!(!err, "{text}");
+    assert!(text.starts_with("    1  using System;"), "{text}");
+    assert_eq!(scope_lookups(&fx), 2);
+}
+
+#[test]
+fn unknown_branch() {
+    let fx = Fixture::start();
+    let (err, text) = read(
+        &fx,
+        Resp::new(404, "text/plain", "gone"),
+        json!({"path": "/a.cs", "branch": "master"}),
+    );
+    assert!(err, "{text}");
+    assert_eq!(text, "not found: /a.cs on master");
+}
+
+#[test]
+fn empty_file() {
+    let fx = Fixture::start();
+    let item = json!({"path": "/empty.txt", "content": "", "contentMetadata": {"isBinary": false}});
+    let (err, text) = read(&fx, Resp::json(&item), json!({"path": "/empty.txt"}));
+    assert!(!err, "{text}");
+    assert_eq!(text, "/empty.txt is empty");
+}
+
+/// A long path, project and branch take room from the page, not from the more line.
+#[test]
+fn long_path_more() {
+    let fx = Fixture::start();
+    let path = format!("/{}.js", "d".repeat(996));
+    let content = format!(
+        "{}
+console.log(1);
+",
+        "x".repeat(50_000)
+    );
+    let item = json!({"path": path, "content": content, "contentMetadata": {"isBinary": false}});
+    let (err, text) = read(
+        &fx,
+        Resp::json(&item),
+        json!({"path": path, "branch": "main"}),
+    );
+    assert!(!err, "{text}");
+    assert!(!text.contains("output cut"), "cut by the reply cap");
+    assert!(text.chars().count() <= 40_000);
+    assert!(
+        text.ends_with(&format!(
+            "
+… more: repo_file path={path} start=2 project=\"My Proj\" repo=R branch=main"
+        )),
+        "{}",
+        &text[text.len() - 1200..]
+    );
 }
 
 /// A project alone names no repo: nothing is sent.
