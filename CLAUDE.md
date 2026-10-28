@@ -167,9 +167,16 @@ weekly.
 
 `.github/rulesets/` holds the repo's rulesets, imported by hand (Settings → Rules → Rulesets → Import; GitHub doesn't
 read the folder, so re-import after changing one): main takes squash or rebase PRs once `test.yml`'s three jobs pass
-(admins bypass it, which `npm run release` pushed to main needs), and only admins move or delete a `v*` tag. Creating
-one stays open: `release.yml` tags each merge with the workflow's token, which no ruleset can exempt. Renaming a
-`test.yml` job or matrix entry changes its check name: update `main.json` and re-import it. The sync workflows open their
-PRs with a GitHub App's token (variable `SYNC_APP_CLIENT_ID`, secret `SYNC_APP_PRIVATE_KEY`; the App needs contents and
-pull requests write) so `test.yml` runs on them; without the App they fall back to `github.token` and their PRs wait on
-checks that never start.
+(admins bypass it, which `npm run release` pushed to main needs), and only admins and the repo's GitHub App create,
+move or delete a `v*` tag or the `release` branch, which every machine's marketplace follows. The App is the bypass
+because the workflow's own token can't be one: any job with `contents: write` holds it, sync jobs running third-party
+code included. Its numeric ID is per account, so it is added to the two release rulesets' bypass lists in the editor
+after importing them. Renaming a `test.yml` job or matrix entry changes its check name: update `main.json` and re-import
+it.
+
+The App (variable `BOT_APP_CLIENT_ID`, secret `BOT_APP_PRIVATE_KEY`; repository permissions contents, pull requests and
+workflows write) signs three pushes, each token minted right before it and scoped to it: the sync PRs, so `test.yml`
+runs on them; `release.yml`'s merge tag, which then starts the tag's own run (the merge's run stops there); and the
+`release` branch move. Workflows write is only for that move, which can carry workflow changes. Without the App all
+three fall back to `github.token`: sync PRs wait on checks that never start, the merge's run releases its tag itself,
+and the release rulesets must then be left off or they block the release.
