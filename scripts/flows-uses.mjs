@@ -13,14 +13,26 @@ export const BUILTIN = 'claude-code';
 const START = '<!-- uses:start -->';
 const END = '<!-- uses:end -->';
 
+// flows' skills, split by frontmatter: conductors carry `disable-model-invocation: true`; the rest (writing) Claude
+// may load on its own.
+const flowsSkills = (root) => {
+  const dir = join(root, FLOWS, 'skills');
+  return readdirSync(dir, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && !d.name.startsWith('.') && existsSync(join(dir, d.name, 'SKILL.md')))
+    .map((d) => d.name)
+    .sort()
+    .map((name) => {
+      const front = /^---\r?\n([\s\S]*?)\r?\n---/.exec(readFileSync(join(dir, name, 'SKILL.md'), 'utf8'))?.[1] ?? '';
+      return { name, conductor: /^disable-model-invocation:\s*true\s*$/m.test(front) };
+    });
+};
+
 export function readUses(root) {
   const dir = join(root, FLOWS, 'skills');
   return Object.fromEntries(
-    readdirSync(dir, { withFileTypes: true })
-      .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
-      .map((d) => d.name)
-      .sort()
-      .map((name) => {
+    flowsSkills(root)
+      .filter((s) => s.conductor)
+      .map(({ name }) => {
         const file = join(dir, name, 'uses.json');
         return [name, existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : undefined];
       }),
@@ -40,6 +52,7 @@ export const packs = (root) =>
 export function checkUses(root, marketplace) {
   const problems = [];
   const packNames = packs(root);
+  const skills = flowsSkills(root);
   for (const [conductor, uses] of Object.entries(readUses(root))) {
     const at = `${FLOWS}/skills/${conductor}/uses.json`;
     const valid =
@@ -53,8 +66,14 @@ export function checkUses(root, marketplace) {
     }
     const skill = readFileSync(join(root, FLOWS, 'skills', conductor, 'SKILL.md'), 'utf8');
     for (const [plugin, names] of Object.entries(uses)) {
+      // flows' own non-conductor skills (writing) are listed under flows; other conductors aren't listed at all.
       if (plugin === 'flows') {
-        problems.push(`${at}: other conductors aren't listed`);
+        for (const name of names) {
+          const own = skills.find((s) => s.name === name);
+          if (!own) problems.push(`${at}: flows has no skill ${name}`);
+          else if (own.conductor) problems.push(`${at}: ${name} is a conductor; other conductors aren't listed`);
+          else if (!skill.includes(name)) problems.push(`${at}: ${name} isn't mentioned in ${conductor}/SKILL.md`);
+        }
         continue;
       }
       const pack = packNames.includes(plugin);
@@ -137,10 +156,10 @@ export function checkPackPaths(root) {
   return problems;
 }
 
-// packNames: packs(root); flows carries those, so they are never a dependency.
+// packNames: packs(root); flows carries those and its own skills, so they are never a dependency.
 export const expectedDeps = (all, packNames) =>
   [...new Set(Object.values(all).flatMap((uses) => Object.keys(uses ?? {})))]
-    .filter((p) => p !== BUILTIN && !packNames.includes(p))
+    .filter((p) => p !== BUILTIN && p !== 'flows' && !packNames.includes(p))
     .sort();
 
 export function renderTree(all) {

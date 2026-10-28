@@ -16,18 +16,26 @@ import {
 
 const ROOT = join(import.meta.dirname, '..');
 
+// A conductor's SKILL.md: only skills with `disable-model-invocation: true` are conductors.
+const conductor = (body) => `---\nname: fix\ndisable-model-invocation: true\n---\n${body}`;
+
 // A repo with one conductor `fix` using `uses`, local plugins picks (a skill, an agent, an MCP server) and web (an
-// MCP server), and the pack superpowers (a skill, no marketplace entry).
-function fixture(uses, skillText = 'how reviewer docs search general-purpose deep') {
+// MCP server), and the pack superpowers (a skill, no marketplace entry). `files` adds more ({ path: text }).
+function repo(uses, skillText = conductor('how reviewer docs search general-purpose deep'), files = {}) {
   const fx = mkdtempSync(join(tmpdir(), 'fu-'));
   const put = (p, s) => (mkdirSync(dirname(join(fx, p)), { recursive: true }), writeFileSync(join(fx, p), s));
   put('plugins/flows/skills/fix/SKILL.md', skillText);
+  for (const [p, s] of Object.entries(files)) put(p, s);
   if (uses !== undefined) put('plugins/flows/skills/fix/uses.json', JSON.stringify(uses));
   put('plugins/picks/skills/how/SKILL.md', '');
   put('plugins/picks/agents/reviewer.md', '');
   put('plugins/picks/.mcp.json', JSON.stringify({ docs: { type: 'http' } }));
   put('plugins/web/.mcp.json', '{}');
   put('plugins/flows/packs/superpowers/skills/writing-plans/SKILL.md', '');
+  return fx;
+}
+
+function fixture(uses, skillText, files) {
   const marketplace = {
     plugins: [
       { name: 'picks', source: './plugins/picks' },
@@ -35,7 +43,7 @@ function fixture(uses, skillText = 'how reviewer docs search general-purpose dee
       { name: 'remote', source: { source: 'url', url: 'https://example.invalid/remote.git' } },
     ],
   };
-  return checkUses(fx, marketplace);
+  return checkUses(repo(uses, skillText, files), marketplace);
 }
 
 test('a valid map has no problems: local skill and agent, MCP tool, url plugin, official, builtin', () => {
@@ -50,8 +58,8 @@ test('a valid map has no problems: local skill and agent, MCP tool, url plugin, 
 });
 
 test('a pack resolves to its folder under plugins/flows/packs, with no marketplace entry', () => {
-  assert.deepEqual(fixture({ superpowers: ['writing-plans'] }, 'writing-plans'), []);
-  assert.deepEqual(fixture({ superpowers: ['nope'] }, 'nope'), [
+  assert.deepEqual(fixture({ superpowers: ['writing-plans'] }, conductor('writing-plans')), []);
+  assert.deepEqual(fixture({ superpowers: ['nope'] }, conductor('nope')), [
     'plugins/flows/skills/fix/uses.json: superpowers has no skill, agent or workflow nope',
   ]);
 });
@@ -65,9 +73,29 @@ test('each kind of problem is reported', () => {
   assert.match(fixture({ picks: 'how' })[0], /missing, or not/);
   assert.match(fixture({ picks: [] })[0], /missing, or not/);
   assert.match(fixture({ nope: ['how'] })[0], /nope is not a plugin/);
-  assert.match(fixture({ flows: ['verify'] })[0], /other conductors/);
-  assert.match(fixture({ picks: ['gone'] }, 'gone')[0], /picks has no skill, agent or workflow gone/);
-  assert.match(fixture({ picks: ['how'] }, 'nothing here')[0], /how isn't mentioned in fix\/SKILL.md/);
+  assert.match(fixture({ flows: ['fix'] })[0], /fix is a conductor/);
+  assert.match(fixture({ picks: ['gone'] }, conductor('gone'))[0], /picks has no skill, agent or workflow gone/);
+  assert.match(fixture({ picks: ['how'] }, conductor('nothing here'))[0], /how isn't mentioned in fix\/SKILL.md/);
+});
+
+test('a model-invocable skill is not a conductor', () => {
+  // The plain skill's frontmatter is CRLF, as a Windows checkout writes it.
+  const plain = '---\r\nname: writing\r\ndescription: x\r\n---\r\nbody\r\n';
+  const fx = repo({ picks: ['how'] }, conductor('how'), { 'plugins/flows/skills/writing/SKILL.md': plain });
+  const all = readUses(fx);
+  assert.deepEqual(Object.keys(all), ['fix']);
+  assert.doesNotMatch(renderTree(all), /writing/);
+  // A conductor's own frontmatter in CRLF still counts.
+  const crlf = repo({ picks: ['how'] }, conductor('how').replaceAll('\n', '\r\n'));
+  assert.deepEqual(Object.keys(readUses(crlf)), ['fix']);
+});
+
+test("uses.json may list flows' non-conductor skills", () => {
+  const files = { 'plugins/flows/skills/writing/SKILL.md': '---\nname: writing\n---\n' };
+  assert.deepEqual(fixture({ flows: ['writing'] }, conductor('writing'), files), []);
+  assert.match(fixture({ flows: ['fix'] }, conductor('fix'), files)[0], /fix is a conductor/);
+  assert.match(fixture({ flows: ['nope'] }, conductor('nope'), files)[0], /flows has no skill nope/);
+  assert.ok(!expectedDeps({ fix: { flows: ['writing'], picks: ['how'] } }, []).includes('flows'));
 });
 
 test('expectedDeps: every plugin once, sorted, builtins and packs left out', () => {

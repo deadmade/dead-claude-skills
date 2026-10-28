@@ -113,6 +113,14 @@ PBC; `LICENSE`), with the agents'
 `description:` rewritten, and [mattpocock/skills](https://github.com/mattpocock/skills)'s engineering code-review
 skill (MIT License, Copyright Matt Pocock; `LICENSE-MIT`), unmodified apart from a source comment.
 
+## writing (flows)
+
+flows' `writing` skill (`plugins/flows/skills/writing/SKILL.md`) states the density test of
+[technical-writing-density](https://github.com/mlwelles/technical-writing-density) (MIT License, Copyright (c) 2026
+Michael Welles) in its own words and links to it; nothing is copied. The rest of the skill is our own wording of
+Williams and Bizup's _Style: Lessons in Clarity and Grace_, checked against free sources it credits; it quotes no
+passage of the book.
+
 ## ponytail
 
 `plugins/flows/packs/ponytail/` is vendored from [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) (MIT
