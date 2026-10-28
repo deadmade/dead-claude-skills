@@ -76,6 +76,8 @@ Agent report, sources fetched in its run (blog posts labelled):
 
 ## Options
 
+- 2026-10-28, scope: the user builds MCP **servers**, not clients ("I build mcp servers not clients").
+
 ## Plan review
 
 ## Tasks
