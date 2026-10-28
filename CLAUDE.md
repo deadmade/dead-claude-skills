@@ -165,12 +165,11 @@ CI: `test.yml` (npm test, the installer typecheck and the dead-skills and md-pan
 PRs touching tui-review; `web-mcp.yml` on PRs touching web-mcp; `build-tui-review.yml`/`build-web-mcp.yml` on PRs touching the workflow and from `release.yml`; `sync-*.yml`
 weekly.
 
-`.github/rulesets/` holds the repo's rulesets, imported by hand (Settings → Rules → Rulesets → Import; GitHub doesn't
-read the folder, so re-import after changing one): main takes squash or rebase PRs once `test.yml`'s three jobs pass
-(admins bypass it, which `npm run release` pushed to main needs), and only admins move or delete a `v*` tag. Creating
-one stays open, since `release.yml` tags each merge with the workflow's token, but releases only come from a push to
-main: `release.yml` has no tag trigger, so a tag pushed any other way publishes nothing. Renaming a `test.yml` job or
-matrix entry changes its check name: update `main.json` and re-import it.
+The repo's rulesets live in its GitHub settings (Settings → Rules), not in the repo: main takes squash or rebase PRs
+once `test.yml`'s three jobs pass (admins bypass it, which `npm run release` pushed to main needs), and only admins move
+or delete a `v*` tag. Creating one stays open, since `release.yml` tags each merge with the workflow's token, but
+releases only come from a push to main: `release.yml` has no tag trigger, so a tag pushed any other way publishes
+nothing. Renaming a `test.yml` job or matrix entry changes its check name: update the main ruleset's required checks.
 
 `release.yml` is the only workflow whose own token may write, and it moves the `release` branch every machine's
 marketplace follows; that branch has no ruleset, because the workflow's token can't be a bypass. The sync workflows read
