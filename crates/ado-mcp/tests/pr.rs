@@ -38,6 +38,10 @@ fn view_routes(fx: &Fixture) {
     );
     fx.route(WI_BATCH, vec![fixture("wi-batch.json")]);
     fx.route(BUILDS, vec![fixture("builds-one.json")]);
+    fx.route(
+        &format!("{PR412}/iterations"),
+        vec![fixture("iterations.json")],
+    );
 }
 
 /// Requests whose path (without query) is `path`, with the query decoded for reading.
@@ -285,12 +289,13 @@ fn view_concurrent() {
     let fx = Fixture::start();
     view_routes(&fx);
     // The first call answers at once and measures the rest (process, git, scope); the second waits 600 ms on each of
-    // three calls: 1800 ms one after the other, about 600 together.
+    // four calls: 2400 ms one after the other, about 600 together.
     let slow = Duration::from_millis(600);
     let twice = |name: &str| vec![fixture(name), fixture(name).delay(slow)];
     fx.route(POLICY, twice("policy-evaluations.json"));
     fx.route(&format!("{PR412}/workitems"), twice("pr-workitems.json"));
     fx.route(BUILDS, twice("builds-one.json"));
+    fx.route(&format!("{PR412}/iterations"), twice("iterations.json"));
     let mut mcp = env(&fx);
     let t = Instant::now();
     ok(&mut mcp, "pr_view", json!({"id": 412}));
@@ -908,4 +913,134 @@ fn files_odd_refs_still_say_cut() {
         "… more than 2000 files; compare the branches with git diff --stat\n\
          diff: run git diff between the target and source branches"
     );
+}
+
+/// `iterations.json` with the latest iteration's source commit set to `commit`.
+fn iterations_to(commit: &str) -> Value {
+    let mut it: Value = serde_json::from_slice(&fixture("iterations.json").body).unwrap();
+    it["value"][1]["sourceRefCommit"]["commitId"] = json!(commit);
+    it
+}
+
+const FIRST: &str = "9b1f3c2a7d4e5f60718293a4b5c6d7e8f9a0b1c2";
+const SECOND: &str = "4e5f60718293a4b5c6d7e8f9a0b1c29b1f3c2a7d";
+
+#[test]
+fn files_since() {
+    let fx = Fixture::start();
+    fx.route(&format!("{PRS}/412"), vec![fixture("pr.json")]);
+    let mut it = iterations_to(SECOND);
+    let mut third = it["value"][1].clone();
+    third["id"] = json!(3);
+    it["value"].as_array_mut().unwrap().push(third);
+    fx.route(&format!("{PR412}/iterations"), vec![Resp::json(&it)]);
+    let changes = format!("{PR412}/iterations/3/changes");
+    fx.route(&changes, vec![fixture("iteration-changes-p2.json")]);
+    let text = ok(&mut env(&fx), "pr_files", json!({"id": 412, "since": 2}));
+    let lines: Vec<&str> = text.lines().collect();
+    assert_eq!(
+        lines[..2],
+        ["changes since iteration 2 (latest 3)", "delete  old.txt"],
+        "{text}"
+    );
+    let q = queries(&fx, &changes);
+    assert!(q[0].split('&').any(|p| p == "$compareTo=2"), "{q:?}");
+}
+
+#[test]
+fn files_since_latest() {
+    let fx = Fixture::start();
+    fx.route(&format!("{PRS}/412"), vec![fixture("pr.json")]);
+    fx.route(
+        &format!("{PR412}/iterations"),
+        vec![fixture("iterations.json")],
+    );
+    let text = ok(&mut env(&fx), "pr_files", json!({"id": 412, "since": 2}));
+    assert_eq!(text, "no changes since iteration 2 (the latest)");
+    assert_eq!(
+        queries(&fx, &format!("{PR412}/iterations/2/changes")).len(),
+        0
+    );
+}
+
+#[test]
+fn files_since_beyond() {
+    let fx = Fixture::start();
+    fx.route(&format!("{PRS}/412"), vec![fixture("pr.json")]);
+    fx.route(
+        &format!("{PR412}/iterations"),
+        vec![fixture("iterations.json")],
+    );
+    let (err, text) = env(&fx).call("pr_files", json!({"id": 412, "since": 3}));
+    assert!(err, "{text}");
+    assert_eq!(text, "since must be 1…2");
+}
+
+#[test]
+fn files_since_zero() {
+    let fx = Fixture::start();
+    fx.route(&format!("{PRS}/412"), vec![fixture("pr.json")]);
+    fx.route(
+        &format!("{PR412}/iterations"),
+        vec![fixture("iterations.json")],
+    );
+    let (err, text) = env(&fx).call("pr_files", json!({"id": 412, "since": 0}));
+    assert!(err, "{text}");
+    assert_eq!(text, "since must be 1…2");
+}
+
+#[test]
+fn files_since_diff_line() {
+    let fx = Fixture::start();
+    fx.route(&format!("{PRS}/412"), vec![fixture("pr.json")]);
+    let iterations = format!("{PR412}/iterations");
+    fx.route(&iterations, vec![Resp::json(&iterations_to(SECOND))]);
+    // An empty page with a `nextSkip`: the reply is cut, so it names the `--stat` call too.
+    let cut = || vec![Resp::json(&json!({"changeEntries": [], "nextSkip": 5}))];
+    let changes = format!("{PR412}/iterations/2/changes");
+    fx.route(&changes, cut());
+    let mut mcp = env(&fx);
+    let text = ok(&mut mcp, "pr_files", json!({"id": 412, "since": 1}));
+    assert_eq!(
+        text,
+        format!(
+            "changes since iteration 1 (latest 2)\n\
+             … more: git diff {FIRST}..{SECOND} --stat\n\
+             diff: git diff {FIRST}..{SECOND}"
+        )
+    );
+    // A commit id that isn't plain hex never goes in a command.
+    fx.route(&iterations, vec![Resp::json(&iterations_to("x;rm -rf ~"))]);
+    fx.route(&changes, cut());
+    let text = ok(&mut mcp, "pr_files", json!({"id": 412, "since": 1}));
+    assert_eq!(
+        text,
+        "changes since iteration 1 (latest 2)\n\
+         … more than 2000 files; compare the iterations with git diff --stat"
+    );
+}
+
+#[test]
+fn view_shows_iteration() {
+    let fx = Fixture::start();
+    view_routes(&fx);
+    let text = ok(&mut env(&fx), "pr_view", json!({"id": 412}));
+    let first = text.lines().next().unwrap();
+    assert!(first.ends_with("  1 approvals  iteration: 2"), "{text}");
+}
+
+#[test]
+fn view_iteration_unavailable() {
+    let fx = Fixture::start();
+    view_routes(&fx);
+    fx.route(
+        &format!("{PR412}/iterations"),
+        vec![Resp::new(500, "text/plain", "boom")],
+    );
+    let text = ok(&mut env(&fx), "pr_view", json!({"id": 412}));
+    let first = text.lines().next().unwrap();
+    assert!(first.contains("  iteration: unavailable ("), "{text}");
+    assert!(text.contains("J. Doe: approved (required)"), "{text}");
+    assert!(text.contains("latest run: #991"), "{text}");
+    assert!(text.ends_with("Second paragraph."), "{text}");
 }

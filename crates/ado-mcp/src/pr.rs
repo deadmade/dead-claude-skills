@@ -7,9 +7,10 @@ use azure_devops_rust_api::build::models::BuildQueryOrder;
 use azure_devops_rust_api::git::models::{
     Comment, CommentPosition, CommentThread, CommentThreadContext, GitPullRequest,
     GitPullRequestCommentThread, GitPullRequestCommentThreadList, GitPullRequestCompletionOptions,
-    GitPullRequestCreateOptions, GitPullRequestList, GitPullRequestUpdateOptions, IdentityId,
-    IdentityRef, IdentityRefWithVote, PullRequestStatus, ResourceRef, comment::CommentType,
-    comment_thread, git_pull_request, git_pull_request_completion_options::MergeStrategy,
+    GitPullRequestCreateOptions, GitPullRequestIteration, GitPullRequestList,
+    GitPullRequestUpdateOptions, IdentityId, IdentityRef, IdentityRefWithVote, PullRequestStatus,
+    ResourceRef, comment::CommentType, comment_thread, git_pull_request,
+    git_pull_request_completion_options::MergeStrategy,
 };
 use azure_devops_rust_api::wit::models::WorkItemBatchGetRequest;
 use rmcp::schemars::{self, JsonSchema};
@@ -84,6 +85,8 @@ pub(crate) struct PrFilesArgs {
     pub at: Where,
     /// Pull request id. Default: the active PR of the branch.
     pub id: Option<u32>,
+    /// Only the changes since this iteration (`pr_view` shows the latest).
+    pub since: Option<u32>,
 }
 
 impl Where {
@@ -449,12 +452,17 @@ async fn find_pr(
 pub(crate) async fn pr_view(ctx: &Ctx, a: &PrViewArgs) -> Result<String, ApiError> {
     let (s, pr) = find_pr(ctx, &a.at, a.id).await?;
     let id = pr.pull_request_id;
-    let (checks, items, run) = tokio::join!(
+    let (checks, items, run, iters) = tokio::join!(
         checks(ctx, &s, id),
         work_items(ctx, &s, id),
-        latest_run(ctx, &s, &pr)
+        latest_run(ctx, &s, &pr),
+        iterations(ctx, &s, id)
     );
     let mut out = line(&pr);
+    let _ = match iters {
+        Ok((_, last)) => write!(out, "  iteration: {last}"),
+        Err(e) => write!(out, "  iteration: unavailable ({e})"),
+    };
     let reviewers: Vec<String> = pr
         .reviewers
         .iter()
@@ -636,15 +644,19 @@ fn plain_ref(name: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || "._/-".contains(c))
 }
 
-const MAX_FILES: u16 = 2000;
+/// Whether `id` is a plain hex commit id, safe to paste into a shell command.
+fn plain_commit(id: &str) -> bool {
+    !id.is_empty() && id.chars().all(|c| c.is_ascii_hexdigit())
+}
 
-/// # Errors
-/// When the scope, the PR or the server fails.
-pub(crate) async fn pr_files(ctx: &Ctx, a: &PrFilesArgs) -> Result<String, ApiError> {
-    let (s, pr) = find_pr(ctx, &a.at, a.id).await?;
-    let (api, (repo, proj)) = (&ctx.api, ids(&s)?);
-    let id = pr.pull_request_id;
-    let last = api
+/// The PR's iterations and the latest one's id.
+async fn iterations(
+    ctx: &Ctx,
+    s: &Scope,
+    id: i32,
+) -> Result<(Vec<GitPullRequestIteration>, i32), ApiError> {
+    let (api, (repo, proj)) = (&ctx.api, ids(s)?);
+    let iters = api
         .az(|| {
             api.git
                 .pull_request_iterations_client()
@@ -652,22 +664,51 @@ pub(crate) async fn pr_files(ctx: &Ctx, a: &PrFilesArgs) -> Result<String, ApiEr
                 .into_future()
         })
         .await?
-        .value
+        .value;
+    let last = iters
         .iter()
         .filter_map(|i| i.id)
         .max()
         .ok_or_else(|| ApiError::local(format!("PR !{id} has no iterations")))?;
+    Ok((iters, last))
+}
+
+const MAX_FILES: u16 = 2000;
+
+/// # Errors
+/// When `since` is out of range, or the scope, the PR or the server fails.
+pub(crate) async fn pr_files(ctx: &Ctx, a: &PrFilesArgs) -> Result<String, ApiError> {
+    let (s, pr) = find_pr(ctx, &a.at, a.id).await?;
+    let (api, (repo, proj)) = (&ctx.api, ids(&s)?);
+    let id = pr.pull_request_id;
+    let (iters, last) = iterations(ctx, &s, id).await?;
+    let since = match a.since {
+        None => None,
+        Some(n) => {
+            let n = i32::try_from(n)
+                .ok()
+                .filter(|n| (1..=last).contains(n))
+                .ok_or_else(|| ApiError::local(format!("since must be 1…{last}")))?;
+            if n == last {
+                return Ok(format!("no changes since iteration {last} (the latest)"));
+            }
+            Some(n)
+        }
+    };
     let changes = api.git.pull_request_iteration_changes_client();
     let mut files = Vec::new();
     let mut skip = 0;
     loop {
         let page = api
             .az(|| {
-                changes
+                let mut b = changes
                     .get(&api.org, &repo, id, last, &proj)
                     .top(i32::from(MAX_FILES))
-                    .skip(skip)
-                    .into_future()
+                    .skip(skip);
+                if let Some(n) = since {
+                    b = b.compare_to(n);
+                }
+                b.into_future()
             })
             .await?;
         let empty = page.change_entries.is_empty();
@@ -681,28 +722,49 @@ pub(crate) async fn pr_files(ctx: &Ctx, a: &PrFilesArgs) -> Result<String, ApiEr
     let has_more = files.len() > usize::from(MAX_FILES) || skip > 0;
     files.truncate(usize::from(MAX_FILES));
     let (source, target) = (ref_name(&pr.source_ref_name), ref_name(&pr.target_ref_name));
-    let mut lines: Vec<String> = files
-        .iter()
-        .map(|f| {
-            let change = &f.git_change.change;
-            let path = change.item.as_ref().and_then(|i| i.get("path")?.as_str());
-            format!("{}  {}", change.change_type, rel(path.unwrap_or_default()))
-        })
+    let mut lines: Vec<String> = since
+        .map(|n| format!("changes since iteration {n} (latest {last})"))
+        .into_iter()
         .collect();
-    // The names come from the server and a branch name may hold shell syntax: only plain ones go in a command.
-    let plain = [target, source].iter().all(|n| plain_ref(n));
+    lines.extend(files.iter().map(|f| {
+        let change = &f.git_change.change;
+        let path = change.item.as_ref().and_then(|i| i.get("path")?.as_str());
+        format!("{}  {}", change.change_type, rel(path.unwrap_or_default()))
+    }));
+    // The names and commit ids come from the server and may hold shell syntax: only plain ones go in a command.
+    let (diff, what) = match since {
+        None => {
+            let plain = [target, source].iter().all(|n| plain_ref(n));
+            (
+                plain.then(|| format!("git diff {target}...{source}")),
+                "the branches",
+            )
+        }
+        Some(from) => {
+            let commit = |iteration: i32| {
+                let it = iters.iter().find(|it| it.id == Some(iteration))?;
+                let commit_id = it.source_ref_commit.as_ref()?.commit_id.as_deref()?;
+                plain_commit(commit_id).then_some(commit_id)
+            };
+            let diff = commit(from)
+                .zip(commit(last))
+                .map(|(from, to)| format!("git diff {from}..{to}"));
+            (diff, "the iterations")
+        }
+    };
     if has_more {
-        lines.push(if plain {
-            more(&format!("git diff {target}...{source} --stat"))
-        } else {
-            "… more than 2000 files; compare the branches with git diff --stat".into()
-        });
+        lines.push(diff.as_ref().map_or_else(
+            || format!("… more than 2000 files; compare {what} with git diff --stat"),
+            |d| more(&format!("{d} --stat")),
+        ));
     }
-    lines.push(if plain {
-        format!("diff: git diff {target}...{source}")
-    } else {
-        "diff: run git diff between the target and source branches".into()
-    });
+    match diff {
+        Some(d) => lines.push(format!("diff: {d}")),
+        None if since.is_none() => {
+            lines.push("diff: run git diff between the target and source branches".into());
+        }
+        None => {}
+    }
     Ok(lines.join("\n"))
 }
 

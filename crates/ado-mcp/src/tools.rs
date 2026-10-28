@@ -100,7 +100,7 @@ impl Server {
     }
 
     #[tool(
-        description = "Show a pull request: reviewers and votes, policy checks, linked work items, latest pipeline run and the description. Without id, the active PR of the current branch.",
+        description = "Show a pull request: its latest iteration, reviewers and votes, policy checks, linked work items, latest pipeline run and the description. Without id, the active PR of the current branch.",
         annotations(read_only_hint = true)
     )]
     async fn pr_view(&self, Parameters(a): Parameters<PrViewArgs>) -> CallToolResult {
@@ -116,7 +116,7 @@ impl Server {
     }
 
     #[tool(
-        description = "List the files a pull request changes (latest iteration) and the git diff command that shows the patch. Without id, the active PR of the current branch.",
+        description = "List the files a pull request changes (latest iteration), or with since only those changed after that iteration, and the git diff command that shows the patch. Without id, the active PR of the current branch.",
         annotations(read_only_hint = true)
     )]
     async fn pr_files(&self, Parameters(a): Parameters<PrFilesArgs>) -> CallToolResult {
