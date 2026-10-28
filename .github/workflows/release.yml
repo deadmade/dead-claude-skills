@@ -79,22 +79,15 @@ jobs:
       - name: Repo checks and tests
         run: npm test
 
-  tui-review:
+  binaries:
     needs: version
     if: needs.version.outputs.tag
-    uses: ./.github/workflows/build-tui-review.yml
-    with:
-      ref: ${{ needs.version.outputs.tag }}
-
-  web-mcp:
-    needs: version
-    if: needs.version.outputs.tag
-    uses: ./.github/workflows/build-web-mcp.yml
+    uses: ./.github/workflows/crates-build.yml
     with:
       ref: ${{ needs.version.outputs.tag }}
 
   publish:
-    needs: [version, check, tui-review, web-mcp]
+    needs: [version, check, binaries]
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -98,5 +98,5 @@ The cache layout is documented in `crates/tui-review/src/format.rs`.
 
 tui-review ships with the repo's releases (see the main README): `npm run release` bumps `crates/tui-review/Cargo.toml`, `Cargo.lock` and
 `.claude-plugin/plugin.json` with everything else (a test checks they match), and the tag's `release.yml` runs
-`.github/workflows/build-tui-review.yml`, which builds Windows and Linux (static), x64 only. Run
-`build-tui-review.yml` by hand to build without releasing.
+`.github/workflows/crates-build.yml`, which builds Windows and Linux (static), x64 only. Run
+`crates-build.yml` by hand to build without releasing.
