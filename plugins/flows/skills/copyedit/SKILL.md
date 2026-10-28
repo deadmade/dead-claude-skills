@@ -73,7 +73,7 @@ node "${CLAUDE_SKILL_DIR}/../copyedit/scripts/compare.mjs" "<run folder>/saved.m
     expected);
   - the editor's `Removed:` line;
   - the new findings, if any, for whoever owns the document to fix;
-  - the measures before and after: run step 2's command again with `"<run folder>/after/"` as its last argument,
+  - the measures before and after: run step 2's command again, with the same timeout and `"<run folder>/after/"` as its last argument,
     show its skip line if it printed one, and show `before/totals.json` and `after/totals.json` as one table, a row
     per figure with its before and after values.
 

@@ -448,6 +448,12 @@ state.chosen)` runs first (`install.ts:225`); the marker would never be written.
   hits rare; the weak-verb-subject and abstract-subject rules use the 7 suffixes the editor test's `metrics.py` used,
   and a token gets one candidate, not two. If wrong, the editor sees fewer nominalization and abstract-subject
   candidates than the prototype's list would give.
+- 2026-10-28, Task 12: `measure.mjs` has two skip reasons the plan didn't list, "can't start <python>: …" and
+  "unreadable output: …", so a Python that won't start or prints something other than JSON reads as a skip, not a
+  crash; and it blanks HTML comments before the phrase search and the word count, as `measure.py` skips comment
+  blocks. Its CRITICAL skill-scanner finding (`COMMAND_INJECTION_JS_CHILD_PROCESS`) is a false positive (no shell, a
+  fixed script path, the document on stdin) and is suppressed for that one file. If wrong, the first two would show
+  as a stack trace instead of a skip line.
 
 ## Deviations
 
