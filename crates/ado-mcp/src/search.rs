@@ -60,9 +60,8 @@ fn plain(highlight: &str) -> String {
             .replace("</highlighthit>", ""),
     );
     let mut line = text.split_whitespace().collect::<Vec<_>>().join(" ");
-    if let Some((at, _)) = line.char_indices().nth(SNIPPET_MAX - 1) {
-        line.truncate(at);
-        line.push('…');
+    if line.chars().count() > SNIPPET_MAX {
+        line = line.chars().take(SNIPPET_MAX - 1).collect::<String>() + "…";
     }
     line
 }
@@ -106,7 +105,7 @@ fn field<'a>(r: &'a WorkItemResult, k: &str) -> &'a str {
         .unwrap_or("?")
 }
 
-/// `#id [type] state  title`, then the best snippet that isn't the title (the title is on the line already).
+/// `#id [type] state  title`, then the best snippet that isn't the title (the title is on the line already), if any.
 fn wi_hit(r: &WorkItemResult) -> String {
     let mut out = format!(
         "#{} [{}] {}  {}",
@@ -120,10 +119,7 @@ fn wi_hit(r: &WorkItemResult) -> String {
             .as_deref()
             .is_some_and(|f| f.eq_ignore_ascii_case("system.title"))
     });
-    if let Some(h) = not_title
-        .or(r.hits.first())
-        .and_then(|h| h.highlights.first())
-    {
+    if let Some(h) = not_title.and_then(|h| h.highlights.first()) {
         let _ = write!(out, "\n  {}", plain(h));
     }
     out
@@ -176,8 +172,10 @@ async fn wi(ctx: &Ctx, a: &SearchArgs, limit: usize) -> Result<String, ApiError>
         .await
         .map_err(|mut e| {
             if let Some(p) = named {
-                // A stale cached project id is the likelier cause than a missing Search.
-                return e.with_what(&format!("project {p}"));
+                // A stale cached project id, or no Search: the 404 can't tell which.
+                return e.with_what(&format!(
+                    "project {p}, or Search isn't installed on this collection"
+                ));
             }
             if e.status == Some(404) {
                 NOT_INSTALLED.clone_into(&mut e.msg);
@@ -193,7 +191,10 @@ async fn wi(ctx: &Ctx, a: &SearchArgs, limit: usize) -> Result<String, ApiError>
         .collect();
     // A rejected or unindexed search answers with no results: its line says why, `0 hits` would mislead.
     if lines.is_empty() || !found.results.is_empty() {
-        let n = found.count.unwrap_or_default();
+        let n = found
+            .count
+            .and_then(|c| usize::try_from(c).ok())
+            .unwrap_or(found.results.len());
         lines.push(format!("{n} hit{}", if n == 1 { "" } else { "s" }));
     }
     let (hits, has_more) = cut(found.results, limit);
@@ -218,6 +219,14 @@ mod tests {
         assert!(line.starts_with("a b ccc"), "{line}");
         assert_eq!(line.chars().count(), SNIPPET_MAX);
         assert!(line.ends_with('…'));
+    }
+
+    #[test]
+    fn plain_keeps_200_characters_whole() {
+        let line = plain(&"c".repeat(SNIPPET_MAX));
+        assert_eq!(line, "c".repeat(SNIPPET_MAX));
+        let line = plain(&"c".repeat(SNIPPET_MAX + 1));
+        assert_eq!(line, "c".repeat(SNIPPET_MAX - 1) + "…");
     }
 
     #[test]

@@ -74,13 +74,14 @@ fn wi_hits_one_line_each() {
     assert_eq!(lines[0], "3 hits", "{text}");
     assert_eq!(lines[1], "#101 [Bug] Active  Login fails", "{text}");
     assert_eq!(lines[2], "  fix login <T>", "{text}");
+    // #102's only hit is its title, which its line shows already: no snippet line.
     assert_eq!(lines[3], "#102 [Task] New  Add a login test", "{text}");
-    assert_eq!(lines[4], "  Add a login test", "{text}");
     assert_eq!(
-        lines[5], "#103 [User Story] Closed  Single sign-on",
+        lines[4], "#103 [User Story] Closed  Single sign-on",
         "{text}"
     );
-    assert_eq!(lines[6], "  login; sso", "{text}");
+    assert_eq!(lines[5], "  login; sso", "{text}");
+    assert_eq!(lines.len(), 6, "{text}");
     for leak in ["highlighthit", "http", "url", PROJ] {
         assert!(!text.contains(leak), "{leak} in {text}");
     }
@@ -127,6 +128,19 @@ fn limit_and_more_quotes() {
         "{text}"
     );
     assert_eq!(bodies(&fx, WIS)[0]["$top"], 2);
+}
+
+/// An answer without `count` counts its results.
+#[test]
+fn missing_count_counts_results() {
+    let fx = Fixture::start();
+    let results = [hit(1, "a"), hit(2, "b")];
+    fx.route(
+        WIS,
+        vec![Resp::json(&json!({"results": results, "infoCode": 0}))],
+    );
+    let text = ok(&mut env(&fx), "search", json!({"kind": "wi", "text": "x"}));
+    assert_eq!(text.lines().next(), Some("2 hits"), "{text}");
 }
 
 #[test]
@@ -200,7 +214,10 @@ fn project_404() {
         json!({"kind": "wi", "text": "x", "project": "My Proj"}),
     );
     assert!(err, "{text}");
-    assert_eq!(text, "not found: project My Proj");
+    assert_eq!(
+        text,
+        "not found: project My Proj, or Search isn't installed on this collection"
+    );
     assert!(!text.contains(PROJ), "{text}");
 }
 
