@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 
 use ts_rs::{Config, TS};
 
+use crate::activity::Activity;
 use crate::doc::{AuditDoc, FlowDoc, Ledger, PlanDoc};
 
 /// Every type that crosses to the views. Types reached from these (gates, findings, ...) are exported with them.
@@ -17,6 +18,7 @@ fn export_all_to(dir: &Path) -> Result<(), ts_rs::ExportError> {
     PlanDoc::export_all(&cfg)?;
     AuditDoc::export_all(&cfg)?;
     Ledger::export_all(&cfg)?;
+    Activity::export_all(&cfg)?;
     Ok(())
 }
 

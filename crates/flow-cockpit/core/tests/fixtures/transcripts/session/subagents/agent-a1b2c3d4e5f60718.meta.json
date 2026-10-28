@@ -1,0 +1,1 @@
+{"agentType":"general-purpose","isBuiltIn":true,"description":"Check the callers","toolUseId":"toolu_agent1","spawnDepth":1,"requestShape":"background","requestNonInteractive":true,"model":"sonnet","finished":true}
