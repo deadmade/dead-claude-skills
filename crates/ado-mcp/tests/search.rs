@@ -364,7 +364,7 @@ fn wiki_hits() {
         "search",
         json!({"kind": "wiki", "text": "deploy", "project": "My Proj"}),
     );
-    // The content hit, not the file-name hit; a page whose only hit is its file name gets no snippet.
+    // The content hit, not the file-name hit; a page without a content hit (file name, title) gets no snippet.
     assert_eq!(
         text,
         "2 hits\nShop/Shop.wiki:/Runbooks/Deploy\n  Run the deploy job & watch the gates\nShop/Shop.wiki:/Runbooks/Deploy Checklist"

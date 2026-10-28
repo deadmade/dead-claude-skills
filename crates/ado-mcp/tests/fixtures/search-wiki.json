@@ -50,6 +50,10 @@
         {
           "fieldReferenceName": "fileNames",
           "highlights": ["<highlighthit>Deploy</highlighthit>-Checklist.md"]
+        },
+        {
+          "fieldReferenceName": "title",
+          "highlights": ["<highlighthit>Deploy</highlighthit> Checklist"]
         }
       ]
     }

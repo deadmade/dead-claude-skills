@@ -4,8 +4,8 @@
 use std::fmt::Write as _;
 
 use azure_devops_rust_api::search::models::{
-    CodeResult, CodeSearchRequest, EntitySearchRequest, EntitySearchRequestBase, WikiHit,
-    WikiResult, WikiSearchRequest, WorkItemResult, WorkItemSearchRequest,
+    CodeResult, CodeSearchRequest, EntitySearchRequest, EntitySearchRequestBase, WikiResult,
+    WikiSearchRequest, WorkItemResult, WorkItemSearchRequest,
 };
 use rmcp::schemars::{self, JsonSchema};
 use serde::Deserialize;
@@ -167,7 +167,7 @@ fn page_path(file_path: &str) -> String {
     pages.map_or_else(|| raw.to_owned(), |p| p.join("/"))
 }
 
-/// `project/wiki:path`, then the content snippet, else the first other one: a file-name hit only repeats the path.
+/// `project/wiki:path`, then the content snippet if there is one: a file-name or title hit only repeats the path.
 fn wiki_hit(r: &WikiResult) -> String {
     let mut out = format!(
         "{}/{}:{}",
@@ -181,13 +181,11 @@ fn wiki_hit(r: &WikiResult) -> String {
             .unwrap_or("?"),
         r.path.as_deref().map_or_else(|| "?".to_owned(), page_path)
     );
-    let on = |h: &&WikiHit, f: &str| h.field_reference_name.as_deref() == Some(f);
-    let best = r
+    let content = r
         .hits
         .iter()
-        .find(|h| on(h, "content"))
-        .or_else(|| r.hits.iter().find(|h| !on(h, "fileNames")));
-    if let Some(h) = best.and_then(|h| h.highlights.first()) {
+        .find(|h| h.field_reference_name.as_deref() == Some("content"));
+    if let Some(h) = content.and_then(|h| h.highlights.first()) {
         let _ = write!(out, "\n  {}", plain(h));
     }
     out
