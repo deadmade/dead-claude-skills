@@ -6,10 +6,11 @@ its version changes, and the installer pinned the marketplace to a release tag, 
 change gets nothing.
 
 `release.yml` now runs on every push to `main` (docs and root `*.md` files aside) and cuts a patch with
-`npm run release -- patch --detach`: the bump is committed off `main` and only its tag is pushed. A tag pushed with
-the workflow's token starts no other run, so the same run builds the binaries from that tag and publishes the
-release. A release the user chooses is still `npm run release -- minor` (or `major`) pushed with its tag; the push to
-`main` that carries it finds `HEAD` already tagged and leaves it to the tag's run.
+`npm run release -- patch --detach`: the bump is committed off `main` and only its tag is pushed, with the workflow's
+token, which starts no other run, so the same run builds the binaries from that tag and publishes the release. A
+release the user chooses is still `npm run release -- minor` (or `major`) pushed with its tag; the push to `main` that
+carries it finds `HEAD` already tagged and releases that tag. `release.yml` has no tag trigger, so releases only come
+from pushes to `main`, which only takes merged PRs (admins aside).
 
 The installer used to pin the marketplace to its own `vX.Y.Z` tag, so a release only reached a machine when the
 installer ran again. It now points the marketplace at a `release` branch that `release.yml` moves to each release once

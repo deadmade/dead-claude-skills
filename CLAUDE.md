@@ -128,7 +128,7 @@ highest `vX.Y.Z` tag (`scripts/next-version.mjs`; fetch tags before a local rele
     npm run release -- minor      # on main, clean tree; bumps, runs npm test, commits and tags
     git push --follow-tags origin main
 
-Either way the `v*` tag's run packs the installer (`installer.tgz`), builds tui-review and web-mcp from the tag and
+Either way the merge's run packs the installer (`installer.tgz`), builds tui-review and web-mcp from the tag and
 publishes the GitHub release npx and the installer download from, then moves the `release` branch to it (never back).
 The installer points the marketplace at that branch (`RELEASE_BRANCH`, `core/release.ts`), so Claude Code's
 marketplace auto-update brings plugin updates without a rerun; the binaries still come from the installer (ADR 0006). Removing a plugin from the marketplace is enough to retire it: the installer uninstalls installed
@@ -164,3 +164,13 @@ plugins of ours that the manifest no longer lists.
 CI: `test.yml` (npm test, the installer typecheck and the dead-skills and md-pane mod tests, Linux and Windows; the skill scan, Linux) on every PR and push to main; `tui-review.yml` on
 PRs touching tui-review; `web-mcp.yml` on PRs touching web-mcp; `build-tui-review.yml`/`build-web-mcp.yml` on PRs touching the workflow and from `release.yml`; `sync-*.yml`
 weekly.
+
+The repo's rulesets live in its GitHub settings (Settings → Rules), not in the repo: main takes squash or rebase PRs
+once `test.yml`'s three jobs pass (admins bypass it, which `npm run release` pushed to main needs), and only admins move
+or delete a `v*` tag. Creating one stays open, since `release.yml` tags each merge with the workflow's token, but
+releases only come from a push to main: `release.yml` has no tag trigger, so a tag pushed any other way publishes
+nothing. Renaming a `test.yml` job or matrix entry changes its check name: update the main ruleset's required checks.
+
+The sync workflows open their PRs with the workflow's own token, which starts no other workflow, so `test.yml` doesn't
+run on a sync PR: they run check-repo and the skill scan themselves, and their PRs are merged past the main ruleset's
+required checks with the admin bypass.
