@@ -34,5 +34,3 @@ still what the installer pins the marketplace to".
   the highest `vX.Y.Z` tag, so a local `npm run release` needs the tags fetched.
 - Every release bumps every plugin, so each merge shows every plugin as updatable (ADR 0003 would fix that).
 - Each merge builds tui-review and web-mcp on Windows and Linux.
-- With every machine following `release`, `release.yml` is the only workflow whose token may write; the sync
-  workflows push with a GitHub App's token instead.

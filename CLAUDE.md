@@ -171,8 +171,6 @@ or delete a `v*` tag. Creating one stays open, since `release.yml` tags each mer
 releases only come from a push to main: `release.yml` has no tag trigger, so a tag pushed any other way publishes
 nothing. Renaming a `test.yml` job or matrix entry changes its check name: update the main ruleset's required checks.
 
-`release.yml` is the only workflow whose own token may write, and it moves the `release` branch every machine's
-marketplace follows; that branch has no ruleset, because the workflow's token can't be a bypass. The sync workflows read
-only and push their branch and open their PR with a GitHub App's token (repo variable `SYNC_APP_CLIENT_ID`, secret
-`SYNC_APP_PRIVATE_KEY`; contents and pull requests write), minted right before that step, so `test.yml` runs on the PR.
-Without the App a sync fails at that step.
+The sync workflows open their PRs with the workflow's own token, which starts no other workflow, so `test.yml` doesn't
+run on a sync PR: they run check-repo and the skill scan themselves, and their PRs are merged past the main ruleset's
+required checks with the admin bypass.

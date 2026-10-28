@@ -5,9 +5,9 @@ on:
     - cron: '0 6 * * 1' # Mondays 06:00 UTC
   workflow_dispatch:
 
-# The sync App pushes the branch and opens the PR, so the workflow's own token only reads.
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
 
 jobs:
   sync:
@@ -28,20 +28,9 @@ jobs:
       - name: Skill scan
         run: npm run scan-skills
 
-      # A PR opened with the workflow's token starts no other workflow; the sync App's lets test.yml run on it.
-      - name: App token
-        id: app
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        with:
-          client-id: ${{ vars.SYNC_APP_CLIENT_ID }}
-          private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
-          permission-contents: write
-          permission-pull-requests: write
-
       - name: Open pull request
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
-          token: ${{ steps.app.outputs.token }}
           branch: sync/hallmark
           delete-branch: true
           commit-message: 'Sync hallmark to ${{ steps.check.outputs.sha }}'

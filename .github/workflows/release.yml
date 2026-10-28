@@ -138,8 +138,7 @@ jobs:
   # The branch the installer points the marketplace at (RELEASE_BRANCH in installer/core/release.ts): Claude Code's
   # marketplace auto-update follows it, so plugins update without rerunning the installer. Moved once the release exists,
   # and never back to an older one (a re-run of an old merge's run). A job of its own, so its write token never shares a
-  # runner with publish's npm ci; release.yml is the only workflow whose token may write (the sync workflows push with
-  # their App's).
+  # runner with publish's npm ci.
   release-branch:
     needs: [version, publish]
     runs-on: ubuntu-latest
