@@ -46,6 +46,64 @@
       "rel": "ArtifactLink",
       "url": "vstfs:///Git/Commit/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455%2F3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01%2F2d9e7b10aa",
       "attributes": { "name": "Fixed in Commit" }
+    },
+    {
+      "rel": "System.LinkTypes.Duplicate-Reverse",
+      "url": "http://dev.example/tfs/Coll/_apis/wit/workItems/98",
+      "attributes": { "isLocked": false, "name": "Duplicate Of" }
+    },
+    {
+      "rel": "Microsoft.VSTS.Common.TestedBy-Forward",
+      "url": "http://dev.example/tfs/Coll/_apis/wit/workItems/130",
+      "attributes": { "isLocked": false, "name": "Tested By" }
+    },
+    {
+      "rel": "System.LinkTypes.Related",
+      "url": "http://dev.example/tfs/Coll/_apis/wit/workItems/101",
+      "attributes": { "isLocked": false, "name": "Related" }
+    },
+    {
+      "rel": "ArtifactLink",
+      "url": "vstfs:///Git/Ref/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455%2F3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01%2FGBfeature%2Fproxy-fix",
+      "attributes": { "name": "Branch" }
+    },
+    {
+      "rel": "Hyperlink",
+      "url": "http://blogs.example/proxy-notes.aspx",
+      "attributes": {
+        "authorizedDate": "2026-03-05T10:00:00Z",
+        "id": 65275,
+        "resourceCreatedDate": "2026-03-05T10:00:00Z",
+        "resourceModifiedDate": "2026-03-05T10:00:00Z",
+        "revisedDate": "9999-01-01T00:00:00Z"
+      }
+    },
+    {
+      "rel": "AttachedFile",
+      "url": "http://dev.example/tfs/Coll/_apis/wit/attachments/098a279a-60b9-40a8-868b-b7fd00c0a439",
+      "attributes": {
+        "authorizedDate": "2026-03-05T10:01:00Z",
+        "id": 65276,
+        "resourceCreatedDate": "2026-03-05T10:01:00Z",
+        "resourceModifiedDate": "2026-03-05T10:01:00Z",
+        "revisedDate": "9999-01-01T00:00:00Z",
+        "resourceSize": 2048,
+        "name": "proxy.log"
+      }
+    },
+    {
+      "rel": "AttachedFile",
+      "url": "http://dev.example/tfs/Coll/_apis/wit/attachments/1c6f0e2d-3b7a-4f9e-a1d2-5e8c9b0a7f13",
+      "attributes": {
+        "authorizedDate": "2026-03-05T10:02:00Z",
+        "id": 65277,
+        "resourceCreatedDate": "2026-03-05T10:02:00Z",
+        "resourceModifiedDate": "2026-03-05T10:02:00Z",
+        "revisedDate": "9999-01-01T00:00:00Z",
+        "resourceSize": 512,
+        "comment": "the failing request",
+        "name": "request.har"
+      }
     }
   ],
   "url": "http://dev.example/tfs/Coll/_apis/wit/workItems/123"

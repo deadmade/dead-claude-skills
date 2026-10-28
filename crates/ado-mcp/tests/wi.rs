@@ -92,6 +92,8 @@ fn view_lines() {
     assert!(lines.contains(&"parent: #100"), "{text}");
     assert!(lines.contains(&"children: #124, #125"), "{text}");
     assert!(lines.contains(&"PRs: !412"), "{text}");
+    assert!(lines.contains(&"Related: #99, #101"), "{text}");
+    assert!(lines.contains(&"commits: 2d9e7b10"), "{text}");
     assert!(
         text.contains("Open the login page behind the proxy.\nIt times out."),
         "{text}"
@@ -108,13 +110,50 @@ fn view_lines() {
         text.ends_with("\n  … 3 older comments: wi_view id=123 full=true"),
         "{text}"
     );
-    for leak in ["<", "&nbsp;", "http", "vstfs", PROJ, "#99", "2d9e7b10"] {
+    for leak in ["<", "&nbsp;", "http", "vstfs", PROJ] {
         assert!(!text.contains(leak), "{leak} in {text}");
     }
     let q = &queries(&fx, WI123)[0];
     assert!(q.contains("$expand=relations"), "{q}");
     let q = &queries(&fx, COMMENTS)[0];
     assert!(q.contains("$top=5") && q.contains("order=desc"), "{q}");
+}
+
+/// Every link of the item, after the head: work item links by the server's name, commits, branches, and the
+/// hyperlinks and attachments counted, with no URL, GUID or attachment name.
+#[test]
+fn view_all_links() {
+    let fx = Fixture::start();
+    fx.route(WI123, vec![fixture("wi.json")]);
+    fx.route(COMMENTS, vec![fixture("wi-comments.json")]);
+    let text = ok(&mut env(&fx), "wi_view", json!({"id": 123}));
+    let links: Vec<&str> = text.lines().skip(2).take_while(|l| !l.is_empty()).collect();
+    assert_eq!(
+        links,
+        [
+            "parent: #100",
+            "children: #124, #125",
+            "PRs: !412",
+            "Related: #99, #101",
+            "Duplicate Of: #98",
+            "Tested By: #130",
+            "commits: 2d9e7b10",
+            "branches: feature/proxy-fix",
+            "links: 1  attachments: 2",
+        ],
+        "{text}"
+    );
+    for leak in [
+        "http",
+        "vstfs",
+        PROJ,
+        "3f2c9a14",
+        "098a279a",
+        "proxy.log",
+        "%2F",
+    ] {
+        assert!(!text.contains(leak), "{leak} in {text}");
+    }
 }
 
 #[test]

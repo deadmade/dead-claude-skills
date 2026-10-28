@@ -15,6 +15,7 @@ use serde_json::{Value, json};
 use crate::api::{ApiError, json};
 use crate::ctx::{Ctx, given, seg};
 use crate::out::{DESC_MAX, args, clip, cut, html_to_text, more};
+use crate::remote::decode_path;
 
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "schemars")]
@@ -128,6 +129,83 @@ fn links(w: &WorkItem, mark: char, rel: &str, needle: &str) -> String {
     ids.join(", ")
 }
 
+/// The hierarchy rels, which `wi_view` shows as parent and children.
+const PARENT: &str = "System.LinkTypes.Hierarchy-Reverse";
+const CHILD: &str = "System.LinkTypes.Hierarchy-Forward";
+
+/// The `rest` of a git artifact link `vstfs:///Git/{kind}/{project}%2F{repo}%2F{rest}`, percent-decoded.
+fn git_artifact(url: &str, kind: &str) -> Option<String> {
+    let id = decode_path(url.strip_prefix(&format!("vstfs:///Git/{kind}/"))?);
+    let mut parts = id.splitn(3, '/');
+    let (proj, repo, rest) = (parts.next()?, parts.next()?, parts.next()?);
+    (!proj.is_empty() && !repo.is_empty() && !rest.is_empty()).then(|| rest.to_owned())
+}
+
+/// The links after parent, children and PRs: work item links grouped by the server's name for them, commits and
+/// branches by name, and hyperlinks and attachments only counted, since their URLs stay out of the reply.
+fn other_links(w: &WorkItem) -> Vec<String> {
+    let mut named: Vec<(&str, Vec<String>)> = Vec::new();
+    let (mut commits, mut branches) = (Vec::new(), Vec::new());
+    let (mut hyperlinks, mut files) = (0, 0);
+    for r in &w.relations {
+        let (rel, url) = (r.link.rel.as_str(), r.link.url.as_str());
+        match rel {
+            "Hyperlink" => hyperlinks += 1,
+            "AttachedFile" => files += 1,
+            "ArtifactLink" => {
+                let sha = git_artifact(url, "Commit")
+                    .filter(|s| s.bytes().all(|b| b.is_ascii_hexdigit()));
+                let branch = || {
+                    git_artifact(url, "Ref")?
+                        .strip_prefix("GB")
+                        .filter(|n| !n.is_empty())
+                        .map(str::to_owned)
+                };
+                if let Some(sha) = sha {
+                    commits.push(sha.get(..8).unwrap_or(&sha).to_owned());
+                } else if let Some(name) = branch() {
+                    branches.push(name);
+                }
+            }
+            PARENT | CHILD => {}
+            _ if url.contains("/_apis/wit/workItems/") => {
+                let Some(id) = last_id(url) else { continue };
+                // Without a name, the rel's last word: `System.LinkTypes.Related` reads `Related`.
+                let name = r
+                    .link
+                    .attributes
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .filter(|n| !n.is_empty())
+                    .unwrap_or_else(|| rel.rsplit_once('.').map_or(rel, |(_, w)| w));
+                match named.iter_mut().find(|(n, _)| *n == name) {
+                    Some((_, ids)) => ids.push(format!("#{id}")),
+                    None => named.push((name, vec![format!("#{id}")])),
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut out: Vec<String> = named
+        .into_iter()
+        .map(|(name, ids)| format!("{name}: {}", ids.join(", ")))
+        .collect();
+    for (title, list) in [("commits", commits), ("branches", branches)] {
+        if !list.is_empty() {
+            out.push(format!("{title}: {}", list.join(", ")));
+        }
+    }
+    let counts: Vec<String> = [("links", hyperlinks), ("attachments", files)]
+        .into_iter()
+        .filter(|&(_, n)| n > 0)
+        .map(|(title, n)| format!("{title}: {n}"))
+        .collect();
+    if !counts.is_empty() {
+        out.push(counts.join("  "));
+    }
+    out
+}
+
 /// Rich text as plain text, cut after the conversion so the cut counts readable characters; `whole` is the call
 /// that shows it all.
 fn text(html: &str, full: bool, whole: &str) -> String {
@@ -220,14 +298,17 @@ fn item_text(item: &WorkItem, full: bool, whole: &str) -> String {
         field(item, "System.IterationPath")
     );
     for (title, mark, rel, needle) in [
-        ("parent", '#', "System.LinkTypes.Hierarchy-Reverse", ""),
-        ("children", '#', "System.LinkTypes.Hierarchy-Forward", ""),
+        ("parent", '#', PARENT, ""),
+        ("children", '#', CHILD, ""),
         ("PRs", '!', "ArtifactLink", "PullRequestId"),
     ] {
         let ids = links(item, mark, rel, needle);
         if !ids.is_empty() {
             let _ = write!(out, "\n{title}: {ids}");
         }
+    }
+    for line in other_links(item) {
+        let _ = write!(out, "\n{line}");
     }
     for (label, f) in [
         ("", "System.Description"),
@@ -641,6 +722,150 @@ mod tests {
         ] {
             assert!(!field_name(bad), "{bad}");
         }
+    }
+
+    fn item_with(relations: &[Value]) -> WorkItem {
+        serde_json::from_value(json!({"id": 1, "fields": {}, "url": "u", "relations": relations}))
+            .unwrap()
+    }
+
+    fn rel(rel: &str, url: &str, attributes: &Value) -> Value {
+        json!({"rel": rel, "url": url, "attributes": attributes})
+    }
+
+    const WI: &str = "http://dev.example/tfs/Coll/_apis/wit/workItems/";
+    const IDS: &str =
+        "b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455%2F3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01%2F";
+
+    #[test]
+    fn other_links_by_kind() {
+        let named = |n: &str| json!({"isLocked": false, "name": n});
+        let w = item_with(&[
+            rel(
+                "System.LinkTypes.Related",
+                &format!("{WI}4"),
+                &named("Related"),
+            ),
+            rel(
+                "System.LinkTypes.Hierarchy-Reverse",
+                &format!("{WI}100"),
+                &named("Parent"),
+            ),
+            rel(
+                "System.LinkTypes.Hierarchy-Forward",
+                &format!("{WI}101"),
+                &named("Child"),
+            ),
+            rel(
+                "System.LinkTypes.Duplicate-Reverse",
+                &format!("{WI}7"),
+                &named("Duplicate Of"),
+            ),
+            rel(
+                "Microsoft.VSTS.Common.TestedBy-Forward",
+                &format!("{WI}12"),
+                &named("Tested By"),
+            ),
+            rel(
+                "ArtifactLink",
+                &format!("vstfs:///Git/Commit/{IDS}2d9e7b10aa55c3"),
+                &named("Fixed in Commit"),
+            ),
+            rel(
+                "ArtifactLink",
+                &format!("vstfs:///Git/Ref/{IDS}GBfeature%2Fx"),
+                &named("Branch"),
+            ),
+            rel(
+                "ArtifactLink",
+                "vstfs:///Git/Commit/garbage",
+                &named("Fixed in Commit"),
+            ),
+            rel(
+                "ArtifactLink",
+                &format!("vstfs:///Git/PullRequestId/{IDS}412"),
+                &named("Pull Request"),
+            ),
+            rel(
+                "System.LinkTypes.Related",
+                &format!("{WI}9"),
+                &named("Related"),
+            ),
+            rel(
+                "AttachedFile",
+                "http://dev.example/tfs/Coll/_apis/wit/attachments/0a1b?fileName=a.png",
+                &named("a.png"),
+            ),
+            rel(
+                "AttachedFile",
+                "http://dev.example/tfs/Coll/_apis/wit/attachments/2c3d",
+                &named("b.txt"),
+            ),
+            rel("Hyperlink", "https://example.com/doc", &json!({})),
+        ]);
+        let got = other_links(&w);
+        assert_eq!(
+            got,
+            [
+                "Related: #4, #9",
+                "Duplicate Of: #7",
+                "Tested By: #12",
+                "commits: 2d9e7b10",
+                "branches: feature/x",
+                "links: 1  attachments: 2",
+            ]
+        );
+        let all = got.join("\n");
+        assert!(!all.contains("vstfs") && !all.contains("http"), "{all}");
+    }
+
+    /// A link without a `name` goes by its rel's last word; artifact links that don't parse, or aren't a commit or a
+    /// branch, are left out; a lone count stands alone.
+    #[test]
+    fn other_links_edges() {
+        let w = item_with(&[
+            rel(
+                "System.LinkTypes.Dependency-Forward",
+                &format!("{WI}5"),
+                &json!({"isLocked": false}),
+            ),
+            rel(
+                "System.LinkTypes.Related",
+                "http://x/_apis/wit/workItems/abc",
+                &json!({"name": "Related"}),
+            ),
+            rel(
+                "ArtifactLink",
+                &format!("vstfs:///Git/Commit/{IDS}zz12"),
+                &json!({}),
+            ),
+            rel(
+                "ArtifactLink",
+                &format!("vstfs:///Git/Commit/{IDS}"),
+                &json!({}),
+            ),
+            rel(
+                "ArtifactLink",
+                &format!("vstfs:///Git/Ref/{IDS}GTv1.0"),
+                &json!({}),
+            ),
+            rel(
+                "ArtifactLink",
+                &format!("vstfs:///Git/Ref/{IDS}GB"),
+                &json!({}),
+            ),
+            rel("ArtifactLink", "vstfs:///Build/Build/17", &json!({})),
+            rel(
+                "AttachedFile",
+                "http://x/_apis/wit/attachments/1",
+                &json!(null),
+            ),
+        ]);
+        assert_eq!(
+            other_links(&w),
+            ["Dependency-Forward: #5", "attachments: 1"]
+        );
+        assert_eq!(other_links(&item_with(&[])), Vec::<String>::new());
     }
 
     #[test]
