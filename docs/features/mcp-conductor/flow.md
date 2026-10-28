@@ -1,6 +1,6 @@
 ---
 flow: feature
-phase: ground
+phase: brainstorm
 ---
 
 # MCP conductor: flow
