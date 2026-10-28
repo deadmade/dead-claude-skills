@@ -91,3 +91,30 @@ _Avoid_: passage, summary
 **Search profile**:
 The browser profile web-mcp's searches run in, with cookies and settings of its own and never the user's.
 _Avoid_: session (one browser), user profile
+
+## Flow cockpit
+
+**Flow cockpit**:
+The desktop window that shows what the conductors and Claude sessions are doing, read from their documents and the
+capture. It only watches.
+_Avoid_: dashboard, board, harness
+
+**Flow run**:
+One conductor run, recorded in a `docs/features/<slug>/flow.md`, from its start to `phase: done`.
+_Avoid_: run (alone; a web-mcp run is something else), flow (alone; that's the conductor), ticket
+
+**Audit**:
+One `docs/audits/<date>-<flow>-<scope>.md` report written by `/test-audit`, `/doc-audit` or `/harden`.
+_Avoid_: audit run, report (alone)
+
+**Claude session**:
+One Claude Code conversation together with the subagents it starts.
+_Avoid_: session (alone; a web-mcp session is a browser), chat
+
+**Loose session**:
+A Claude session that belongs to no flow run or audit.
+_Avoid_: orphan session, ad-hoc session
+
+**Capture**:
+The record of what one Claude session did, written event by event by the flow-cockpit plugin's hooks.
+_Avoid_: log, telemetry, trace
