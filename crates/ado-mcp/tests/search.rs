@@ -134,11 +134,16 @@ fn info_code_line() {
     let fx = Fixture::start();
     fx.route(WIS, vec![answer(2, &[])]);
     let text = ok(&mut env(&fx), "search", json!({"kind": "wi", "text": "x"}));
-    assert_eq!(
-        text.lines().next(),
-        Some("search indexing hasn't started on this collection"),
-        "{text}"
-    );
+    // No results: the line alone, no `0 hits` under it.
+    assert_eq!(text, "search indexing hasn't started on this collection");
+}
+
+#[test]
+fn no_hits() {
+    let fx = Fixture::start();
+    fx.route(WIS, vec![answer(0, &[])]);
+    let text = ok(&mut env(&fx), "search", json!({"kind": "wi", "text": "x"}));
+    assert_eq!(text, "0 hits");
 }
 
 /// Review Focus 7: a rejected query answers 200 with no results; the reply says it was rejected.
@@ -156,7 +161,7 @@ fn query_rejected() {
         Some("the server rejected the query: prefix wildcard not supported"),
         "{text}"
     );
-    assert_ne!(text, "0 hits");
+    assert!(!text.contains("0 hits"), "{text}");
 }
 
 #[test]
@@ -169,7 +174,7 @@ fn trimmed() {
         lines[..3],
         [
             "the server trimmed the results to its maximum",
-            "1 hits",
+            "1 hit",
             "#1 [Task] New  a"
         ],
         "{text}"

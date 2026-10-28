@@ -191,7 +191,11 @@ async fn wi(ctx: &Ctx, a: &SearchArgs, limit: usize) -> Result<String, ApiError>
         .map(str::to_owned)
         .into_iter()
         .collect();
-    lines.push(format!("{} hits", found.count.unwrap_or_default()));
+    // A rejected or unindexed search answers with no results: its line says why, `0 hits` would mislead.
+    if lines.is_empty() || !found.results.is_empty() {
+        let n = found.count.unwrap_or_default();
+        lines.push(format!("{n} hit{}", if n == 1 { "" } else { "s" }));
+    }
     let (hits, has_more) = cut(found.results, limit);
     lines.extend(hits.iter().map(wi_hit));
     if has_more {

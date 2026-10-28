@@ -500,7 +500,7 @@ fn scope(path: &str) -> Option<&'static str> {
         Some("wit") => Some("Work Items"),
         Some("build" | "pipelines") => Some("Build"),
         Some("projects" | "identities" | "connectionData") => Some("Project and Team (Read)"),
-        Some("search") => Some("Code, Work Items or Wiki (Read), for what you searched"),
+        Some("search") => Some("Code, Work Items or Wiki (Read)"),
         _ => None,
     }
 }

@@ -123,7 +123,10 @@ fn maps_403_search_scope() {
     );
     let (err, text) = ado(&fx, &[]).call("search", json!({"kind": "wi", "text": "x"}));
     assert!(err, "{text}");
-    assert!(text.contains("Code, Work Items or Wiki (Read)"), "{text}");
+    assert_eq!(
+        text,
+        "the PAT may not do this: it needs the Code, Work Items or Wiki (Read) scope"
+    );
 }
 
 #[test]
