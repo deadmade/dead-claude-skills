@@ -31,6 +31,12 @@ fn initialize_has_instructions() {
     );
     assert!(instructions.contains("the wiki tree 100"), "{instructions}");
     assert!(
+        instructions.contains(
+            "(pass project, and repo for the pr_* tools, repo_file and code search, to override it)"
+        ),
+        "{instructions}"
+    );
+    assert!(
         instructions
             .contains("pipeline_view 20 issues (pipeline_log shows the rest) and 20 failed tests."),
         "{instructions}"

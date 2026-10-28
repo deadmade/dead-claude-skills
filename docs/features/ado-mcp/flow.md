@@ -105,6 +105,7 @@ MCP server.
   - test: `TestRun.substate`, `RunStatistic.resultMetadata`, `resultGroupType`.
   - Fixtures built from the docs can't show an unknown value, so the smoke checklist checks live answers. If one
     trips, the fix is the D1 fallback: the raw body into a small struct of ours.
+  - Decision: 2026-10-28, ruled in the ado-mcp-next flow.
 
 ## Walkthrough
 

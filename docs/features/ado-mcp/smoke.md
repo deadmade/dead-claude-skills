@@ -97,8 +97,8 @@ enum value it doesn't know (D8). Paste back every such line, with the tool it ca
    carry the repo's type in a closed enum (git, tfvc or custom), so this checks it on a live answer.
 3. `search kind=wiki text=<a word from a wiki page>`.
 
-Each answer starts with `1 hit` or `N hits`, or with a line saying the index is being rebuilt or the query was
-rejected. Paste back: for each call that first line, how many hit lines followed, one hit line with names and paths
+Each answer starts with `1 hit` or `N hits`, after a line when the server reports something about the index or the
+query. Paste back: for each call those first lines, how many hit lines followed, one hit line with names and paths
 replaced by `…`, and any error line. If Search isn't installed, paste back that line, take the `repo_file` path from
 `repo_list` and the repo's web UI, and skip step 3 of the wiki section.
 

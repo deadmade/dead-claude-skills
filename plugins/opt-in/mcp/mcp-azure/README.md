@@ -40,7 +40,7 @@ Reads, each named `mcp__plugin_mcp-azure_ado__<tool>`:
 - `project_list`: every project the PAT can see, by name.
 - `search`: the server's own Search, ranked. `kind` is `code`, `wi` (work items) or `wiki`, and `text` is in the
   server's search syntax; `project`, and `repo` for code, narrow it. It prints `1 hit` or `N hits` (and a line when
-  the index is being rebuilt or the server rejected the query), then a line per hit: `#id [type] state  title`,
+  the server reports something about the index or the query), then a line per hit: `#id [type] state  title`,
   `<project>/<repo>:<path>  (N matches)` or `<project>/<wiki>:<page path>`, with a snippet under it where there is
   one. A wiki hit's page path is the one `wiki` takes, relative to a code wiki's published folder.
 - `repo_file`: a file of any repo on the server, as 200 numbered lines per call from `start` (default 1), on the
@@ -101,8 +101,8 @@ sensitive setting and is only ever sent to the collection URL.
 - YAML pipelines only: no classic release pipelines, feeds or TFVC.
 - Wikis are read only: no wiki writes. A code wiki is read at its first published branch only.
 - Test results are read per pipeline run: no test plans.
-- `search` needs the Search extension on the server (Code, Work Item and Wiki search on Azure DevOps Server). Without
-  it, `search` says Search isn't installed.
+- `search` needs Search set up on the server, with the search extension for each kind it's asked for (Code, Work Item,
+  Wiki); without it, `search` says Search isn't installed.
 - Builds for Windows and Linux x64 only.
 - TLS trusts the operating system's certificate store (on Windows, the Windows store).
 
