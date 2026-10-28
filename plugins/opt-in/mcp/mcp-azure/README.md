@@ -5,9 +5,11 @@ stdio MCP server (Rust, `crates/ado-mcp/`) that talks to one self-hosted collect
 calls the REST API through Microsoft's `azure_devops_rust_api` crate, with a few calls sent by hand where the crate
 falls short.
 
-Inside a clone, the tools read the git remote (`origin`), so they need no project or repo; pass `project` and `repo`
-to override it. Outside an Azure DevOps clone, they use the default project. Output is plain text, one line per item,
-id first; lists show 20 and say how to get more.
+Inside a clone, the tools read the git remote (`origin`), so they need no project or repo; pass `project` (and
+`repo` for the `pr_*` tools) to override it. When the clone names no project of this collection, pass `project`
+(`project_list` names them); `wi_view` takes the work item's own and `wi_update` needs none. Output is plain text,
+one line per item, id first; lists show 20 and say how to get more, except `repo_list` and `project_list`, which show
+all, `pr_files` (up to 2000 files) and `pipeline_view`'s issues (20; `pipeline_log` shows the rest).
 
 ## Tools
 
@@ -17,15 +19,18 @@ Reads, each named `mcp__plugin_mcp-azure_ado__<tool>`:
 - `pr_view`: reviewers and votes, policy checks, linked work items, the latest run and the description.
 - `pr_threads`: review threads with file and line; system threads, and unless `all` resolved ones, are left out.
   Comments are cut at 2000 characters unless `full`.
-- `pr_files`: the files the latest iteration changes, plus the `git diff` command for the patch.
+- `pr_files`: the files the latest iteration changes and, for plain branch names, the `git diff` command for the
+  patch.
 - `wi_view`: a work item with its parent, children, linked PRs, description, acceptance criteria and last 5 comments
   (`full`: the whole texts and up to 200 comments).
 - `wi_query`: work items by assignee (`me` or a name), state, type or title text, or a raw WIQL query.
 - `pipeline_runs`: recent runs, newest first, by pipeline, branch, PR or result.
 - `pipeline_view`: a run's stages and jobs with result and duration, and its errors and warnings.
-- `pipeline_log`: a run's cleaned logs: each failed step's error lines with context and its last 50 lines, read from at most its last 20,000 lines; `step`
-  picks one, `full` pages through a whole log (at most 2000 lines or 40,000 characters per call).
+- `pipeline_log`: a run's cleaned logs: each failed step's error lines with context and its last 50 lines, read from
+  at most its last 20,000 lines when the server reports the log's length (else the whole log); `step` picks one,
+  `full` pages through a whole log (at most 2000 lines or 40,000 characters per call).
 - `repo_list`: the project's repos with their default branch.
+- `project_list`: every project the PAT can see, by name.
 
 Without `id`, the `pr_*` tools use the active PR of the current branch. In a git worktree, pass `branch`. There is no
 diff tool: local `git diff` does it.
@@ -56,10 +61,10 @@ auto and bypass modes, and allow rules don't skip it. In `dontAsk` mode writes a
 
 ## Install
 
-The installer, with mcp-azure ticked, asks for the collection URL (e.g. `https://tfs.company/tfs/DefaultCollection`),
-the PAT (hidden) and an optional default project, installs the plugin, downloads `ado-mcp` to `~/.claude/bin` and
-saves it all, `binPath` included. Enter keeps a value already saved. On a Claude Code older than 2.1.285, or without a
-PAT, it prints what to set instead: configure the plugin in Claude Code, then run the installer again.
+The installer, with mcp-azure ticked, asks for the collection URL (e.g. `https://tfs.company/tfs/DefaultCollection`)
+and the PAT (hidden) unless both are saved already, installs the plugin, downloads `ado-mcp` to `~/.claude/bin` and saves it all, `binPath`
+included. Enter keeps a value already saved. On a Claude Code older than 2.1.285, or without a PAT, it prints what to
+set instead: configure the plugin in Claude Code, then run the installer again.
 
 By hand:
 
@@ -82,11 +87,11 @@ stored as a sensitive setting and is only ever sent to the collection URL.
 
 ## Upgrading from the npm server
 
-Up to 0.4.0, mcp-azure ran `@tiberriver256/mcp-server-azure-devops` through `npx`. Now:
+Before `ado-mcp`, mcp-azure ran `@tiberriver256/mcp-server-azure-devops` through `npx`. Now:
 
 - Re-run the installer, which downloads `ado-mcp` and sets `binPath`, or set `binPath` yourself. Without it, the
   server doesn't start unless `ado-mcp` is on PATH.
 - The server is now called `ado`, so old `mcp__plugin_mcp-azure_azure-devops-server__*` allow rules no longer match.
   Remove them and allow the new reads.
-- The `ado_api_version` setting is gone; a saved value is ignored. The collection URL, PAT and default project carry
-  over.
+- The `ado_api_version` and `ado_default_project` settings are gone; saved values are ignored. The collection URL
+  and PAT carry over. Outside an Azure DevOps clone, Claude passes `project`.

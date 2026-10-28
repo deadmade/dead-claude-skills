@@ -8,12 +8,11 @@ pub struct Config {
     /// The collection URL, always ending in `/` so `Url::join` keeps the collection.
     pub org_url: Url,
     pub pat: String,
-    pub default_project: Option<String>,
     pub project_dir: PathBuf,
 }
 
 impl Config {
-    /// Reads `ADO_ORG_URL`, `ADO_PAT`, `ADO_DEFAULT_PROJECT` and `ADO_PROJECT_DIR` (default: the working directory).
+    /// Reads `ADO_ORG_URL`, `ADO_PAT` and `ADO_PROJECT_DIR` (default: the working directory).
     ///
     /// # Errors
     /// When a required variable is unset or empty, or `ADO_ORG_URL` is not a URL.
@@ -42,7 +41,6 @@ impl Config {
         Ok(Self {
             org_url,
             pat,
-            default_project: var("ADO_DEFAULT_PROJECT"),
             project_dir,
         })
     }

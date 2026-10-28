@@ -3,6 +3,14 @@
   "count": 5,
   "comments": [
     {
+      "mentions": [
+        {
+          "artifactId": "5e8f1a77-0c2b-4d39-8e6a-1b7c3d9f4a02",
+          "artifactType": "Person",
+          "commentId": 8,
+          "targetId": "5e8f1a77-0c2b-4d39-8e6a-1b7c3d9f4a02"
+        }
+      ],
       "workItemId": 123,
       "id": 8,
       "version": 1,

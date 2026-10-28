@@ -59,7 +59,7 @@ fn plain_http_url_is_refused() {
     );
 }
 
-const READS: [&str; 10] = [
+const READS: [&str; 11] = [
     "pipeline_log",
     "pipeline_runs",
     "pipeline_view",
@@ -67,6 +67,7 @@ const READS: [&str; 10] = [
     "pr_list",
     "pr_threads",
     "pr_view",
+    "project_list",
     "repo_list",
     "wi_query",
     "wi_view",
@@ -120,6 +121,7 @@ fn errors_are_tool_errors_without_pat() {
         "/tfs/Coll/_apis/projects/P",
         "/tfs/Coll/P/_apis/git/repositories/R",
         "/tfs/Coll/_apis/wit/workitems/1",
+        "/tfs/Coll/_apis/projects",
     ] {
         fx.route(path, denied());
     }
@@ -147,6 +149,7 @@ fn errors_are_tool_errors_without_pat() {
         ("pipeline_view", json!({"run": 1})),
         ("pipeline_log", json!({"run": 1})),
         ("repo_list", json!({})),
+        ("project_list", json!({})),
     ];
     let mut called: Vec<&str> = calls.iter().map(|c| c.0).collect();
     called.sort_unstable();

@@ -59,21 +59,28 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   `installer/agent-browser.json` (bumped by `sync-agent-browser.yml`). Test-only hooks: `WEB_MCP_TEST_PUBLIC_IP`
   (debug builds or the `test-hooks` feature) treats a comma-separated list of IPs as public; `WEB_MCP_FALLBACK_MS` shortens the fetch browser fallback's deadline, `WEB_MCP_PAPERS_MS` each paper source's (8 s), `WEB_MCP_LOOKUP_MS` each lookup source's.
 - `plugins/opt-in/mcp/mcp-azure/`: `.mcp.json` and settings for `ado-mcp` (Rust, `crates/ado-mcp/`), a stdio MCP server
-  for one Azure DevOps Server collection and PAT: `pr_*`, `wi_*`, `pipeline_*` and `repo_list`, built for Windows and
-  Linux x64 only (`build-ado-mcp.yml`). The installer asks for its settings itself (`SELF_CONFIGURED` in `core.mjs`),
+  for one Azure DevOps Server collection and PAT: `pr_*`, `wi_*`, `pipeline_*`, `repo_list` and `project_list` (both
+  in `pipeline.rs`; no default project: outside an Azure DevOps clone the model passes `project`), built for Windows
+  and Linux x64 only (`build-ado-mcp.yml`). The installer asks for its settings itself (`SELF_CONFIGURED` in `core.mjs`),
   downloads the binary and saves both, `binPath` included, in one `claude plugin configure --values-stdin` call.
   - Calls go through Microsoft's `azure_devops_rust_api` (`=0.39.1`, sending `api-version=7.1-preview`) on our own
     reqwest client via `.transport()`. Pins are exact (`rmcp`, `reqwest`, `azure_core` too), and `reqwest` must stay
-    the one azure_core uses (`cargo tree -d -i reqwest` shows one). The crate compiles in aws-lc-rs (C code).
+    the one azure_core uses (`cargo tree -d -i reqwest` shows one). The crate compiles in aws-lc-rs (C code). Its
+    repo was archived on 2026-10-26, so no fix comes from upstream: a model the server's answer doesn't fit is read
+    from the raw body into our own struct (`api::json`; `Batch` and `RawComments` in `wi.rs`, `Props` beside the
+    crate model in `pr.rs`).
   - Where the crate falls short a call is sent or read by hand (`pr_list status=all`, `pr_threads`, the work-item
-    batch, build log text, `pipeline_cancel`, `/vsts/info`, `connectionData`); why each is in
-    `docs/features/ado-mcp/flow.md` (D1-D5). `pr_update` has no draft flag and `pr_complete` sends no
+    batch, work-item comments, build log text, `pipeline_cancel`, `/vsts/info`, `connectionData`); why each is in
+    `docs/features/ado-mcp/flow.md` (D1-D5, D7). `pr_update` has no draft flag and `pr_complete` sends no
     `lastMergeSourceCommit`, because the crate's model carries neither.
   - The PAT goes only to `ADO_ORG_URL`: crate calls pass the `Guard` policy, hand-sent ones `Api::url`'s check
     (`api.rs`), and redirects aren't followed.
   - Writes carry `anthropic/requiresUserInteraction` through `WRITES` in `tools.rs`; a new write tool goes there.
   - Tests run the binary over stdio against a fake server (`tests/common/mod.rs`) serving `tests/fixtures/`.
-    `tests/fixtures.rs` maps each fixture to the crate model its route returns, so every fixture must fit that model.
+    `tests/fixtures.rs` maps each fixture to the crate model its route returns, so every fixture must fit that model;
+    fixtures no crate model reads are listed apart, in `HAND_WRITTEN`. Fitting the model doesn't prove the server's
+    shape: build fixtures from real answers or the Server docs' samples (the comments fixture carried a `url` the
+    server leaves out of mentions, D7).
     Test-only hook: `ADO_TIMEOUT_MS` (debug builds) replaces the 60 s request timeout.
 - `plugins/opt-in/md-pane/`: a mod. Pure path logic in `hooks/paths.ts`; `register.tsx` redraws replies that name an existing
   `.md` file as its own `Markdown` (only a plugin-drawn `Markdown` with `onLinkPress` receives plain link clicks, and
@@ -125,7 +132,11 @@ plugins of ours that the manifest no longer lists.
 - tui-review: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/tui-review`.
 - web-mcp: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/web-mcp`.
 - ado-mcp: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/ado-mcp`. CI uses the latest stable
-  Rust, which can carry lints the pinned `rust-version` (1.97) lacks.
+  Rust, which can carry lints the pinned `rust-version` (1.97) lacks. A test that times concurrency makes one fast call
+  first and bounds the slow one against it (`view_concurrent` in `tests/pr.rs`, `tests/wi.rs`): under the full
+  parallel run on Windows, process start and git subprocesses outweigh a fixed wall-clock bound.
+- On Windows without symlink rights, `npm test`'s `installer/files.test.mjs` clean-slate test fails with `EPERM`
+  creating a symlink: the machine, not a regression.
 - tui-review mod tests need a generated fixture first, from `crates/tui-review`:
   `cargo run --release -- gen --out <dir> && node ../../plugins/shared/tui-review/tests/make-fixture.mjs <dir>`, then `claude plugin test .` in
   `plugins/shared/tui-review`.

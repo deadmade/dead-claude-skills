@@ -1,5 +1,5 @@
-//! What every tool needs first: the project and repo (from arguments, the git remote or the default project), who
-//! "me" is, who a name is, and which pipeline a name means. Answers are cached for the life of the server.
+//! What every tool needs first: the project and repo (from arguments or the git remote), who "me" is, who a name
+//! is, and which pipeline a name means. Answers are cached for the life of the server.
 
 use std::collections::HashMap;
 use std::fmt::Write as _;
@@ -106,8 +106,8 @@ impl Ctx {
         self.cache.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// The project (and repo) a tool works in. Explicit arguments win, then the clone's `origin`, then the default
-    /// project. `branch` is the argument, else the clone's current branch.
+    /// The project (and repo) a tool works in. Explicit arguments win, then the clone's `origin`. `branch` is the
+    /// argument, else the clone's current branch.
     ///
     /// # Errors
     /// When nothing names a project, the remote isn't ours (nothing is sent then), or the server refuses.
@@ -121,7 +121,7 @@ impl Ctx {
             self.named(p, given(repo)).await?
         } else {
             let base = self.ambient().await?;
-            // A repo argument without a project means that repo in the remote's (or default) project.
+            // A repo argument without a project means that repo in the remote's project.
             match given(repo) {
                 Some(r) => self.named(&base.project_id, Some(r)).await?,
                 None => base,
@@ -195,9 +195,9 @@ impl Ctx {
         .await
     }
 
-    /// The clone's `origin`, else the default project.
+    /// The clone's `origin`.
     async fn ambient(&self) -> Result<Scope, ApiError> {
-        // A clone of something else (GitHub, say) falls through to the default project.
+        // A clone of something else (GitHub, say) names no project.
         if let Some(remote) = origin_url(&self.cfg.project_dir).filter(|r| is_azure_remote(r)) {
             // Nothing is sent when the remote is another server or collection.
             let https = https_remote(&remote, &self.cfg.org_url).map_err(ApiError::local)?;
@@ -220,12 +220,9 @@ impl Ctx {
                 })
                 .await;
         }
-        match &self.cfg.default_project {
-            Some(p) => self.named(p, None).await,
-            None => Err(ApiError::local(
-                "no project: pass project, or open Claude Code in a clone of an Azure DevOps repo",
-            )),
-        }
+        Err(ApiError::local(
+            "no project: pass project (project_list names them), or open Claude Code in a clone of an Azure DevOps repo",
+        ))
     }
 
     /// Runs `f`; if it fails with a 404, drops the cached scope `key` (a repo or project that was deleted or

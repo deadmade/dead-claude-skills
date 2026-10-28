@@ -21,12 +21,6 @@
       "sensitive": true,
       "required": true
     },
-    "ado_default_project": {
-      "type": "string",
-      "title": "Azure DevOps default project",
-      "description": "Optional. Project used when a request doesn't name one.",
-      "default": ""
-    },
     "binPath": {
       "type": "string",
       "title": "ado-mcp binary",

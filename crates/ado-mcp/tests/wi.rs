@@ -184,14 +184,111 @@ fn view_not_found_and_comments_degrade() {
 #[test]
 fn view_concurrent() {
     let fx = Fixture::start();
-    let slow = Duration::from_millis(400);
-    fx.route(WI123, vec![fixture("wi.json").delay(slow)]);
-    fx.route(COMMENTS, vec![fixture("wi-comments.json").delay(slow)]);
+    // The first call answers at once and measures the rest (process, git, scope); the second waits 600 ms on each of
+    // two calls: 1200 ms one after the other, about 600 together.
+    let slow = Duration::from_millis(600);
+    fx.route(
+        WI123,
+        vec![fixture("wi.json"), fixture("wi.json").delay(slow)],
+    );
+    fx.route(
+        COMMENTS,
+        vec![
+            fixture("wi-comments.json"),
+            fixture("wi-comments.json").delay(slow),
+        ],
+    );
     let mut mcp = env(&fx);
     let t = Instant::now();
     ok(&mut mcp, "wi_view", json!({"id": 123}));
+    let base = t.elapsed();
+    let t = Instant::now();
+    ok(&mut mcp, "wi_view", json!({"id": 123}));
     let took = t.elapsed();
-    assert!(took < Duration::from_millis(750), "{took:?}");
+    assert!(
+        took < base + Duration::from_millis(1000),
+        "{took:?} against {base:?}"
+    );
+}
+
+/// A comments answer `Notes` can't read: the item still shows, the comments say why, and nothing is retried.
+#[test]
+fn view_comments_unreadable() {
+    let fx = Fixture::start();
+    fx.route(WI123, vec![fixture("wi.json")]);
+    fx.route(
+        COMMENTS,
+        vec![Resp::json(&json!({"totalCount": 1, "comments": {}}))],
+    );
+    let text = ok(&mut env(&fx), "wi_view", json!({"id": 123}));
+    assert!(text.starts_with("#123 "), "{text}");
+    assert!(
+        text.contains(
+            "
+
+comments: unavailable (unexpected answer from the server: "
+        ),
+        "{text}"
+    );
+    assert_eq!(requests(&fx, COMMENTS).len(), 1);
+}
+
+/// `"comments": null` is no comments, as the crate's model read it.
+#[test]
+fn view_comments_null() {
+    let fx = Fixture::start();
+    fx.route(WI123, vec![fixture("wi.json")]);
+    fx.route(
+        COMMENTS,
+        vec![Resp::json(&json!({"totalCount": 0, "comments": null}))],
+    );
+    let text = ok(&mut env(&fx), "wi_view", json!({"id": 123}));
+    assert!(!text.contains("\ncomments"), "{text}");
+}
+
+/// An answer without a `comments` key isn't "no comments": it says it couldn't read them.
+#[test]
+fn view_comments_missing_key() {
+    let fx = Fixture::start();
+    fx.route(WI123, vec![fixture("wi.json")]);
+    fx.route(COMMENTS, vec![Resp::json(&json!({"totalCount": 3}))]);
+    let text = ok(&mut env(&fx), "wi_view", json!({"id": 123}));
+    assert!(
+        text.contains(
+            "
+
+comments: unavailable (unexpected answer from the server: "
+        ),
+        "{text}"
+    );
+}
+
+/// Outside an Azure DevOps clone, with no project: the item is collection-wide and names its own project, which the
+/// comments are read from.
+#[test]
+fn view_outside_clone_uses_the_items_project() {
+    let fx = Fixture::start();
+    fx.route(WI123, vec![fixture("wi.json")]);
+    let home = "/tfs/Coll/My%20Proj/_apis/wit/workItems/123/comments";
+    fx.route(home, vec![fixture("wi-comments.json")]);
+    let text = ok(&mut ado(&fx, &[]), "wi_view", json!({"id": 123}));
+    assert!(text.starts_with("#123 "), "{text}");
+    assert!(
+        text.contains(
+            "
+comments:
+  2026-03-06 Jane Roe:"
+        ),
+        "{text}"
+    );
+    assert_eq!(requests(&fx, home).len(), 1);
+    // An empty project is no project, as everywhere else.
+    let text = ok(
+        &mut ado(&fx, &[]),
+        "wi_view",
+        json!({"id": 123, "project": ""}),
+    );
+    assert!(text.starts_with("#123 "), "{text}");
 }
 
 #[test]
@@ -491,7 +588,9 @@ fn comment_preview_version() {
     fx.route(
         COMMENTS,
         vec![Resp::json(
-            &json!({"id": 9, "text": "Fixed in !412.", "url": "http://x"}),
+            // The server leaves `url` out of a mention, which the crate's `CommentMention` (inside `Comment`) requires.
+            &json!({"id": 9, "text": "Fixed in !412.", "url": "http://x",
+                "mentions": [{"artifactId": "a", "artifactType": "Person", "commentId": 9, "targetId": "a"}]}),
         )],
     );
     let text = ok(

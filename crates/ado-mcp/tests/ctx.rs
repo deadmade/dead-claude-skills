@@ -16,6 +16,7 @@ const DEFS: &str = "/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/build/d
 const BUILDS: &str = "/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/build/builds";
 /// `repo.json`'s project and repo, by name.
 const BY_NAME: &str = "/tfs/Coll/P/_apis/git/repositories/R";
+const NO_PROJECT: &str = "no project: pass project (project_list names them), or open Claude Code in a clone of an Azure DevOps repo";
 
 fn in_clone(fx: &Fixture, dir: &Path) -> Mcp {
     ado(fx, &[("ADO_PROJECT_DIR", dir.to_str().unwrap())])
@@ -170,40 +171,30 @@ fn explicit_args_win() {
 }
 
 #[test]
-fn default_project_outside_clone() {
+fn no_default_project_outside_clone() {
     let fx = Fixture::start();
+    // A leftover ADO_DEFAULT_PROJECT is ignored: the model is told what to do, and nothing is sent.
+    let mut mcp = ado(&fx, &[("ADO_DEFAULT_PROJECT", "Fallback")]);
+    assert_eq!(mcp.call("repo_list", json!({})), (true, NO_PROJECT.into()));
+    assert!(fx.requests().is_empty(), "{:?}", paths(&fx));
+    // A project but no repo and no branch.
     fx.route(
         "/tfs/Coll/_apis/projects/Fallback",
         vec![project("p-fb", "Fallback")],
     );
-    fx.route(
-        "/tfs/Coll/p-fb/_apis/git/repositories",
-        vec![fixture("repos.json")],
-    );
-    // The default temp dir is no git clone.
-    let mut mcp = ado(&fx, &[("ADO_DEFAULT_PROJECT", "Fallback")]);
-    let (err, text) = mcp.call("repo_list", json!({}));
-    assert!(!err, "{text}");
-    assert!(text.contains("R  default: main"), "{text}");
-    // A project but no repo and no branch.
     assert_eq!(
-        mcp.call("pr_list", json!({})),
+        mcp.call("pr_list", json!({"project": "Fallback"})),
         (
             true,
             "no repo: pass repo, or open Claude Code in a clone of an Azure DevOps repo".into()
         )
     );
     assert_eq!(
-        mcp.call("pipeline_run", json!({"pipeline": "12"})),
+        mcp.call(
+            "pipeline_run",
+            json!({"project": "Fallback", "pipeline": "12"})
+        ),
         (true, "no branch: pass branch".into())
-    );
-    // And with neither a clone nor a default, the model is told what to do.
-    let mut bare = ado(&fx, &[]);
-    let (err, text) = bare.call("repo_list", json!({}));
-    assert!(err);
-    assert_eq!(
-        text,
-        "no project: pass project, or open Claude Code in a clone of an Azure DevOps repo"
     );
 }
 
@@ -427,7 +418,7 @@ fn concurrent_scopes_all_ok() {
 }
 
 #[test]
-fn github_clone_uses_default_project() {
+fn github_clone_needs_project() {
     let fx = Fixture::start();
     fx.route(
         "/tfs/Coll/_apis/projects/Fallback",
@@ -445,18 +436,21 @@ fn github_clone_uses_default_project() {
             ("ADO_DEFAULT_PROJECT", "Fallback"),
         ],
     );
-    // The default project, with the clone's branch.
-    let (err, text) = mcp.call("pipeline_run", json!({"pipeline": "12"}));
+    // No project: it says what to do, and sends nothing.
+    assert_eq!(
+        mcp.call("pipeline_run", json!({"pipeline": "12"})),
+        (true, NO_PROJECT.into())
+    );
+    assert!(fx.requests().is_empty(), "{:?}", paths(&fx));
+    // The project given, with the clone's branch.
+    let (err, text) = mcp.call(
+        "pipeline_run",
+        json!({"project": "Fallback", "pipeline": "12"}),
+    );
     assert!(!err, "{text}");
     assert_eq!(text, "queued run #78 of CI on main");
     let body = String::from_utf8(only(&fx, "/tfs/Coll/p-fb/_apis/pipelines/12/runs").body).unwrap();
     assert!(body.contains("refs/heads/main"), "{body}");
-    assert_eq!(fx.requests().len(), 2);
-    // Without a default project it still says what to do, and sends nothing.
-    let mut bare = in_clone(&fx, &clone);
-    let (err, text) = bare.call("pipeline_run", json!({"pipeline": "12"}));
-    assert!(err);
-    assert!(text.starts_with("no project: pass project"), "{text}");
     assert_eq!(fx.requests().len(), 2);
 }
 

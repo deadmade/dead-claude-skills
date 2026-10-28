@@ -53,17 +53,18 @@ const TABLE: &[(&str, Check)] = &[
     ("repos.json", fits::<git::models::GitRepositoryList>),
     ("timeline.json", fits::<build::models::Timeline>),
     ("wi-batch.json", fits::<wit::models::WorkItemList>),
-    ("wi-comments.json", fits::<wit::models::CommentList>),
     ("wi.json", fits::<wit::models::WorkItem>),
     ("wiql.json", fits::<wit::models::WorkItemQueryResult>),
 ];
 
-/// Answers with no crate model: the two hand-written calls, an error body, and a log, which is plain text.
+/// Fixtures no crate model reads: the two hand-written calls, an error body, a log, which is plain text, and the
+/// comments, whose mentions lack the `url` the crate's `CommentMention` (inside `CommentList`) requires.
 const HAND_WRITTEN: &[&str] = &[
     "connection-data.json",
     "vsts-info.json",
     "pr-409.json",
     "log.txt",
+    "wi-comments.json",
 ];
 
 #[test]

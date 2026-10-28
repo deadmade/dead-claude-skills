@@ -11,7 +11,7 @@ Writes run on scratch items only, and each says how to clean it up.
 ## 1. Install
 
 1. Run `npx --allow-git=root github:deadmade/dead-claude-skills#semver:*`.
-2. Tick mcp-azure, then enter the collection URL (`https://…/tfs/<Collection>`), the PAT and the default project.
+2. Tick mcp-azure, then enter the collection URL (`https://…/tfs/<Collection>`) and the PAT.
    The PAT prompt must not echo what you type.
 3. Start Claude Code and check that `/mcp` shows the `ado` server as connected.
 

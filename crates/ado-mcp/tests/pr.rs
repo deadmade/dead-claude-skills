@@ -284,18 +284,24 @@ fn view_no_run() {
 fn view_concurrent() {
     let fx = Fixture::start();
     view_routes(&fx);
-    let slow = Duration::from_millis(300);
-    fx.route(POLICY, vec![fixture("policy-evaluations.json").delay(slow)]);
-    fx.route(
-        &format!("{PR412}/workitems"),
-        vec![fixture("pr-workitems.json").delay(slow)],
-    );
-    fx.route(BUILDS, vec![fixture("builds-one.json").delay(slow)]);
+    // The first call answers at once and measures the rest (process, git, scope); the second waits 600 ms on each of
+    // three calls: 1800 ms one after the other, about 600 together.
+    let slow = Duration::from_millis(600);
+    let twice = |name: &str| vec![fixture(name), fixture(name).delay(slow)];
+    fx.route(POLICY, twice("policy-evaluations.json"));
+    fx.route(&format!("{PR412}/workitems"), twice("pr-workitems.json"));
+    fx.route(BUILDS, twice("builds-one.json"));
     let mut mcp = env(&fx);
     let t = Instant::now();
     ok(&mut mcp, "pr_view", json!({"id": 412}));
+    let base = t.elapsed();
+    let t = Instant::now();
+    ok(&mut mcp, "pr_view", json!({"id": 412}));
     let took = t.elapsed();
-    assert!(took < Duration::from_millis(800), "{took:?}");
+    assert!(
+        took < base + Duration::from_millis(1200),
+        "{took:?} against {base:?}"
+    );
 }
 
 #[test]
@@ -814,7 +820,8 @@ fn threads_reply_is_capped() {
     fx.route(&format!("{PRS}/412"), vec![fixture("pr.json")]);
     fx.route(&format!("{PR412}/threads"), vec![long_threads(30, 1900)]);
     let text = ok(&mut env(&fx), "pr_threads", json!({"id": 412, "limit": 30}));
-    let tail = "\n… output cut at 40,000 characters; narrow the call (limit, id, step)";
+    let tail =
+        "\n… output cut at 40,000 characters; narrow the call where it can be (limit, id, step)";
     assert!(text.ends_with(tail), "{}", &text[text.len() - 200..]);
     assert!(text.chars().count() <= 40_000 + tail.chars().count());
     // Cut at a line end: the last line kept is a whole thread header or comment.

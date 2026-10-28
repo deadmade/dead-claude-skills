@@ -29,7 +29,8 @@ downloaded when it runs. The user doesn't need a terminal tool: "goal is for cla
 
 1. **One stdio MCP server in Rust, `ado-mcp`** (`crates/ado-mcp/`), replacing the npm server inside the existing
    `mcp-azure` plugin.
-   - The plugin keeps its name and its userConfig keys, so existing configuration carries over.
+   - The plugin keeps its name and its collection URL and PAT keys, so those carry over (`ado_api_version` and
+     `ado_default_project` are gone).
    - It is built, released, downloaded and version-synced like web-mcp: Windows x64 and Linux x64 (musl) only. The
      touch points are listed in flow.md, Grounding.
    - It calls the REST API through Microsoft's `azure_devops_rust_api` crate (pinned `=0.39.1`, only the `git`,
@@ -74,6 +75,7 @@ downloaded when it runs. The user doesn't need a terminal tool: "goal is for cla
      - `step` picks another step
      - `full: true` with `start` returns the cleaned lines, at most 2000 or 40,000 characters per call (grill Q8; R8)
    - `repo_list`: repos in the project.
+   - `project_list`: every project in the collection, by name (fix-flow `ado-mcp-default-project-400`).
 
    **Writes.** Each one carries `_meta["anthropic/requiresUserInteraction"]: true` in `tools/list` (the user's
    choice, 2026-10-18).
@@ -125,8 +127,10 @@ downloaded when it runs. The user doesn't need a terminal tool: "goal is for cla
      at its collection segment: `ADO_ORG_URL` plus the rest of the path after the collection.
    - Before any request, the remote's host and collection must match `ADO_ORG_URL`'s, so the PAT only goes to the
      configured server (plan review round 1).
-   - Every tool takes optional `project` and `repo` arguments that override the remote. Outside a clone,
-     `ado_default_project` applies.
+   - Every tool but `project_list` and `wi_update` takes an optional `project` argument, and the `pr_*` tools also
+     `repo`, that override the remote. Outside an Azure DevOps clone, `project` is required (`wi_view` takes the
+     work item's own); there is no default project (removed 2026-10-28, fix-flow `ado-mcp-default-project-400`:
+     the user switches projects often, and a bad default only showed as a bare HTTP 400).
    - Every tool that infers the current branch also takes an optional `branch`. In a worktree the project folder's
      branch isn't Claude's (grill Q2).
    - One server and one PAT (grill Q9). A remote on a different server from `ado_org_url` is an error that names
@@ -178,8 +182,8 @@ downloaded when it runs. The user doesn't need a terminal tool: "goal is for cla
    - Installer: `BIN_PLUGINS` maps `mcp-azure` → binary `ado-mcp`. The plugin and binary names now differ, so
      `install.mjs:370` uses the binary's crate folder.
    - **The installer installs and configures mcp-azure itself** (grill Q10). It no longer hands it off.
-     - When mcp-azure is ticked, it asks for the collection URL, the PAT (hidden input) and an optional default
-       project. Enter keeps a value that is already saved.
+     - When mcp-azure is ticked, it asks for the collection URL and the PAT (hidden input), unless both are saved
+       already. Enter keeps a value that is already saved.
      - Then it installs the plugin, downloads `ado-mcp`, and saves everything, `binPath` included, in one
        `claude plugin configure mcp-azure@<marketplace> --values-stdin` call (Claude Code ≥ 2.1.285).
      - The PAT travels over stdin only, never as an argument (no `--config key=value`).

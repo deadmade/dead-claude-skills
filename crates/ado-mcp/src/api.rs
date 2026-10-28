@@ -110,6 +110,14 @@ impl ApiError {
     }
 }
 
+/// A raw body (a crate call's `.send()`) read into our own type, where the crate's model doesn't fit the server.
+///
+/// # Errors
+/// When the body doesn't fit `T`.
+pub(crate) fn json<T: DeserializeOwned>(raw: &[u8]) -> Result<T, ApiError> {
+    serde_json::from_slice(raw).map_err(|e| ApiError::unreadable(&e))
+}
+
 /// Keeps the PAT on `ADO_ORG_URL` and words HTTP failures while the request URL is still at hand.
 #[derive(Debug)]
 struct Guard {
@@ -556,7 +564,6 @@ mod tests {
         let cfg = Config {
             org_url: Url::parse("https://ado.example/tfs/Coll/").unwrap(),
             pat: "secret-pat".into(),
-            default_project: None,
             project_dir: PathBuf::new(),
         };
         Api::new(&cfg).unwrap()

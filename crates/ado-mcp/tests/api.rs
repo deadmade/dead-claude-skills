@@ -283,3 +283,92 @@ fn no_resend_on_dropped_connection() {
     assert!(text.starts_with("can't reach 127.0.0.1: "), "{text}");
     assert_eq!(fx.requests().len(), 1);
 }
+
+/// A page of projects as the server answers it.
+fn project_page(names: &[String]) -> Resp {
+    let value: Vec<_> = names
+        .iter()
+        .map(|n| json!({"id": format!("id-{n}"), "name": n, "state": "wellFormed", "visibility": "private"}))
+        .collect();
+    Resp::json(&json!({"count": value.len(), "value": value}))
+}
+
+const PROJECTS: &str = "/tfs/Coll/_apis/projects";
+
+/// `project_list` pages with `$top`/`$skip` until a page adds nothing, and names them sorted without regard to case.
+#[test]
+fn project_list_names_every_project() {
+    let fx = Fixture::start();
+    // A full first page in reverse order, so only the sort puts it right, then a short one and an empty one.
+    let first: Vec<String> = (0..100).rev().map(|i| format!("p{i:03}")).collect();
+    let second: Vec<String> = ["beta", "Alpha", "Gamma"].map(String::from).into();
+    fx.route(
+        PROJECTS,
+        vec![
+            project_page(&first),
+            project_page(&second),
+            project_page(&[]),
+        ],
+    );
+    let (err, text) = ado(&fx, &[]).call("project_list", json!({}));
+    assert!(!err, "{text}");
+    let lines: Vec<&str> = text.lines().collect();
+    assert_eq!(lines.len(), 103);
+    assert_eq!(&lines[..4], ["Alpha", "beta", "Gamma", "p000"]);
+    assert_eq!(lines[102], "p099");
+    let reqs = fx.requests();
+    assert_eq!(reqs.len(), 3);
+    assert!(reqs[0].path.contains("%24top=100"), "{}", reqs[0].path);
+    assert!(reqs[1].path.contains("%24skip=100"), "{}", reqs[1].path);
+    assert!(reqs[2].path.contains("%24skip=103"), "{}", reqs[2].path);
+}
+
+/// A server that hands out fewer than asked for still gets read to the end: `$skip` follows what came back.
+#[test]
+fn project_list_short_pages() {
+    let fx = Fixture::start();
+    let page = |from: usize| -> Vec<String> { (from..from + 2).map(|i| format!("p{i}")).collect() };
+    fx.route(
+        PROJECTS,
+        vec![
+            project_page(&page(0)),
+            project_page(&page(2)),
+            project_page(&[]),
+        ],
+    );
+    let (err, text) = ado(&fx, &[]).call("project_list", json!({}));
+    assert!(!err, "{text}");
+    assert_eq!(
+        text,
+        "p0
+p1
+p2
+p3"
+    );
+    let reqs = fx.requests();
+    assert_eq!(reqs.len(), 3);
+    assert!(reqs[1].path.contains("%24skip=2"), "{}", reqs[1].path);
+    assert!(reqs[2].path.contains("%24skip=4"), "{}", reqs[2].path);
+}
+
+/// A server that ignores `$skip` repeats its first page: the repeat ends the listing, with no duplicates.
+#[test]
+fn project_list_ignored_skip() {
+    let fx = Fixture::start();
+    let first: Vec<String> = (0..100).map(|i| format!("p{i:03}")).collect();
+    fx.route(PROJECTS, vec![project_page(&first)]);
+    let (err, text) = ado(&fx, &[]).call("project_list", json!({}));
+    assert!(!err, "{text}");
+    assert_eq!(text.lines().count(), 100);
+    assert_eq!(fx.requests().len(), 2);
+}
+
+/// None visible: the PAT's user may lack access, so the line says whose view it is.
+#[test]
+fn project_list_none() {
+    let fx = Fixture::start();
+    fx.route(PROJECTS, vec![project_page(&[])]);
+    let (err, text) = ado(&fx, &[]).call("project_list", json!({}));
+    assert!(!err, "{text}");
+    assert_eq!(text, "no projects visible to this PAT");
+}

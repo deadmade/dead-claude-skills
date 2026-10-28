@@ -1,5 +1,5 @@
 //! The pipeline tools: the reads `pipeline_runs`, `pipeline_view` and `pipeline_log`, the writes `pipeline_run` and
-//! `pipeline_cancel`; and `repo_list`.
+//! `pipeline_cancel`; and `repo_list` and `project_list`.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Write as _;
@@ -899,6 +899,57 @@ pub(crate) async fn repo_list(ctx: &Ctx, a: &ProjectArgs) -> Result<String, ApiE
     } else {
         lines.join("\n")
     })
+}
+
+/// Projects asked for per request (`$top`); the server may hand out fewer.
+const PROJECTS_PAGE: i32 = 100;
+
+/// Requests at most: 10,000 projects at full pages.
+const PROJECT_PAGES: usize = 100;
+
+/// Every well-formed project the PAT can see, sorted by name, one per line.
+///
+/// # Errors
+/// When the server fails.
+pub(crate) async fn project_list(ctx: &Ctx) -> Result<String, ApiError> {
+    let api = &ctx.api;
+    let mut names = Vec::new();
+    let mut seen = HashSet::new();
+    let mut ended = false;
+    for _ in 0..PROJECT_PAGES {
+        // `$skip` follows what came back, so a server that hands out fewer than `$top` is still read to the end.
+        let skip = i32::try_from(names.len()).unwrap_or(i32::MAX);
+        let page = api
+            .az(|| {
+                api.core
+                    .projects_client()
+                    .list(&api.org)
+                    .top(PROJECTS_PAGE)
+                    .skip(skip)
+                    .into_future()
+            })
+            .await?
+            .value;
+        let before = names.len();
+        names.extend(
+            page.into_iter()
+                .map(|p| p.name)
+                .filter(|n| seen.insert(n.clone())),
+        );
+        // An empty page ends the list; so does one with nothing new (a server that ignores `$skip`).
+        if names.len() == before {
+            ended = true;
+            break;
+        }
+    }
+    names.sort_by_cached_key(|n| n.to_lowercase());
+    if names.is_empty() {
+        return Ok("no projects visible to this PAT".into());
+    }
+    if !ended {
+        names.push(format!("… the list stops at {} projects", names.len()));
+    }
+    Ok(names.join("\n"))
 }
 
 #[cfg(test)]

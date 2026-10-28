@@ -126,7 +126,7 @@ test('mcp-azure asks for its settings itself, in manifest order, without its bin
   const prompts = configPrompts(userConfig, 'binPath', ['ado_org_url']);
   assert.deepEqual(
     prompts.map((p) => p.key),
-    ['ado_org_url', 'ado_pat', 'ado_default_project'],
+    ['ado_org_url', 'ado_pat'],
   );
   assert.deepEqual(
     prompts.filter((p) => p.secret).map((p) => p.key),
@@ -137,7 +137,6 @@ test('mcp-azure asks for its settings itself, in manifest order, without its bin
     [
       ['ado_org_url', true, true],
       ['ado_pat', false, true],
-      ['ado_default_project', false, false],
     ],
   );
   assert.equal(prompts[0].title, userConfig.ado_org_url.title);
@@ -147,13 +146,13 @@ test('configValues trims answers, keeps saved values on empty and names what is 
   const { userConfig } = json('plugins/opt-in/mcp/mcp-azure/.claude-plugin/plugin.json');
   const url = 'https://tfs.example/tfs/Coll';
   const unsaved = configPrompts(userConfig, 'binPath', []);
-  assert.deepEqual(configValues(unsaved, { ado_org_url: ` ${url} `, ado_pat: '', ado_default_project: '' }), {
+  assert.deepEqual(configValues(unsaved, { ado_org_url: ` ${url} `, ado_pat: '' }), {
     values: { ado_org_url: url },
     missing: ['ado_pat'],
   });
   const saved = configPrompts(userConfig, 'binPath', ['ado_org_url', 'ado_pat']);
-  assert.deepEqual(configValues(saved, { ado_org_url: '', ado_pat: '  ', ado_default_project: 'My Project' }), {
-    values: { ado_default_project: 'My Project' },
+  assert.deepEqual(configValues(saved, { ado_org_url: '', ado_pat: '  ' }), {
+    values: {},
     missing: [],
   });
   assert.deepEqual(configValues(unsaved, { ado_org_url: url, ado_pat: 'test-pat' }), {

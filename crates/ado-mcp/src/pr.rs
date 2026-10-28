@@ -16,7 +16,7 @@ use rmcp::schemars::{self, JsonSchema};
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
-use crate::api::{ApiError, V71_PREVIEW};
+use crate::api::{ApiError, V71_PREVIEW, json};
 use crate::ctx::{Ctx, Scope, given, seg};
 use crate::out::{DESC_MAX, args, clip, cut, full_ref, more, ref_name};
 
@@ -581,9 +581,8 @@ pub(crate) async fn pr_threads(ctx: &Ctx, a: &PrThreadsArgs) -> Result<String, A
         .await?
         .into_raw_response()
         .into_body();
-    let list: GitPullRequestCommentThreadList =
-        serde_json::from_slice(&body).map_err(|e| ApiError::unreadable(&e))?;
-    let props: List<Props> = serde_json::from_slice(&body).map_err(|e| ApiError::unreadable(&e))?;
+    let list: GitPullRequestCommentThreadList = json(&body)?;
+    let props: List<Props> = json(&body)?;
     let mut threads: Vec<CommentThread> = list
         .value
         .into_iter()

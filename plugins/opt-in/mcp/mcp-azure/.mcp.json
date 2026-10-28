@@ -5,7 +5,6 @@
       "env": {
         "ADO_ORG_URL": "${user_config.ado_org_url}",
         "ADO_PAT": "${user_config.ado_pat}",
-        "ADO_DEFAULT_PROJECT": "${user_config.ado_default_project}",
         "ADO_PROJECT_DIR": "${CLAUDE_PROJECT_DIR}"
       }
     }

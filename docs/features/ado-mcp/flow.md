@@ -91,6 +91,12 @@ MCP server.
     failed jobs without a failed step, one step per `full` page, three installer messages and `--clean` keeping
     `pluginConfigs`). Recommended: keep them all.
   - Decision: pending.
+- **D7, 2026-10-28: work-item comments read by hand** (fix flow `docs/features/ado-mcp-wi-comments-missing-url/`).
+  The server sends a comment's `mentions` without a `url`, which the crate's `CommentList`, `Comment` and
+  `CommentMention` require, so every `wi_view` with a mentioning comment showed `comments: unavailable`. `wi_view`
+  reads the raw body into its own `RawComments` (only what it shows); `wi_comment` sends with `.send()` and doesn't decode
+  the reply, which would otherwise fail after the comment was posted. The crate's repo is archived (2026-10-26).
+  - Decision: 2026-10-28, approved in that fix flow.
 
 ## Walkthrough
 
@@ -121,6 +127,7 @@ JS tests are named by their title's first words.
 | 2 pipeline_log: `step`; `full` + `start`, 2000 lines or 39,000 chars (R8) | 8 | src/pipeline.rs:85-98,490-505,558-603,779-782 | src/pipeline.rs::page_cuts_at_lines_or_chars; tests/pipeline.rs::log_full_paged, ::log_matrix_steps_failed_first; smoke.md step 4 |
 | 2 pipeline_log: whole reply in budget, steps past it named (R9) | 8 | src/pipeline.rs:605-671,728-793 | src/pipeline.rs::budget_names_what_is_left_out; tests/pipeline.rs::log_budget_names_the_rest |
 | 2 repo_list | 8 | src/pipeline.rs:870-902 | tests/pipeline.rs::repo_list_lines |
+| 2 project_list (fix-flow `ado-mcp-default-project-400`) | — | src/pipeline.rs:904-953 | tests/api.rs::project_list_names_every_project, ::project_list_short_pages, ::project_list_ignored_skip, ::project_list_none |
 | 2 pr_create: source/target defaults, draft, reviewers, work items | 9 | src/pr.rs:808-892 | tests/pr.rs::create_defaults_and_reviewers |
 | 2 pr_update: title, description, abandon/reactivate, no draft (D4) | 9 | src/pr.rs:894-941 | tests/pr.rs::update_only_given_fields |
 | 2 pr_comment (`file:line`), pr_reply, pr_thread_status | 9 | src/pr.rs:943-1063 | tests/pr.rs::comment_anchor, ::comment_line_needs_file, ::reply_and_thread_status |
@@ -143,7 +150,7 @@ JS tests are named by their title's first words.
 | 5 HTTPS and SSH remotes, SSH mapped at the collection (R4) | 2 | src/remote.rs:31-116 | src/remote.rs::https_same, ::ssh_with_tfs, ::ssh_without_tfs, ::scp_style |
 | 5 host and collection match before any request; other server names both (R4) | 2, 3, 6a | src/remote.rs:61-70,82-114; src/api.rs:144-146,354-362; src/ctx.rs:73-87 | src/remote.rs::other_host_refused, ::other_collection_refused, ::cannot_leave_the_collection; src/api.rs::guard_refuses_outside_org; tests/ctx.rs::other_server_sends_nothing |
 | 5 redirects not followed (PAT stays on the server) | 3 | src/api.rs:235-236 | none |
-| 5 `project`/`repo` override; default project outside an ADO clone (R7) | 4 | src/ctx.rs:109-134,198-229 | tests/ctx.rs::explicit_args_win, ::default_project_outside_clone, ::github_clone_uses_default_project |
+| 5 `project`/`repo` override; outside an ADO clone `project` is required (R7; default project removed by fix-flow `ado-mcp-default-project-400`) | 4 | src/ctx.rs:109-134,198-229 | tests/ctx.rs::explicit_args_win, ::no_default_project_outside_clone, ::github_clone_needs_project; tests/wi.rs::view_outside_clone_uses_the_items_project |
 | 5 optional `branch` where the current branch is inferred | 4, 6, 9, 10 | src/ctx.rs:130-132; src/pr.rs:31-32; src/pipeline.rs:76-77,799-813 | tests/pr.rs::view_by_branch; tests/pipeline.rs::run_ref_and_params; smoke.md step 3 |
 | 6 one reqwest client per process | 3, 6a | src/api.rs:230-237,250 | none |
 | 6 a tool's requests concurrent; parallel calls concurrent | 1, 6, 7 | src/pr.rs:452-456; src/wi.rs:191-201; src/main.rs:13; Cargo.toml:14 | tests/pr.rs::view_concurrent; tests/wi.rs::view_concurrent; tests/ctx.rs::concurrent_scopes_all_ok |
@@ -165,7 +172,7 @@ JS tests are named by their title's first words.
 | 9 `binPath` (default `ado-mcp`), `.mcp.json` runs it as `ado` | 13 | mcp-azure/.claude-plugin/plugin.json:30-35; mcp-azure/.mcp.json:3-4 | installer/core.test.mjs::"web-mcp downloads its own archive"; smoke.md step 1 |
 | 9 README (tools, 4 scopes, setup), descriptions; THIRD_PARTY, CLAUDE.md, README | 13, 14 | mcp-azure/README.md:12-73; .claude-plugin/marketplace.json:56; CLAUDE.md:22,61-75; README.md:12 | none |
 | 9 `BIN_PLUGINS` mcp-azure → ado-mcp, crate folder by binary | 13 | installer/core.mjs:351-355; installer/install.mjs:367-377 | installer/core.test.mjs::"web-mcp downloads its own archive" |
-| 9 asks URL, hidden PAT, default project; Enter keeps a saved value | 13 | installer/core.mjs:357-384; installer/install.mjs:703-730; installer/ui.mjs:107-137 | installer/core.test.mjs::"configValues trims answers"; installer/ui.test.mjs::"secret returns the typed text", ::"line stops at the first Enter" |
+| 9 asks URL and hidden PAT (default project removed by fix-flow `ado-mcp-default-project-400`); Enter keeps a saved value | 13 | installer/core.mjs:357-384; installer/install.mjs:703-730; installer/ui.mjs:107-137 | installer/core.test.mjs::"configValues trims answers"; installer/ui.test.mjs::"secret returns the typed text", ::"line stops at the first Enter" |
 | 9 installs, downloads, one `configure --values-stdin` with `binPath`; PAT on stdin only | 13 | installer/install.mjs:366-406,731-741,760; installer/core.mjs:407-408 | installer/core.test.mjs::"configureArgs reads the values from stdin" |
 | 9 empty PAT or Claude Code < 2.1.285: handoff, no API-version line (R2) | 13 | installer/core.mjs:386-405; installer/install.mjs:472-476,698-731,795-799 | installer/core.test.mjs::"selfConfigure prompts", ::"configure needs Claude Code 2.1.285", ::"afterPrompts hands off" |
 | 9 mcp-github keeps the handoff | 13 | installer/core.mjs:358; installer/install.mjs:468-471 | installer/core.test.mjs::"mcp-azure asks for its settings itself" |

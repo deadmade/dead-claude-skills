@@ -290,6 +290,7 @@ impl Mcp {
         for k in [
             "ADO_ORG_URL",
             "ADO_PAT",
+            // No longer read; removed so only tests that set it on purpose have it.
             "ADO_DEFAULT_PROJECT",
             "ADO_PROJECT_DIR",
             "http_proxy",

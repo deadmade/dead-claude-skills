@@ -50,7 +50,7 @@ pub fn finish(text: &str) -> String {
     if let Some((at, _)) = text.char_indices().nth(REPLY_MAX) {
         let at = text[..at].rfind('\n').unwrap_or(at);
         text.truncate(at);
-        text.push_str("\n… output cut at 40,000 characters; narrow the call (limit, id, step)");
+        text.push_str("\n… output cut at 40,000 characters; narrow the call where it can be (limit, id, step)");
     }
     text
 }
@@ -338,7 +338,7 @@ mod tests {
         assert!(out.starts_with(&"ü".repeat(REPLY_MAX)));
         assert!(
             out.ends_with(
-                "ü\n… output cut at 40,000 characters; narrow the call (limit, id, step)"
+                "ü\n… output cut at 40,000 characters; narrow the call where it can be (limit, id, step)"
             )
         );
         assert_eq!(finish(&"a".repeat(REPLY_MAX)), "a".repeat(REPLY_MAX));
@@ -350,7 +350,7 @@ mod tests {
         assert_eq!(
             finish(&text),
             "a".repeat(REPLY_MAX - 10)
-                + "\n… output cut at 40,000 characters; narrow the call (limit, id, step)"
+                + "\n… output cut at 40,000 characters; narrow the call where it can be (limit, id, step)"
         );
     }
 

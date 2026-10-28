@@ -4,15 +4,15 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt::Write as _;
 
 use azure_devops_rust_api::wit::models::{
-    CommentCreate, CommentList, CommentSortOrder, JsonPatchOperation, Wiql, WorkItem,
-    WorkItemBatchGetRequest, WorkItemExpand, json_patch_operation::Op,
-    work_item_batch_get_request::ErrorPolicy, work_item_query_result::QueryResultType,
+    CommentCreate, CommentSortOrder, JsonPatchOperation, Wiql, WorkItem, WorkItemBatchGetRequest,
+    WorkItemExpand, json_patch_operation::Op, work_item_batch_get_request::ErrorPolicy,
+    work_item_query_result::QueryResultType,
 };
 use rmcp::schemars::{self, JsonSchema};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use crate::api::ApiError;
+use crate::api::{ApiError, json};
 use crate::ctx::{Ctx, given, seg};
 use crate::out::{DESC_MAX, args, clip, cut, html_to_text, more};
 
@@ -135,16 +135,61 @@ fn text(html: &str, full: bool, whole: &str) -> String {
     if full { t } else { clip(&t, DESC_MAX, whole) }
 }
 
-fn comments(list: &CommentList, full: bool, whole: &str) -> String {
+/// A work item's comments, read by hand: the server sends mentions without the `url` the crate's `CommentMention`
+/// (inside `CommentList`) requires. `comments` must be there, as `null` or a list, so a body of another shape reads
+/// as unavailable rather than as no comments.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RawComments {
+    total_count: Option<usize>,
+    #[serde(deserialize_with = "null_as_empty")]
+    comments: Vec<RawComment>,
+}
+
+/// One comment: only what `comments` shows.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RawComment {
+    text: Option<String>,
+    created_by: Option<Author>,
+    created_date: Option<String>,
+}
+
+/// A comment's author.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Author {
+    display_name: Option<String>,
+}
+
+/// `null` as an empty list, as the crate's models read it.
+fn null_as_empty<'de, D: serde::Deserializer<'de>, T: Deserialize<'de>>(
+    d: D,
+) -> Result<Vec<T>, D::Error> {
+    Ok(Option::<Vec<T>>::deserialize(d)?.unwrap_or_default())
+}
+
+/// The `2026-03-05` of an RFC 3339 time in UTC, else `?`.
+fn day(time: Option<&str>) -> &str {
+    let d = time.map_or("", |t| t.split_once('T').map_or(t, |(d, _)| d));
+    let b = d.as_bytes();
+    let shaped = b.len() == 10
+        && b[4] == b'-'
+        && b[7] == b'-'
+        && b.iter()
+            .enumerate()
+            .all(|(i, c)| i == 4 || i == 7 || c.is_ascii_digit());
+    if shaped { d } else { "?" }
+}
+
+fn comments(list: &RawComments, full: bool, whole: &str) -> String {
     let mut out = String::from("comments:");
     for c in &list.comments {
-        let date = c
-            .created_date
-            .map_or_else(|| "?".into(), |t| t.date().to_string());
+        let date = day(c.created_date.as_deref());
         let author = c
             .created_by
             .as_ref()
-            .and_then(|a| a.graph_subject_base.display_name.as_deref());
+            .and_then(|a| a.display_name.as_deref());
         let body = text(c.text.as_deref().unwrap_or_default(), full, whole);
         let _ = write!(
             out,
@@ -153,13 +198,48 @@ fn comments(list: &CommentList, full: bool, whole: &str) -> String {
             body.replace('\n', "\n    ")
         );
     }
-    let total = usize::try_from(list.total_count.unwrap_or_default()).unwrap_or_default();
+    let total = list.total_count.unwrap_or_default();
     let older = total.saturating_sub(list.comments.len());
     // A `full` call fetched the most it can: there is no bigger call to name.
     if older > 0 && full {
         let _ = write!(out, "\n  … {older} older comments");
     } else if older > 0 {
         let _ = write!(out, "\n  … {older} older comments: {whole}");
+    }
+    out
+}
+
+/// The item as `wi_view` shows it, up to its comments: head, assignment, links, description and acceptance criteria.
+fn item_text(item: &WorkItem, full: bool, whole: &str) -> String {
+    let mut out = head(item);
+    let _ = write!(
+        out,
+        "\nassigned: {}  area: {}  iteration: {}",
+        assignee(item),
+        field(item, "System.AreaPath"),
+        field(item, "System.IterationPath")
+    );
+    for (title, mark, rel, needle) in [
+        ("parent", '#', "System.LinkTypes.Hierarchy-Reverse", ""),
+        ("children", '#', "System.LinkTypes.Hierarchy-Forward", ""),
+        ("PRs", '!', "ArtifactLink", "PullRequestId"),
+    ] {
+        let ids = links(item, mark, rel, needle);
+        if !ids.is_empty() {
+            let _ = write!(out, "\n{title}: {ids}");
+        }
+    }
+    for (label, f) in [
+        ("", "System.Description"),
+        (
+            "acceptance criteria:\n",
+            "Microsoft.VSTS.Common.AcceptanceCriteria",
+        ),
+    ] {
+        let html = item.fields.get(f).and_then(Value::as_str);
+        if let Some(t) = html.map(|h| text(h, full, whole)).filter(|t| !t.is_empty()) {
+            let _ = write!(out, "\n\n{label}{t}");
+        }
     }
     out
 }
@@ -175,75 +255,61 @@ pub(crate) async fn wi_view(ctx: &Ctx, a: &WiViewArgs) -> Result<String, ApiErro
         args(&[("project", a.project.as_deref())])
     );
     let top = if full { 200 } else { 5 };
-    let scope = ctx.scope(a.project.as_deref(), None, None).await?;
-    let (api, proj) = (&ctx.api, seg(&scope.project_id));
-    let comments_in = |proj: String| async move {
-        api.az(|| {
-            api.wit
-                .comments_client()
-                .get_comments(&api.org, &proj, num)
-                .top(top)
-                .order(CommentSortOrder::Desc)
-                .into_future()
-        })
-        .await
+    let scope = match ctx.scope(a.project.as_deref(), None, None).await {
+        Ok(s) => Some(s),
+        // The clone names no project of this collection, and no project was passed: the item is collection-wide and
+        // names its own project.
+        Err(e) if given(a.project.as_deref()).is_none() && e.status.is_none() => None,
+        Err(e) => return Err(e),
     };
-    let (got, mut notes) = tokio::join!(
-        // No project: an id is unique in the collection. The guard cuts the `//` this leaves.
-        api.az(|| {
-            api.wit
-                .work_items_client()
-                .get_work_item(&api.org, num, "")
-                .expand(WorkItemExpand::Relations)
-                .into_future()
-        }),
-        comments_in(proj)
-    );
+    let api = &ctx.api;
+    let comments_in = |proj: String| async move {
+        let raw = api
+            .az(|| {
+                api.wit
+                    .comments_client()
+                    .get_comments(&api.org, &proj, num)
+                    .top(top)
+                    .order(CommentSortOrder::Desc)
+                    .send()
+            })
+            .await?
+            .into_raw_response()
+            .into_body();
+        json::<RawComments>(&raw)
+    };
+    // No project: an id is unique in the collection. The guard cuts the `//` this leaves.
+    let fetch = api.az(|| {
+        api.wit
+            .work_items_client()
+            .get_work_item(&api.org, num, "")
+            .expand(WorkItemExpand::Relations)
+            .into_future()
+    });
+    let (got, first) = match &scope {
+        Some(s) => {
+            let (got, notes) = tokio::join!(fetch, comments_in(seg(&s.project_id)));
+            (got, Some(notes))
+        }
+        None => (fetch.await, None),
+    };
     let item = got.map_err(|e| e.with_what(&format!("work item #{id}")))?;
     // The comments path needs the item's own project, which only the item names.
     let home = item
         .fields
         .get("System.TeamProject")
         .and_then(Value::as_str);
-    if let (Err(e), Some(home)) = (&notes, home)
-        && e.status == Some(404)
-        && home != scope.project
-    {
-        notes = comments_in(seg(home)).await;
-    }
-    let mut out = head(&item);
-    let _ = write!(
-        out,
-        "\nassigned: {}  area: {}  iteration: {}",
-        assignee(&item),
-        field(&item, "System.AreaPath"),
-        field(&item, "System.IterationPath")
-    );
-    for (title, mark, rel, needle) in [
-        ("parent", '#', "System.LinkTypes.Hierarchy-Reverse", ""),
-        ("children", '#', "System.LinkTypes.Hierarchy-Forward", ""),
-        ("PRs", '!', "ArtifactLink", "PullRequestId"),
-    ] {
-        let ids = links(&item, mark, rel, needle);
-        if !ids.is_empty() {
-            let _ = write!(out, "\n{title}: {ids}");
-        }
-    }
-    for (label, f) in [
-        ("", "System.Description"),
-        (
-            "acceptance criteria:\n",
-            "Microsoft.VSTS.Common.AcceptanceCriteria",
-        ),
-    ] {
-        let html = item.fields.get(f).and_then(Value::as_str);
-        if let Some(t) = html
-            .map(|h| text(h, full, &whole))
-            .filter(|t| !t.is_empty())
+    let notes = match (first, home) {
+        (None, Some(home)) => comments_in(seg(home)).await,
+        (None, None) => Err(ApiError::local("the work item names no project")),
+        (Some(Err(e)), Some(home))
+            if e.status == Some(404) && scope.as_ref().is_some_and(|s| s.project != home) =>
         {
-            let _ = write!(out, "\n\n{label}{t}");
+            comments_in(seg(home)).await
         }
-    }
+        (Some(notes), _) => notes,
+    };
+    let mut out = item_text(&item, full, &whole);
     match notes {
         Ok(list) if list.comments.is_empty() => {}
         Ok(list) => {
@@ -374,7 +440,7 @@ pub(crate) async fn wi_query(ctx: &Ctx, a: &WiQueryArgs) -> Result<String, ApiEr
             .await?
             .into_raw_response()
             .into_body();
-        let batch: Batch = serde_json::from_slice(&raw).map_err(|e| ApiError::unreadable(&e))?;
+        let batch: Batch = json(&raw)?;
         items.extend(batch.value.into_iter().flatten());
     }
     // The batch needn't answer in the order asked; the query's order is the one that counts.
@@ -515,7 +581,8 @@ pub(crate) async fn wi_comment(ctx: &Ctx, a: &WiCommentArgs) -> Result<String, A
         api.wit
             .comments_client()
             .add_comment(&api.org, body.clone(), &proj, num)
-            .into_future()
+            // Not decoded: the crate's `Comment` holds `CommentMention`s, which require a `url` the server leaves out.
+            .send()
     })
     .await
     // The comments path needs the item's project; a retry elsewhere would send the write twice.
@@ -531,6 +598,21 @@ pub(crate) async fn wi_comment(ctx: &Ctx, a: &WiCommentArgs) -> Result<String, A
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn comment_day() {
+        assert_eq!(day(Some("2026-03-06T09:00:00.123Z")), "2026-03-06");
+        assert_eq!(day(Some("2026-03-06")), "2026-03-06");
+        for bad in [
+            None,
+            Some(""),
+            Some("T09:00"),
+            Some("yesterday"),
+            Some("2026-3-6T09:00Z"),
+        ] {
+            assert_eq!(day(bad), "?", "{bad:?}");
+        }
+    }
 
     #[test]
     fn field_names() {
