@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
-import { addPaths, frontmatterDescription, stableTags, summary } from './sync-lib.mjs';
+import { addPaths, frontmatterDescription, sparseClone, stableTags, summary } from './sync-lib.mjs';
 
 test('frontmatterDescription', () => {
   assert.equal(
@@ -58,4 +62,35 @@ test('stableTags lists stable tags oldest first, each with its peeled commit', (
 test('stableTags is empty without a stable tag', () => {
   assert.deepEqual(stableTags(lsRemote([[sha('c'), 'refs/tags/v8.0.0-rc.1']])), []);
   assert.deepEqual(stableTags(''), []);
+});
+
+test('sparseClone checks out a commit', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sparse-clone-test-'));
+  try {
+    const repo = join(dir, 'repo');
+    mkdirSync(repo);
+    const git = (...args) =>
+      execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', '-C', repo, ...args], {
+        encoding: 'utf8',
+      }).trim();
+    git('init', '--quiet');
+    git('config', 'uploadpack.allowFilter', 'true');
+    git('config', 'uploadpack.allowAnySHA1InWant', 'true');
+    mkdirSync(join(repo, 'sub'));
+    writeFileSync(join(repo, 'sub', 'a.txt'), 'first\n');
+    git('add', 'sub/a.txt');
+    git('commit', '--quiet', '-m', 'first');
+    const first = git('rev-parse', 'HEAD');
+    writeFileSync(join(repo, 'sub', 'a.txt'), 'second\n');
+    git('commit', '--quiet', '-am', 'second');
+
+    const url = `file://${repo.replaceAll('\\', '/')}`;
+    const old = sparseClone(url, ['sub'], { ref: first });
+    assert.equal(readFileSync(join(old, 'sub', 'a.txt'), 'utf8'), 'first\n');
+    assert.equal(execFileSync('git', ['-C', old, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), first);
+    const head = sparseClone(url, ['sub']);
+    assert.equal(readFileSync(join(head, 'sub', 'a.txt'), 'utf8'), 'second\n');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

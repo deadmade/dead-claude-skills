@@ -4,7 +4,7 @@ description: "Find what a change could break somewhere else before it ships, bey
 disable-model-invocation: true
 ---
 
-> **Claude Code port:** skills this file names (for example **how**, **why**, **unslop**, **arena**, or a **...** principle skill) are sibling skills in this plugin. They are user-invoked, so the Skill tool can't load them. To use one, read `${CLAUDE_SKILL_DIR}/../<name>/SKILL.md` (principle skills: `${CLAUDE_SKILL_DIR}/../principle-<name>/SKILL.md`) and follow it. Subagents use the Agent tool; valid `model` values are `fable`, `opus`, `sonnet`, `haiku`.
+> **Claude Code port:** skills this file names (for example **how**, **why**, **recall**, **arena**, or a **...** principle skill) are sibling skills in this plugin. They are user-invoked, so the Skill tool can't load them. To use one, read `${CLAUDE_SKILL_DIR}/../<name>/SKILL.md` (principle skills: `${CLAUDE_SKILL_DIR}/../principle-<name>/SKILL.md`) and follow it. Subagents use the Agent tool; valid `model` values are `fable`, `opus`, `sonnet`, `haiku`.
 
 # Blast radius
 
@@ -47,6 +47,6 @@ Step 4 is usually one small script that imports the same library the app ships a
 - **Cleared.** What you checked and why it's fine.
 - **Before you merge.** The cheapest test or repro that catches the real bug, including the script you wrote.
 
-Write it through `unslop`, cite real code, and strip anything private before it goes anywhere public.
+Write it through flows' **writing** skill (`flows:writing`, loaded through the Skill tool), cite real code, and strip anything private before it goes anywhere public.
 
 **Reply:** the writeup above, with the one safety fact either proven or marked unproven.
