@@ -135,13 +135,14 @@ fn name(i: &IdentityRef) -> &str {
 fn line(pr: &GitPullRequest) -> String {
     let votes = || pr.reviewers.iter().map(|r| r.vote.unwrap_or_default());
     let approvals = votes().filter(|v| *v >= 5).count();
+    let s = if approvals == 1 { "" } else { "s" };
     let rejected = if votes().any(|v| v == -10) {
         ", rejected"
     } else {
         ""
     };
     format!(
-        "!{}  {}{}  {} → {}  \"{}\"  {}  {approvals} approvals{rejected}",
+        "!{}  {}{}  {} → {}  \"{}\"  {}  {approvals} approval{s}{rejected}",
         pr.pull_request_id,
         pr.status,
         if pr.is_draft { " draft" } else { "" },
@@ -477,11 +478,13 @@ pub(crate) async fn pr_view(ctx: &Ctx, a: &PrViewArgs) -> Result<String, ApiErro
         })
         .collect();
     section(&mut out, "reviewers:", &reviewers);
-    for (title, lines) in [("checks:", checks), ("work items:", items)] {
+    // A 404's own text names the request's path, GUIDs and all.
+    let gone = |e: ApiError, what: &str| e.with_what(&format!("{what} of !{id}"));
+    for (title, lines) in [("checks", checks), ("work items", items)] {
         match lines {
-            Ok(lines) => section(&mut out, title, &lines),
+            Ok(lines) => section(&mut out, &format!("{title}:"), &lines),
             Err(e) => {
-                let _ = write!(out, "\n{title} unavailable ({e})");
+                let _ = write!(out, "\n{title}: unavailable ({})", gone(e, title));
             }
         }
     }
@@ -490,7 +493,7 @@ pub(crate) async fn pr_view(ctx: &Ctx, a: &PrViewArgs) -> Result<String, ApiErro
             let _ = write!(out, "\nlatest run: {run}");
         }
         Err(e) => {
-            let _ = write!(out, "\nlatest run: unavailable ({e})");
+            let _ = write!(out, "\nlatest run: unavailable ({})", gone(e, "latest run"));
         }
     }
     let desc = pr.description.as_deref().unwrap_or_default().trim();
@@ -663,7 +666,8 @@ async fn iterations(
                 .list(&api.org, &repo, id, &proj)
                 .into_future()
         })
-        .await?
+        .await
+        .map_err(|e| e.with_what(&format!("PR !{id}")))?
         .value;
     let last = iters
         .iter()
@@ -692,6 +696,11 @@ pub(crate) async fn pr_files(ctx: &Ctx, a: &PrFilesArgs) -> Result<String, ApiEr
             if n == last {
                 return Ok(format!("no changes since iteration {last} (the latest)"));
             }
+            if !iters.iter().any(|i| i.id == Some(n)) {
+                return Err(ApiError::local(format!(
+                    "not found: iteration {n} on !{id}"
+                )));
+            }
             Some(n)
         }
     };
@@ -710,7 +719,8 @@ pub(crate) async fn pr_files(ctx: &Ctx, a: &PrFilesArgs) -> Result<String, ApiEr
                 }
                 b.into_future()
             })
-            .await?;
+            .await
+            .map_err(|e| e.with_what(&format!("iteration {last} on !{id}")))?;
         let empty = page.change_entries.is_empty();
         files.extend(page.change_entries);
         skip = page.next_skip.unwrap_or(0);
@@ -1212,6 +1222,17 @@ mod tests {
         let t: CommentThread = serde_json::from_value(json.clone()).unwrap();
         let p: Props = serde_json::from_value(json.clone()).unwrap();
         is_system(&t, &p)
+    }
+
+    #[test]
+    fn approvals_count() {
+        let mut pr: Value =
+            serde_json::from_str(include_str!("../tests/fixtures/pr.json")).unwrap();
+        let one: GitPullRequest = serde_json::from_value(pr.clone()).unwrap();
+        assert!(line(&one).ends_with("  1 approval"), "{}", line(&one));
+        pr["reviewers"][1]["vote"] = json!(5);
+        let two: GitPullRequest = serde_json::from_value(pr).unwrap();
+        assert!(line(&two).ends_with("  2 approvals"), "{}", line(&two));
     }
 
     #[test]

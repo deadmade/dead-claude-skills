@@ -84,11 +84,11 @@ fn list_one_line_each() {
     assert_eq!(lines.len(), 3, "{text}");
     assert_eq!(
         lines[0],
-        "!412  active  feature/login-retry → main  \"Retry login on timeout\"  Alice Example  1 approvals"
+        "!412  active  feature/login-retry → main  \"Retry login on timeout\"  Alice Example  1 approval"
     );
     assert_eq!(
         lines[1],
-        "!409  active draft  feature/parser → main  \"Draft: new parser\"  Bob Builder  1 approvals, rejected"
+        "!409  active draft  feature/parser → main  \"Draft: new parser\"  Bob Builder  1 approval, rejected"
     );
     assert!(!text.contains("http"), "{text}");
     let q = &queries(&fx, PRS)[0];
@@ -288,9 +288,9 @@ fn view_no_run() {
 fn view_concurrent() {
     let fx = Fixture::start();
     view_routes(&fx);
-    // The first call answers at once and measures the rest (process, git, scope); the second waits 600 ms on each of
-    // four calls: 2400 ms one after the other, about 600 together.
-    let slow = Duration::from_millis(600);
+    // The first call answers at once and measures the rest (process, git, scope); the second waits 1000 ms on each of
+    // four calls: 4000 ms one after the other, about 1000 together, 2000 with one call outside the join.
+    let slow = Duration::from_millis(1000);
     let twice = |name: &str| vec![fixture(name), fixture(name).delay(slow)];
     fx.route(POLICY, twice("policy-evaluations.json"));
     fx.route(&format!("{PR412}/workitems"), twice("pr-workitems.json"));
@@ -304,7 +304,7 @@ fn view_concurrent() {
     ok(&mut mcp, "pr_view", json!({"id": 412}));
     let took = t.elapsed();
     assert!(
-        took < base + Duration::from_millis(1200),
+        took < base + Duration::from_millis(1500),
         "{took:?} against {base:?}"
     );
 }
@@ -924,6 +924,7 @@ fn iterations_to(commit: &str) -> Value {
 
 const FIRST: &str = "9b1f3c2a7d4e5f60718293a4b5c6d7e8f9a0b1c2";
 const SECOND: &str = "4e5f60718293a4b5c6d7e8f9a0b1c29b1f3c2a7d";
+const THIRD: &str = "c6d7e8f9a0b1c29b1f3c2a7d4e5f60718293a4b5";
 
 #[test]
 fn files_since() {
@@ -932,15 +933,22 @@ fn files_since() {
     let mut it = iterations_to(SECOND);
     let mut third = it["value"][1].clone();
     third["id"] = json!(3);
+    third["push"]["pushId"] = json!(103);
+    third["sourceRefCommit"]["commitId"] = json!(THIRD);
     it["value"].as_array_mut().unwrap().push(third);
+    it["count"] = json!(3);
     fx.route(&format!("{PR412}/iterations"), vec![Resp::json(&it)]);
     let changes = format!("{PR412}/iterations/3/changes");
     fx.route(&changes, vec![fixture("iteration-changes-p2.json")]);
     let text = ok(&mut env(&fx), "pr_files", json!({"id": 412, "since": 2}));
     let lines: Vec<&str> = text.lines().collect();
     assert_eq!(
-        lines[..2],
-        ["changes since iteration 2 (latest 3)", "delete  old.txt"],
+        lines,
+        [
+            "changes since iteration 2 (latest 3)",
+            "delete  old.txt",
+            &format!("diff: git diff {SECOND}..{THIRD}")
+        ],
         "{text}"
     );
     let q = queries(&fx, &changes);
@@ -994,7 +1002,10 @@ fn files_since_diff_line() {
     let fx = Fixture::start();
     fx.route(&format!("{PRS}/412"), vec![fixture("pr.json")]);
     let iterations = format!("{PR412}/iterations");
-    fx.route(&iterations, vec![Resp::json(&iterations_to(SECOND))]);
+    // Newest first: the latest is the highest id, not the last in the list.
+    let mut it = iterations_to(SECOND);
+    it["value"].as_array_mut().unwrap().reverse();
+    fx.route(&iterations, vec![Resp::json(&it)]);
     // An empty page with a `nextSkip`: the reply is cut, so it names the `--stat` call too.
     let cut = || vec![Resp::json(&json!({"changeEntries": [], "nextSkip": 5}))];
     let changes = format!("{PR412}/iterations/2/changes");
@@ -1026,7 +1037,7 @@ fn view_shows_iteration() {
     view_routes(&fx);
     let text = ok(&mut env(&fx), "pr_view", json!({"id": 412}));
     let first = text.lines().next().unwrap();
-    assert!(first.ends_with("  1 approvals  iteration: 2"), "{text}");
+    assert!(first.ends_with("  1 approval  iteration: 2"), "{text}");
 }
 
 #[test]
@@ -1043,4 +1054,114 @@ fn view_iteration_unavailable() {
     assert!(text.contains("J. Doe: approved (required)"), "{text}");
     assert!(text.contains("latest run: #991"), "{text}");
     assert!(text.ends_with("Second paragraph."), "{text}");
+}
+
+/// Asserts `text` names neither the project's nor the repo's GUID.
+fn no_guid(text: &str) {
+    for guid in [PROJ, REPO] {
+        assert!(!text.contains(guid), "{guid} in {text}");
+    }
+}
+
+#[test]
+fn files_iterations_404() {
+    let fx = Fixture::start();
+    fx.route(&format!("{PRS}/412"), vec![fixture("pr.json")]);
+    fx.route(
+        &format!("{PR412}/iterations"),
+        vec![Resp::new(404, "text/plain", "gone")],
+    );
+    let (err, text) = env(&fx).call("pr_files", json!({"id": 412}));
+    assert!(err, "{text}");
+    assert_eq!(text, "not found: PR !412");
+}
+
+#[test]
+fn view_iterations_404() {
+    let fx = Fixture::start();
+    view_routes(&fx);
+    fx.route(
+        &format!("{PR412}/iterations"),
+        vec![Resp::new(404, "text/plain", "gone")],
+    );
+    let text = ok(&mut env(&fx), "pr_view", json!({"id": 412}));
+    let first = text.lines().next().unwrap();
+    assert!(
+        first.ends_with("  iteration: unavailable (not found: PR !412)"),
+        "{text}"
+    );
+    no_guid(&text);
+}
+
+#[test]
+fn files_changes_404() {
+    let fx = Fixture::start();
+    fx.route(&format!("{PRS}/412"), vec![fixture("pr.json")]);
+    fx.route(
+        &format!("{PR412}/iterations"),
+        vec![fixture("iterations.json")],
+    );
+    fx.route(
+        &format!("{PR412}/iterations/2/changes"),
+        vec![Resp::new(404, "text/plain", "gone")],
+    );
+    let (err, text) = env(&fx).call("pr_files", json!({"id": 412}));
+    assert!(err, "{text}");
+    assert_eq!(text, "not found: iteration 2 on !412");
+}
+
+#[test]
+fn files_since_in_a_gap() {
+    let fx = Fixture::start();
+    fx.route(&format!("{PRS}/412"), vec![fixture("pr.json")]);
+    let mut it: Value = serde_json::from_slice(&fixture("iterations.json").body).unwrap();
+    it["value"][1]["id"] = json!(3);
+    fx.route(&format!("{PR412}/iterations"), vec![Resp::json(&it)]);
+    let (err, text) = env(&fx).call("pr_files", json!({"id": 412, "since": 2}));
+    assert!(err, "{text}");
+    assert_eq!(text, "not found: iteration 2 on !412");
+    assert_eq!(
+        queries(&fx, &format!("{PR412}/iterations/3/changes")).len(),
+        0
+    );
+}
+
+#[test]
+fn files_since_without_commit() {
+    let fx = Fixture::start();
+    fx.route(&format!("{PRS}/412"), vec![fixture("pr.json")]);
+    let mut it = iterations_to(SECOND);
+    it["value"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("sourceRefCommit");
+    fx.route(&format!("{PR412}/iterations"), vec![Resp::json(&it)]);
+    fx.route(
+        &format!("{PR412}/iterations/2/changes"),
+        vec![fixture("iteration-changes-p2.json")],
+    );
+    let text = ok(&mut env(&fx), "pr_files", json!({"id": 412, "since": 1}));
+    assert_eq!(
+        text,
+        "changes since iteration 1 (latest 2)\ndelete  old.txt"
+    );
+}
+
+#[test]
+fn view_sections_404() {
+    let fx = Fixture::start();
+    view_routes(&fx);
+    let gone = || vec![Resp::new(404, "text/plain", "gone")];
+    fx.route(POLICY, gone());
+    fx.route(&format!("{PR412}/workitems"), gone());
+    fx.route(BUILDS, gone());
+    let text = ok(&mut env(&fx), "pr_view", json!({"id": 412}));
+    for line in [
+        "checks: unavailable (not found: checks of !412)",
+        "work items: unavailable (not found: work items of !412)",
+        "latest run: unavailable (not found: latest run of !412)",
+    ] {
+        assert!(text.contains(line), "{line} not in {text}");
+    }
+    no_guid(&text);
 }
