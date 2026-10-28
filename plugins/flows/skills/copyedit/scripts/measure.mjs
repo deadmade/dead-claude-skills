@@ -1,7 +1,7 @@
 // /copyedit's measure step: the phrase list's candidates, and spaCy's (measure.py) when the prose environment exists.
 // `node measure.mjs <file> <outdir>` writes <outdir>/candidates.txt (one candidate per line, for the editor) and
 // <outdir>/totals.json, and prints one line when spaCy's measures were skipped. It always writes both files: without
-// spaCy they hold the phrase candidates and the word-based figures.
+// spaCy they hold the phrase candidates and the word-based figures. Any other failure prints one line and exits 2.
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -63,8 +63,11 @@ export function measure(file, outdir, { python, timeoutMs = 540000, spawn = spaw
 
   const spacy = runSpacy(masked, { python, timeoutMs, spawn });
   const fromSpacy = spacy.candidates ?? [];
-  // "there is" from the list and spaCy's abstract subject name the same words: keep one candidate, spaCy's.
-  const taken = new Set(fromSpacy.map((c) => `${c.line} ${c.text.toLowerCase()}`));
+  // "there is" from the list and spaCy's abstract subject name the same words: keep one candidate, spaCy's. Other
+  // kinds judge something else in those words, so both stay.
+  const taken = new Set(
+    fromSpacy.filter((c) => c.kind === 'abstract subject').map((c) => `${c.line} ${c.text.toLowerCase()}`),
+  );
   const candidates = [...fromSpacy, ...phrases.filter((c) => !taken.has(`${c.line} ${c.text.toLowerCase()}`))].sort(
     (a, b) => a.line - b.line,
   );
@@ -83,8 +86,13 @@ export function measure(file, outdir, { python, timeoutMs = 540000, spawn = spaw
 }
 
 if (import.meta.main ?? process.argv[1] === import.meta.filename) {
-  const [file, outdir] = process.argv.slice(2);
-  const config = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude');
-  const { skipped } = measure(file, outdir, { python: findPython({ config, platform: process.platform }) });
-  if (skipped) console.log(`spaCy's measures were skipped: ${skipped}`);
+  try {
+    const [file, outdir] = process.argv.slice(2);
+    const config = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude');
+    const { skipped } = measure(file, outdir, { python: findPython({ config, platform: process.platform }) });
+    if (skipped) console.log(`spaCy's measures were skipped: ${skipped}`);
+  } catch (err) {
+    console.log(`measure.mjs failed: ${err.message}`);
+    process.exitCode = 2;
+  }
 }

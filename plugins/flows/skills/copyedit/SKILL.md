@@ -35,7 +35,9 @@ node "${CLAUDE_SKILL_DIR}/../copyedit/scripts/measure.mjs" "<document>" "<run fo
 ```
 
 It writes `before/candidates.txt` and `before/totals.json`. When spaCy's measures didn't run, it prints one line
-saying so and why; show that line. The phrase candidates are in the file either way.
+saying so and why; show that line. The phrase candidates are in the file either way. When it exits 2, it failed and
+printed one line: show that line, say the measures were skipped, and run the edit without the bracketed candidates
+paragraph.
 
 ## 3. Edit
 

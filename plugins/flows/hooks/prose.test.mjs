@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { copyFileSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import { check, loadTerms, main, mask, newRanges, report } from './prose.mjs';
 
@@ -148,6 +149,46 @@ test('prose-check exits 0 and prints nothing when common-terms.txt cannot be rea
   const stdin = JSON.stringify({ tool_name: 'Write', tool_input: { file_path: doc, content: 'x' } });
   const ran = spawnSync(process.execPath, [join(dir, 'prose-check.mjs')], { input: stdin, encoding: 'utf8' });
   assert.deepEqual([ran.status, ran.stdout, ran.stderr], [0, '', '']);
+});
+
+const CLOSING = 'Fix what makes the prose worse for a reader. Leave a sentence as is when the finding is wrong.';
+
+// Runs the shipped prose-check.mjs on a hook payload, with the check on.
+function hook(payload) {
+  const env = { ...process.env };
+  delete env.FLOWS_PROSE_CHECK;
+  const script = new URL('./prose-check.mjs', import.meta.url);
+  return spawnSync(process.execPath, [fileURLToPath(script)], {
+    input: JSON.stringify(payload),
+    encoding: 'utf8',
+    env,
+  });
+}
+
+test('prose-check exits 2 with the findings and the closing line after a Write', () => {
+  for (const eol of ['\n', '\r\n']) {
+    const doc = join(mkdtempSync(join(tmpdir(), 'prose-')), 'doc.md');
+    const content = `# Notes${eol}${eol}Decided in Q11, XYZ rules.${eol}`;
+    writeFileSync(doc, content);
+    const ran = hook({ tool_name: 'Write', tool_input: { file_path: doc, content } });
+    assert.equal(ran.status, 2);
+    assert.equal(ran.stdout, '');
+    assert.match(ran.stderr, /doc\.md:3:12 shorthand: "Q11"/);
+    assert.match(ran.stderr, /doc\.md:3:17 undefined: "XYZ"/);
+    assert.ok(ran.stderr.endsWith(`${CLOSING}\n`), ran.stderr);
+  }
+});
+
+test('prose-check exits 0 after an Edit that adds a clean line to a file with an old label', () => {
+  for (const eol of ['\n', '\r\n']) {
+    const doc = join(mkdtempSync(join(tmpdir(), 'prose-')), 'doc.md');
+    writeFileSync(doc, `We settled Q3 last week.${eol}A clean line.${eol}`);
+    const ran = hook({
+      tool_name: 'Edit',
+      tool_input: { file_path: doc, old_string: 'A line.', new_string: 'A clean line.' },
+    });
+    assert.deepEqual([ran.status, ran.stdout, ran.stderr], [0, '', '']);
+  }
 });
 
 test("inline code doesn't pair across list items", () => {

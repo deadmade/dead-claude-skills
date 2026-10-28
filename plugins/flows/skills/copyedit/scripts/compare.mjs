@@ -1,9 +1,9 @@
 // /copyedit's last step: compare the editor's document with the saved copy, and replace the document only when
-// nothing was lost. `node compare.mjs <saved> <edited> <document>`: prints the lost items and exits 1, or copies the
-// edited text over the document in the saved copy's line endings, prints the check's new findings and exits 0. Any
-// other failure exits 2 and leaves the document as it was.
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+// nothing was lost. `node compare.mjs <saved> <edited> <document>`: prints the lost items and exits 1 (so too when the
+// document no longer matches the saved copy), or copies the edited text over the document in the saved copy's line
+// endings, prints the check's new findings and exits 0. Any other failure exits 2 and leaves the document as it was.
+import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import { check, loadTerms, report } from '../../../hooks/prose.mjs';
 
 const lf = (text) => text.replace(/\r\n/g, '\n');
@@ -49,9 +49,15 @@ function items(text) {
   const prose = flat
     .replace(/`[^`\n]+`/g, ' ')
     .replace(/\]\([^)]*\)/g, ']')
-    // Enumerators aren't content: a list's markers, and "(1)" or "1)" in a sentence a list may replace.
+    // Enumerators aren't content: a list's markers, and "(1)" or "1)" in a sentence a list may replace. A bare "1)"
+    // that closes an open parenthesis, as in "(Task 11)", is a number.
     .replace(/^[ \t]*\d+[.)][ \t]/gm, ' ')
-    .replace(/(?<!\S)\(?\d{1,2}\)(?!\S)/g, ' ');
+    .replace(/(?<!\S)(\()?\d{1,2}\)(?!\S)/g, (m, open, at, all) => {
+      const before = all.slice(all.lastIndexOf('\n', at - 1) + 1, at);
+      return open || depth(before) <= 0 ? ' ' : m;
+    });
+  // Paragraphs and list items, one line each after the reflow: what isn't a heading, a table row or a quote.
+  const paragraphs = prose.split('\n').filter((l) => l.trim() && !/^[ \t]*(?:#{1,6}[ \t]|\||>)/.test(l));
   return {
     headings: lines.filter((l) => /^#{1,6} /.test(l)).map((l) => l.trim()),
     blocks,
@@ -60,7 +66,34 @@ function items(text) {
     numbers: (prose.match(TOKEN) ?? []).map((n) => n.replace(/\.+$/, '')),
     checkboxes: lines.flatMap((l) => /^\s*(?:[-*+]|\d+[.)]) \[([ xX])\]/.exec(l)?.[1].toLowerCase() ?? []).join(''),
     tables: tables.map((t) => `${t.rows}×${t.cols}`),
+    quotes: quotes(lines),
+    paragraphs: paragraphs.length,
+    words: paragraphs.join(' ').match(WORD)?.length ?? 0,
   };
+}
+
+const WORD = /[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu;
+const depth = (text) => (text.match(/\(/g)?.length ?? 0) - (text.match(/\)/g)?.length ?? 0);
+
+// Block quotes, one item per quoted paragraph: the ">" markers and the wrapping aren't content. A line that follows a
+// quote's line and starts no block continues the quote without its ">".
+function quotes(lines) {
+  const out = [];
+  let open = false;
+  for (const line of lines) {
+    const quoted = /^[ \t]*>/.test(line);
+    const lazy = open && !quoted && !/^[ \t]*(?:[-*+][ \t]|\d+[.)][ \t]|#{1,6}[ \t]|\|)/.test(line);
+    const text =
+      quoted || lazy
+        ? line
+            .replace(/^(?:[ \t]*>)+/, '')
+            .replace(/\s+/g, ' ')
+            .trim()
+        : '';
+    if (text) out.push(open ? `${out.pop()} ${text}` : text);
+    open = Boolean(text);
+  }
+  return out;
 }
 
 // What `before` has that `after` lacks, counting repeats.
@@ -85,12 +118,20 @@ export function lost(saved, edited) {
     ...missing(a.spans, b.spans).map((s) => `code span: ${s}`),
     ...missing(a.links, b.links).map((l) => `link target: ${l}`),
     ...missing(a.numbers, b.numbers).map((n) => `number: ${n}`),
+    ...missing(a.quotes, b.quotes).map((q) => `quote: ${q}`),
   ];
   if (out.length === 0 && a.headings.join('\n') !== b.headings.join('\n'))
     out.push('headings: added to or reordered; keep every heading in its place');
   if (a.checkboxes !== b.checkboxes) out.push(`checkbox steps: ${boxes(b.checkboxes)}, was ${boxes(a.checkboxes)}`);
   if (a.tables.join() !== b.tables.join())
     out.push(`tables (rows×columns): ${b.tables.join(', ') || 'none'}, was ${a.tables.join(', ')}`);
+  // Prose without a number in it is compared by amount: an edit that keeps under 60% of the words or under 75% of
+  // the paragraphs and list items dropped some, or the editor's output was cut short.
+  if (b.words * 5 < a.words * 3) out.push(`prose: ${b.words} words, was ${a.words} (an edit keeps at least 60%)`);
+  if (b.paragraphs * 4 < a.paragraphs * 3)
+    out.push(
+      `prose blocks: ${b.paragraphs}, was ${a.paragraphs} (paragraphs and list items; an edit keeps at least 75%)`,
+    );
   return out;
 }
 
@@ -113,7 +154,12 @@ if (import.meta.main ?? process.argv[1] === import.meta.filename) {
     const saved = readFileSync(savedPath, 'utf8');
     const terms = loadTerms(readFileSync(join(import.meta.dirname, '../../../hooks/common-terms.txt'), 'utf8'));
     let edited = existsSync(editedPath) ? lf(readFileSync(editedPath, 'utf8')) : '';
-    const gone = edited.trim() ? lost(saved, edited) : ['the editor wrote no document'];
+    const gone =
+      readFileSync(docPath, 'utf8') !== saved
+        ? ['the document changed since it was saved; edit refused']
+        : edited.trim()
+          ? lost(saved, edited)
+          : ['the editor wrote no document'];
     if (gone.length) {
       console.log(gone.join('\n'));
       process.exitCode = 1;
@@ -121,7 +167,15 @@ if (import.meta.main ?? process.argv[1] === import.meta.filename) {
       // The saved copy's last newline, or its absence, stays.
       edited = edited.replace(/\n*$/, /\r?\n$/.test(saved) ? '\n' : '');
       const text = report(docPath, newFindings(saved, edited, { file: docPath, terms }));
-      writeFileSync(docPath, saved.includes('\r\n') ? edited.replace(/\n/g, '\r\n') : edited);
+      // Written next to the document and renamed over it, so a failed write leaves the document whole.
+      const temp = join(dirname(docPath), `.${basename(docPath)}.${process.pid}.copyedit`);
+      try {
+        writeFileSync(temp, saved.includes('\r\n') ? edited.replace(/\n/g, '\r\n') : edited);
+        renameSync(temp, docPath);
+      } catch (err) {
+        rmSync(temp, { force: true });
+        throw err;
+      }
       if (text) console.log(text);
     }
   } catch (err) {

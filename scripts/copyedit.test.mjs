@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { mask } from '../plugins/flows/hooks/prose.mjs';
@@ -120,6 +120,73 @@ test('lost flags reordered and added headings', () => {
   }
 });
 
+test('lost flags a number dropped or changed inside parentheses', () => {
+  const doc = '# T\n\nThe wait is a minute (default = 60) and the step comes from the plan (Task 11) as written.\n';
+  for (const eol of EOLS) {
+    assert.match(lost(eol(doc), eol(doc.replace(' (default = 60)', ''))).join('\n'), /number: 60/);
+    assert.match(lost(eol(doc), eol(doc.replace('Task 11', 'Task 12'))).join('\n'), /number: 11/);
+  }
+});
+
+test('lost refuses an edit that drops most of the prose', () => {
+  const doc = '# T\n\nOne fact here.\n\nSecond fact here.\n\nThird fact here.\n';
+  for (const eol of EOLS) {
+    const out = lost(eol(doc), eol('# T\n\nOne fact here.\n')).join('\n');
+    assert.match(out, /prose: 3 words, was 9/);
+    assert.match(out, /prose blocks: 1, was 3/);
+  }
+});
+
+test('lost holds the prose to 60% of its words and 75% of its paragraphs and list items', () => {
+  const doc = [
+    '# T',
+    '',
+    'The first paragraph has ten words in it, more or less.',
+    '',
+    '- The first item says one thing about `code` here.',
+    '- The second item says [another](https://example.com/a-long-path) thing.',
+    '',
+    'The last paragraph closes it.',
+    '',
+    '```bash',
+    'many words in a fenced block that never count as prose words at all',
+    '```',
+    '',
+  ].join('\n');
+  for (const eol of EOLS) {
+    const check = (edited) => lost(eol(doc), eol(edited)).join('\n');
+    // Four blocks to three is 75%: it passes; to two (merged into one paragraph each) it doesn't.
+    assert.equal(check(doc.replace('\n\nThe last paragraph closes it.', ' The last paragraph closes it.')), '');
+    const merged = doc
+      .replace('more or less.\n\n- The first item', 'more or less. The first item')
+      .replace('\n\nThe last paragraph closes it.', ' The last paragraph closes it.');
+    assert.match(check(merged), /prose blocks: 2, was 4/);
+    // 30 words: 18 is 60% and passes, 17 doesn't.
+    const words = (first) =>
+      doc
+        .replace('The first paragraph has ten words in it, more or less.', first)
+        .replace('The last paragraph closes it.', 'It closes.');
+    assert.equal(check(words('Ten words.')), '');
+    assert.match(check(words('Words.')), /prose: 17 words, was 30/);
+  }
+});
+
+test('lost names a dropped or changed block quote and accepts a rewrapped one', () => {
+  const doc = '# T\n\nThe spec says:\n\n> Keep every quoted word\n> as it is.\n\nThat holds.\n';
+  for (const eol of EOLS) {
+    const check = (edited) => lost(eol(doc), eol(edited)).join('\n');
+    assert.equal(check(doc.replace('word\n> as', 'word as')), '');
+    assert.equal(check(doc.replace('> Keep', '>   Keep')), '');
+    // A wrapped line without its ">" still belongs to the quote (a lazy continuation).
+    assert.equal(check(doc.replace('word\n> as', 'word\n  as')), '');
+    assert.match(check(doc.replace('quoted word', 'quoted words')), /quote: Keep every quoted word as it is\./);
+    assert.match(
+      check(doc.replace('> Keep every quoted word\n> as it is.\n\n', '')),
+      /quote: Keep every quoted word as it is\./,
+    );
+  }
+});
+
 test('newFindings ignores labels the original already had', () => {
   const terms = new Set();
   for (const eol of EOLS) {
@@ -142,7 +209,7 @@ function run(saved, edited, doc = saved ?? DOC) {
   writeFileSync(paths.doc, doc);
   if (edited !== undefined) writeFileSync(paths.edited, edited);
   const r = spawnSync(process.execPath, [COMPARE, paths.saved, paths.edited, paths.doc], { encoding: 'utf8' });
-  return { ...r, doc: readFileSync(paths.doc, 'utf8') };
+  return { ...r, dir, doc: readFileSync(paths.doc, 'utf8') };
 }
 
 test('the CLI refuses a missing edit', () => {
@@ -188,6 +255,23 @@ test("the CLI keeps the original's final newline", () => {
   const edited = DOC.replace('Nothing else.\n', 'There is nothing else.');
   assert.equal(run(DOC, edited).doc, DOC.replace('Nothing else.', 'There is nothing else.'));
   assert.equal(run(DOC.trimEnd(), edited + '\n\n').doc, DOC.replace('Nothing else.\n', 'There is nothing else.'));
+});
+
+test('the CLI refuses an edit when the document changed since it was saved, and leaves it', () => {
+  const edited = DOC.replace('Nothing else.', 'There is nothing else.');
+  const changed = DOC.replace('Nothing else.', 'Something new.');
+  for (const eol of EOLS) {
+    const r = run(eol(DOC), eol(edited), eol(changed));
+    assert.equal(r.status, 1);
+    assert.equal(r.stdout.trim(), 'the document changed since it was saved; edit refused');
+    assert.equal(r.doc, eol(changed));
+  }
+});
+
+test('the CLI leaves no temporary file behind', () => {
+  const r = run(DOC, DOC.replace('Nothing else.', 'There is nothing else.'));
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.deepEqual(readdirSync(r.dir).sort(), ['doc.md', 'edited.txt', 'saved.md']);
 });
 
 test('the CLI reports only new findings', () => {
@@ -571,6 +655,24 @@ test('measure merges phrase and spaCy candidates', () => {
   }
 });
 
+test('only an abstract subject from spaCy hides the phrase candidate with the same words', () => {
+  const spacy = {
+    candidates: [
+      { line: 3, kind: 'abstract subject', text: 'There is', note: "'There' as the subject" },
+      { line: 3, kind: 'nominalization', text: 'in order to', note: 'a stub' },
+    ],
+    totals: {},
+  };
+  for (const eol of EOLS) {
+    const { spawn } = stubSpawn({ stdout: JSON.stringify(spacy) });
+    const { result } = measureIn({ python: '/env/bin/python', spawn }, eol(MEASURED));
+    assert.deepEqual(
+      result.candidates.filter((c) => c.line === 3),
+      [...spacy.candidates, { line: 3, kind: 'wordy', text: 'in order to', note: 'to' }],
+    );
+  }
+});
+
 test('measure skips spaCy without a Python', () => {
   for (const eol of EOLS) {
     const { spawn, calls } = stubSpawn({});
@@ -648,4 +750,15 @@ test('measure leaves HTML comments out of the phrases and the word count', () =>
     const run = measureIn({ python: undefined, spawn: stubSpawn({}).spawn }, eol(commented));
     assertPhrasesOnly(run);
   }
+});
+
+test('the measure CLI exits 2 with one line when it fails', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'measure-cli-'));
+  const r = spawnSync(process.execPath, [MEASURE_MJS, join(dir, 'missing.md'), join(dir, 'before')], {
+    encoding: 'utf8',
+    env: { ...process.env, CLAUDE_CONFIG_DIR: join(dir, 'config') },
+  });
+  assert.equal(r.status, 2);
+  assert.match(r.stdout, /^measure\.mjs failed: ENOENT[^\n]*missing\.md[^\n]*\n$/);
+  assert.equal(r.stderr, '');
 });
