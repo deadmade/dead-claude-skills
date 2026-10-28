@@ -36,7 +36,8 @@ pub enum TaskState {
 }
 
 /// Reads a ledger. A line that begins `Task <n>:` (or `Task <a>-<b>:`) is an entry; indented lines under it, and
-/// plain lines directly below it, are its wrapped text. A `Ruling:` anywhere is also collected under `rulings`.
+/// nothing else, are its wrapped text. Any other top-level line (a `Ruling:`, a `Note`) is an entry of its own, never
+/// joined to a task. A `Ruling:` anywhere is collected under `rulings`.
 #[must_use]
 pub fn parse_ledger(text: &str) -> Ledger {
     let text = normalize(text);
@@ -78,21 +79,19 @@ fn strip_bullet(s: &str) -> &str {
         .trim()
 }
 
-/// Lines joined into entries. Blank lines and headings end an entry; a `- ` or `Task ` line starts one.
+/// Lines joined into entries. Blank lines and headings end an entry; every other line starts one, and only an indented line continues the one above.
 fn entries(text: &str) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     let mut open = false;
     for line in text.lines() {
         let t = line.trim();
         let indented = line.starts_with([' ', '\t']);
-        let starts =
-            !indented && (t.starts_with("Task ") || t.starts_with("- ") || t.starts_with("* "));
         if t.is_empty() {
             open = false;
         } else if t.starts_with('#') && !indented {
             out.push(t.to_string());
             open = false;
-        } else if open && !starts {
+        } else if open && indented {
             let last = out.last_mut().expect("open means an entry exists");
             last.push(' ');
             last.push_str(t);

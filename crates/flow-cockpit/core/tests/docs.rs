@@ -470,3 +470,30 @@ fn no_input_panics() {
         );
     }
 }
+
+#[test]
+fn rulings_and_notes_between_task_lines_stay_out_of_tasks() {
+    let ledger = parse_ledger(
+        "# SDD ledger — plan: docs/features/x/plan.md\n\n## Progress\n\
+         Task 1: dispatched (base abc1234, implementer sonnet)\n\
+         Task 1: implemented def5678 (the parser)\n\
+         Ruling: the cache key ignores the fragment — it never reaches\n  \
+         the server — costs nothing if wrong.\n\
+         Note for the controller: Task 2 starts from def5678.\n\
+         Task 2: dispatched (base def5678, implementer opus)\n",
+    );
+    assert_eq!(ledger.rulings.len(), 1);
+    assert!(ledger.rulings[0].contains("never reaches the server — costs nothing"));
+    let everywhere: Vec<&String> = ledger
+        .tasks
+        .iter()
+        .flat_map(|t| t.story.iter().chain(&t.later).chain(&t.security))
+        .collect();
+    assert!(everywhere.iter().all(|l| !l.contains("cache key")));
+    assert!(
+        everywhere
+            .iter()
+            .all(|l| !l.contains("Note for the controller"))
+    );
+    assert!(ledger.rulings.iter().all(|r| !r.contains("Note for")));
+}
