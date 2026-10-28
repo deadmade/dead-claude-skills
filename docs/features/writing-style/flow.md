@@ -421,6 +421,13 @@ state.chosen)` runs first (`install.ts:225`); the marker would never be written.
   7,800 words. Execution stopped after Task 3; see Deviations.
 - 2026-10-28: the plan was rewritten for the re-approved design (Tasks 1 and 2 kept as built; Tasks 3–12 new). The
   first plan's Task 3 (the sample review) is the gate that missed, recorded above.
+- 2026-10-28, Task 13: criterion 4 missed. In blind rankings `/copyedit`'s edits lost to the plain prompt's on both
+  documents (mean ranks 1.9–2.3 against 1.2–1.6 over three versions); no claim was lost by either. The judges' reasons
+  point at compressed fragments the shipped guide's editor left alone. A revised guide ("Whole sentences first", and
+  "don't guess" narrowed to meaning) came within about 0.1 of plain without beating it (four versions per section:
+  plain 1.56–2.00, variant 1.69–2.42). Decided by the user ("Variant + test labels (Recommended)"): adopt the revised
+  guide and test one more change, letting the editor say what a conversation label stands for when the document itself
+  says it. Runs in `editor-test/acceptance/`.
 
 ## Rulings
 
@@ -467,6 +474,13 @@ state.chosen)` runs first (`install.ts:225`); the marker would never be written.
 
 - 2026-10-28, Options: the candidate measures stay in Python (spaCy), not a Rust port on Harper's tagger and chunker
   (user: "Let's just stay on python").
+- 2026-10-28, Task 13: criterion 4 missed. In blind rankings `/copyedit`'s edits lost to the plain prompt's on both
+  documents (mean ranks 1.9–2.3 against 1.2–1.6 over three versions); no claim was lost by either. The judges' reasons
+  point at compressed fragments the shipped guide's editor left alone. A revised guide ("Whole sentences first", and
+  "don't guess" narrowed to meaning) came within about 0.1 of plain without beating it (four versions per section:
+  plain 1.56–2.00, variant 1.69–2.42). Decided by the user ("Variant + test labels (Recommended)"): adopt the revised
+  guide and test one more change, letting the editor say what a conversation label stands for when the document itself
+  says it. Runs in `editor-test/acceptance/`.
 
 ## Walkthrough
 
