@@ -47,6 +47,33 @@ phase: ground
 
 ## Prior art
 
+Agent report, sources fetched in its run (blog posts labelled):
+
+- **Spec drift.** Current MCP spec is 2026-07-28, breaking: no `initialize`/`Mcp-Session-Id` (`server/discover`
+  instead), sampling/elicitation/roots become `InputRequiredResult` round trips, Roots/Sampling/Logging/DCR deprecated
+  ([changelog](https://modelcontextprotocol.io/specification/latest/changelog)). Anthropic's skills still target
+  2025-11-25 ([versions.md](https://raw.githubusercontent.com/anthropics/claude-plugins-official/main/plugins/mcp-server-dev/skills/build-mcp-server/references/versions.md));
+  rmcp implements 2026-07-28 ([rust-sdk](https://github.com/modelcontextprotocol/rust-sdk)).
+- **Build skills (server only):** anthropics/skills `mcp-builder` (Apache-2.0; research/plan → implement → Inspector →
+  10-question eval via `scripts/evaluation.py`, needs `ANTHROPIC_API_KEY`); anthropics/claude-plugins-official
+  `mcp-server-dev` (Apache-2.0; `build-mcp-server`/`build-mcp-app`/`build-mcpb`, tool-design rules: audit past 15 tools,
+  search+execute past ~30, read vs write tools split, descriptions never instruct the model). Neither covers clients.
+- **Review skills:** github/awesome-copilot `mcp-implementation-security-review` (MIT; server or client source, six
+  steps incl. OWASP MCP Top 10, file:line evidence) and `mcp-security-audit` (MIT; configs only: secrets, shell
+  injection, unpinned `npx`). jassics `mcp-security-review` is GPL-3.0: checklist source only, not vendorable.
+- **Tooling:** Inspector CLI (`--method tools/list|tools/call`, `--strict`), `modelcontextprotocol/conformance`
+  (`server --url`, `client --command`, auth scenarios). snyk/agent-scan sends configs to a remote API: opt-in at most.
+- **Constraints:** [Security Best Practices](https://modelcontextprotocol.io/specification/latest/basic/security_best_practices)
+  (confused deputy, no token passthrough, SSRF in OAuth discovery, local-server consent); tools spec treats annotations
+  as untrusted, input errors as `isError`; stdio forbids non-MCP bytes on stdout; Streamable HTTP must validate `Origin`.
+- **Pitfalls:** stdout logging, context bloat from tool definitions (~150k vs ~2k tokens with progressive discovery,
+  [client best practices](https://modelcontextprotocol.io/docs/2026-07-28/develop/clients/client-best-practices.md)),
+  tool poisoning / rug pull / cross-server shadowing and toxic agent flows (Invariant, vendor blog).
+- **No skill for building MCP clients exists;** the client best-practices page and the review skills are the material.
+- Approaches it saw: A vendor a build skill + thin conductor; B own build conductor; C review-only conductor; D one
+  conductor with build/review modes. Its pick: D on B, borrowing mcp-builder's eval, vendoring the awesome-copilot
+  review skills. Not yet weighed against this repo (no conductor has modes today).
+
 ## Options
 
 ## Plan review
