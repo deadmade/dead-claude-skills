@@ -14,6 +14,7 @@ use serde_json::{Value, json};
 use crate::api::ApiError;
 use crate::ctx::{Ctx, given, seg};
 use crate::out::{args, cut, html_to_text, more};
+use crate::remote::decode_path;
 
 const NOT_INSTALLED: &str = "Search isn't installed or is turned off on this collection";
 /// Characters of a hit's snippet line.
@@ -151,6 +152,21 @@ fn code_hit(r: &CodeResult) -> String {
     )
 }
 
+/// The page path the wiki tool takes, from a hit's git file path: `.md` cut, then in each segment `-` read as a space
+/// and percent-decoded (the wiki stores a literal `-` as `%2D`). A segment that isn't UTF-8 decoded keeps it raw.
+fn page_path(file_path: &str) -> String {
+    let raw = file_path.strip_suffix(".md").unwrap_or(file_path);
+    let pages: Option<Vec<String>> = raw
+        .split('/')
+        .map(|s| {
+            let page = decode_path(&s.replace('-', " "));
+            // `decode_path` turns bytes that aren't UTF-8 into U+FFFD.
+            (!page.contains('\u{FFFD}') || s.contains('\u{FFFD}')).then_some(page)
+        })
+        .collect();
+    pages.map_or_else(|| raw.to_owned(), |p| p.join("/"))
+}
+
 /// `project/wiki:path`, then the content snippet, else the first other one: a file-name hit only repeats the path.
 fn wiki_hit(r: &WikiResult) -> String {
     let mut out = format!(
@@ -163,7 +179,7 @@ fn wiki_hit(r: &WikiResult) -> String {
             .as_ref()
             .and_then(|w| w.name.as_deref())
             .unwrap_or("?"),
-        r.path.as_deref().unwrap_or("?")
+        r.path.as_deref().map_or_else(|| "?".to_owned(), page_path)
     );
     let on = |h: &&WikiHit, f: &str| h.field_reference_name.as_deref() == Some(f);
     let best = r
@@ -362,6 +378,19 @@ mod tests {
         assert_eq!(matches(Some(&m)), 2);
         assert_eq!(matches(Some(&json!({"fileName": []}))), 0);
         assert_eq!(matches(None), 0);
+    }
+
+    #[test]
+    fn page_path_undoes_file_names() {
+        assert_eq!(page_path("/Runbooks/Deploy.md"), "/Runbooks/Deploy");
+        assert_eq!(page_path("/Getting-Started.md"), "/Getting Started");
+        assert_eq!(
+            page_path("/Q%2DA/Pre%2Dflight-Check.md"),
+            "/Q-A/Pre-flight Check"
+        );
+        assert_eq!(page_path("/Q%2DA/Read-me"), "/Q-A/Read me");
+        // Not UTF-8 once decoded: the raw path, `.md` cut.
+        assert_eq!(page_path("/Bad%FF-Name.md"), "/Bad%FF-Name");
     }
 
     #[test]

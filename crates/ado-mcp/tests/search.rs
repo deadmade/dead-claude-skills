@@ -367,7 +367,7 @@ fn wiki_hits() {
     // The content hit, not the file-name hit; a page whose only hit is its file name gets no snippet.
     assert_eq!(
         text,
-        "2 hits\nShop/Shop.wiki:/Runbooks/Deploy.md\n  Run the deploy job & watch the gates\nShop/Shop.wiki:/Runbooks/Deploy-Checklist.md"
+        "2 hits\nShop/Shop.wiki:/Runbooks/Deploy\n  Run the deploy job & watch the gates\nShop/Shop.wiki:/Runbooks/Deploy Checklist"
     );
     let body = &bodies(&fx, PROJ_WIKI)[0];
     assert_eq!(body["filters"], json!({"Project": ["My Proj"]}));
