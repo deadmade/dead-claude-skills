@@ -221,7 +221,7 @@ downloaded when it runs. The user doesn't need a terminal tool: "goal is for cla
 ## Non-goals
 
 - A command-line front end. The user picked the MCP server only.
-- Classic Release pipelines, wikis, Artifacts feeds, test plans, TFVC, admin/permissions, and project settings.
+- Classic Release pipelines, wiki writes, Artifacts feeds, test plans, TFVC, admin/permissions, and project settings.
 - Windows integrated authentication (NTLM/Kerberos). The PAT is the only auth method.
 - A diff tool: local git does it.
 - Azure DevOps Services (cloud): not targeted or tested, though not deliberately blocked.

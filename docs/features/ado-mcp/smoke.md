@@ -82,7 +82,74 @@ Then check these in particular:
   change-type enum knows only some flag combinations. Paste back: the line for each such file, with the path replaced
   by `…`, or the error line.
 
-## 5. Writes
+## 5. Search, files, wikis and test results
+
+`search`, `wiki` and `pipeline_view`'s test results go through the crate's search, wiki and test areas, which send
+`7.1-preview` like the rest; this section checks that the server accepts it for each. A line naming the API version
+means the server refuses it for that area, which then moves to hand-sent requests in a fix flow. A line
+`unexpected answer from the server: …` means the answer lacks a field the crate's model requires (D1) or holds an
+enum value it doesn't know (D8). Paste back every such line, with the tool it came from.
+
+### search
+
+1. `search kind=wi text=<a word from a work item title>`.
+2. `search kind=code text=<a function or class name> project=<project>`, then the same with `repo=<repo>`. Code hits
+   carry the repo's type in a closed enum (git, tfvc or custom), so this checks it on a live answer.
+3. `search kind=wiki text=<a word from a wiki page>`.
+
+Each answer starts with `1 hit` or `N hits`, or with a line saying the index is being rebuilt or the query was
+rejected. Paste back: for each call that first line, how many hit lines followed, one hit line with names and paths
+replaced by `…`, and any error line. If Search isn't installed, paste back that line, take the `repo_file` path from
+`repo_list` and the repo's web UI, and skip step 3 of the wiki section.
+
+### repo_file
+
+Take a code hit from a repo you haven't cloned. Call `repo_file project=<project> repo=<repo> path=<path>` with the
+path as the hit printed it, then the `start=` call its last line offers (on a file over 200 lines), then the same file
+with `branch=<another branch>`.
+
+Paste back: the line numbers of the first and last line of each page, and any error line.
+
+### wiki
+
+1. `wiki` in a clone, with no arguments: the page tree. If the project has several wikis, the error names them; pass
+   `wiki=<name>`.
+2. `wiki path=<a page path from the tree>`, then the `full=true` call on a page over 4000 characters.
+3. If a project has a code wiki published from a subfolder of its repo (not the repo root), run
+   `search kind=wiki text=<a word from one of its pages>`. The hit's path must start at the wiki's root, not with the
+   folder. Open that hit with `wiki project=<project> wiki=<name> path=<the hit's path>`.
+
+Paste back: the number of tree lines, whether the page and its `full=true` call read as markdown, and for step 3
+whether the hit's path started with the folder (yes or no) and whether `wiki` opened it, or the error lines.
+
+### pipeline_view test results
+
+Pick a run whose tests failed. Call `pipeline_view run=<run>`. After the stages, jobs and issues it prints
+`tests: <n> passed, <n> failed, <n> skipped`, then up to 20 failed tests, each with its error's first line and up to 5
+stack trace lines. Compare the counts with the run's Tests tab in the web UI.
+
+Paste back: the `tests:` line, whether the counts match the web UI (and, if not, the web UI's), how many failed tests
+were listed, and any `couldn't be read` line.
+
+### pr_files since
+
+Pick a PR with 2 or more iterations (pushed to after it was opened). Call `pr_view id=<pr>` and note its
+`iteration: <n>`, then `pr_files id=<pr> since=<n - 1>` and `pr_files id=<pr> since=<n>`.
+
+Paste back: the `iteration:` value, the first line of the `since=<n - 1>` answer (`changes since iteration …`) and
+its `diff:` line if it has one (commit ids replaced by `…`), whether its files are those pushed in the last iteration,
+and the `since=<n>` answer.
+
+### wi_view links
+
+Pick a work item linked to a commit and a branch (from the work item's Development section) and, if you find one,
+to a work item by a link other than parent or child (Related, Duplicate, …). Call `wi_view id=<wi>`.
+
+Paste back: the `commits:` and `branches:` lines with values replaced by `…`, the other link lines' names
+(`Related: …`), whether the counts on the `links:`/`attachments:` line match the web UI, and any link the web UI
+shows that `wi_view` left out.
+
+## 6. Writes
 
 On scratch items only. Make two scratch branches from the default branch and push them:
 
@@ -121,9 +188,9 @@ Clean up:
 Paste back: for each call its output or error line (they hold only the scratch titles), whether the prompt appeared
 every time, and especially any error line from step 3 or naming `lastMergeSourceCommit` from step 9.
 
-## 6. Minimal PAT
+## 7. Minimal PAT
 
 Make a second PAT with only the scopes the plugin's README lists, and set it with `/plugin configure mcp-azure`.
-Repeat steps 2 and 5 with new scratch items. Afterwards, set your usual PAT again and revoke the minimal one.
+Repeat steps 2, 5 and 6 with new scratch items. Afterwards, set your usual PAT again and revoke the minimal one.
 
 Paste back: every 403 line, with the tool it came from.

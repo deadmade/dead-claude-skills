@@ -3,7 +3,7 @@ name = "ado-mcp"
 version = "0.4.0"
 edition = "2024"
 rust-version = "1.97"
-description = "Stdio MCP server for the mcp-azure plugin: Azure DevOps Server pull request, work item and pipeline tools."
+description = "Stdio MCP server for the mcp-azure plugin: Azure DevOps Server pull request, work item, pipeline, search, wiki and repo file tools."
 license = "MIT"
 publish = false
 

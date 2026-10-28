@@ -1,7 +1,7 @@
 {
   "name": "mcp-azure",
   "version": "0.4.0",
-  "description": "Azure DevOps Server tools for Claude: pull requests, work items and YAML pipelines, through the ado-mcp binary (self-hosted, PAT auth). Writes always ask first.",
+  "description": "Azure DevOps Server tools for Claude: pull requests, work items, YAML pipelines, search, wikis and repo files, through the ado-mcp binary (self-hosted, PAT auth). Writes always ask first.",
   "author": {
     "name": "deadmade",
     "url": "https://github.com/deadmade"
@@ -17,7 +17,7 @@
     "ado_pat": {
       "type": "string",
       "title": "Azure DevOps personal access token",
-      "description": "PAT with Code (Read & Write), Work Items (Read & Write), Build (Read & Execute), Project and Team (Read).",
+      "description": "PAT with Code (Read & Write), Work Items (Read & Write), Build (Read & Execute), Project and Team (Read), Wiki (Read), Test Management (Read).",
       "sensitive": true,
       "required": true
     },

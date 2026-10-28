@@ -97,6 +97,14 @@ MCP server.
   reads the raw body into its own `RawComments` (only what it shows); `wi_comment` sends with `.send()` and doesn't decode
   the reply, which would otherwise fail after the comment was posted. The crate's repo is archived (2026-10-26).
   - Decision: 2026-10-28, approved in that fix flow.
+- **D8, 2026-10-28: closed enums in the search, wiki and test models** (feature flow `docs/features/ado-mcp-next/`).
+  The crate's enums have no catch-all variant, so one value the crate doesn't know fails that whole answer
+  (`unexpected answer from the server: …`). The ones `search`, `wiki` and `pipeline_view` read:
+  - search: `repository.type` (git, tfvc, custom);
+  - wiki: `Type`, `VersionType`, `VersionOptions`;
+  - test: `TestRun.substate`, `RunStatistic.resultMetadata`, `resultGroupType`.
+  - Fixtures built from the docs can't show an unknown value, so the smoke checklist checks live answers. If one
+    trips, the fix is the D1 fallback: the raw body into a small struct of ours.
 
 ## Walkthrough
 

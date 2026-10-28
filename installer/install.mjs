@@ -471,7 +471,7 @@ const HANDOFF = {
   ],
   'mcp-azure': [
     'Needs the collection URL (e.g. https://tfs.company/tfs/DefaultCollection), a PAT with Code (Read & Write),',
-    'Work Items (Read & Write), Build (Read & Execute), Project and Team (Read).',
+    'Work Items (Read & Write), Build (Read & Execute), Project and Team (Read), Wiki (Read), Test Management (Read).',
     'Then run this installer again: it downloads the ado-mcp binary.',
   ],
 };
