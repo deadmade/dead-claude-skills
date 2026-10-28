@@ -128,7 +128,7 @@ highest `vX.Y.Z` tag (`scripts/next-version.mjs`; fetch tags before a local rele
     npm run release -- minor      # on main, clean tree; bumps, runs npm test, commits and tags
     git push --follow-tags origin main
 
-Either way the `v*` tag's run packs the installer (`installer.tgz`), builds tui-review and web-mcp from the tag and
+Either way the merge's run packs the installer (`installer.tgz`), builds tui-review and web-mcp from the tag and
 publishes the GitHub release npx and the installer download from, then moves the `release` branch to it (never back).
 The installer points the marketplace at that branch (`RELEASE_BRANCH`, `core/release.ts`), so Claude Code's
 marketplace auto-update brings plugin updates without a rerun; the binaries still come from the installer (ADR 0006). Removing a plugin from the marketplace is enough to retire it: the installer uninstalls installed
@@ -167,22 +167,13 @@ weekly.
 
 `.github/rulesets/` holds the repo's rulesets, imported by hand (Settings → Rules → Rulesets → Import; GitHub doesn't
 read the folder, so re-import after changing one): main takes squash or rebase PRs once `test.yml`'s three jobs pass
-(admins bypass it, which `npm run release` pushed to main needs), and only admins and the release App create, move or
-delete a `v*` tag or the `release` branch, which every machine's marketplace follows. An App is the bypass because the
-workflow's own token can't be one: any job with `contents: write` holds it, sync jobs running third-party code
-included. Its numeric ID is per account, so it is added to the two release rulesets' bypass lists in the editor after
-importing them. Renaming a `test.yml` job or matrix entry changes its check name: update `main.json` and re-import it.
+(admins bypass it, which `npm run release` pushed to main needs), and only admins move or delete a `v*` tag. Creating
+one stays open, since `release.yml` tags each merge with the workflow's token, but releases only come from a push to
+main: `release.yml` has no tag trigger, so a tag pushed any other way publishes nothing. Renaming a `test.yml` job or
+matrix entry changes its check name: update `main.json` and re-import it.
 
-Two GitHub Apps, each token minted right before its push and scoped to it, because a token's permissions don't narrow
-a ruleset bypass:
-
-- The sync App (repo variable `SYNC_APP_CLIENT_ID`, secret `SYNC_APP_PRIVATE_KEY`; contents and pull requests write,
-  on no bypass list) opens the sync PRs, so `test.yml` runs on them.
-- The release App (variable `RELEASE_APP_CLIENT_ID`, secret `RELEASE_APP_PRIVATE_KEY`, both in the `release`
-  environment, whose deployment refs are `main` and `v*` tags; contents and workflows write) pushes `release.yml`'s merge
-  tag, which then starts the tag's own run (the merge's run stops there), and moves the `release` branch, in a job of
-  its own (`release-branch`). Only jobs that install no packages use the environment. Workflows write is only for the
-  move, which can carry workflow changes.
-
-Without an App its pushes fall back to `github.token`: sync PRs wait on checks that never start, the merge's run
-releases its tag itself, and the release rulesets must then be left off or they block the release.
+`release.yml` is the only workflow whose own token may write, and it moves the `release` branch every machine's
+marketplace follows; that branch has no ruleset, because the workflow's token can't be a bypass. The sync workflows read
+only and push their branch and open their PR with a GitHub App's token (repo variable `SYNC_APP_CLIENT_ID`, secret
+`SYNC_APP_PRIVATE_KEY`; contents and pull requests write), minted right before that step, so `test.yml` runs on the PR.
+Without the App a sync fails at that step.

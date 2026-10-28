@@ -1,14 +1,15 @@
 name: Release
 
 # One release for the whole repo: scripts/release.mjs bumps package.json, the marketplace and every plugin to the
-# same version and tags vX.Y.Z. Every merge to main cuts a patch here (stamped on a commit off main, so main is never
-# pushed to); a release you choose is `npm run release -- minor` pushed with its tag. Either way the tag's build checks
-# the repo, builds tui-review and web-mcp and publishes the release. Docs-only merges don't release.
+# same version and tags vX.Y.Z. Only a push to main releases, and main only takes merged PRs (admins aside), so a tag
+# pushed any other way publishes nothing. Each merge cuts a patch here (stamped on a commit off main, so main is never
+# pushed to); a release you choose is `npm run release -- minor` pushed to main with its tag, which this run then
+# releases. The run checks the repo, builds tui-review and web-mcp from the tag and publishes the release. Docs-only
+# merges don't release.
 on:
   push:
     branches: [main]
     paths-ignore: ['docs/**', '*.md']
-    tags: ['v*']
 
 permissions:
   contents: read
@@ -16,23 +17,20 @@ permissions:
 # Merges release one at a time, so each counts from the tag before it; a queued run is replaced by a newer one, which
 # carries its changes too.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
 
 jobs:
-  # The tag to release: the pushed one, or a patch cut from the merge. A merge that is itself a release commit
-  # (`npm run release` pushed with --follow-tags) is left to its tag's run.
+  # The tag to release: the one already on HEAD (a release commit pushed with its tag), or a patch cut from the merge.
   version:
     runs-on: ubuntu-latest
-    environment: release
     permissions:
       contents: write
     outputs:
-      tag: ${{ steps.tag.outputs.tag || steps.push.outputs.tag }}
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          persist-credentials: false
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -41,40 +39,15 @@ jobs:
       - name: Tag
         id: tag
         run: |
-          if [ "$GITHUB_REF_TYPE" = tag ]; then
-            echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
-          elif [ -n "$(git tag --points-at HEAD --list 'v*')" ]; then
-            echo "HEAD is already tagged; its tag's run releases it."
-          else
+          tag=$(git tag --points-at HEAD --list 'v*' | sort -V | tail -n1)
+          if [ -z "$tag" ]; then
             git config user.name 'github-actions[bot]'
             git config user.email '41898283+github-actions[bot]@users.noreply.github.com'
             npm run release -- patch --detach
-            echo "cut=v$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+            tag="v$(jq -r .version package.json)"
+            git push origin "$tag"
           fi
-
-      # Only admins and the release App may create a v* tag (.github/rulesets/release-tags.json). Its key lives in the
-      # release environment, which only main and v* tags may use, and only jobs that install no packages read it.
-      - name: Release App token
-        id: app
-        if: steps.tag.outputs.cut && vars.RELEASE_APP_CLIENT_ID
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        with:
-          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
-          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-          permission-contents: write
-
-      # A tag pushed with the release App's token starts its own run, which releases it. Without the App it goes out with the
-      # workflow's token, which starts no run, so this one releases it.
-      - name: Push the tag
-        id: push
-        if: steps.tag.outputs.cut
-        env:
-          TAG: ${{ steps.tag.outputs.cut }}
-          TOKEN: ${{ steps.app.outputs.token || github.token }}
-          OWN_RUN: ${{ steps.app.outputs.token == '' }}
-        run: |
-          git push "https://x-access-token:$TOKEN@github.com/$GITHUB_REPOSITORY" "$TAG"
-          if [ "$OWN_RUN" = true ]; then echo "tag=$TAG" >> "$GITHUB_OUTPUT"; fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
   check:
     needs: version
@@ -153,10 +126,14 @@ jobs:
           tui-review-*: the binary behind tui-review, for each platform; the installer downloads yours.
           web-mcp-*: the binary behind the web-mcp plugin, for Windows and Linux x64; the installer downloads yours."
 
+  # The branch the installer points the marketplace at (RELEASE_BRANCH in installer/core/release.ts): Claude Code's
+  # marketplace auto-update follows it, so plugins update without rerunning the installer. Moved once the release exists,
+  # and never back to an older one (a re-run of an old merge's run). A job of its own, so its write token never shares a
+  # runner with publish's npm ci; release.yml is the only workflow whose token may write (the sync workflows push with
+  # their App's).
   release-branch:
     needs: [version, publish]
     runs-on: ubuntu-latest
-    environment: release
     permissions:
       contents: write
     env:
@@ -165,25 +142,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.TAG }}
-          persist-credentials: false
-
-      # The branch the installer points the marketplace at (RELEASE_BRANCH in installer/core/release.ts): Claude Code's
-      # marketplace auto-update follows it, so plugins update without rerunning the installer. Moved once the release
-      # exists, and never back to an older one (a re-run of an old tag's run). Only admins and the release App may move it
-      # (.github/rulesets/release-branch.json); a job of its own, so its key never shares a runner with npm ci.
-      - name: Release App token
-        id: app
-        if: vars.RELEASE_APP_CLIENT_ID
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        with:
-          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
-          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-          permission-contents: write
-          permission-workflows: write
 
       - name: Move the release branch
-        env:
-          TOKEN: ${{ steps.app.outputs.token || github.token }}
         run: |
           if git fetch --depth=1 origin release 2>/dev/null; then
             have=$(git show FETCH_HEAD:package.json | jq -r .version)
@@ -193,4 +153,4 @@ jobs:
               exit 0
             fi
           fi
-          git push --force "https://x-access-token:$TOKEN@github.com/$GITHUB_REPOSITORY" HEAD:refs/heads/release
+          git push --force origin HEAD:refs/heads/release
