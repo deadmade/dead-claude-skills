@@ -115,6 +115,25 @@ are in [references/flow-rules.md](references/flow-rules.md).
 Calls between conductors (`/fix-flow` → `/verify`) aren't listed. Each conductor still has a fallback for a
 plugin that isn't there, for installs that skipped one.
 
+## Writing
+
+flows holds one standard for prose a person will read, and two ways to apply it.
+
+- **The `writing` skill** (`skills/writing/`) is Williams and Bizup's _Style: Lessons in Clarity and Grace_ in our own
+  words: characters as subjects and actions as verbs, old information before new, the point stated early, the
+  concision cuts limited by a density test, no conversation shorthand. Unlike the conductors, Claude may load it on
+  its own (`flows:writing`) whenever it writes a spec, a plan, a report, a README, a PR description or a commit
+  message. `/doc-audit` reads changed docs against it and `/integrate` revises PR text by it.
+- **The prose check** (`hooks/prose-check.mjs`, a `PostToolUse` hook on every `Write` and `Edit` of a `*.md` file)
+  reports conversation shorthand (`Q4`, `D2`, `round 2`, "my call") and abbreviations the file never defines, in the
+  new text only. It is Node code with no model call, so it costs nothing per write. Claude sees its findings and may
+  leave a sentence that a finding gets wrong. In `flow.md` files the shorthand rule is off, since flow.md is the log
+  where those labels belong. `FLOWS_PROSE_CHECK=off` in the environment turns the check off.
+- **`/copyedit <file.md>`** has a fresh Opus agent revise a document by the book for a reader who wasn't in the
+  conversation, then lets the edit through only when code shows that no heading, code block, code span, link, number,
+  checkbox step or table row was lost. It shows the diff and commits nothing. Before a gate shows a spec, a plan or an
+  audit report, the conductors run it on that document.
+
 ## Packs
 
 flows carries the skill packs its conductors run, in `packs/`: superpowers, ponytail, mattpocock-picks, pstack-picks,

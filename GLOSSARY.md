@@ -42,6 +42,16 @@ A plugin for one database engine. It can combine vendored skills with an MCP
 server.
 _Avoid_: DB pack, language plugin
 
+**Prose check**:
+flows' code-only `PostToolUse` hook on Markdown writes: it flags conversation shorthand and undefined abbreviations
+in the new text, with no model call. `FLOWS_PROSE_CHECK=off` turns it off.
+_Avoid_: lint, model check
+
+**Copyedit pass**:
+A run of `/copyedit` on a spec, plan or audit report before its gate: an Opus editor revises it by the writing skill's
+book, and code checks that nothing was lost.
+_Avoid_: rewrite, polish
+
 **Release**:
 One tagged `vX.Y.Z` cut of the whole repository: the installer, the marketplace and the binaries that machines get
 together. Its number is the repo's, not any plugin's.

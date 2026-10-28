@@ -70,7 +70,7 @@
     },
     {
       "name": "flows",
-      "description": "Conductor skills that run the rest of the marketplace in order, with approval gates and resumable state: /feature-flow, /research-flow, /implement, /fix-flow and /upgrade build; /test-audit, /doc-audit and /harden check a branch or the whole repo; /self-review reviews your branch before a PR and /verify proves it is ready for one; /understand teaches a codebase; /learn saves what a flow taught. Carries its skill packs, which only its conductors read, and installs the other plugins they use. Opt-in.",
+      "description": "Conductor skills that run the rest of the marketplace in order, with approval gates and resumable state: /feature-flow, /research-flow, /implement, /fix-flow and /upgrade build; /test-audit, /doc-audit and /harden check a branch or the whole repo; /self-review reviews your branch before a PR and /verify proves it is ready for one; /understand teaches a codebase; /learn saves what a flow taught. Also a writing skill, a code-only prose check on every Markdown write, and /copyedit, which has an Opus editor revise a document by the book. Carries its skill packs, which only its conductors read, and installs the other plugins they use. Opt-in.",
       "source": "./plugins/flows",
       "category": "development"
     },
