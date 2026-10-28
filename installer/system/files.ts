@@ -61,6 +61,15 @@ export function replaceBin(staged: string, bin: string, aside: boolean) {
   }
 }
 
+// Deletes a folder tree; the error code when that fails (Windows: a file still open), never a throw.
+export function removeDir(path: string, rm = rmSync): string | undefined {
+  try {
+    rm(path, { recursive: true, force: true, maxRetries: 5 });
+  } catch (e) {
+    return e.code ?? e.message;
+  }
+}
+
 // Copies every clean target that exists; any failure throws before the caller deletes anything.
 export function backup(config: string, dir: string) {
   for (const t of [...CLEAN_TARGETS, 'settings.json']) {

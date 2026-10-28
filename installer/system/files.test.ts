@@ -14,7 +14,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Worker } from 'node:worker_threads';
-import { backup, clearTargets, replaceBin } from './files.ts';
+import { backup, clearTargets, removeDir, replaceBin } from './files.ts';
 
 // A config dir with a skill, settings.json, a symlinked rules dir (home-manager) and a file clean never touches.
 function config() {
@@ -165,4 +165,25 @@ test('replaceBin waits out a staged binary that is still being scanned', LOCKS, 
   await release();
   await swapping;
   assert.equal(readFileSync(bin, 'utf8'), 'new');
+});
+
+test('removeDir removes a tree', () => {
+  const root = mkdtempSync(join(tmpdir(), 'dcs-rmdir-'));
+  const dir = join(root, 'flows-prose');
+  mkdirSync(join(dir, 'env', 'bin'), { recursive: true });
+  writeFileSync(join(dir, 'env', 'bin', 'python'), 'x');
+  assert.equal(removeDir(dir), undefined);
+  assert.ok(!existsSync(dir));
+  assert.ok(existsSync(root));
+  assert.equal(removeDir(dir), undefined, 'a missing folder is fine');
+});
+
+test('removeDir returns the code instead of throwing', () => {
+  const calls: unknown[][] = [];
+  const rm = (...args: unknown[]) => {
+    calls.push(args);
+    throw Object.assign(new Error('resource busy or locked'), { code: 'EBUSY' });
+  };
+  assert.equal(removeDir('somewhere', rm), 'EBUSY');
+  assert.deepEqual(calls, [['somewhere', { recursive: true, force: true, maxRetries: 5 }]]);
 });

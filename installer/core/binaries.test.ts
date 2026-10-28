@@ -13,6 +13,7 @@ import {
   sha256Of,
   sha256Matches,
   binAction,
+  hasBuild,
 } from './binaries.ts';
 import { unavailable } from './options.ts';
 
@@ -30,6 +31,32 @@ test('missing binaries per OS', () => {
     missingBinaries('linux', ['dead-skills'], () => true),
     [],
   );
+});
+
+test('uv is reported once for graphify and prose', () => {
+  const none = () => false;
+  const uv = (wanted: string[]) => missingBinaries('linux', wanted, none).filter((r) => r.binary === 'uv');
+  assert.equal(uv(['prose']).length, 1);
+  assert.equal(uv(['graphify']).length, 1);
+  assert.equal(uv(['graphify', 'prose']).length, 1);
+  assert.equal(uv(['dead-skills']).length, 0);
+  assert.equal(
+    missingBinaries('win32', ['prose'], none).find((r) => r.binary === 'uv')!.command,
+    'winget install -e --id astral-sh.uv',
+  );
+});
+
+test('hasBuild: Windows and Linux x64 only', () => {
+  assert.equal(hasBuild('linux', 'x64'), true);
+  assert.equal(hasBuild('win32', 'x64'), true);
+  for (const [platform, arch] of [
+    ['linux', 'arm64'],
+    ['darwin', 'arm64'],
+    ['darwin', 'x64'],
+    ['win32', 'arm64'],
+    ['linux', 'toString'],
+  ])
+    assert.equal(hasBuild(platform, arch), false, `${platform}-${arch}`);
 });
 
 test('tui-review downloads the release archive built for this machine', () => {

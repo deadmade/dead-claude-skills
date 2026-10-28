@@ -1,5 +1,5 @@
 // The installer's pages and toggles, and what each option runs or why it can't run here.
-import { BIN_PLUGINS, binAsset } from './binaries.ts';
+import { BIN_PLUGINS, binAsset, hasBuild } from './binaries.ts';
 import { OFFICIAL, nameOf } from './plugins.ts';
 import { MARKETPLACE } from './release.ts';
 import { CLEAN_TARGETS } from './settings.ts';
@@ -29,7 +29,7 @@ export function dcgCommand(platform: string, action: 'install' | 'uninstall'): [
 
 // The installer's pages, in order. keys: plugin names and installer toggles; an opt-in not listed here lands in Other,
 // so a new marketplace plugin is never left out.
-export const TOGGLES = ['ccstatusline', 'dcg', 'strip-defaults', 'clean', 'web-builtins-off'];
+export const TOGGLES = ['ccstatusline', 'dcg', 'strip-defaults', 'clean', 'web-builtins-off', 'prose'];
 export const CATEGORIES: Page[] = [
   {
     id: 'workflow',
@@ -67,7 +67,7 @@ export const CATEGORIES: Page[] = [
     id: 'tools',
     title: 'Tools',
     blurb: 'Plugins that bring their own binary or pane.',
-    keys: ['graphify', 'tui-review', 'web-mcp', 'web-builtins-off', 'md-pane'],
+    keys: ['graphify', 'tui-review', 'web-mcp', 'web-builtins-off', 'md-pane', 'prose'],
   },
   {
     id: 'system',
@@ -106,14 +106,26 @@ export const HINTS: Record<string, string> = {
   dcg: 'destructive command guard, runs its own installer',
   'strip-defaults': `remove other marketplaces + plugins (keeps the ${OFFICIAL} ones used here), claude.ai connectors, synced skills/plugins, builtins`,
   'web-builtins-off': 'Turn off the built-in WebSearch and WebFetch (web-mcp replaces them; only with web-mcp)',
+  prose: "/copyedit's spaCy environment (about 1.7 GB, set up with uv in flows-prose; only with flows)",
   clean: `clean slate: back up, then reset settings.json and delete ${CLEAN_TARGETS.join(', ')}`,
 };
 
-// Why an option can't work on this machine, or undefined when it can. version: the release whose binaries to look for.
-export function unavailable(key: string, platform: string, arch: string, version: string): string | undefined {
+// Why an option can't work on this machine, or undefined when it can. version: the release whose binaries to look for;
+// nixos: /etc/NIXOS exists.
+export function unavailable(
+  key: string,
+  platform: string,
+  arch: string,
+  version: string,
+  nixos = false,
+): string | undefined {
   const name = nameOf(key);
   if (platform === 'win32' && name === 'nix-lsp') return 'nixd is not available on Windows';
-  if (name === 'web-builtins-off') return unavailable(`web-mcp@${MARKETPLACE}`, platform, arch, version);
+  if (name === 'web-builtins-off') return unavailable(`web-mcp@${MARKETPLACE}`, platform, arch, version, nixos);
+  if (name === 'prose') {
+    if (nixos) return 'not supported on NixOS yet';
+    if (!hasBuild(platform, arch)) return `no prose environment for ${platform}-${arch}`;
+  }
   const bin = BIN_PLUGINS[name];
   if (bin && !binAsset(bin.name, platform, arch, version)) return `no ${bin.name} build for ${platform}-${arch}`;
   return undefined;

@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // Interactive installer for the dead-claude-skills marketplace: the flow. Decisions live in core/, the OS in system/,
 // each thing it applies in steps/.
-import { readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { missingBinaries } from './core/binaries.ts';
 import { HINTS, TOGGLES, categorize, unavailable } from './core/options.ts';
+import { proseDefault, proseState } from './core/prose.ts';
 import {
   type Marketplace,
   type PluginJson,
@@ -55,6 +56,7 @@ import { applyCcstatusline } from './steps/ccstatusline.ts';
 import { confirmClean } from './steps/clean.ts';
 import { applyDcg } from './steps/dcg.ts';
 import { addMarketplaces, applyPlugins, listed, removeForeign } from './steps/plugins.ts';
+import { applyProse } from './steps/prose.ts';
 import { applySettings } from './steps/settings.ts';
 import { clearTargets } from './system/files.ts';
 import { trustSystemCerts } from './system/net.ts';
@@ -130,6 +132,8 @@ const installedIds = rows.map((pl) => pl.id);
 // By name, so a plugin that moved marketplaces stays selected; its old copy is removed as a duplicate.
 const has = (id: string) => installedIds.some((i) => nameOf(i) === nameOf(id));
 const settingsNow = tryJson(SETTINGS) ?? {};
+const nixos = existsSync('/etc/NIXOS');
+const prose = proseState({ config: CONFIG, platform: process.platform, exists: existsSync });
 
 // What each option is right now, and what the pages start from.
 const current: Record<string, boolean> = {
@@ -139,6 +143,7 @@ const current: Record<string, boolean> = {
   'strip-defaults': isStripped(settingsNow),
   clean: false,
   'web-builtins-off': isWebBuiltinsOff(settingsNow),
+  prose: prose.installed,
 };
 const chosen: Record<string, boolean> = {
   ...current,
@@ -151,12 +156,18 @@ const chosen: Record<string, boolean> = {
   // web-mcp is selected and its search browser works.
   'web-builtins-off': has(WEB_MCP)
     ? current['web-builtins-off']
-    : unavailable('web-builtins-off', process.platform, process.arch, VERSION) === undefined,
+    : unavailable('web-builtins-off', process.platform, process.arch, VERSION, nixos) === undefined,
 };
+// On by default with flows where offered, until the user unticks it once (the flows-prose.off marker).
+chosen.prose = proseDefault({
+  ...prose,
+  offered: unavailable('prose', process.platform, process.arch, VERSION, nixos) === undefined,
+  flows: chosen[FLOWS],
+});
 
 // Options that can't work here stay off the pages, unless they're on already: hiding never removes anything.
 const hidden = [...opts, ...TOGGLES]
-  .map((key) => ({ key, why: unavailable(key, process.platform, process.arch, VERSION) }))
+  .map((key) => ({ key, why: unavailable(key, process.platform, process.arch, VERSION, nixos) }))
   .filter((h) => h.why && !current[h.key]);
 const pages = categorize([...opts, ...TOGGLES].filter((k) => !hidden.some((h) => h.key === k)));
 
@@ -208,6 +219,8 @@ const data: Data = {
   ],
 };
 
+// What the screens start from: chosen holds their result after them.
+const started = { ...chosen };
 let state = initial({ ...chosen });
 for (;;) {
   state = await screen(state, { move: (s, k) => move(s, k, data), render: (s, o) => render(s, data, o) });
@@ -277,8 +290,13 @@ if (browser.path) await configureAgentBrowser(browser.path);
 if (clean) done.push(...clearTargets(CONFIG));
 // The global instructions moved into a dead-skills SessionStart hook; the old file would duplicate them.
 remove(RULES, RULES);
+await applyProse({ toggle: on('prose'), flows: selected.includes(FLOWS), unticked: started.prose && !on('prose') });
 
-const wanted = [...selected.map(nameOf), ...TOGGLES.filter(on)];
+// prose needs uv only with flows: without it the step sets nothing up.
+const wanted = [
+  ...selected.map(nameOf),
+  ...TOGGLES.filter((k) => on(k) && (k !== 'prose' || selected.includes(FLOWS))),
+];
 const missing = missingBinaries(process.platform, wanted, onPath);
 
 note('Summary', [

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { optIns, manifestPath, BUNDLE, type Marketplace, type PluginJson } from './plugins.ts';
-import { dcgCommand, CATEGORIES, TOGGLES, categorize, unavailable } from './options.ts';
+import { dcgCommand, CATEGORIES, HINTS, TOGGLES, categorize, unavailable } from './options.ts';
 
 const json = (p: string) => JSON.parse(readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8'));
 const marketplace: Marketplace = json('.claude-plugin/marketplace.json');
@@ -70,4 +70,17 @@ test('options hidden per platform', () => {
     assert.equal(unavailable(k, 'darwin', 'arm64', '1.0.0'), undefined);
   }
   assert.equal(unavailable(`tui-review@${M}`, 'linux', 'x64', '1.0.0'), undefined);
+});
+
+test('prose is a tools toggle, hidden on NixOS and off linux-x64 and win32-x64', () => {
+  assert.ok(TOGGLES.includes('prose'));
+  assert.ok(CATEGORIES.find((c) => c.id === 'tools')!.keys.includes('prose'));
+  assert.ok(HINTS.prose);
+  assert.equal(unavailable('prose', 'linux', 'x64', '1.0.0'), undefined);
+  assert.equal(unavailable('prose', 'win32', 'x64', '1.0.0'), undefined);
+  assert.equal(unavailable('prose', 'linux', 'x64', '1.0.0', true), 'not supported on NixOS yet');
+  assert.equal(unavailable('prose', 'linux', 'arm64', '1.0.0'), 'no prose environment for linux-arm64');
+  assert.equal(unavailable('prose', 'darwin', 'arm64', '1.0.0'), 'no prose environment for darwin-arm64');
+  // NixOS hides only prose.
+  assert.equal(unavailable('dcg', 'linux', 'x64', '1.0.0', true), undefined);
 });
