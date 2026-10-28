@@ -77,6 +77,13 @@ Agent report, sources fetched in its run (blog posts labelled):
 ## Options
 
 - 2026-10-28, scope: the user builds MCP **servers**, not clients ("I build mcp servers not clients").
+- 2026-10-28, user: primarily Rust and C#; wants already-published MCP skills that are usable and updated regularly;
+  more interested in language-unspecific material, focused on building, running and rolling servers out.
+- Upstream freshness checked (git log on the paths, 2026-10-28): `mcp-server-dev` (claude-plugins-official) 2026-03-20,
+  04-17, 04-28; `mcp-builder` (anthropics/skills) last content change 2025-12-01; awesome-copilot
+  `mcp-implementation-security-review` 2026-07-10, `mcp-security-audit` 2026-04-09 and 2026-10-07. dotnet/skills has
+  only `troubleshoot-binlog-mcp` (not about building servers). `mcp-server-dev` sits in claude-plugins-official, which
+  the marketplace already allows cross-marketplace dependencies on: it could be a flows dependency, not a vendored pack.
 
 ## Plan review
 
