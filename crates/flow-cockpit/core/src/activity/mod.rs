@@ -10,11 +10,12 @@ use ts_rs::TS;
 
 pub use transcript::{Transcript, read_transcript};
 
-/// A prompt or a reply, with the entry's timestamp.
+/// A prompt or a reply, with the entry's timestamp. `agent` is the subagent that wrote it, `None` for the main session.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 pub struct Text {
     pub at: String,
     pub text: String,
+    pub agent: Option<String>,
 }
 
 /// The tool's input, kept in the parts a view shows as a diff, a file or a command.
@@ -182,6 +183,7 @@ fn assistant_parts(
         Some(Value::String(s)) if !s.trim().is_empty() => texts.push(Text {
             at: when,
             text: s.clone(),
+            agent: agent.map(str::to_string),
         }),
         Some(Value::Array(blocks)) => {
             for b in blocks {
@@ -192,6 +194,7 @@ fn assistant_parts(
                             texts.push(Text {
                                 at: when.clone(),
                                 text,
+                                agent: agent.map(str::to_string),
                             });
                         }
                     }
@@ -218,17 +221,44 @@ fn assistant_parts(
     (texts, tools)
 }
 
-/// A user entry with string content that does not start with `<` (those are injected reminders and command
-/// echoes) is a prompt and opens a turn.
+/// A user entry that is not `isMeta` and whose text does not start with `<` (injected reminders and command echoes)
+/// is a prompt and opens a turn. The text is the string content or the array's `text` blocks joined, so a prompt
+/// with an image still counts and a tool result (no text blocks) does not.
 fn prompt_of(entry: &Value) -> Option<Text> {
-    if str_of(entry, "type") != Some("user") {
+    if str_of(entry, "type") != Some("user")
+        || entry.get("isMeta").and_then(Value::as_bool) == Some(true)
+    {
         return None;
     }
-    let text = content(entry)?.as_str()?;
+    let text = match content(entry)? {
+        Value::String(s) => s.clone(),
+        Value::Array(blocks) => blocks
+            .iter()
+            .filter(|b| str_of(b, "type") == Some("text"))
+            .filter_map(|b| str_of(b, "text"))
+            .collect::<Vec<_>>()
+            .join("\n"),
+        _ => return None,
+    };
     (!text.trim().is_empty() && !text.starts_with('<')).then(|| Text {
         at: at(entry),
-        text: text.to_string(),
+        text,
+        agent: None,
     })
+}
+
+/// The turn open at `when`: the last one that started at or before it, else the first; made when there is none.
+fn turn_at<'a>(
+    turns: &'a mut Vec<Turn>,
+    starts: &mut Vec<String>,
+    when: &str,
+) -> Option<&'a mut Turn> {
+    if turns.is_empty() {
+        starts.push(when.to_string());
+        turns.push(Turn::default());
+    }
+    let i = starts.iter().rposition(|s| s.as_str() <= when).unwrap_or(0);
+    turns.get_mut(i)
 }
 
 fn agent_info(sub: &transcript::SubTranscript) -> AgentInfo {
@@ -290,20 +320,21 @@ pub fn activity(t: &Transcript) -> Activity {
             .iter()
             .filter(|e| str_of(e, "type") == Some("assistant"))
         {
-            let (_, tools) = assistant_parts(e, Some(&sub.id), &failed);
-            for call in tools {
-                if turns.is_empty() {
-                    starts.push(call.at.clone());
-                    turns.push(Turn::default());
+            let (texts, tools) = assistant_parts(e, Some(&sub.id), &failed);
+            for text in texts {
+                if let Some(turn) = turn_at(&mut turns, &mut starts, &text.at) {
+                    turn.replies.push(text);
                 }
-                let i = starts.iter().rposition(|s| *s <= call.at).unwrap_or(0);
-                if let Some(turn) = turns.get_mut(i) {
+            }
+            for call in tools {
+                if let Some(turn) = turn_at(&mut turns, &mut starts, &call.at) {
                     turn.tools.push(call);
                 }
             }
         }
     }
     for turn in &mut turns {
+        turn.replies.sort_by(|a, b| a.at.cmp(&b.at));
         turn.tools.sort_by(|a, b| a.at.cmp(&b.at));
     }
     Activity {

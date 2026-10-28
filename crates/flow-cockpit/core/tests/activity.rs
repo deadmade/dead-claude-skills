@@ -37,7 +37,7 @@ fn missing_file_reads_as_empty() {
 #[test]
 fn skips_unknown_entries() {
     let a = session();
-    assert_eq!(a.turns.len(), 2);
+    assert_eq!(a.turns.len(), 3);
     assert_eq!(a.live.waiting, None);
 }
 
@@ -49,7 +49,7 @@ fn turns_group_by_prompt() {
         first.prompt.as_ref().map(|p| p.text.as_str()),
         Some("Add a retry to the fetch helper.")
     );
-    assert_eq!(first.replies.len(), 1);
+    assert_eq!(first.replies.len(), 2);
     assert_eq!(first.replies[0].text, "I'll look at the helper first.");
     assert_eq!(a.turns[1].replies[0].text, "Running them.");
     assert_eq!(a.turns[1].tools.len(), 2);
@@ -74,7 +74,7 @@ fn thinking_blocks_are_skipped() {
             .flat_map(|t| &t.replies)
             .all(|r| !r.text.is_empty())
     );
-    assert_eq!(a.turns[0].replies.len(), 1);
+    assert_eq!(a.turns[0].replies.len(), 2);
 }
 
 #[test]
@@ -103,6 +103,37 @@ fn subagent_tools_carry_agent() {
     assert_eq!(info.model.as_deref(), Some("sonnet"));
     assert_eq!(info.started.as_deref(), Some("2026-01-05T10:00:12.000Z"));
     assert_eq!(info.ended.as_deref(), Some("2026-01-05T10:00:18.000Z"));
+}
+
+#[test]
+fn meta_entries_do_not_open_turns() {
+    let a = session();
+    assert!(a.turns.iter().all(|t| {
+        t.prompt
+            .as_ref()
+            .is_none_or(|p| !p.text.starts_with("Invented injected"))
+    }));
+}
+
+#[test]
+fn array_prompts_open_turns() {
+    let a = session();
+    assert_eq!(
+        a.turns[2].prompt.as_ref().map(|p| p.text.as_str()),
+        Some("Also look at this screenshot.")
+    );
+}
+
+#[test]
+fn subagent_replies_carry_agent() {
+    let a = session();
+    let reply = a.turns[0]
+        .replies
+        .iter()
+        .find(|r| r.text == "Only fetch.js calls it.")
+        .expect("subagent reply in the first turn");
+    assert_eq!(reply.agent.as_deref(), Some("a1b2c3d4e5f60718"));
+    assert_eq!(a.turns[0].replies[0].agent, None);
 }
 
 #[test]
