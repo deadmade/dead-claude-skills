@@ -260,7 +260,7 @@ document was copyedited. flow.md files get only the check; they change after eve
 
 The installer sets up the Python environment for `measure.py` on Linux x64 and Windows x64, the platforms the other
 binaries ship for. It's a toggle on the tools page, on by default when flows is selected, because the environment is
-about 1.5 GB. Ticking it is the consent; there is no second question. Once the user unticks it, it stays off on later
+about 1.7 GB. Ticking it is the consent; there is no second question. Once the user unticks it, it stays off on later
 runs.
 
 - **uv** comes from PATH. When it's missing, the installer's "Missing on PATH" note prints the command that installs
@@ -270,7 +270,7 @@ runs.
   `en_core_web_trf` 3.8.0 from its GitHub release wheel with its hash. On Linux, PyPI's default PyTorch wheel pulls in
   about 1.8 GB of CUDA libraries, so the CPU index is required. The installer runs `uv sync --frozen` into
   `~/.claude/flows-prose/`, with uv's cache and its Python inside that folder too, so unticking the toggle frees the
-  whole 1.5 GB and never touches graphify's uv files.
+  whole 1.7 GB and never touches graphify's uv files.
 - **NixOS isn't supported yet.** uv's Python and PyTorch's Linux wheels expect the system library layout other Linux
   distributions have, and nixpkgs' `en_core_web_trf` doesn't load (tested 2026-10-28: nixpkgs pairs it with a newer
   spacy-curated-transformers, whose weight layout doesn't match). The installer hides the toggle on NixOS, so

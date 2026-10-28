@@ -3,7 +3,7 @@
 flows' `/copyedit` measures a document with spaCy and its transformer model, `en_core_web_trf`, before an Opus editor
 applies Williams and Bizup's _Style_ to it. A test showed the editor does best with those measures in hand. spaCy is
 Python, and the model needs PyTorch, so the installer, until now Node only, sets up a Python environment of about
-1.5 GB, behind a toggle that is on by default when flows is selected. On Windows and Linux it runs `uv sync --frozen` on a
+1.7 GB, behind a toggle that is on by default when flows is selected. On Windows and Linux it runs `uv sync --frozen` on a
 locked project in `installer/assets/prose/`, with uv from PATH, into `~/.claude/flows-prose/`. NixOS waits for a later
 change: uv's Python and PyTorch's Linux wheels don't run there, and nixpkgs' model doesn't load.
 
@@ -12,7 +12,7 @@ change: uv's Python and PyTorch's Linux wheels don't run there, and nixpkgs' mod
 - **A Rust port of the measures on Harper's tagger and noun-phrase chunker.** One binary per platform, like
   tui-review and web-mcp, with no Python. Rejected by the user ("Let's just stay on python"); Harper has no full
   sentence parser, so the sentence-shape measures would be approximate.
-- **spaCy's small model.** About 12 MB instead of 1.5 GB, but untested; the user chose the large model the test used
+- **spaCy's small model.** About 12 MB instead of 1.7 GB, but untested; the user chose the large model the test used
   ("Large pls").
 - **No measures, the editor alone.** It ranked second in the test, behind the editor with measures. It remains the
   fallback whenever the environment is missing.
