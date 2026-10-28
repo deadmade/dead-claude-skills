@@ -105,9 +105,9 @@ redundant	used for fuel purposes	used for fuel	Strunk 1920 rule 13
 negative	not honest	dishonest	Strunk 1920 rule 11
 negative	not important	trifling	Strunk 1920 rule 11
 negative	did not remember	forgot	Strunk 1920 rule 11
-negative	do not remember	forgot	Strunk 1920 rule 11
+negative	do not remember	forgot	Strunk 1920 rule 11 (present tense)
 negative	did not pay any attention to	ignored	Strunk 1920 rule 11
-negative	do not pay any attention to	ignored	Strunk 1920 rule 11
+negative	do not pay any attention to	ignored	Strunk 1920 rule 11 (present tense)
 negative	did not have much confidence in	distrusted	Strunk 1920 rule 11
-negative	do not have much confidence in	distrusted	Strunk 1920 rule 11
+negative	do not have much confidence in	distrusted	Strunk 1920 rule 11 (present tense)
 negative	not very often	usually	Strunk 1920 rule 11

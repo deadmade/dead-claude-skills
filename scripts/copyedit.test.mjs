@@ -221,8 +221,11 @@ test('findPhrases matches whole words only, and never inside code', () => {
 });
 
 test('findPhrases matches a phrase wrapped over a line and reports the line it starts on', () => {
-  const found = find('First line.\nWe did it in order\nto learn.\n');
-  assert.deepEqual(found, [{ line: 2, kind: 'wordy', text: 'in order to', note: 'to' }]);
+  for (const eol of ['\n', '\r\n']) {
+    const found = find(`First line.${eol}We did it in order${eol}to learn.${eol}`);
+    assert.deepEqual(found, [{ line: 2, kind: 'wordy', text: 'in order to', note: 'to' }]);
+  }
+  assert.equal(find('We did it in order\u00a0to learn.').length, 1);
   assert.equal(find('One\n\nin order\n\nto two.').length, 0);
 });
 
@@ -267,7 +270,7 @@ test('the shipped phrases.tsv loads, cites a source for every row and matches ea
     );
   assert.equal(new Set(rows.map((r) => r.phrase)).size, rows.length, 'a phrase is listed twice');
   for (const r of rows) {
-    assert.match(r.source, /^(plainlanguage\.gov [a-z-]+|Strunk 1920 rule (11|13))$/, r.phrase);
+    assert.match(r.source, /^(plainlanguage\.gov [a-z-]+|Strunk 1920 rule (11|13)( \(present tense\))?)$/, r.phrase);
     assert.ok(r.replacement, r.phrase);
     assert.doesNotMatch(r.phrase, /[*\\^$|()[\]{}?+]|\.\.\./, `${r.phrase} is not a literal phrase`);
     const found = find(`Alpha ${r.phrase} omega.`, [r]);

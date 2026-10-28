@@ -5,7 +5,7 @@
 const KINDS = new Set(['wordy', 'redundant', 'negative']);
 const WORD = String.raw`[\p{L}\p{N}_]`;
 // Wrapped prose: a phrase's space may be a space or one line break, never a blank line.
-const GAP = String.raw`(?:[ \t]+|[ \t]*\r?\n[ \t]*)`;
+const GAP = String.raw`(?:[ \t\u00a0]+|[ \t\u00a0]*\r?\n[ \t\u00a0]*)`;
 
 // kind, phrase, replacement and source per line; the first line is the header.
 export function loadPhrases(tsv) {
@@ -30,7 +30,8 @@ function pattern(phrase) {
   return new RegExp(before + body + after, 'giu');
 }
 
-// Where two phrases overlap, the longer one wins ("the fact that" inside "owing to the fact that").
+// Where two phrases overlap, the one that starts first wins, and at the same start the longer one ("owing to the fact
+// that" over "the fact that" inside it).
 export function findPhrases(masked, phrases) {
   const hits = [];
   for (const { kind, replacement, phrase } of phrases)
