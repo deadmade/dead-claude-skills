@@ -1,6 +1,6 @@
 ---
 flow: feature
-phase: execute
+phase: plan
 ---
 
 # Writing style: flow
@@ -25,6 +25,9 @@ Started 2026-10-27 on branch `claude/relaxed-newton-cr62u9` (from `main` 753ba2c
 - Gate 1, spec approved: 2026-10-27, by the user ("I approve lets go"), after grill rounds 1–3.
   Reopened 2026-10-27 for the copyedit pass (no commits; a diff against a saved copy) and four smaller points, plan
   review round 1. Re-approved the same day ("yes to all").
+  Reopened 2026-10-27: the Task 3 sample gate missed (Haiku hook); Options reopened, see the editor test and
+  Deviations. Re-approved 2026-10-28 ("Large pls and I approve"): code check only at write time, the book's method in
+  the writing skill, an Opus editor agent fed spaCy candidates (`en_core_web_trf`), Python set up by the installer.
 - Gate 2, plan approved: 2026-10-27, by the user ("approve, subagent-driven"), after plan review round 1.
   Execution: subagent-driven (my recommendation). Commits: one per task on `claude/relaxed-newton-cr62u9`.
 
