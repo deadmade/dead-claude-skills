@@ -52,7 +52,7 @@ the project folder's branch is not necessarily yours.\n\
 wi_update, wi_comment, pipeline_run, pipeline_cancel) asks the user for approval on every call. Say what you are \
 about to do, then call it once; in dontAsk mode these calls are denied.\n\
 - Lists show 20 items and say how to get more (limit); repo_list and project_list show all, pr_files up to 2000 \
-files, the wiki tree 100, pipeline_view 20 issues and 20 failed tests (pipeline_log shows the rest). Long text is cut with the call that shows the rest.";
+files, the wiki tree 100, pipeline_view 20 issues (pipeline_log shows the rest) and 20 failed tests. Long text is cut with the call that shows the rest.";
 
 pub struct Server {
     ctx: Arc<Ctx>,

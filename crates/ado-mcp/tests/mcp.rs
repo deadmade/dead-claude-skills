@@ -30,6 +30,11 @@ fn initialize_has_instructions() {
         "{instructions}"
     );
     assert!(instructions.contains("the wiki tree 100"), "{instructions}");
+    assert!(
+        instructions
+            .contains("pipeline_view 20 issues (pipeline_log shows the rest) and 20 failed tests."),
+        "{instructions}"
+    );
     assert!(instructions.chars().count() < 4096);
     assert!(result["capabilities"]["tools"].is_object(), "{result}");
 }

@@ -251,9 +251,74 @@ fn runs_query() {
     assert!(raw.contains("includeRunDetails=true"), "{raw}");
     let q = &queries(&fx, &results(42))[0];
     assert!(
-        q.contains("outcomes=Failed") && q.contains("$top=21"),
+        q.contains("outcomes=Failed") && q.contains("$top=20"),
         "{q}"
     );
+}
+
+/// A results call that fails keeps the stages, the issues and the summary, plus one line; a 404 names no path.
+#[test]
+fn results_failure_keeps_summary() {
+    for (resp, why) in [
+        (
+            Resp::new(404, "text/plain", "gone"),
+            "not found: test results",
+        ),
+        (
+            Resp::new(500, "text/plain", "down"),
+            "the server failed (500); try again",
+        ),
+    ] {
+        let fx = Fixture::start();
+        run_routes(&fx);
+        test_routes(&fx);
+        fx.route(&results(42), vec![resp]);
+        let text = ok(&mut env(&fx), "pipeline_view", json!({"run": 77}));
+        assert_eq!(
+            text,
+            format!(
+                "{}\ntests: 12 passed, 1 failed, 2 skipped\n\
+                 \x20 … 1 more failed test: pipeline_log run=77\n\
+                 \x20 failed tests couldn't be read ({why})",
+                view_base()
+            )
+        );
+    }
+}
+
+/// Failed results of `n` tests named `<prefix><i>`.
+fn failed_results(prefix: &str, n: usize) -> Resp {
+    let value: Vec<Value> = (0..n)
+        .map(|i| json!({"testCaseTitle": format!("{prefix}{i}"), "outcome": "Failed"}))
+        .collect();
+    Resp::json(&json!({"count": n, "value": value}))
+}
+
+/// The 20 failed tests span the runs: the second run is asked for what is left.
+#[test]
+fn failed_cap_across_runs() {
+    let fx = Fixture::start();
+    run_routes(&fx);
+    let run = |id: u32, name: &str, failed: u32| json!({"id": id, "name": name, "totalTests": failed, "passedTests": 0, "unanalyzedTests": failed});
+    fx.route(
+        TEST_RUNS,
+        vec![Resp::json(
+            &json!({"count": 2, "value": [run(51, "B", 10), run(50, "A", 15)]}),
+        )],
+    );
+    fx.route(&results(50), vec![failed_results("a", 15)]);
+    fx.route(&results(51), vec![failed_results("b", 10)]);
+    let text = ok(&mut env(&fx), "pipeline_view", json!({"run": 77}));
+    let q = &queries(&fx, &results(51))[0];
+    assert!(q.contains("$top=5"), "{q}");
+    let tests: Vec<&str> = text
+        .lines()
+        .skip_while(|l| !l.starts_with("tests:"))
+        .collect();
+    assert_eq!(tests[0], "tests: 0 passed, 25 failed, 0 skipped");
+    assert_eq!(tests.len(), 1 + 20 + 1, "{text}");
+    assert_eq!((tests[15], tests[16], tests[20]), ("  a14", "  b0", "  b4"));
+    assert_eq!(tests[21], "  … 5 more failed tests: pipeline_log run=77");
 }
 
 /// Review Focus 4: a test-results call that fails keeps the stages and issues, plus one line.

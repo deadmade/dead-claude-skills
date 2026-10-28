@@ -383,7 +383,7 @@ fn newest_per_name(mut runs: Vec<TestRun>) -> Vec<TestRun> {
 }
 
 /// `tests: <passed> passed, <failed> failed, <skipped> skipped` over `runs`, then the first 20 failed tests (the
-/// error's first line, the stack trace's first 5 lines), then how many the counts say were left out.
+/// error's first line, the stack trace's first 5 lines), then how many of the counted failures weren't shown.
 fn test_lines(runs: &[TestRun], failed: &[TestCaseResult], rest: &str) -> Vec<String> {
     let n = |v: Option<i32>| usize::try_from(v.unwrap_or(0)).unwrap_or(0);
     let (mut passed, mut fails, mut skipped) = (0, 0, 0);
@@ -402,7 +402,8 @@ fn test_lines(runs: &[TestRun], failed: &[TestCaseResult], rest: &str) -> Vec<St
         cap(&mut line);
         line
     };
-    for t in failed.iter().take(FAILED_MAX) {
+    let shown = failed.len().min(FAILED_MAX);
+    for t in &failed[..shown] {
         let mut head = t.test_case_title.clone().unwrap_or_else(|| "?".into());
         let msg = strip_ansi(t.error_message.as_deref().unwrap_or_default());
         if let Some(first) = msg.lines().map(str::trim).find(|l| !l.is_empty()) {
@@ -419,7 +420,7 @@ fn test_lines(runs: &[TestRun], failed: &[TestCaseResult], rest: &str) -> Vec<St
                 .map(|l| indented("    ", l)),
         );
     }
-    let left = fails.saturating_sub(FAILED_MAX);
+    let left = fails.saturating_sub(shown);
     if left > 0 {
         let s = if left == 1 { "" } else { "s" };
         lines.push(format!("  … {left} more failed test{s}{rest}"));
@@ -428,7 +429,7 @@ fn test_lines(runs: &[TestRun], failed: &[TestCaseResult], rest: &str) -> Vec<St
 }
 
 /// The test result lines of run `run`: none when it published no tests or the server has no test area, one line when
-/// they can't be read.
+/// its test runs can't be read, the summary and one line more when their failed tests can't.
 async fn test_results(ctx: &Ctx, proj: &str, run: u32, rest: &str) -> Vec<String> {
     let unread = |e: ApiError| vec![format!("tests: couldn't be read ({e})")];
     let api = &ctx.api;
@@ -458,7 +459,7 @@ async fn test_results(ctx: &Ctx, proj: &str, run: u32, rest: &str) -> Vec<String
         let Some(id) = r.id.filter(|_| r.unanalyzed_tests.unwrap_or(0) > 0) else {
             continue;
         };
-        let top = i32::try_from(remaining + 1).unwrap_or(i32::MAX);
+        let top = i32::try_from(remaining).unwrap_or(i32::MAX);
         let page = api
             .az(|| {
                 api.test
@@ -471,7 +472,12 @@ async fn test_results(ctx: &Ctx, proj: &str, run: u32, rest: &str) -> Vec<String
             .await;
         match page {
             Ok(l) => failed.extend(l.value.into_iter().take(remaining)),
-            Err(e) => return unread(e.with_what("test results")),
+            Err(e) => {
+                let mut lines = test_lines(&runs, &failed, rest);
+                let e = e.with_what("test results");
+                lines.push(format!("  failed tests couldn't be read ({e})"));
+                return lines;
+            }
         }
     }
     test_lines(&runs, &failed, rest)
@@ -482,7 +488,8 @@ async fn test_results(ctx: &Ctx, proj: &str, run: u32, rest: &str) -> Vec<String
 pub(crate) async fn pipeline_view(ctx: &Ctx, a: &RunArgs) -> Result<String, ApiError> {
     let p = a.project.as_deref();
     let rest = format!(": pipeline_log run={}{}", a.run, args(&[("project", p)]));
-    // The scope first: the timeline and the test runs are then asked for at once.
+    // The scope first: the timeline and the test runs are then asked for at once. A stale cached project id drops the
+    // test lines for this one reply; the timeline's retry refreshes the cache for the next one.
     let proj = seg(&ctx.scope(p, None, None).await?.project_id);
     let (t, tests) = tokio::join!(
         timeline(ctx, p, a.run),
@@ -1376,6 +1383,9 @@ mod tests {
         );
         let lines = test_lines(&[test_run(1, "Unit", 21, 0, 21)], &failed, "");
         assert_eq!(lines[lines.len() - 1], "  … 1 more failed test");
+        // Fewer results than the counts promise: the rest is counted from those shown.
+        let lines = test_lines(&[test_run(1, "Unit", 25, 0, 25)], &failed[..10], "");
+        assert_eq!(lines[lines.len() - 1], "  … 15 more failed tests");
         // No error message, no stack trace: the name alone.
         let bare: TestCaseResult =
             serde_json::from_value(serde_json::json!({"testCaseTitle": "t"})).unwrap();
