@@ -30,6 +30,9 @@ Installing flows installs every plugin below; the packs ship inside flows itself
 <!-- uses:start -->
 
 ```text
+copyedit
+└ claude-code: general-purpose
+
 doc-audit
 ├ tob-picks: spec-to-code-compliance, spec-compliance, spec-compliance-checker
 ├ claude-md-management@claude-plugins-official: claude-md-improver
