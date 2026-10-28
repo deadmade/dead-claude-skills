@@ -443,6 +443,11 @@ state.chosen)` runs first (`install.ts:225`); the marker would never be written.
   checkbox states and table columns as well as counts, after the review showed versions and labels could vanish
   unnoticed; its line-joining uses prose.mjs's block-start rule, which took honest rewraps of this repo's specs and
   plans from 27 of 92 refused to 0. The guide no longer asks for tables, which compare.mjs refuses by design.
+- 2026-10-28, Task 10: without WordNet, the prototype's 14 nominalization suffixes flag ordinary nouns (message,
+  package, feature) as actions. The light-verb rule ("make a decision") keeps the 14, since its context keeps false
+  hits rare; the weak-verb-subject and abstract-subject rules use the 7 suffixes the editor test's `metrics.py` used,
+  and a token gets one candidate, not two. If wrong, the editor sees fewer nominalization and abstract-subject
+  candidates than the prototype's list would give.
 
 ## Deviations
 
