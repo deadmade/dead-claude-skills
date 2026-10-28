@@ -166,8 +166,9 @@ PRs touching tui-review; `web-mcp.yml` on PRs touching web-mcp; `build-tui-revie
 weekly.
 
 `.github/rulesets/` holds the repo's rulesets, imported by hand (Settings → Rules → Rulesets → Import; GitHub doesn't
-read the folder, so re-import after changing one): main takes squash or rebase PRs once `test.yml`'s three jobs pass, and
-only admins create or move `v*` tags. Admins bypass both, which the release's direct push to main needs. Renaming a
+read the folder, so re-import after changing one): main takes squash or rebase PRs once `test.yml`'s three jobs pass
+(admins bypass it, which `npm run release` pushed to main needs), and only admins move or delete a `v*` tag. Creating
+one stays open: `release.yml` tags each merge with the workflow's token, which no ruleset can exempt. Renaming a
 `test.yml` job or matrix entry changes its check name: update `main.json` and re-import it. The sync workflows open their
 PRs with a GitHub App's token (variable `SYNC_APP_CLIENT_ID`, secret `SYNC_APP_PRIVATE_KEY`; the App needs contents and
 pull requests write) so `test.yml` runs on them; without the App they fall back to `github.token` and their PRs wait on
