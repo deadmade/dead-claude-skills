@@ -123,6 +123,17 @@ Michael Welles) in its own words and links to it; nothing is copied. The rest of
 Williams and Bizup's _Style: Lessons in Clarity and Grace_, checked against free sources it credits; it quotes no
 passage of the book.
 
+## copyedit phrase list (flows)
+
+`plugins/flows/skills/copyedit/data/phrases.tsv` lists wordy phrases, redundant pairs and negatives with an affirmative
+form, each row naming its source:
+
+- [plainlanguage.gov](https://github.com/GSA/plainlanguage.gov) (US government work, CC0 / public domain): the multi-word
+  entries of "Use simple words and phrases" and the examples of "Avoid hidden verbs" and "Use positive language"
+  (`_pages/guidelines/`). Single-word substitutions are left out.
+- Strunk, _The Elements of Style_ (1920, public domain, [Project Gutenberg #37134](https://www.gutenberg.org/ebooks/37134)):
+  rules 11 and 13.
+
 ## ponytail
 
 `plugins/flows/packs/ponytail/` is vendored from [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) (MIT
