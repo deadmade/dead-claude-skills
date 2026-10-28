@@ -425,6 +425,16 @@ state.chosen)` runs first (`install.ts:225`); the marker would never be written.
 ## Rulings
 
 - 2026-10-27, Task 2: probes and the sample run load a scratchpad copy of `plugins/flows` with `dependencies` removed, because on Claude Code 2.1.311 an unsatisfied dependency (graphify) disables flows under `--plugin-dir` — the copy is test scaffolding and changes nothing in the repo — if wrong, the measured hooks differ from the shipped ones only in the manifest.
+- 2026-10-28, Task 4: the writing skill's source check found near-copies of technical-writing-density, unslop and
+  technical-writing, two misquoted examples and Lessons 3 and 4 out of order; all fixed in a3d381e. Lesson 1's line
+  stays (the spec asks for it), reworded to what the free sources support.
+- 2026-10-28, Task 5: the editing guide differs from the tested `book.md` in more than the labels rule. Its source
+  check found that "If not, cut it" could cut facts, that it invited guessing at actors, abbreviations and referents,
+  and that it quoted technical-writing-density word for word. The guide now says to revise only with what the
+  document states, to cut words but never content, and gives a diagnosis for every lesson. If that is wrong, Task 13's
+  re-run of the editor test (criterion 4) shows it, since it uses the shipped guide.
+- 2026-10-28, Task 5: "four or more parallel items" is the spec's own count, not technical-writing-density's (which
+  gives none); Prior art above credits the count to it by mistake. Kept as the spec states it.
 
 ## Deviations
 

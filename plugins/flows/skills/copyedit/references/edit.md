@@ -6,27 +6,34 @@ Writing", 1990). These are expectations, not laws: change a sentence only when t
 
 Work sentence by sentence and paragraph by paragraph, running the diagnoses below. Diagnose first, then revise.
 
+You weren't there either. Revise only with what the document itself says: never invent an actor, a definition, a
+referent or a reason it doesn't state. Where a fix would need a guess, leave the sentence as it is.
+
 ## Clarity (Lessons 3–6)
-
-**Characters as subjects (Lesson 4).** Ask: whose story is this sentence? The main characters (people, programs,
-components, the user) should be the grammatical subjects.
-
-- Diagnose: read the first seven or eight words. Is the subject short and specific, a character the reader can see?
-  Or is it an abstraction ("the implementation of", "there is", "it is … that")?
-- Revise: make the character the subject. "There is a need for the installer to check the hash" → "The installer
-  must check the hash."
 
 **Actions in verbs (Lesson 3).** Ask: what are the actions? They should be verbs, not nouns.
 
-- Diagnose: find nouns made from verbs (decision, removal, validation, failure), especially after weak verbs (make,
-  perform, provide, have, occur, take place).
+- Diagnose: find nouns made from verbs (decision, removal, validation, failure), especially after weak verbs (be,
+  make, perform, provide, have, occur, take place).
 - Revise: turn the noun back into a verb with its character as subject. "The removal of the cache occurs on update" →
   "Updating removes the cache."
 - Keep a nominalization when it names something the text keeps referring to ("the installation folder") or links to
   the previous sentence ("These arguments…").
 
-**Passive voice (Lesson 4).** Use active when the reader needs to know who acts. Keep the passive when the actor is
-unknown, obvious, or unimportant, or when it keeps the paragraph's topic in subject position.
+**Characters as subjects (Lesson 4).** Ask: whose story is this sentence? The main characters (people, programs,
+components, the user) should be the grammatical subjects.
+
+- Diagnose: read the first seven or eight words. Is the subject short and specific, a character the reader can see?
+  Or is it an abstraction ("the implementation of"), or empty ("there is", "it is … that")?
+- Revise: make the character the subject. "There is a need for the installer to check the hash" → "The installer
+  must check the hash."
+
+**Passive voice (Lesson 4).**
+
+- Diagnose: a form of "be" plus a past participle ("is set", "were checked"). Does the reader need to know who acts,
+  and does the document say who?
+- Revise: when it does, name that actor as the subject. Keep the passive when the actor is unknown, obvious or
+  unimportant, when it keeps the paragraph's topic in subject position, or when the document never says who acts.
 
 **Cohesion: old before new (Lesson 5).** Each sentence should begin with something the reader already knows (from the
 previous sentence or the paragraph's topic) and end with what is new.
@@ -40,16 +47,23 @@ information.
 
 - Diagnose: does the sentence trail off into an afterthought, a qualification, or a weak phrase ("as well", "in this
   case")?
-- Revise: put the point that matters last; move qualifiers and context to the front.
+- Revise: put the point that matters last; move qualifiers and context to the front. When you move words, keep "only"
+  and "not" next to the word they change, or the sentence says something else.
 
 ## Coherence of the whole (Lessons 7–8)
 
-**Motivation (Lesson 7).** An introduction states the problem: the condition and its cost to the reader. Then the
-point: what the document decides or shows. A reader should know from the opening why to read on.
+**Motivation (Lesson 7).**
 
-**Global coherence (Lesson 8).** Each section and paragraph opens with a short, plain statement of its point; the rest
-supports it. Key terms stated in that point are the terms the rest uses. If a paragraph has no point, either it needs
-one or it can go.
+- Diagnose: does the opening say what problem the document answers (a condition and what it costs the reader), and
+  then what the document decides or shows?
+- Revise: sharpen the opening the document has, from what it already says. If it has no introduction, don't add one.
+
+**Global coherence (Lesson 8).**
+
+- Diagnose: does each section open with a short passage that gives its point, and each paragraph with a sentence
+  that does? Does the rest use the key terms of that point?
+- Revise: move the point forward, or state it from what the section or paragraph already says. Never delete a
+  paragraph because its point is unclear.
 
 ## Grace (Lessons 9–11)
 
@@ -57,32 +71,40 @@ one or it can go.
 
 - words that mean little or nothing (basically, actually, really, very, quite, generally);
 - redundant pairs and modifiers (each and every, completely finish, future plans);
-- what the reader can infer;
-- phrases that say in many words what one would say ("due to the fact that" → "because", "in order to" → "to");
-- metadiscourse that only narrates the writing ("it is important to note that", "as mentioned above", "in this
-  section we will");
-- negatives with a positive form ("not many" → "few").
-  Keep a hedge where the claim really is uncertain or not universal; remove it where it only protects the writer.
+- modifiers and categories the reader can infer ("final outcome", "blue in color");
+- phrases that say in many words what one would say ("at this point in time" → "now", "in the event that" → "if");
+- metadiscourse that only narrates the writing ("as mentioned above", "in this section we will");
+- negatives with a positive form ("not many" → "few"), only when the meaning holds: "must not include" isn't "must
+  omit".
 
-The test for any cut (technical-writing-density): does removing this lose a reason, constraint, or disambiguation that
-matters to the topic and prevents a likely misreading? If not, cut it.
+Keep a hedge where the claim really is uncertain or not universal; remove it where it only protects the writer.
 
-**Shape (Lesson 10).** Get to the subject quickly and from the subject to the verb quickly: no long opening clause, no
-long subject, no interruption between subject and verb. Break a sentence that sprawls with clause after clause. Put
-four or more parallel items in a list, and items that share attributes in a table.
+Every cut must pass the density test (after technical-writing-density): would a careful reader misread the topic
+without these words, because they carry a reason, a limit or a distinction that matters to it? Then they stay. And
+never cut a fact, a number, a name or a decision: concision removes words, not content.
 
-**Elegance (Lesson 11).** Not a goal here; never trade clarity for flourish.
+**Shape (Lesson 10).**
+
+- Diagnose: how many words come before the subject, how long is the subject, and what stands between the subject and
+  its verb? Does the sentence run on, clause after clause?
+- Revise: get to the subject quickly and from the subject to the verb quickly; break a sprawling sentence in two. Put
+  four or more parallel items in a list, and items that share attributes in a table.
+
+**Elegance (Lesson 11).** Not a goal here: clarity comes first.
 
 ## The reader who was not there (Pinker, "the curse of knowledge")
 
-The writer knows things the reader doesn't. Spell out an abbreviation at first use unless every reader of this
-document knows it, and name the thing instead of "this" or "it" when the referent could be ambiguous.
+The writer knew things the reader doesn't.
+
+- Diagnose: an abbreviation the document never spells out; a "this" or "it" that could point at two things.
+- Revise: spell out an abbreviation only with the expansion the document gives elsewhere; name the referent only when
+  the text makes it certain. Otherwise leave it: the author can fix it, you can't.
 
 Leave conversation labels as they are: question numbers like Q11, "round 2", "D4", "my call", "the spike". You weren't
-in the conversation, so you can't know what they stood for, and a guess would change the document's meaning. The
-write-time check reports them to the author, who can.
+in the conversation, so you can't know what they stood for, and a guess would change the document's meaning.
 
 ## Ethics (Lesson 12)
 
-Write as you would want to be written to. Never make a claim stronger or weaker than the evidence, and never hide who
-decided or who is responsible.
+- Diagnose: is any claim stronger or weaker than the document's evidence? Does any sentence hide who decided or who is
+  responsible, when the document says who?
+- Revise: match the claim to the evidence, and keep the one who decided in the sentence.
