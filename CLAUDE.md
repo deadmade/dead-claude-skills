@@ -120,13 +120,18 @@ When what's vendored or its license changes, update THIRD_PARTY.md.
 
 Everything ships as one version: `package.json` and `package-lock.json`, the marketplace's `metadata.version`, every
 plugin's `.claude-plugin/plugin.json`, both crates' `Cargo.toml`/`Cargo.lock` and the installer URL in README.md.
-`check-repo.mjs` fails on drift. Never bump by hand:
+`check-repo.mjs` fails on drift. Never bump by hand. Every merge to `main` that touches more than `docs/` or the root
+`*.md` files releases a patch on its own: `release.yml` runs `npm run release -- patch --detach`, which commits the
+bump off `main` and tags it, so `main`'s `package.json` lags behind the tags and the next version counts from the
+highest `vX.Y.Z` tag (`scripts/next-version.mjs`; fetch tags before a local release). A release you choose:
 
-    npm run release -- patch      # on main, clean tree; bumps, runs npm test, commits and tags
+    npm run release -- minor      # on main, clean tree; bumps, runs npm test, commits and tags
     git push --follow-tags origin main
 
-The `v*` tag runs `release.yml`, which packs the installer (`installer.tgz`), builds tui-review and web-mcp and
-publishes the GitHub release npx and the installer download from. Removing a plugin from the marketplace is enough to retire it: the installer uninstalls installed
+Either way the `v*` tag's run packs the installer (`installer.tgz`), builds tui-review and web-mcp from the tag and
+publishes the GitHub release npx and the installer download from, then moves the `release` branch to it (never back).
+The installer points the marketplace at that branch (`RELEASE_BRANCH`, `core/release.ts`), so Claude Code's
+marketplace auto-update brings plugin updates without a rerun; the binaries still come from the installer (ADR 0006). Removing a plugin from the marketplace is enough to retire it: the installer uninstalls installed
 plugins of ours that the manifest no longer lists.
 
 ## Checks
