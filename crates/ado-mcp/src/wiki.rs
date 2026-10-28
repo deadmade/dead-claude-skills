@@ -131,9 +131,11 @@ pub(crate) async fn wiki(ctx: &Ctx, a: &WikiArgs) -> Result<String, ApiError> {
             .wiki_page_create_or_update_parameters
             .content
             .unwrap_or_default();
-        if !content.is_empty() {
+        text.push('\n');
+        if content.is_empty() {
+            text.push_str("(empty page)");
+        } else {
             let rest = format!("wiki{scope}{} full=true", args(&[("path", Some(p))]));
-            text.push('\n');
             if a.full == Some(true) {
                 text.push_str(&content);
             } else {

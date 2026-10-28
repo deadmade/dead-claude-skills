@@ -29,6 +29,7 @@ fn initialize_has_instructions() {
         instructions.contains("- wiki reads the project's wiki pages; repo_file reads files of repos that aren't cloned."),
         "{instructions}"
     );
+    assert!(instructions.contains("the wiki tree 100"), "{instructions}");
     assert!(instructions.chars().count() < 4096);
     assert!(result["capabilities"]["tools"].is_object(), "{result}");
 }

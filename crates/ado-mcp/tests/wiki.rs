@@ -193,6 +193,44 @@ fn unknown_wiki() {
 }
 
 #[test]
+fn empty_page() {
+    let fx = Fixture::start();
+    let page = json!({"path": "/Blank", "order": 0, "gitItemPath": "/Blank.md", "content": ""});
+    fx.route(PAGES, vec![Resp::json(&page)]);
+    let (err, text) = call(
+        &mut env(&fx, fixture("wikis-one.json")),
+        json!({"path": "/Blank"}),
+    );
+    assert!(!err, "{text}");
+    assert_eq!(text, "My Proj.wiki:/Blank\n(empty page)");
+}
+
+/// The project went away after its id was cached: the list 404s on both tries.
+#[test]
+fn missing_project() {
+    let fx = Fixture::start();
+    let gone = Resp::new(
+        404,
+        "application/json",
+        json!({"message": format!("TF200016: The following project does not exist: {PROJ}")})
+            .to_string(),
+    );
+    let (err, text) = call(&mut env(&fx, gone), json!({}));
+    assert!(err, "{text}");
+    assert_eq!(text, "not found: project My Proj");
+    assert_eq!(queries(&fx, WIKIS).len(), 2);
+}
+
+#[test]
+fn missing_tree() {
+    let fx = Fixture::start();
+    fx.route(PAGES, vec![Resp::new(404, "text/plain", "gone")]);
+    let (err, text) = call(&mut env(&fx, fixture("wikis-one.json")), json!({}));
+    assert!(err, "{text}");
+    assert_eq!(text, "not found: page /");
+}
+
+#[test]
 fn missing_page() {
     let fx = Fixture::start();
     let gone = Resp::new(
