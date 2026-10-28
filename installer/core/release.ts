@@ -1,21 +1,24 @@
-// The release this installer belongs to: our marketplace pinned to its tag, and the installer's own URLs.
+// Our marketplace on its release branch, and the URLs of the release this installer belongs to.
 import type { Settings } from './settings.ts';
 
 export const MARKETPLACE = 'dead-claude-skills';
 
-// Our marketplace at the release tag of the installer that runs, so the plugins always match it: updating means
-// running a newer installer. As `claude plugin marketplace add` takes it, and as its settings entry.
+// Our marketplace on the `release` branch, which release.yml moves to each new release once it is published: Claude
+// Code's marketplace auto-update follows it, so plugins update after every release without rerunning the installer
+// (the binaries still come from the installer). As `claude plugin marketplace add` takes it, and as its settings entry.
 const REPO = 'deadmade/dead-claude-skills';
-export const marketplaceArg = (version: string) => `${REPO}@v${version}`;
-export const marketplaceSource = (version: string) => ({ source: 'github', repo: REPO, ref: `v${version}` });
+export const RELEASE_BRANCH = 'release';
+export const marketplaceArg = () => `${REPO}@${RELEASE_BRANCH}`;
+export const marketplaceSource = () => ({ source: 'github', repo: REPO, ref: RELEASE_BRANCH });
 
 // Claude Code refuses to add a marketplace whose source differs from its extraKnownMarketplaces entry, so the entry
-// is pinned before the add; the add then moves the checkout to the tag and keeps its plugins. Unchanged otherwise.
-export function pinMarketplace(settings: Settings, version: string) {
+// is pinned before the add (an install pinned to a vX.Y.Z tag moves to the branch); the add then moves the checkout
+// and keeps its plugins. Unchanged otherwise.
+export function pinMarketplace(settings: Settings) {
   const entry = settings?.extraKnownMarketplaces?.[MARKETPLACE];
-  if (!entry || JSON.stringify(entry.source) === JSON.stringify(marketplaceSource(version))) return settings;
+  if (!entry || JSON.stringify(entry.source) === JSON.stringify(marketplaceSource())) return settings;
   const out = structuredClone(settings);
-  out.extraKnownMarketplaces![MARKETPLACE].source = marketplaceSource(version);
+  out.extraKnownMarketplaces![MARKETPLACE].source = marketplaceSource();
   return out;
 }
 
