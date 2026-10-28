@@ -151,7 +151,7 @@ fn errors_are_tool_errors_without_pat() {
         ("pipeline_log", json!({"run": 1})),
         ("repo_list", json!({})),
         ("project_list", json!({})),
-        ("search", json!({"kind": "wi", "text": "x"})),
+        ("search", json!({"kind": "code", "text": "x"})),
     ];
     let mut called: Vec<&str> = calls.iter().map(|c| c.0).collect();
     called.sort_unstable();

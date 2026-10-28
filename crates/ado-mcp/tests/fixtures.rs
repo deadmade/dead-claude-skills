@@ -52,6 +52,18 @@ const TABLE: &[(&str, Check)] = &[
     ("repo.json", fits::<git::models::GitRepository>),
     ("repos.json", fits::<git::models::GitRepositoryList>),
     (
+        "search-code.json",
+        fits::<search::models::CodeSearchResponse>,
+    ),
+    (
+        "search-repo-status.json",
+        fits::<search::models::RepositoryStatusResponse>,
+    ),
+    (
+        "search-wiki.json",
+        fits::<search::models::WikiSearchResponse>,
+    ),
+    (
         "search-wi.json",
         fits::<search::models::WorkItemSearchResponse>,
     ),

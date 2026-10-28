@@ -4,7 +4,8 @@
 use std::fmt::Write as _;
 
 use azure_devops_rust_api::search::models::{
-    EntitySearchRequest, EntitySearchRequestBase, WorkItemResult, WorkItemSearchRequest,
+    CodeResult, CodeSearchRequest, EntitySearchRequest, EntitySearchRequestBase, WikiHit,
+    WikiResult, WikiSearchRequest, WorkItemResult, WorkItemSearchRequest,
 };
 use rmcp::schemars::{self, JsonSchema};
 use serde::Deserialize;
@@ -125,84 +126,210 @@ fn wi_hit(r: &WorkItemResult) -> String {
     out
 }
 
-/// # Errors
-/// When the scope or the server fails; a 404 says Search is missing, or names the project.
-pub(crate) async fn search(ctx: &Ctx, a: &SearchArgs) -> Result<String, ApiError> {
-    let limit = usize::from(a.limit.unwrap_or(20).max(1));
-    match a.kind {
-        Kind::Wi => wi(ctx, a, limit).await,
-        Kind::Code | Kind::Wiki => Err(ApiError::local(format!(
-            "kind={} is not supported yet",
-            a.kind.name()
-        ))),
-    }
+/// How many places in a code hit's content match: `matches.content` holds one offset each.
+fn matches(m: Option<&Value>) -> usize {
+    m.and_then(|m| m.get("content"))
+        .and_then(Value::as_array)
+        .map_or(0, Vec::len)
 }
 
-async fn wi(ctx: &Ctx, a: &SearchArgs, limit: usize) -> Result<String, ApiError> {
-    let named = given(a.project.as_deref());
-    // No project: the whole collection, even inside a clone (local search covers the clone). The guard cuts the `//`.
-    let (project, filters) = match named {
-        Some(p) => {
-            let s = ctx.scope(Some(p), None, None).await?;
-            let filters = json!({"System.TeamProject": [s.project]});
-            (seg(&s.project_id), Some(filters))
-        }
-        None => (String::new(), None),
-    };
-    let body = WorkItemSearchRequest {
-        entity_search_request: EntitySearchRequest {
-            entity_search_request_base: EntitySearchRequestBase {
-                filters,
-                search_text: Some(a.text.clone()),
-            },
-            top: Some(i32::try_from(limit + 1).unwrap_or(i32::MAX)),
-            include_facets: Some(false),
-            ..EntitySearchRequest::default()
-        },
-    };
-    let api = &ctx.api;
-    // Sent once: no `retry_stale` around a POST.
-    let found = api
-        .az(|| {
-            api.search
-                .work_item_search_results_client()
-                .fetch_work_item_search_results(&api.org, body.clone(), &project)
-                .into_future()
-        })
-        .await
-        .map_err(|mut e| {
-            if let Some(p) = named {
-                // A stale cached project id, or no Search: the 404 can't tell which.
-                return e.with_what(&format!(
-                    "project {p}, or Search isn't installed on this collection"
-                ));
-            }
-            if e.status == Some(404) {
-                NOT_INSTALLED.clone_into(&mut e.msg);
-            }
-            e
-        })?;
-    let mut lines: Vec<String> = found
-        .entity_search_response
-        .info_code
+/// `project/repo:path  (N matches)`.
+fn code_hit(r: &CodeResult) -> String {
+    let n = matches(r.matches.as_ref());
+    format!(
+        "{}/{}:{}  ({n} match{})",
+        r.project
+            .as_ref()
+            .and_then(|p| p.name.as_deref())
+            .unwrap_or("?"),
+        r.repository
+            .as_ref()
+            .and_then(|p| p.name.as_deref())
+            .unwrap_or("?"),
+        r.path.as_deref().unwrap_or("?"),
+        if n == 1 { "" } else { "es" }
+    )
+}
+
+/// `project/wiki:path`, then the content snippet, else the first other one: a file-name hit only repeats the path.
+fn wiki_hit(r: &WikiResult) -> String {
+    let mut out = format!(
+        "{}/{}:{}",
+        r.project
+            .as_ref()
+            .and_then(|p| p.name.as_deref())
+            .unwrap_or("?"),
+        r.wiki
+            .as_ref()
+            .and_then(|w| w.name.as_deref())
+            .unwrap_or("?"),
+        r.path.as_deref().unwrap_or("?")
+    );
+    let on = |h: &&WikiHit, f: &str| h.field_reference_name.as_deref() == Some(f);
+    let best = r
+        .hits
+        .iter()
+        .find(|h| on(h, "content"))
+        .or_else(|| r.hits.iter().find(|h| !on(h, "fileNames")));
+    if let Some(h) = best.and_then(|h| h.highlights.first()) {
+        let _ = write!(out, "\n  {}", plain(h));
+    }
+    out
+}
+
+/// A failed search: a 404 says Search is missing, or names the project too (a stale cached project id, or no
+/// Search: the 404 can't tell which).
+fn missing(mut e: ApiError, named: Option<&str>) -> ApiError {
+    if let Some(p) = named {
+        return e.with_what(&format!(
+            "project {p}, or Search isn't installed on this collection"
+        ));
+    }
+    if e.status == Some(404) {
+        NOT_INSTALLED.clone_into(&mut e.msg);
+    }
+    e
+}
+
+/// The `infoCode` line, the count, a line per hit and the more line.
+fn listed<T>(
+    a: &SearchArgs,
+    limit: usize,
+    info_code: Option<i32>,
+    count: Option<i32>,
+    results: Vec<T>,
+    line: fn(&T) -> String,
+) -> Vec<String> {
+    let mut lines: Vec<String> = info_code
         .and_then(info)
         .map(str::to_owned)
         .into_iter()
         .collect();
     // A rejected or unindexed search answers with no results: its line says why, `0 hits` would mislead.
-    if lines.is_empty() || !found.results.is_empty() {
-        let n = found
-            .count
+    if lines.is_empty() || !results.is_empty() {
+        let n = count
             .and_then(|c| usize::try_from(c).ok())
-            .unwrap_or(found.results.len());
+            .unwrap_or(results.len());
         lines.push(format!("{n} hit{}", if n == 1 { "" } else { "s" }));
     }
-    let (hits, has_more) = cut(found.results, limit);
-    lines.extend(hits.iter().map(wi_hit));
+    let (hits, has_more) = cut(results, limit);
+    lines.extend(hits.iter().map(line));
     if has_more {
         lines.push(more(&more_call(a, limit)));
     }
+    lines
+}
+
+/// # Errors
+/// When the scope or the server fails; a 404 says Search is missing, or names the project.
+pub(crate) async fn search(ctx: &Ctx, a: &SearchArgs) -> Result<String, ApiError> {
+    let limit = usize::from(a.limit.unwrap_or(20).max(1));
+    let (named, repo) = (given(a.project.as_deref()), given(a.repo.as_deref()));
+    if repo.is_some() && !matches!(a.kind, Kind::Code) {
+        return Err(ApiError::local("repo narrows code search only"));
+    }
+    // Neither: the whole collection, even inside a clone (local search covers the clone). The guard cuts the `//`.
+    let scope = match (named, repo) {
+        (None, None) => None,
+        _ => Some(ctx.scope(named, repo, None).await?),
+    };
+    let project = scope
+        .as_ref()
+        .map(|s| seg(&s.project_id))
+        .unwrap_or_default();
+    let filters = scope.as_ref().map(|s| match (a.kind, repo) {
+        (Kind::Wi, _) => json!({"System.TeamProject": [s.project]}),
+        (_, Some(r)) => json!({"Project": [s.project], "Repository": [r]}),
+        _ => json!({"Project": [s.project]}),
+    });
+    let request = EntitySearchRequest {
+        entity_search_request_base: EntitySearchRequestBase {
+            filters,
+            search_text: Some(a.text.clone()),
+        },
+        top: Some(i32::try_from(limit + 1).unwrap_or(i32::MAX)),
+        include_facets: Some(false),
+        ..EntitySearchRequest::default()
+    };
+    let api = &ctx.api;
+    // Each search is sent once: no `retry_stale` around a POST.
+    let lines = match a.kind {
+        Kind::Wi => {
+            let body = WorkItemSearchRequest {
+                entity_search_request: request,
+            };
+            let found = api
+                .az(|| {
+                    api.search
+                        .work_item_search_results_client()
+                        .fetch_work_item_search_results(&api.org, body.clone(), &project)
+                        .into_future()
+                })
+                .await
+                .map_err(|e| missing(e, named))?;
+            let info_code = found.entity_search_response.info_code;
+            listed(a, limit, info_code, found.count, found.results, wi_hit)
+        }
+        Kind::Code => {
+            let body = CodeSearchRequest {
+                entity_search_request: request,
+                include_snippet: None,
+            };
+            let found = api
+                .az(|| {
+                    api.search
+                        .code_search_results_client()
+                        .fetch_code_search_results(&api.org, body.clone(), &project)
+                        .into_future()
+                })
+                .await
+                .map_err(|e| missing(e, named))?;
+            let empty = found.results.is_empty();
+            let info_code = found.entity_search_response.info_code;
+            let mut lines = listed(a, limit, info_code, found.count, found.results, code_hit);
+            if let (true, Some(r), Some(id)) = (empty, repo, scope.and_then(|s| s.repo_id))
+                && unindexed(ctx, &project, &id).await
+            {
+                lines.push(format!("{r} isn't indexed by Search yet"));
+            }
+            lines
+        }
+        Kind::Wiki => {
+            let body = WikiSearchRequest {
+                entity_search_request: request,
+            };
+            let found = api
+                .az(|| {
+                    api.search
+                        .wiki_search_results_client()
+                        .fetch_wiki_search_results(&api.org, body.clone(), &project)
+                        .into_future()
+                })
+                .await
+                .map_err(|e| missing(e, named))?;
+            let info_code = found.entity_search_response.info_code;
+            listed(a, limit, info_code, found.count, found.results, wiki_hit)
+        }
+    };
     Ok(lines.join("\n"))
+}
+
+/// Whether Search has no branch of the repo indexed, or doesn't know the repo. Any other failure says nothing.
+async fn unindexed(ctx: &Ctx, project: &str, repo_id: &str) -> bool {
+    let api = &ctx.api;
+    // The crate puts both into the URL raw: `project` is a segment already, `repo_id` a GUID.
+    let status = api
+        .az(|| {
+            api.search
+                .repositories_client()
+                .get(&api.org, project, repo_id)
+                .into_future()
+        })
+        .await;
+    match status {
+        Ok(s) => s.indexed_branches.is_empty(),
+        Err(e) => e.status == Some(404),
+    }
 }
 
 #[cfg(test)]
@@ -227,6 +354,14 @@ mod tests {
         assert_eq!(line, "c".repeat(SNIPPET_MAX));
         let line = plain(&"c".repeat(SNIPPET_MAX + 1));
         assert_eq!(line, "c".repeat(SNIPPET_MAX - 1) + "…");
+    }
+
+    #[test]
+    fn matches_counts_content_offsets() {
+        let m = json!({"content": [{"charOffset": 1}, {"charOffset": 9}], "fileName": [{"charOffset": 0}]});
+        assert_eq!(matches(Some(&m)), 2);
+        assert_eq!(matches(Some(&json!({"fileName": []}))), 0);
+        assert_eq!(matches(None), 0);
     }
 
     #[test]

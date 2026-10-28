@@ -1,0 +1,60 @@
+{
+  "count": 2,
+  "results": [
+    {
+      "fileName": "OrderParser.cs",
+      "path": "/src/OrderParser.cs",
+      "matches": {
+        "content": [
+          { "charOffset": 412, "length": 5 },
+          { "charOffset": 980, "length": 5 },
+          { "charOffset": 1544, "length": 5 }
+        ],
+        "fileName": [{ "charOffset": 0, "length": 5 }]
+      },
+      "collection": { "name": "Coll" },
+      "project": {
+        "name": "Shop",
+        "id": "5e0d7c21-8a4f-4b39-9c62-d1f3a7e8b240"
+      },
+      "repository": {
+        "name": "Orders",
+        "id": "a83f1c5e-2d47-4e9b-b016-7c2e9f4d3a18",
+        "type": "git"
+      },
+      "versions": [
+        {
+          "branchName": "main",
+          "changeId": "9c1e4b7a2f05d83e6a1b9c4d7e2f0a5b8c3d6e91"
+        }
+      ],
+      "contentId": "4d8a2f6c1e9b3a7d5f0c2e8b4a6d1f9c3e7b5a20"
+    },
+    {
+      "fileName": "OrderTests.cs",
+      "path": "/tests/OrderTests.cs",
+      "matches": {
+        "content": [{ "charOffset": 233, "length": 5 }],
+        "fileName": []
+      },
+      "collection": { "name": "Coll" },
+      "project": {
+        "name": "Shop",
+        "id": "5e0d7c21-8a4f-4b39-9c62-d1f3a7e8b240"
+      },
+      "repository": {
+        "name": "Orders",
+        "id": "a83f1c5e-2d47-4e9b-b016-7c2e9f4d3a18",
+        "type": "git"
+      },
+      "versions": [
+        {
+          "branchName": "main",
+          "changeId": "9c1e4b7a2f05d83e6a1b9c4d7e2f0a5b8c3d6e91"
+        }
+      ],
+      "contentId": "b7e3a9d1c5f2084e6b3d9a1c7e5f2b8d4a0c6e13"
+    }
+  ],
+  "infoCode": 0
+}

@@ -1,0 +1,58 @@
+{
+  "count": 2,
+  "results": [
+    {
+      "fileName": "Deploy.md",
+      "path": "/Runbooks/Deploy.md",
+      "collection": { "name": "Coll" },
+      "project": {
+        "id": "5e0d7c21-8a4f-4b39-9c62-d1f3a7e8b240",
+        "name": "Shop",
+        "visibility": null
+      },
+      "wiki": {
+        "id": "e2b6d4f8-1a3c-4e5b-9d7f-0c8a6e4b2d19",
+        "mappedPath": "/",
+        "name": "Shop.wiki",
+        "version": "wikiMaster"
+      },
+      "contentId": "1f5c9e3a7d2b6f0e4a8c1d5b9e3f7a2c6d0b4e88",
+      "hits": [
+        {
+          "fieldReferenceName": "fileNames",
+          "highlights": ["<highlighthit>Deploy</highlighthit>.md"]
+        },
+        {
+          "fieldReferenceName": "content",
+          "highlights": [
+            "Run the <highlighthit>deploy</highlighthit> job &amp; watch the gates"
+          ]
+        }
+      ]
+    },
+    {
+      "fileName": "Deploy-Checklist.md",
+      "path": "/Runbooks/Deploy-Checklist.md",
+      "collection": { "name": "Coll" },
+      "project": {
+        "id": "5e0d7c21-8a4f-4b39-9c62-d1f3a7e8b240",
+        "name": "Shop",
+        "visibility": null
+      },
+      "wiki": {
+        "id": "e2b6d4f8-1a3c-4e5b-9d7f-0c8a6e4b2d19",
+        "mappedPath": "/",
+        "name": "Shop.wiki",
+        "version": "wikiMaster"
+      },
+      "contentId": "8a2d6f0c4e9b3a7d1f5c8e2b6a0d4f9c3e7b1a55",
+      "hits": [
+        {
+          "fieldReferenceName": "fileNames",
+          "highlights": ["<highlighthit>Deploy</highlighthit>-Checklist.md"]
+        }
+      ]
+    }
+  ],
+  "infoCode": 0
+}

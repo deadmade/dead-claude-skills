@@ -11,6 +11,15 @@ const PROJECT: &str = "/tfs/Coll/_apis/projects/My%20Proj";
 const PROJ_WIS: &str =
     "/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/search/workitemsearchresults";
 const NOT_INSTALLED: &str = "Search isn't installed or is turned off on this collection";
+const CODE: &str = "/tfs/Coll/_apis/search/codesearchresults";
+const WIKI: &str = "/tfs/Coll/_apis/search/wikisearchresults";
+const REPO: &str = "/tfs/Coll/My%20Proj/_apis/git/repositories/R";
+const PROJ_CODE: &str =
+    "/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/search/codesearchresults";
+const PROJ_WIKI: &str =
+    "/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/search/wikisearchresults";
+/// The repo's index status, by the ids of `repo.json`.
+const STATUS: &str = "/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/search/status/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01";
 
 /// Inside a clone, so the tests also show that search stays collection-wide there.
 fn env(fx: &Fixture) -> Mcp {
@@ -197,28 +206,32 @@ fn trimmed() {
 
 #[test]
 fn not_installed() {
-    let fx = Fixture::start();
-    fx.route(WIS, vec![Resp::new(404, "text/plain", "not found")]);
-    let (err, text) = env(&fx).call("search", json!({"kind": "wi", "text": "x"}));
-    assert!(err, "{text}");
-    assert_eq!(text, NOT_INSTALLED);
+    for (kind, path) in [("wi", WIS), ("code", CODE), ("wiki", WIKI)] {
+        let fx = Fixture::start();
+        fx.route(path, vec![Resp::new(404, "text/plain", "not found")]);
+        let (err, text) = env(&fx).call("search", json!({"kind": kind, "text": "x"}));
+        assert!(err, "{kind}: {text}");
+        assert_eq!(text, NOT_INSTALLED, "{kind}");
+    }
 }
 
 #[test]
 fn project_404() {
-    let fx = Fixture::start();
-    fx.route(PROJECT, vec![project()]);
-    fx.route(PROJ_WIS, vec![Resp::new(404, "text/plain", "not found")]);
-    let (err, text) = env(&fx).call(
-        "search",
-        json!({"kind": "wi", "text": "x", "project": "My Proj"}),
-    );
-    assert!(err, "{text}");
-    assert_eq!(
-        text,
-        "not found: project My Proj, or Search isn't installed on this collection"
-    );
-    assert!(!text.contains(PROJ), "{text}");
+    for (kind, path) in [("wi", PROJ_WIS), ("code", PROJ_CODE), ("wiki", PROJ_WIKI)] {
+        let fx = Fixture::start();
+        fx.route(PROJECT, vec![project()]);
+        fx.route(path, vec![Resp::new(404, "text/plain", "not found")]);
+        let (err, text) = env(&fx).call(
+            "search",
+            json!({"kind": kind, "text": "x", "project": "My Proj"}),
+        );
+        assert!(err, "{kind}: {text}");
+        assert_eq!(
+            text, "not found: project My Proj, or Search isn't installed on this collection",
+            "{kind}"
+        );
+        assert!(!text.contains(PROJ), "{text}");
+    }
 }
 
 /// rmcp answers bad arguments with a tool error, not a JSON-RPC one; nothing is sent.
@@ -229,4 +242,134 @@ fn kind_required() {
     assert!(err, "{text}");
     assert!(text.contains("missing field `kind`"), "{text}");
     assert!(fx.requests().is_empty());
+}
+
+#[test]
+fn code_hits() {
+    let fx = Fixture::start();
+    fx.route(CODE, vec![fixture("search-code.json")]);
+    let text = ok(
+        &mut env(&fx),
+        "search",
+        json!({"kind": "code", "text": "Order"}),
+    );
+    assert_eq!(
+        text,
+        "2 hits\nShop/Orders:/src/OrderParser.cs  (3 matches)\nShop/Orders:/tests/OrderTests.cs  (1 match)"
+    );
+    // Collection-wide even inside a clone: the search is the only request.
+    assert_eq!(fx.requests().len(), 1);
+    let body = &bodies(&fx, CODE)[0];
+    assert_eq!(body["searchText"], "Order");
+    assert_eq!(body["$top"], 21);
+    assert!(body.get("filters").is_none(), "{body}");
+}
+
+/// Review Focus 3: the path takes the project id, the filters the names as given.
+#[test]
+fn code_repo_filter() {
+    let fx = Fixture::start();
+    fx.route(REPO, vec![fixture("repo.json")]);
+    fx.route(PROJ_CODE, vec![fixture("search-code.json")]);
+    ok(
+        &mut env(&fx),
+        "search",
+        json!({"kind": "code", "text": "Order", "project": "My Proj", "repo": "R"}),
+    );
+    let bodies = bodies(&fx, PROJ_CODE);
+    assert_eq!(bodies.len(), 1);
+    assert_eq!(
+        bodies[0]["filters"],
+        json!({"Project": ["My Proj"], "Repository": ["R"]})
+    );
+    // Hits: no status request.
+    assert!(requests(&fx, STATUS).is_empty());
+}
+
+/// Review Focus 1: a quoted phrase and the scope repeat exactly in the more line.
+#[test]
+fn code_more_repeats_scope() {
+    let fx = Fixture::start();
+    fx.route(REPO, vec![fixture("repo.json")]);
+    fx.route(PROJ_CODE, vec![fixture("search-code.json")]);
+    let text = ok(
+        &mut env(&fx),
+        "search",
+        json!({"kind": "code", "text": "path:\"a b\"", "project": "My Proj", "repo": "R", "limit": 1}),
+    );
+    assert!(!text.contains("OrderTests"), "{text}");
+    assert!(
+        text.ends_with(
+            "\n… more: search kind=code text=\"path:\\\"a b\\\"\" project=\"My Proj\" repo=R limit=2"
+        ),
+        "{text}"
+    );
+}
+
+fn code_in_repo(fx: &Fixture, status: Resp) -> String {
+    fx.route(REPO, vec![fixture("repo.json")]);
+    fx.route(PROJ_CODE, vec![answer(0, &[])]);
+    fx.route(STATUS, vec![status]);
+    ok(
+        &mut env(fx),
+        "search",
+        json!({"kind": "code", "text": "x", "project": "My Proj", "repo": "R"}),
+    )
+}
+
+#[test]
+fn code_repo_not_indexed() {
+    let fx = Fixture::start();
+    let text = code_in_repo(&fx, fixture("search-repo-status.json"));
+    assert_eq!(text, "0 hits\nR isn't indexed by Search yet");
+    assert_eq!(requests(&fx, STATUS).len(), 1);
+}
+
+#[test]
+fn code_repo_status_404() {
+    let fx = Fixture::start();
+    let text = code_in_repo(&fx, Resp::new(404, "text/plain", "not found"));
+    assert_eq!(text, "0 hits\nR isn't indexed by Search yet");
+}
+
+/// An indexed branch, or a status call that fails otherwise, adds nothing.
+#[test]
+fn code_repo_indexed_or_unknown() {
+    let indexed =
+        Resp::json(&json!({"id": "x", "name": "R", "indexedBranches": [{"name": "main"}]}));
+    for status in [indexed, Resp::new(500, "text/plain", "boom")] {
+        let fx = Fixture::start();
+        assert_eq!(code_in_repo(&fx, status), "0 hits");
+    }
+}
+
+#[test]
+fn repo_needs_code() {
+    for kind in ["wi", "wiki"] {
+        let fx = Fixture::start();
+        let (err, text) = env(&fx).call("search", json!({"kind": kind, "text": "x", "repo": "R"}));
+        assert!(err, "{kind}: {text}");
+        assert_eq!(text, "repo narrows code search only", "{kind}");
+        assert!(fx.requests().is_empty(), "{kind}");
+    }
+}
+
+#[test]
+fn wiki_hits() {
+    let fx = Fixture::start();
+    fx.route(PROJECT, vec![project()]);
+    fx.route(PROJ_WIKI, vec![fixture("search-wiki.json")]);
+    let text = ok(
+        &mut env(&fx),
+        "search",
+        json!({"kind": "wiki", "text": "deploy", "project": "My Proj"}),
+    );
+    // The content hit, not the file-name hit; a page whose only hit is its file name gets no snippet.
+    assert_eq!(
+        text,
+        "2 hits\nShop/Shop.wiki:/Runbooks/Deploy.md\n  Run the deploy job & watch the gates\nShop/Shop.wiki:/Runbooks/Deploy-Checklist.md"
+    );
+    let body = &bodies(&fx, PROJ_WIKI)[0];
+    assert_eq!(body["filters"], json!({"Project": ["My Proj"]}));
+    assert_eq!(body["$top"], 21);
 }
