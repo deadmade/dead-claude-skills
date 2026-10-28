@@ -15,7 +15,9 @@ use azure_core::http::headers::{
 };
 use azure_core::http::policies::{Policy, PolicyResult};
 use azure_core::http::{Context, Request, RetryOptions, Transport};
-use azure_devops_rust_api::{Credential, build, git, ims, pipelines, policy, search, wiki, wit};
+use azure_devops_rust_api::{
+    Credential, build, git, ims, pipelines, policy, search, test, wiki, wit,
+};
 use base64::Engine as _;
 use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderMap, HeaderValue, RETRY_AFTER};
 use reqwest::{Client, Method};
@@ -222,6 +224,7 @@ pub(crate) struct Api {
     pub ims: ims::Client,
     pub search: search::Client,
     pub wiki: wiki::Client,
+    pub test: test::Client,
 }
 
 impl Api {
@@ -283,6 +286,7 @@ impl Api {
             ims: area!(ims),
             search: area!(search),
             wiki: area!(wiki),
+            test: area!(test),
             client,
             org_url: cfg.org_url.clone(),
             org,
@@ -504,6 +508,7 @@ fn scope(path: &str) -> Option<&'static str> {
         Some("projects" | "identities" | "connectionData") => Some("Project and Team (Read)"),
         Some("search") => Some("Code, Work Items or Wiki (Read)"),
         Some("wiki") => Some("Wiki (Read)"),
+        Some("test") => Some("Test Management (Read)"),
         _ => None,
     }
 }
@@ -631,6 +636,8 @@ mod tests {
         f("_apis/projects", "Project and Team (Read)");
         f("_apis/connectionData", "Project and Team (Read)");
         f("P/_apis/wiki/wikis/w/pages", "Wiki (Read)");
+        f("P/_apis/test/runs", "Test Management (Read)");
+        f("P/_apis/test/Runs/5/results", "Test Management (Read)");
     }
 
     #[test]

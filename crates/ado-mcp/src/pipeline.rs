@@ -1,6 +1,7 @@
 //! The pipeline tools: the reads `pipeline_runs`, `pipeline_view` and `pipeline_log`, the writes `pipeline_run` and
 //! `pipeline_cancel`; and `repo_list` and `project_list`.
 
+use std::cmp::Reverse;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Write as _;
 
@@ -8,6 +9,7 @@ use azure_devops_rust_api::build::models::{
     BuildQueryOrder, BuildResult, Issue, Timeline, TimelineRecord, timeline_record,
 };
 use azure_devops_rust_api::pipelines::models::{RunPipelineParameters, RunResourcesParameters};
+use azure_devops_rust_api::test::models::{TestCaseResult, TestRun};
 use reqwest::Method;
 use rmcp::schemars::{self, JsonSchema};
 use serde::Deserialize;
@@ -89,6 +91,9 @@ const WINDOW: u32 = 20_000;
 /// A log line is cut here: one minified file on a line would fill the reply.
 const LINE_MAX: usize = 1000;
 const ISSUES_MAX: usize = 20;
+/// Failed tests `pipeline_view` shows, and the stack trace lines of each.
+const FAILED_MAX: usize = 20;
+const STACK_MAX: usize = 5;
 /// Step names an error lists.
 const NAMES_MAX: usize = 20;
 /// Lines of error context an excerpt shows before it points at the full log.
@@ -368,10 +373,122 @@ fn tree<'a>(
     }
 }
 
+/// Of the test runs with one name (a retried job publishes one per attempt), the newest (highest id); by id.
+fn newest_per_name(mut runs: Vec<TestRun>) -> Vec<TestRun> {
+    runs.sort_by_key(|r| Reverse(r.id));
+    let mut seen = HashSet::new();
+    runs.retain(|r| seen.insert(r.name.clone()));
+    runs.reverse();
+    runs
+}
+
+/// `tests: <passed> passed, <failed> failed, <skipped> skipped` over `runs`, then the first 20 failed tests (the
+/// error's first line, the stack trace's first 5 lines), then how many the counts say were left out.
+fn test_lines(runs: &[TestRun], failed: &[TestCaseResult], rest: &str) -> Vec<String> {
+    let n = |v: Option<i32>| usize::try_from(v.unwrap_or(0)).unwrap_or(0);
+    let (mut passed, mut fails, mut skipped) = (0, 0, 0);
+    for r in runs {
+        let (p, f) = (n(r.passed_tests), n(r.unanalyzed_tests));
+        passed += p;
+        fails += f;
+        // A skipped test is published as `NotExecuted`: neither `notApplicableTests` nor `incompleteTests` counts it.
+        skipped += n(r.total_tests).saturating_sub(p + f);
+    }
+    let mut lines = vec![format!(
+        "tests: {passed} passed, {fails} failed, {skipped} skipped"
+    )];
+    let indented = |pad: &str, text: &str| {
+        let mut line = format!("{pad}{text}");
+        cap(&mut line);
+        line
+    };
+    for t in failed.iter().take(FAILED_MAX) {
+        let mut head = t.test_case_title.clone().unwrap_or_else(|| "?".into());
+        let msg = strip_ansi(t.error_message.as_deref().unwrap_or_default());
+        if let Some(first) = msg.lines().map(str::trim).find(|l| !l.is_empty()) {
+            let _ = write!(head, ": {first}");
+        }
+        lines.push(indented("  ", &head));
+        let stack = strip_ansi(t.stack_trace.as_deref().unwrap_or_default());
+        lines.extend(
+            stack
+                .lines()
+                .map(str::trim)
+                .filter(|l| !l.is_empty())
+                .take(STACK_MAX)
+                .map(|l| indented("    ", l)),
+        );
+    }
+    let left = fails.saturating_sub(FAILED_MAX);
+    if left > 0 {
+        let s = if left == 1 { "" } else { "s" };
+        lines.push(format!("  … {left} more failed test{s}{rest}"));
+    }
+    lines
+}
+
+/// The test result lines of run `run`: none when it published no tests or the server has no test area, one line when
+/// they can't be read.
+async fn test_results(ctx: &Ctx, proj: &str, run: u32, rest: &str) -> Vec<String> {
+    let unread = |e: ApiError| vec![format!("tests: couldn't be read ({e})")];
+    let api = &ctx.api;
+    let uri = format!("vstfs:///Build/Build/{run}");
+    // Without `includeRunDetails` the runs carry no counts.
+    let runs = api
+        .az(|| {
+            api.test
+                .runs_client()
+                .list(&api.org, proj)
+                .build_uri(&uri)
+                .include_run_details(true)
+                .into_future()
+        })
+        .await;
+    let runs = match runs {
+        Ok(l) if !l.value.is_empty() => newest_per_name(l.value),
+        Err(e) if e.status != Some(404) => return unread(e),
+        _ => return Vec::new(),
+    };
+    let mut failed = Vec::new();
+    for r in &runs {
+        let remaining = FAILED_MAX.saturating_sub(failed.len());
+        if remaining == 0 {
+            break;
+        }
+        let Some(id) = r.id.filter(|_| r.unanalyzed_tests.unwrap_or(0) > 0) else {
+            continue;
+        };
+        let top = i32::try_from(remaining + 1).unwrap_or(i32::MAX);
+        let page = api
+            .az(|| {
+                api.test
+                    .results_client()
+                    .list(&api.org, proj, id)
+                    .outcomes("Failed")
+                    .top(top)
+                    .into_future()
+            })
+            .await;
+        match page {
+            Ok(l) => failed.extend(l.value.into_iter().take(remaining)),
+            Err(e) => return unread(e.with_what("test results")),
+        }
+    }
+    test_lines(&runs, &failed, rest)
+}
+
 /// # Errors
 /// When the scope, the run or the server fails.
 pub(crate) async fn pipeline_view(ctx: &Ctx, a: &RunArgs) -> Result<String, ApiError> {
-    let (_, t) = timeline(ctx, a.project.as_deref(), a.run).await?;
+    let p = a.project.as_deref();
+    let rest = format!(": pipeline_log run={}{}", a.run, args(&[("project", p)]));
+    // The scope first: the timeline and the test runs are then asked for at once.
+    let proj = seg(&ctx.scope(p, None, None).await?.project_id);
+    let (t, tests) = tokio::join!(
+        timeline(ctx, p, a.run),
+        test_results(ctx, &proj, a.run, &rest)
+    );
+    let (_, t) = t?;
     let mut kids: Children = HashMap::new();
     for r in &t.records {
         kids.entry(r.parent_id.as_deref()).or_default().push(r);
@@ -392,12 +509,9 @@ pub(crate) async fn pipeline_view(ctx: &Ctx, a: &RunArgs) -> Result<String, ApiE
         .collect();
     if !issues.is_empty() {
         lines.push("issues:".into());
-        let p = args(&[("project", a.project.as_deref())]);
-        lines.extend(issue_lines(
-            &issues,
-            &format!(": pipeline_log run={}{p}", a.run),
-        ));
+        lines.extend(issue_lines(&issues, &rest));
     }
+    lines.extend(tests);
     Ok(lines.join("\n"))
 }
 
@@ -1212,6 +1326,61 @@ mod tests {
             "{e}"
         );
         assert!(e.msg.ends_with(", t19 … and 5 more"), "{e}");
+    }
+
+    fn test_run(id: i32, name: &str, total: i32, passed: i32, failed: i32) -> TestRun {
+        serde_json::from_value(
+            serde_json::json!({"id": id, "name": name, "totalTests": total,
+            "passedTests": passed, "unanalyzedTests": failed}),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn newest_run_per_name() {
+        let kept = newest_per_name(vec![
+            test_run(5, "Unit", 1, 0, 1),
+            test_run(3, "Lint", 1, 1, 0),
+            test_run(9, "Unit", 1, 1, 0),
+        ]);
+        let ids: Vec<Option<i32>> = kept.iter().map(|r| r.id).collect();
+        assert_eq!(ids, [Some(3), Some(9)]);
+    }
+
+    #[test]
+    fn test_lines_summary_stack_and_cap() {
+        let failed: Vec<TestCaseResult> = (0..21)
+            .map(|i| {
+                serde_json::from_value(serde_json::json!({"testCaseTitle": format!("t{i}"),
+                    "errorMessage": "boom\x1b[31m\r\nsecond", "stackTrace": "  a\r\n\r\nb\nc\nd\ne\nf\n"}))
+                .unwrap()
+            })
+            .collect();
+        // Skipped: 30 − 4 − 25.
+        let lines = test_lines(
+            &[test_run(1, "Unit", 30, 4, 25)],
+            &failed,
+            ": pipeline_log run=7",
+        );
+        assert_eq!(lines[0], "tests: 4 passed, 25 failed, 1 skipped");
+        assert_eq!(lines[1], "  t0: boom");
+        assert_eq!(
+            lines[2..8],
+            ["    a", "    b", "    c", "    d", "    e", "  t1: boom"]
+        );
+        assert_eq!(lines.len(), 1 + 20 * 6 + 1, "{lines:?}");
+        assert_eq!(lines[115], "  t19: boom");
+        assert_eq!(
+            lines[lines.len() - 1],
+            "  … 5 more failed tests: pipeline_log run=7"
+        );
+        let lines = test_lines(&[test_run(1, "Unit", 21, 0, 21)], &failed, "");
+        assert_eq!(lines[lines.len() - 1], "  … 1 more failed test");
+        // No error message, no stack trace: the name alone.
+        let bare: TestCaseResult =
+            serde_json::from_value(serde_json::json!({"testCaseTitle": "t"})).unwrap();
+        let lines = test_lines(&[test_run(1, "Unit", 1, 0, 1)], &[bare], "");
+        assert_eq!(lines, ["tests: 0 passed, 1 failed, 0 skipped", "  t"]);
     }
 
     #[test]

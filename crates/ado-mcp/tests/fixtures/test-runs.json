@@ -1,0 +1,133 @@
+{
+  "value": [
+    {
+      "id": 41,
+      "name": "Unit",
+      "url": "https://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/test/Runs/41",
+      "build": {
+        "id": "77",
+        "name": "20260305.1",
+        "url": "https://dev.example/tfs/Coll/_apis/build/Builds/77"
+      },
+      "isAutomated": true,
+      "owner": {
+        "id": "e5a5f7f8-6507-4c34-b397-6c4818e002f4",
+        "displayName": "Project Collection Build Service (Coll)",
+        "uniqueName": "Build\\78b5727d-4a24-4ec8-9caf-704685572174",
+        "url": "https://dev.example/tfs/Coll/_apis/Identities/e5a5f7f8-6507-4c34-b397-6c4818e002f4",
+        "imageUrl": "https://dev.example/tfs/Coll/_api/_common/identityImage?id=e5a5f7f8-6507-4c34-b397-6c4818e002f4"
+      },
+      "project": {
+        "id": "b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455",
+        "name": "My Proj",
+        "url": "https://dev.example/tfs/Coll/_apis/projects/My%20Proj"
+      },
+      "startedDate": "2026-03-05T10:01:10.17Z",
+      "completedDate": "2026-03-05T10:01:40.953Z",
+      "state": "Completed",
+      "plan": {
+        "id": "1"
+      },
+      "postProcessState": "Complete",
+      "totalTests": 10,
+      "passedTests": 7,
+      "unanalyzedTests": 3,
+      "createdDate": "2026-03-05T10:01:10.03Z",
+      "lastUpdatedDate": "2026-03-05T10:01:40.953Z",
+      "lastUpdatedBy": {
+        "id": "e5a5f7f8-6507-4c34-b397-6c4818e002f4",
+        "displayName": "Project Collection Build Service (Coll)",
+        "uniqueName": "Build\\78b5727d-4a24-4ec8-9caf-704685572174",
+        "url": "https://dev.example/tfs/Coll/_apis/Identities/e5a5f7f8-6507-4c34-b397-6c4818e002f4",
+        "imageUrl": "https://dev.example/tfs/Coll/_api/_common/identityImage?id=e5a5f7f8-6507-4c34-b397-6c4818e002f4"
+      },
+      "revision": 3
+    },
+    {
+      "id": 42,
+      "name": "Unit",
+      "url": "https://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/test/Runs/42",
+      "build": {
+        "id": "77",
+        "name": "20260305.1",
+        "url": "https://dev.example/tfs/Coll/_apis/build/Builds/77"
+      },
+      "isAutomated": true,
+      "owner": {
+        "id": "e5a5f7f8-6507-4c34-b397-6c4818e002f4",
+        "displayName": "Project Collection Build Service (Coll)",
+        "uniqueName": "Build\\78b5727d-4a24-4ec8-9caf-704685572174",
+        "url": "https://dev.example/tfs/Coll/_apis/Identities/e5a5f7f8-6507-4c34-b397-6c4818e002f4",
+        "imageUrl": "https://dev.example/tfs/Coll/_api/_common/identityImage?id=e5a5f7f8-6507-4c34-b397-6c4818e002f4"
+      },
+      "project": {
+        "id": "b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455",
+        "name": "My Proj",
+        "url": "https://dev.example/tfs/Coll/_apis/projects/My%20Proj"
+      },
+      "startedDate": "2026-03-05T10:02:10.17Z",
+      "completedDate": "2026-03-05T10:02:40.953Z",
+      "state": "Completed",
+      "plan": {
+        "id": "1"
+      },
+      "postProcessState": "Complete",
+      "totalTests": 10,
+      "passedTests": 9,
+      "unanalyzedTests": 1,
+      "createdDate": "2026-03-05T10:02:10.03Z",
+      "lastUpdatedDate": "2026-03-05T10:02:40.953Z",
+      "lastUpdatedBy": {
+        "id": "e5a5f7f8-6507-4c34-b397-6c4818e002f4",
+        "displayName": "Project Collection Build Service (Coll)",
+        "uniqueName": "Build\\78b5727d-4a24-4ec8-9caf-704685572174",
+        "url": "https://dev.example/tfs/Coll/_apis/Identities/e5a5f7f8-6507-4c34-b397-6c4818e002f4",
+        "imageUrl": "https://dev.example/tfs/Coll/_api/_common/identityImage?id=e5a5f7f8-6507-4c34-b397-6c4818e002f4"
+      },
+      "revision": 3
+    },
+    {
+      "id": 43,
+      "name": "Integration",
+      "url": "https://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/test/Runs/43",
+      "build": {
+        "id": "77",
+        "name": "20260305.1",
+        "url": "https://dev.example/tfs/Coll/_apis/build/Builds/77"
+      },
+      "isAutomated": true,
+      "owner": {
+        "id": "e5a5f7f8-6507-4c34-b397-6c4818e002f4",
+        "displayName": "Project Collection Build Service (Coll)",
+        "uniqueName": "Build\\78b5727d-4a24-4ec8-9caf-704685572174",
+        "url": "https://dev.example/tfs/Coll/_apis/Identities/e5a5f7f8-6507-4c34-b397-6c4818e002f4",
+        "imageUrl": "https://dev.example/tfs/Coll/_api/_common/identityImage?id=e5a5f7f8-6507-4c34-b397-6c4818e002f4"
+      },
+      "project": {
+        "id": "b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455",
+        "name": "My Proj",
+        "url": "https://dev.example/tfs/Coll/_apis/projects/My%20Proj"
+      },
+      "startedDate": "2026-03-05T10:03:10.17Z",
+      "completedDate": "2026-03-05T10:03:40.953Z",
+      "state": "Completed",
+      "plan": {
+        "id": "1"
+      },
+      "postProcessState": "Complete",
+      "totalTests": 5,
+      "passedTests": 3,
+      "createdDate": "2026-03-05T10:03:10.03Z",
+      "lastUpdatedDate": "2026-03-05T10:03:40.953Z",
+      "lastUpdatedBy": {
+        "id": "e5a5f7f8-6507-4c34-b397-6c4818e002f4",
+        "displayName": "Project Collection Build Service (Coll)",
+        "uniqueName": "Build\\78b5727d-4a24-4ec8-9caf-704685572174",
+        "url": "https://dev.example/tfs/Coll/_apis/Identities/e5a5f7f8-6507-4c34-b397-6c4818e002f4",
+        "imageUrl": "https://dev.example/tfs/Coll/_api/_common/identityImage?id=e5a5f7f8-6507-4c34-b397-6c4818e002f4"
+      },
+      "revision": 3
+    }
+  ],
+  "count": 3
+}

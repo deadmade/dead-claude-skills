@@ -53,6 +53,31 @@ fn run_routes(fx: &Fixture) {
         vec![Resp::new(200, "text/plain", log)],
     );
     fx.route(LOGS, vec![fixture("logs.json")]);
+    fx.route(
+        TEST_RUNS,
+        vec![Resp::json(&json!({"count": 0, "value": []}))],
+    );
+}
+
+const TEST_RUNS: &str = "/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/test/runs";
+
+/// A test run's results.
+fn results(id: u32) -> String {
+    format!("/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/test/Runs/{id}/results")
+}
+
+/// `pipeline_view run=77`'s reply without test results.
+fn view_base() -> String {
+    format!(
+        "Build: failed 5m 0s\n  Test: failed 2m 54s\nDeploy stage: failed 1h 0m\n  Deploy: failed 1h 0m\n\
+         issues:\n  error boom\n  {TIMEOUT}"
+    )
+}
+
+/// The run's test runs (`Unit` twice: a retried job) and the newest `Unit`'s failed test.
+fn test_routes(fx: &Fixture) {
+    fx.route(TEST_RUNS, vec![fixture("test-runs.json")]);
+    fx.route(&results(42), vec![fixture("test-results.json")]);
 }
 
 #[test]
@@ -146,6 +171,106 @@ fn view_tree_skips_phase() {
         format!(
             "Build: failed 5m 0s\n  Test: failed 2m 54s\nDeploy stage: failed 1h 0m\n  Deploy: failed 1h 0m\n\
              issues:\n  error boom\n  {TIMEOUT}"
+        )
+    );
+}
+
+#[test]
+fn tests_summary_and_failures() {
+    let fx = Fixture::start();
+    run_routes(&fx);
+    test_routes(&fx);
+    let text = ok(&mut env(&fx), "pipeline_view", json!({"run": 77}));
+    // Skipped: 5 − 3 − 0 of Integration; the newest Unit's 10 − 9 − 1 none. Five stack lines of seven.
+    assert_eq!(
+        text,
+        format!(
+            "{}\ntests: 12 passed, 1 failed, 2 skipped\n\
+             \x20 ParsesEmptyInput: Assert.AreEqual failed. Expected:<1>. Actual:<0>.\n\
+             \x20   at Parser.Tests.ParsesEmptyInput() in C:\\a\\1\\s\\Parser.Tests\\ParserTests.cs:line 20\n\
+             \x20   at Frame2()\n    at Frame3()\n    at Frame4()\n    at Frame5()",
+            view_base()
+        )
+    );
+}
+
+#[test]
+fn no_test_runs_adds_nothing() {
+    let fx = Fixture::start();
+    run_routes(&fx);
+    let text = ok(&mut env(&fx), "pipeline_view", json!({"run": 77}));
+    assert_eq!(text, view_base());
+    assert_eq!(sent(&fx, TEST_RUNS).len(), 1);
+}
+
+/// A server without the test area answers 404: nothing is added.
+#[test]
+fn test_area_404_adds_nothing() {
+    let fx = Fixture::start();
+    run_routes(&fx);
+    fx.route(TEST_RUNS, vec![Resp::new(404, "text/plain", "gone")]);
+    let text = ok(&mut env(&fx), "pipeline_view", json!({"run": 77}));
+    assert_eq!(text, view_base());
+}
+
+/// Of the test runs with one name, only the newest counts: no results of the first attempt are read.
+#[test]
+fn retried_run_counts_newest() {
+    let fx = Fixture::start();
+    run_routes(&fx);
+    test_routes(&fx);
+    let mut mcp = env(&fx);
+    ok(&mut mcp, "pipeline_view", json!({"run": 77}));
+    assert_eq!(sent(&fx, &results(41)).len(), 0);
+    assert_eq!(sent(&fx, &results(43)).len(), 0, "no failures in it");
+    // The retry passed: the first attempt's 3 failures don't show.
+    let mut runs: Value = serde_json::from_slice(&fixture("test-runs.json").body).unwrap();
+    runs["value"][1]["passedTests"] = json!(10);
+    runs["value"][1]["unanalyzedTests"] = json!(0);
+    fx.route(TEST_RUNS, vec![Resp::json(&runs)]);
+    let text = ok(&mut mcp, "pipeline_view", json!({"run": 77}));
+    assert!(
+        text.ends_with("\ntests: 13 passed, 0 failed, 2 skipped"),
+        "{text}"
+    );
+    assert_eq!(sent(&fx, &results(41)).len(), 0);
+}
+
+#[test]
+fn runs_query() {
+    let fx = Fixture::start();
+    run_routes(&fx);
+    test_routes(&fx);
+    ok(&mut env(&fx), "pipeline_view", json!({"run": 77}));
+    // `buildUri` is one query value, escaped once.
+    let raw = &sent(&fx, TEST_RUNS)[0].path;
+    assert!(
+        raw.contains("buildUri=vstfs%3A%2F%2F%2FBuild%2FBuild%2F77"),
+        "{raw}"
+    );
+    assert!(raw.contains("includeRunDetails=true"), "{raw}");
+    let q = &queries(&fx, &results(42))[0];
+    assert!(
+        q.contains("outcomes=Failed") && q.contains("$top=21"),
+        "{q}"
+    );
+}
+
+/// Review Focus 4: a test-results call that fails keeps the stages and issues, plus one line.
+#[test]
+fn test_403_keeps_stages() {
+    let fx = Fixture::start();
+    run_routes(&fx);
+    fx.route(
+        TEST_RUNS,
+        vec![Resp::new(403, "application/json", r#"{"message":"no"}"#)],
+    );
+    let text = ok(&mut env(&fx), "pipeline_view", json!({"run": 77}));
+    assert_eq!(
+        text,
+        format!(
+            "{}\ntests: couldn't be read (the PAT may not do this: it needs the Test Management (Read) scope)",
+            view_base()
         )
     );
 }

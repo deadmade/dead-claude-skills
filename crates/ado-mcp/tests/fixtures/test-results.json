@@ -1,0 +1,75 @@
+{
+  "count": 1,
+  "value": [
+    {
+      "id": 100001,
+      "project": {
+        "id": "b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455",
+        "name": "My Proj",
+        "url": "https://dev.example/tfs/Coll/_apis/projects/My%20Proj"
+      },
+      "startedDate": "2026-03-05T10:02:12.547Z",
+      "completedDate": "2026-03-05T10:02:12.62Z",
+      "durationInMs": 74,
+      "outcome": "Failed",
+      "revision": 1,
+      "runBy": {
+        "id": "a5cbf24d-799f-452e-82be-f049a85b5895",
+        "displayName": "Project Collection Build Service (Coll)",
+        "uniqueName": "Build\\78b5727d-4a24-4ec8-9caf-704685572174",
+        "url": "https://dev.example/tfs/Coll/_apis/Identities/a5cbf24d-799f-452e-82be-f049a85b5895",
+        "imageUrl": "https://dev.example/tfs/Coll/_api/_common/identityImage?id=a5cbf24d-799f-452e-82be-f049a85b5895"
+      },
+      "state": "Completed",
+      "testCase": {
+        "name": "ParsesEmptyInput"
+      },
+      "testRun": {
+        "id": "42",
+        "name": "Unit",
+        "url": "https://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/test/Runs/42"
+      },
+      "lastUpdatedDate": "2026-03-05T10:02:40.123Z",
+      "lastUpdatedBy": {
+        "id": "375baa5b-5148-4e89-a549-ec202b722d89",
+        "displayName": "Project Collection Build Service (Coll)",
+        "uniqueName": "Build\\78b5727d-4a24-4ec8-9caf-704685572174",
+        "url": "https://dev.example/tfs/Coll/_apis/Identities/375baa5b-5148-4e89-a549-ec202b722d89",
+        "imageUrl": "https://dev.example/tfs/Coll/_api/_common/identityImage?id=375baa5b-5148-4e89-a549-ec202b722d89"
+      },
+      "priority": 10,
+      "computerName": "AGENT-1",
+      "build": {
+        "id": "77",
+        "name": "20260305.1",
+        "url": "https://dev.example/tfs/Coll/_apis/build/Builds/77"
+      },
+      "errorMessage": "Assert.AreEqual failed. Expected:<1>. Actual:<0>.\r\nThe parser returned no nodes.",
+      "createdDate": "2026-03-05T10:02:40.123Z",
+      "url": "https://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/test/Runs/42/Results/100001",
+      "failureType": "None",
+      "automatedTestStorage": "parser.tests.dll",
+      "automatedTestType": "UnitTest",
+      "automatedTestTypeId": "13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b",
+      "automatedTestId": "7c66fbda-2d0e-a714-e18d-83c0464019a5",
+      "area": {
+        "id": "37528",
+        "name": "My Proj",
+        "url": "vstfs:///Classification/Node/ebe8ac79-8d9f-4a5b-8d0a-c3095c81e70e"
+      },
+      "testCaseTitle": "ParsesEmptyInput",
+      "stackTrace": "   at Parser.Tests.ParsesEmptyInput() in C:\\a\\1\\s\\Parser.Tests\\ParserTests.cs:line 20\r\n   at Frame2()\r\n   at Frame3()\r\n   at Frame4()\r\n   at Frame5()\r\n   at Frame6()\r\n   at Frame7()\r\n",
+      "customFields": [],
+      "failingSince": {
+        "date": "2026-03-05T09:11:17.587Z",
+        "build": {
+          "id": 76,
+          "definitionId": 0,
+          "number": "20260305.0",
+          "buildSystem": "Azure DevOps Server"
+        }
+      },
+      "automatedTestName": "Parser.Tests.ParsesEmptyInput"
+    }
+  ]
+}
