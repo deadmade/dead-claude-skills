@@ -102,6 +102,15 @@ test('lost accepts a fenced block unindented from a list, and a renumbered list'
   for (const eol of EOLS) assert.deepEqual(lost(eol(saved), eol(edited)), []);
 });
 
+test('lost accepts an inline enumeration turned into a numbered list', () => {
+  const saved = '# T\n\nThe flow (1) reads, (2) checks, (3) writes and (4) reports.\n';
+  const edited = '# T\n\nThe flow:\n\n1. Reads.\n2. Checks.\n3. Writes.\n4. Reports.\n';
+  for (const eol of EOLS) {
+    assert.deepEqual(lost(eol(saved), eol(edited)), []);
+    assert.deepEqual(lost(eol(saved.replaceAll('(', '')), eol(edited)), []);
+  }
+});
+
 test('lost flags reordered and added headings', () => {
   const edited = DOC.replace('## Steps', '## Tmp').replace('## Notes', '## Steps').replace('## Tmp', '## Notes');
   for (const eol of EOLS) {

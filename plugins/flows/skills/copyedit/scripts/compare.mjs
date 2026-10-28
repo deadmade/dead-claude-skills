@@ -49,7 +49,9 @@ function items(text) {
   const prose = flat
     .replace(/`[^`\n]+`/g, ' ')
     .replace(/\]\([^)]*\)/g, ']')
-    .replace(/^[ \t]*\d+[.)][ \t]/gm, ' ');
+    // Enumerators aren't content: a list's markers, and "(1)" or "1)" in a sentence a list may replace.
+    .replace(/^[ \t]*\d+[.)][ \t]/gm, ' ')
+    .replace(/(?<!\S)\(?\d{1,2}\)(?!\S)/g, ' ');
   return {
     headings: lines.filter((l) => /^#{1,6} /.test(l)).map((l) => l.trim()),
     blocks,
