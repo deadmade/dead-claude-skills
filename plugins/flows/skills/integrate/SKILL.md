@@ -13,7 +13,7 @@ them.
 | Phase    | Runs                                                                | Output                      |
 | -------- | ------------------------------------------------------------------- | --------------------------- |
 | 1 Commit | /verify's result, else superpowers `verification-before-completion` | commits shown, then made    |
-| 2 PR     | pstack `blast-radius`, `unslop`                                     | title and body. **Gate**    |
+| 2 PR     | pstack `blast-radius`, `flows:writing`                              | title and body. **Gate**    |
 | 3 CI     | `Monitor` on `gh pr checks`                                         | green, or cause and options |
 
 [flow-rules.md](../../references/flow-rules.md) applies: read it first. State: the caller's
@@ -37,8 +37,8 @@ release phase.
 ## Phase 2: PR
 
 Write the body inline, short: why, what changed, blast radius (pstack `blast-radius` over the diff against the base:
-what else it touches) and verification (the commands and results from Phase 1). Pass title and body through pstack
-`unslop`. Save the body to a file in the scratchpad.
+what else it touches) and verification (the commands and results from Phase 1). Revise title and body by `flows:writing`
+(the Skill tool). Save the body to a file in the scratchpad.
 
 **Gate:** show the title and body; the user approves or edits them. Then hand over, to run in order:
 

@@ -16,7 +16,7 @@ keeps a state file so the next session can resume. Claude proposes and recommend
 | `/harden [branch\|all]`     | security, footguns, bloat, architecture           | claude-security, tob `sharp-edges`, ponytail audit/review, `improve-codebase-architecture`                                                         | fixes you pick       |
 | `/self-review [base]`       | review your branch before a PR                    | bug pass, spec and standards pass, `security-review`, `claude-md-improver`, specialist agents (silent failures, tests, types, comments)            | fixes you pick       |
 | `/verify [base]`            | is this branch ready for a PR?                    | checks once, `/self-review`, `/doc-audit branch`, optional `/test-audit branch`, tui-review, a Decisions gate on the build's rulings and shortcuts | how to integrate     |
-| `/integrate [base]`         | commit, open the PR, watch CI                     | commits shown first, `blast-radius` + `unslop` for the PR body, `!` lines for push and `gh` (never run), `Monitor` on the checks                   | PR open, CI green    |
+| `/integrate [base]`         | commit, open the PR, watch CI                     | commits shown first, `blast-radius` + `writing` for the PR body, `!` lines for push and `gh` (never run), `Monitor` on the checks                  | PR open, CI green    |
 | `/learn [flow]`             | keep what the work taught                         | `revise-claude-md`, `domain-modeling`, a `docs/solutions/` note, `writing-skills` for a skill or conductor lesson                                  | done                 |
 
 `branch` (the default) audits what changed against the base, plus the tests and docs that should have changed with
@@ -37,7 +37,7 @@ doc-audit
 ├ tob-picks: spec-to-code-compliance, spec-compliance, spec-compliance-checker
 ├ claude-md-management@claude-plugins-official: claude-md-improver
 ├ web-mcp: fetch
-└ pstack-picks: technical-writing, unslop
+└ flows: writing
 
 feature-flow
 ├ pstack-picks: how, why, architect, arena, interrogate, blast-radius, principle-redesign-from-first-principles, principle-boundary-discipline
@@ -66,7 +66,8 @@ implement
 
 integrate
 ├ claude-code: Monitor
-├ pstack-picks: blast-radius, unslop
+├ flows: writing
+├ pstack-picks: blast-radius
 └ superpowers: verification-before-completion, systematic-debugging
 
 learn

@@ -36,3 +36,9 @@ test('copyedit is a conductor', () => {
     [],
   );
 });
+
+test('flow-rules runs /copyedit before gates', () => {
+  const rules = read('plugins/flows/references/flow-rules.md');
+  assert.match(rules, /\$\{CLAUDE_SKILL_DIR\}\/\.\.\/copyedit\/SKILL\.md/);
+  assert.match(rules, /flows:writing/);
+});
