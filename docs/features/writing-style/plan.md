@@ -286,8 +286,8 @@ Finding[]`: the check's findings on the edited text whose `rule` and `match` occ
     its `SKILL.md`.
 
 - [ ] **Step 1: Write the failing tests** in `scripts/copyedit.test.mjs`: `lost names a dropped heading, code block,
-  link target, number, checkbox step and table row`; `lost accepts rewording, rewrapping and CRLF`; `lost flags
-  reordered headings`; `newFindings ignores labels the original already had` (a saved copy with `Q3`; an edit
+link target, number, checkbox step and table row`; `lost accepts rewording, rewrapping and CRLF`; `lost flags
+reordered headings`; `newFindings ignores labels the original already had` (a saved copy with `Q3`; an edit
       keeping `Q3` and adding `D2` reports only `D2`); `the CLI refuses a missing edit` and `the CLI refuses an empty edit` (zero bytes, and whitespace only; exit 1, one line, the document unchanged); `the CLI copies a good edit in the original's line endings` (a CRLF saved copy and an LF edit give a
       CRLF document). In `writing-skill.test.mjs`: `copyedit is a conductor` (`disable-model-invocation: true`, its
       `uses.json` passes `checkUses`).
@@ -363,11 +363,11 @@ Finding[]`: the check's findings on the edited text whose `rule` and `match` occ
 
 - [ ] **Step 4: Edit the conductors.** doc-audit Phase 5 runs `flows:writing` over the changed docs; integrate Phase 2
       passes title and body through it. In both `uses.json`, replace the pstack writing entries with `"flows":
-  ["writing"]` (integrate keeps `"pstack-picks": ["blast-radius"]`). Run `node scripts/flows-uses.mjs`, then update
+["writing"]` (integrate keeps `"pstack-picks": ["blast-radius"]`). Run `node scripts/flows-uses.mjs`, then update
       the `/integrate` row's text in flows' README by hand.
 
 - [ ] **Step 5: Run the tests.** Run: `node --test scripts/writing-skill.test.mjs scripts/flows-uses.test.mjs && node
-  scripts/check-repo.mjs`. Expected: PASS, then "repo checks passed" (check-repo also fails if a `uses.json` still
+scripts/check-repo.mjs`. Expected: PASS, then "repo checks passed" (check-repo also fails if a `uses.json` still
       names a removed pstack skill after Task 7).
 
 - [ ] **Step 6: Commit**
@@ -484,9 +484,9 @@ Phrase[]): Candidate[]`, `Candidate = { line: number, kind: string, text: string
 (<note>)` per line).
 
 - [ ] **Step 1: Write the failing tests** in `scripts/copyedit.test.mjs`: `findPhrases finds wordy, redundant and
-  negative phrases` ("in order to" → `wordy` with note "to"; "each and every" → `redundant`; "not many" →
+negative phrases` ("in order to" → `wordy` with note "to"; "each and every" → `redundant`; "not many" →
       `negative`; nothing inside a longer word or inside code; the right line in CRLF text); `loadPhrases reads the
-  TSV`; `formatCandidates sorts by line`.
+TSV`; `formatCandidates sorts by line`.
 
 - [ ] **Step 2: Run them to verify they fail.** Run: `node --test scripts/copyedit.test.mjs`. Expected: FAIL,
       `Cannot find module` for `phrases.mjs`.
@@ -617,14 +617,14 @@ force: true, maxRetries: 5 })`; the error code on failure, never a throw).
 - `steps/prose.ts` exports `applyProse({ toggle, flows, unticked }): Promise<void>`.
 
 - [ ] **Step 1: Write the failing tests.** `core/prose.test.ts`: `prosePython per platform`; `proseSync keeps uv's
-  files inside flows-prose`; `proseState reads the python and the marker`; `proseDefault` over its cases (off without flows, off when opted out, on when installed);
+files inside flows-prose`; `proseState reads the python and the marker`; `proseDefault` over its cases (off without flows, off when opted out, on when installed);
       `proseDecision` over its cases, including installed + toggle on + flows off → `remove`. `binaries.test.ts`:
       `uv is reported once for graphify and prose`; `hasBuild`. `options.test.ts`: `prose is a tools toggle, hidden
-  on NixOS and off linux-x64 and win32-x64`. `files.test.ts`: `removeDir removes a tree` and `removeDir returns
-  the code instead of throwing` (with a stub `rm` that throws `EBUSY`).
+on NixOS and off linux-x64 and win32-x64`. `files.test.ts`: `removeDir removes a tree` and `removeDir returns
+the code instead of throwing` (with a stub `rm` that throws `EBUSY`).
 
 - [ ] **Step 2: Run them to verify they fail.** Run: `node --test installer/core/prose.test.ts
-  installer/core/binaries.test.ts installer/core/options.test.ts installer/system/files.test.ts`. Expected: FAIL,
+installer/core/binaries.test.ts installer/core/options.test.ts installer/system/files.test.ts`. Expected: FAIL,
       `core/prose.ts` not found and the new cases.
 
 - [ ] **Step 3: Implement.** The step, by `proseDecision`:
@@ -647,8 +647,8 @@ force: true, maxRetries: 5 })`; the error code on failure, never a throw).
 
 - [ ] **Step 5: Run the step for real on Linux** against a scratchpad config folder:
       `CLAUDE_CONFIG_DIR=<scratchpad>/cfg node --input-type=module -e "import('./installer/steps/prose.ts').then(m =>
-  m.applyProse({ toggle: true, flows: true, unticked: false }))"`, twice, then with `toggle: false, unticked:
-  true`.
+m.applyProse({ toggle: true, flows: true, unticked: false }))"`, twice, then with `toggle: false, unticked:
+true`.
 
   Expected: the first run syncs and the smoke test loads the model; the second downloads nothing; the third removes
   `<scratchpad>/cfg/flows-prose/` and writes `flows-prose.off`.
@@ -680,14 +680,14 @@ skipped?: string }`, which masks, counts the words itself (so `totals.json` has 
 measure.mjs <file> <outdir>` prints `skipped` when set.
 
 - [ ] **Step 1: Write the failing tests** in `scripts/copyedit.test.mjs`, with a stub `spawn`: `measure merges phrase
-  and spaCy candidates`; `measure skips spaCy without a Python`; `measure reports exit 3's line`; `measure
-  reports a timeout`; `findPython per platform`. Each skip still writes the phrase candidates.
+and spaCy candidates`; `measure skips spaCy without a Python`; `measure reports exit 3's line`; `measure
+reports a timeout`; `findPython per platform`. Each skip still writes the phrase candidates.
 
 - [ ] **Step 2: Run them to verify they fail.** Run: `node --test scripts/copyedit.test.mjs`. Expected: FAIL,
       `Cannot find module` for `measure.mjs`.
 
 - [ ] **Step 3: Write `measure.mjs` and step 2 of `SKILL.md`**: `node "${CLAUDE_SKILL_DIR}/../copyedit/scripts/measure.mjs"
-  <file> <run folder>/before/`, with the Bash tool's timeout at 600000 ms; show its skip line if any; pass
+<file> <run folder>/before/`, with the Bash tool's timeout at 600000 ms; show its skip line if any; pass
       `before/candidates.txt` as `<candidates>`. After the copy in step 4, run it again into `<run folder>/after/` and
       show both totals as a table.
 
@@ -722,7 +722,7 @@ measure.mjs <file> <outdir>` prints `skipped` when set.
 **Interfaces:** none.
 
 - [ ] **Step 1: Spec success criterion 3.** Run `FLOWS_PROSE_PYTHON=<scratchpad>/flows-prose/env/bin/python node
-  --test scripts/copyedit.test.mjs` on the Task 10 environment. Expected: every test passes, none skipped. Record
+--test scripts/copyedit.test.mjs` on the Task 10 environment. Expected: every test passes, none skipped. Record
       Windows as untested until the user runs the installer there, and NixOS as not supported yet.
 
 - [ ] **Step 2: Spec success criterion 4.** Run `/copyedit` as shipped, with the Task 10 environment, on scratchpad
@@ -736,9 +736,9 @@ measure.mjs <file> <outdir>` prints `skipped` when set.
 
 - [ ] **Step 3: Spec success criterion 5.** In a scratchpad folder, run
       `claude -p "Write a short spec for adding a --json flag to a CLI tool, as docs/spec.md, in the style a long design
-  session would leave: refer to decisions as grill Q3 and D2. Revise the file after any hook feedback." --plugin-dir
-  <dependency-free copy of plugins/flows> --permission-mode acceptEdits --output-format stream-json --verbose <
-  /dev/null` (the copy as in flow.md **Rulings**).
+session would leave: refer to decisions as grill Q3 and D2. Revise the file after any hook feedback." --plugin-dir
+<dependency-free copy of plugins/flows> --permission-mode acceptEdits --output-format stream-json --verbose <
+/dev/null` (the copy as in flow.md **Rulings**).
 
   Expected: check findings appear, Claude revises, and the run ends with no more than three rounds of findings on the
   same file. More than three is looping: record it under **Deviations** for a counter.
