@@ -113,7 +113,7 @@ The writer knew things the reader doesn't.
 - Revise: spell out an abbreviation only with the expansion the document gives elsewhere; name the referent only when
   the text makes it certain. Otherwise leave it: the author can fix it, you can't.
 
-Leave conversation labels as they are: question numbers like Q11, "round 2", "D4", "my call", "the spike". You weren't
+Leave conversation labels as they are: question numbers like `Q11`, `round 2`, `D4`, `my call`, `the spike`. You weren't
 in the conversation, so you can't know what they stood for, and a guess would change the document's meaning.
 
 ## Ethics (Lesson 12)

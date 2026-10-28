@@ -19,7 +19,7 @@ The opt-in [flows](plugins/flows/README.md) plugin ties the rest together: condu
 `/fix-flow`, `/test-audit`, `/doc-audit`, `/self-review`, `/verify`, `/learn` and more) that run the other plugins' skills in order,
 with approval gates and a state file to resume from. Picking flows installs every plugin its conductors use.
 flows also sets the house standard for prose: a `writing` skill (Williams and Bizup's _Style_ in our own words), a
-code-only check on every Markdown write that flags conversation shorthand and undefined abbreviations
+code-only check on each Write or Edit of a Markdown file that flags conversation shorthand and undefined abbreviations
 (`FLOWS_PROSE_CHECK=off` turns it off), and `/copyedit`, which has an Opus editor revise a spec, plan or report before
 its gate and keeps the edit only when nothing was lost (otherwise the gate shows the original and says why).
 flows also carries the skill packs they read by path from `plugins/flows/packs/` (superpowers, ponytail, paper-lookup

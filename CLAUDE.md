@@ -10,7 +10,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
 
 - `installer/`: TypeScript, by layer. `install.ts` is the entry point and only runs the flow (read state, screens, steps,
   summary); `context.ts` holds the shared paths, version and summary lines; `core/` the pure decisions by topic
-  (`settings`, `plugins`, `binaries`, `options`, `release`); `system/` everything that touches the OS (file writes and
+  (`settings`, `plugins`, `binaries`, `options`, `release`, `prose`); `system/` everything that touches the OS (file writes and
   clean-slate backup/delete, processes, downloads); `steps/` one file per thing the installer
   applies; `ui/` the screens; `assets/` the shipped configs and pins. No runtime npm dependencies: Node's standard library
   only (`typescript` and `@types/node` are devDependencies, for `npm run typecheck` and the build). New logic goes into
@@ -27,7 +27,13 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   page's prose toggle is on, it runs `uv sync --frozen` on the locked project in `installer/assets/prose/` (CPython
   3.13, spaCy 3.8, CPU-only PyTorch, `en_core_web_trf`) into `<config>/flows-prose/`, about 1.7 GB, where
   `/copyedit`'s `scripts/measure.mjs` finds its Python. To change a pin, edit `pyproject.toml` there and run `uv lock`
-  in that folder. NixOS isn't supported yet: the toggle is hidden there.
+  in that folder. It needs `uv` on PATH (without it the summary says so; the install doesn't fail), and a sync counts
+  only when `spacy.load('en_core_web_trf')` works. The toggle follows flows until the user unticks it once
+  (`<config>/flows-prose.off`, removed when they tick it again); unticking it or deselecting flows deletes
+  `flows-prose/`. Linux and Windows x64 only: `hasBuild` and `environments` in `pyproject.toml` change together to add
+  a platform. NixOS isn't supported yet: the toggle is hidden there unless already installed (ADR 0005).
+  `measure.mjs`'s `findPython` repeats `prosePython`'s path rule, because the plugin ships without the installer:
+  change both together.
 - `plugins/` is grouped by how a plugin gets installed: `default/` (the bundle, dead-skills, on every machine),
   `flows` (the conductors), both plain plugins at the top, then `shared/` (what flows pulls in) and `opt-in/` (extras
   nothing else depends on; `opt-in/mcp/` holds the MCP configs, `opt-in/implementation/` the language, database and LSP
@@ -89,7 +95,9 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   (`${CLAUDE_PLUGIN_ROOT}/packs`), and the installer retires old installs of them and checks none remains
   (`stillInstalled`). The folder list is the source of truth, not this file. pstack-picks leaves out pstack's
   `technical-writing` and `unslop` (flows' `writing` replaces them, and the sync rewrites the lines that named them);
-  `sync-pstack.mjs --ref <commit>` syncs one commit instead of upstream's default branch. tob's spec checker ships as flows' own agent,
+  `sync-pstack.mjs --ref <commit>` syncs one commit instead of upstream's default branch. pstack-picks' `UPSTREAM`
+  stays at `519d36a` on purpose: upstream's newer commits fail the sync's `GUARD`, so the weekly `sync-pstack.yml`
+  (no `--ref`) fails until a PR adapts the rewrites; don't hand-edit the pack to get past it. tob's spec checker ships as flows' own agent,
   `plugins/flows/agents/spec-compliance-checker.md` (vendored by `sync-tob`), because a pack's agents don't load.
   Where a conductor changes a pack's rule it quotes the sentence in an `<!-- overrides <pack>/<path>: "..." -->`
   marker in flows' own `.md` files; `checkOverrides` (`scripts/flows-uses.mjs`, run by check-repo and by every pack
@@ -148,7 +156,9 @@ plugins of ours that the manifest no longer lists.
   loads every module so none hides from it. `system/` tests use the real OS: Windows-only cases skip elsewhere. Parsers of what other tools write test against captured output in `core/fixtures/`,
   not shapes we assume. A test for a bug not fixed yet is marked `todo`, so it shows failing without blocking.
 - `/copyedit`'s spaCy tests (`scripts/copyedit.test.mjs`) run only with `FLOWS_PROSE_PYTHON=<python>`, a Python that
-  loads spaCy and `en_core_web_trf`, such as the prose step's `~/.claude/flows-prose/env/bin/python`.
+  loads spaCy and `en_core_web_trf`, such as the prose step's `~/.claude/flows-prose/env/bin/python` (Windows:
+  `env\Scripts\python.exe`). Only the tests read it, and neither `npm test` nor CI sets it, so run them yourself after
+  touching `measure.py`.
 - `npm ci` once, then `npm run typecheck`: `tsc --noEmit` over `installer/` (sources and tests, strict).
 - tui-review: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/tui-review`.
 - web-mcp: `cargo test` and `cargo clippy --all-targets -- -D warnings` in `crates/web-mcp`.
@@ -165,6 +175,9 @@ plugins of ours that the manifest no longer lists.
   started in a subfolder, its hook setup treats that folder as the repo and uninstalls the pre-commit hook. The hook config is generated, so a commit touching `plugins/flows/packs/` or
   `plugins/flows/agents/` needs `nix develop` re-entered once to pick up their excludes.
 - `nix fmt` formats everything per `treefmt.toml` (alejandra, prettier for js/ts/json/md/yaml, rustfmt).
+  `docs/features/writing-style/editor-test/` is test evidence kept exactly as the editors and judges wrote it (the
+  writing-style spec's success criterion 4 reruns it): treefmt and the end-of-file hook skip it, so don't re-save its
+  files.
 - `npm run scan-skills` (needs `pipx`): Cisco's skill-scanner, pinned in `package.json`, over every skill under `plugins/`;
   it fails on a high or critical finding. A finding judged benign gets a scoped suppression with its reason in
   `.github/skill-scanner.yaml`. Every sync workflow runs it before opening its PR.

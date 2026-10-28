@@ -125,11 +125,11 @@ flows holds one standard for prose a person will read, and two ways to apply it.
   its own (`flows:writing`) whenever it writes a spec, a plan, a report, a README, a PR description or a commit
   message. `/doc-audit` reads changed docs against it and `/integrate` revises PR text by it.
 - **The prose check** (`hooks/prose-check.mjs`, a `PostToolUse` hook on every `Write` and `Edit` of a `*.md` file)
-  reports conversation shorthand (`Q4`, `D2`, `round 2`, "my call") and abbreviations the file never defines, in the
+  reports conversation shorthand (`Q4`, `D2`, `round 2`, `my call`) and abbreviations the file never defines, in the
   new text only. It is Node code with no model call, so it costs nothing per write. Claude sees its findings and may
   leave a sentence that a finding gets wrong. In `flow.md` files the shorthand rule is off, since flow.md is the log
   where those labels belong. `FLOWS_PROSE_CHECK=off` in the environment turns the check off.
-- **`/copyedit <file.md>`** has a fresh Opus agent revise a document by the book for a reader who wasn't in the
+- **`/copyedit <file.md>`** has a fresh Opus agent revise a document by _Style_'s method for a reader who wasn't in the
   conversation, then lets the edit through only when code shows that no heading, code block, code span, link, number,
   checkbox step or table row was lost. It shows the diff and commits nothing. Before a gate shows a spec, a plan or an
   audit report, the conductors run it on that document; when it refuses an edit, the gate shows the unedited

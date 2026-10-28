@@ -42,17 +42,6 @@ A plugin for one database engine. It can combine vendored skills with an MCP
 server.
 _Avoid_: DB pack, language plugin
 
-**Prose check**:
-flows' code-only `PostToolUse` hook on Markdown writes: it flags conversation shorthand and undefined abbreviations
-in the new text, with no model call. `FLOWS_PROSE_CHECK=off` turns it off.
-_Avoid_: lint, model check
-
-**Copyedit pass**:
-A run of `/copyedit` on a spec, plan or audit report before its gate: an Opus editor revises it by the `writing` skill's
-method (Williams and Bizup's _Style_), and code checks that nothing was lost. A refused edit leaves the document as it
-was, and the gate says so.
-_Avoid_: rewrite, polish
-
 **Release**:
 One tagged `vX.Y.Z` cut of the whole repository: the installer, the marketplace and the binaries that machines get
 together. Its number is the repo's, not any plugin's.
@@ -112,11 +101,12 @@ A label only the session that coined it understands, such as a grill question nu
 _Avoid_: tag, reference
 
 **Prose check**:
-A hook that reads the Markdown Claude has just written and returns findings for Claude to revise; the code check and
-the model check are the two kinds.
-_Avoid_: linter, lint
+flows' code-only `PostToolUse` hook on each Write or Edit of a Markdown file: it flags conversation shorthand and
+undefined abbreviations in the new text, with no model call. `FLOWS_PROSE_CHECK=off` turns it off.
+_Avoid_: linter, lint, model check
 
 **Copyedit pass**:
-A fresh agent's edit of a spec or audit report for a reader who wasn't in the conversation, run before the document
-reaches a gate.
-_Avoid_: review, rewrite
+A run of `/copyedit` on a spec, plan or audit report before its gate: a fresh Opus editor revises it for a reader who
+wasn't in the conversation, by the `writing` skill's method (Williams and Bizup's _Style_), and code checks that
+nothing was lost. A refused edit leaves the document as it was, and the gate says so.
+_Avoid_: review, rewrite, polish

@@ -104,12 +104,12 @@ between subject and verb, or between the verb and its object. Break a sentence t
 You know things the reader doesn't, and it is hard to imagine not knowing them (Pinker calls this the curse of
 knowledge). The worst case in this repo is conversation shorthand.
 
-**No conversation shorthand.** A reader who wasn't there doesn't know what `Q11`, `round 2`, `D4`, "my call" or "the
-spike" means. Write what the label stands for. Record who decided what in one place, such as a **Decisions** section,
+**No conversation shorthand.** A reader who wasn't there doesn't know what `Q11`, `round 2`, `D4`, `my call` or `the
+spike` means. Write what the label stands for. Record who decided what in one place, such as a **Decisions** section,
 not as a tag on every line, and quote the user only where the exact words matter. Logs of the conversation itself,
 such as a flow's `flow.md`, are where those numbers belong.
 
-- Before: "Order _(D-1, user: "there is helium", "let's continue")_" (`docs/features/web-mcp-search/spec.md`, commit
+- Before: `Order _(D-1, user: "there is helium", "let's continue")_` (`docs/features/web-mcp-search/spec.md`, commit
   `8281c59`)
 - After: "The browser order:", with the user's choice of Helium recorded once under **Decisions**.
 

@@ -1,26 +1,32 @@
 # The installer sets up a Python environment for flows' prose measures
 
 flows' `/copyedit` measures a document with spaCy and its transformer model, `en_core_web_trf`, before an Opus editor
-applies Williams and Bizup's _Style_ to it. A test showed the editor does best with those measures in hand. spaCy is
-Python, and the model needs PyTorch, so the installer, until now Node only, sets up a Python environment of about
-1.7 GB, behind a toggle that is on by default when flows is selected. On Windows and Linux it runs `uv sync --frozen` on a
-locked project in `installer/assets/prose/`, with uv from PATH, into `~/.claude/flows-prose/`. NixOS waits for a later
-change: uv's Python and PyTorch's Linux wheels don't run there, and nixpkgs' model doesn't load.
+applies Williams and Bizup's _Style_ to it. spaCy is Python, and the model needs PyTorch, but the installer was Node
+only. So the installer now sets up a Python environment of about 1.7 GB, behind a toggle that is on by default when
+flows is selected.
+
+The editor test behind this choice ranked the editor with these measures first (1.94 against the plain prompt's 2.64).
+The acceptance re-run with the shipped pieces brought it to parity with the plain prompt, not ahead of it; the user
+kept the measures ([flow.md](../features/writing-style/flow.md), **Deviations**).
+
+On Windows and Linux x64 it runs `uv sync --frozen` on a locked project in `installer/assets/prose/`, with uv from
+PATH, into `~/.claude/flows-prose/`. NixOS waits for a later change: uv's Python and PyTorch's Linux wheels don't run
+there, and nixpkgs' model doesn't load.
 
 ## Considered options
 
-- **A Rust port of the measures on Harper's tagger and noun-phrase chunker.** One binary per platform, like
-  tui-review and web-mcp, with no Python. Rejected by the user ("Let's just stay on python"); Harper has no full
-  sentence parser, so the sentence-shape measures would be approximate.
-- **spaCy's small model.** About 12 MB instead of 1.7 GB, but untested; the user chose the large model the test used
-  ("Large pls").
+- **A Rust port of the measures on the tagger and noun-phrase chunker of Harper (a Rust grammar checker).** One
+  binary per platform, like tui-review and web-mcp, with no Python. Rejected by the user: Harper has no full sentence
+  parser, so the sentence-shape measures would be approximate.
+- **spaCy's small model.** About 12 MB instead of 1.7 GB, but untested; the user chose the transformer pipeline the
+  test used.
 - **No measures, the editor alone.** It ranked second in the test, behind the editor with measures. It remains the
   fallback whenever the environment is missing.
-- **A pinned uv download in the installer.** Rejected after plan review: graphify already expects uv on PATH, and a
-  pin needs its own sync workflow.
+- **A pinned uv download in the installer.** Rejected: graphify already expects uv on PATH, and a pin needs its own
+  sync workflow.
 - **For NixOS, nixpkgs' spaCy and model.** The model doesn't build against nixpkgs' spacy-curated-transformers, and
   with that check relaxed it builds but its weights don't load (tested 2026-10-28). Running the uv environment inside
-  an FHS environment (`buildFHSEnv`) worked in a test and is the likely way to add NixOS later; nix-ld is another.
+  an environment that follows the Filesystem Hierarchy Standard (`buildFHSEnv`) worked in a test and is the likely way to add NixOS later; nix-ld is another.
 
 ## Consequences
 

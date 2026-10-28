@@ -59,7 +59,8 @@
           check-json.enable = true;
           end-of-file-fixer = {
             enable = true;
-            excludes = vendored;
+            # The editor test's documents are evidence, kept exactly as the editors and judges wrote them.
+            excludes = vendored ++ ["^docs/features/writing-style/editor-test/"];
           };
           plugin-validate = {
             enable = true;
