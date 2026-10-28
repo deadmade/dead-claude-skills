@@ -96,6 +96,17 @@ test("uses.json may list flows' non-conductor skills", () => {
   assert.match(fixture({ flows: ['fix'] }, conductor('fix'), files)[0], /fix is a conductor/);
   assert.match(fixture({ flows: ['nope'] }, conductor('nope'), files)[0], /flows has no skill nope/);
   assert.ok(!expectedDeps({ fix: { flows: ['writing'], picks: ['how'] } }, []).includes('flows'));
+  assert.match(fixture({ flows: ['writing'] }, conductor('nothing here'), files)[0], /writing isn't mentioned/);
+});
+
+test('a uses.json beside a skill that is not a conductor is reported', () => {
+  const files = {
+    'plugins/flows/skills/writing/SKILL.md': '---\r\nname: writing\r\n---\r\n',
+    'plugins/flows/skills/writing/uses.json': '{"picks":["how"]}',
+  };
+  assert.deepEqual(fixture({ picks: ['how'] }, conductor('how'), files), [
+    "plugins/flows/skills/writing/uses.json: writing isn't a conductor (no disable-model-invocation: true)",
+  ]);
 });
 
 test('expectedDeps: every plugin once, sorted, builtins and packs left out', () => {

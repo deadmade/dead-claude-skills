@@ -64,8 +64,9 @@ trail off into a qualification, an afterthought or a weak phrase; move context t
 document decides or shows. A reader should know from the opening why to read on.
 
 **Global coherence (Lesson 8).** State each section's and paragraph's point early, in a short plain sentence, and
-let the rest support it; a document's point comes at the end of its introduction, right after the problem. Use the key terms of that point in what follows, so a reader can skim the
-openings and get the argument. A paragraph without a point needs one or can go.
+let the rest support it. A document's point comes at the end of its introduction, right after the problem. Use the
+key terms of that point in what follows, so a reader can skim the openings and get the argument. A paragraph without
+a point needs one or can go.
 
 ## Concision: cut what does no work (Lesson 9)
 
@@ -131,8 +132,8 @@ These keep a technical document from being read two ways.
 
 ## Plain speech: say what happens
 
-- **Whole sentences.** Don't compress prose into notes: keep the articles and verbs, and write out arrows and
-  symbols. "Hash mismatch → abort" becomes "When the hash doesn't match, the installer stops." List items and table
+- **Whole sentences.** Don't compress prose into notes: in prose, keep the articles and verbs, and write out
+  arrows and symbols. "Hash mismatch → abort" becomes "When the hash doesn't match, the installer stops." List items and table
   cells may be fragments.
 - **Say what a thing does, not how it feels.** Name the mechanism or the number: not "a snappy search" but "a search
   that answers in under 5 s".

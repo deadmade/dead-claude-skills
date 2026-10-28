@@ -53,6 +53,9 @@ export function checkUses(root, marketplace) {
   const problems = [];
   const packNames = packs(root);
   const skills = flowsSkills(root);
+  for (const { name, conductor } of skills)
+    if (!conductor && existsSync(join(root, FLOWS, 'skills', name, 'uses.json')))
+      problems.push(`${FLOWS}/skills/${name}/uses.json: ${name} isn't a conductor (no disable-model-invocation: true)`);
   for (const [conductor, uses] of Object.entries(readUses(root))) {
     const at = `${FLOWS}/skills/${conductor}/uses.json`;
     const valid =
