@@ -73,11 +73,14 @@ const TABLE: &[(&str, Check)] = &[
     ("wiql.json", fits::<wit::models::WorkItemQueryResult>),
 ];
 
-/// Fixtures no crate model reads: the two hand-written calls, an error body, a log, which is plain text, and the
-/// comments, whose mentions lack the `url` the crate's `CommentMention` (inside `CommentList`) requires.
+/// Fixtures no crate model reads: the hand-written calls (`connectionData`, `/vsts/info`, `repo_file`'s items), an
+/// error body, a log, which is plain text, and the comments, whose mentions lack the `url` the crate's
+/// `CommentMention` (inside `CommentList`) requires.
 const HAND_WRITTEN: &[&str] = &[
     "connection-data.json",
     "vsts-info.json",
+    "item.json",
+    "item-folder.json",
     "pr-409.json",
     "log.txt",
     "wi-comments.json",

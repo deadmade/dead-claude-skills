@@ -10,6 +10,7 @@ use rmcp::handler::server::wrapper::Parameters;
 use crate::api::ApiError;
 use crate::config::Config;
 use crate::ctx::Ctx;
+use crate::file::{self, RepoFileArgs};
 use crate::out;
 use crate::pipeline::{self, LogArgs, PipelineRunArgs, ProjectArgs, RunArgs, RunsArgs};
 use crate::pr::{
@@ -250,6 +251,14 @@ impl Server {
     )]
     async fn repo_list(&self, Parameters(a): Parameters<ProjectArgs>) -> CallToolResult {
         reply(pipeline::repo_list(&self.ctx, &a).await)
+    }
+
+    #[tool(
+        description = "Read a file from any repo on the server (default branch unless branch), 200 numbered lines per call from start. For search hits in repos that aren't cloned.",
+        annotations(read_only_hint = true)
+    )]
+    async fn repo_file(&self, Parameters(a): Parameters<RepoFileArgs>) -> CallToolResult {
+        reply(file::repo_file(&self.ctx, &a).await)
     }
 
     #[tool(

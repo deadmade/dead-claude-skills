@@ -1,0 +1,28 @@
+{
+  "objectId": "61a86fdaa79e5c6f5fb6e4026508489feb6ed92c",
+  "gitObjectType": "blob",
+  "commitId": "23d0bc5b128a10056dc68afece360d8a0fabb014",
+  "path": "/src/Program.cs",
+  "contentMetadata": {
+    "encoding": 65001,
+    "contentType": "text/plain",
+    "fileName": "Program.cs",
+    "extension": "cs",
+    "isBinary": false,
+    "isImage": false,
+    "vsLink": "vstfs:///Git/VersionedContent/My%20Proj/R/GBmain//src/Program.cs"
+  },
+  "content": "using System;\r\n\r\nnamespace App;\r\n\r\nstatic class Program\r\n{\r\n    static void Main() => Console.WriteLine(\"hi\");\r\n}\r\n",
+  "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/items?path=%2Fsrc%2FProgram.cs&versionType=Branch&versionOptions=None",
+  "_links": {
+    "self": {
+      "href": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/items?path=%2Fsrc%2FProgram.cs&versionType=Branch&versionOptions=None"
+    },
+    "repository": {
+      "href": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01"
+    },
+    "blob": {
+      "href": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/blobs/61a86fdaa79e5c6f5fb6e4026508489feb6ed92c"
+    }
+  }
+}

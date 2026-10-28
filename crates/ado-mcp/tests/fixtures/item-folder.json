@@ -1,0 +1,19 @@
+{
+  "objectId": "8b3e8f5c3c1a4d0e9f6a2b7c4d1e0f9a8b7c6d5e",
+  "gitObjectType": "tree",
+  "commitId": "23d0bc5b128a10056dc68afece360d8a0fabb014",
+  "path": "/src",
+  "isFolder": true,
+  "url": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/items?path=%2Fsrc&versionType=Branch&versionOptions=None",
+  "_links": {
+    "self": {
+      "href": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/items?path=%2Fsrc&versionType=Branch&versionOptions=None"
+    },
+    "repository": {
+      "href": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01"
+    },
+    "tree": {
+      "href": "http://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/git/repositories/3f2c9a14-1b7e-4c55-9d1a-6a1f0c2b7e01/trees/8b3e8f5c3c1a4d0e9f6a2b7c4d1e0f9a8b7c6d5e"
+    }
+  }
+}

@@ -59,7 +59,7 @@ fn plain_http_url_is_refused() {
     );
 }
 
-const READS: [&str; 12] = [
+const READS: [&str; 13] = [
     "pipeline_log",
     "pipeline_runs",
     "pipeline_view",
@@ -68,6 +68,7 @@ const READS: [&str; 12] = [
     "pr_threads",
     "pr_view",
     "project_list",
+    "repo_file",
     "repo_list",
     "search",
     "wi_query",
@@ -149,6 +150,7 @@ fn errors_are_tool_errors_without_pat() {
         ("pipeline_runs", json!({})),
         ("pipeline_view", json!({"run": 1})),
         ("pipeline_log", json!({"run": 1})),
+        ("repo_file", json!({"path": "/a"})),
         ("repo_list", json!({})),
         ("project_list", json!({})),
         ("search", json!({"kind": "code", "text": "x"})),

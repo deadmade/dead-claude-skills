@@ -1,6 +1,7 @@
 mod api;
 mod config;
 mod ctx;
+mod file;
 mod out;
 mod pipeline;
 mod pr;
