@@ -217,35 +217,41 @@ middle of a line ("everything marked _(my call)_ was decided by Claude") wasn't 
 A skill named `copyedit` in flows, `plugins/flows/skills/copyedit/SKILL.md`, run as `/copyedit <file>`. Like the
 conductors, it runs only when called. It runs three steps.
 
-1. **Measure.** A Python script, `skills/copyedit/scripts/measure.py`, parses the document's prose with spaCy and
-   `en_core_web_trf` and lists candidate problems by line. It masks code, front matter, link targets and block quotes
-   first, as the check does.
+1. **Measure.** Node masks the document as the check does (one masking rule, shared with `prose.mjs`), with inline
+   code read as a placeholder word so sentences still parse, and finds the phrase candidates. A Python script,
+   `skills/copyedit/scripts/measure.py`, parses the masked text with spaCy and `en_core_web_trf` for the rest. The
+   candidates are the kinds the test used, minus shorthand and abbreviations, which the check owns:
 
    | Lesson       | Candidates                                                                                                   |
    | ------------ | ------------------------------------------------------------------------------------------------------------ |
-   | 3 Actions    | Nouns made from verbs, especially after a weak verb ("make", "perform", "provide", "occur")                  |
+   | 3 Actions    | Nouns made from verbs after a weak verb ("make", "perform", "provide"), or as a sentence's subject           |
    | 4 Characters | Passive sentences; subjects that are abstractions or "there is" / "it is"                                    |
    | 5 Cohesion   | A sentence that opens with nothing from the sentence before it, in the same paragraph                        |
-   | 6 Emphasis   | A sentence that ends on a weak phrase ("as well", "in this case")                                            |
-   | 9 Concision  | Wordy phrases, redundant pairs and modifiers, negatives with a positive form, words that narrate the writing |
-   | 10 Shape     | A long opening before the subject, a long subject, words between subject and verb, a sentence over 35 words  |
+   | 9 Concision  | Wordy phrases, redundant pairs and modifiers, negatives with a positive form                                 |
+   | 10 Shape     | A long opening before the subject, a long subject, words between subject and verb, a long list in a sentence |
 
-   The phrase lists come from plainlanguage.gov (CC0) and Strunk (public domain). The nouns that have verbs come from
-   a table generated once from WordNet, whose license allows that with its notice. The script also prints the
-   document's totals for these measures, so the effect of an edit can be compared.
+   The phrase lists come from plainlanguage.gov (CC0) and Strunk (public domain). A noun counts as made from a verb by
+   its part of speech and its suffix; no word table ships. The script also prints the document's totals for these
+   measures, so the effect of an edit can be compared.
 
-2. **Edit.** A fresh `general-purpose` agent on Opus gets the document, the candidate list and the editing guide,
-   `skills/copyedit/references/edit.md`. The guide is the book's method as diagnoses: for each lesson, what to look for
-   and how to revise. The agent judges each candidate (many passives and long openers are fine), runs the diagnoses on
-   the sentences the list doesn't name, and returns the whole edited document as text, plus a list of anything it
-   removed rather than reworded. It keeps every fact, number, quote, code span, link and heading. It leaves
-   conversation labels alone: it can't know what they meant.
-3. **Show.** The skill saves the document's current version to the scratchpad, writes the edited version over it, and
-   shows `git diff --no-index <saved copy> <document>`, the removed-text list, and the measures before and after.
-   Nothing is committed, so it works the same on any branch and inside audits.
+2. **Edit.** The skill first saves the document's current version to the scratchpad. A fresh `general-purpose` agent
+   on Opus then gets the document, the candidate list and the editing guide, `skills/copyedit/references/edit.md`.
+   The guide is the book's method as diagnoses: for each lesson, what to look for and how to revise. The agent judges
+   each candidate (many passives and long openers are fine), runs the diagnoses on the sentences the list doesn't
+   name, and writes the whole edited document to a scratchpad file (`.txt`, since subagents may not write Markdown
+   files), plus a list of anything it removed rather than reworded. It keeps every fact, number, quote, code span,
+   link and heading, every checkbox step and numbered item, and every table. It leaves conversation labels alone: it
+   can't know what they meant.
+3. **Check and show.** Code compares the edited file with the saved copy: every heading in order, every code block and
+   code span, every link target, number, checkbox step and table row must still be there. If anything is missing,
+   nothing is written and the skill names what was lost. Otherwise it copies the edited file over the document (a
+   copy, so the write-time check doesn't report the whole document as new), runs the check on both versions and
+   reports only findings the saved copy didn't have, and shows `git diff --no-index <saved copy> <document>`, the
+   removed-text list, and the measures before and after. Nothing is committed, so it works the same on any branch and
+   inside audits.
 
-Without the Python environment, step 1 is skipped and says so; the editor still applies the book without a list. The
-test ranked that variant second, ahead of the plain prompt.
+Without the Python environment, step 1 runs only its Node part and says that spaCy's measures were skipped; the editor
+still applies the book. The test ranked the editor without any list second, ahead of the plain prompt.
 
 `plugins/flows/references/flow-rules.md` gets one rule: before a gate shows the user a `spec.md`, a `plan.md` or an
 audit report, the conductor runs `/copyedit` on it, each time the document goes to a gate. The gate message says the
@@ -253,20 +259,28 @@ document was copyedited. flow.md files get only the check; they change after eve
 
 ## Installing the measures
 
-The installer sets up a Python environment for `measure.py` on Linux x64 and Windows x64, the platforms the other
-binaries ship for. It's a toggle on the tools page, on by default when flows is installed, because the environment is
-about 1.5 GB.
+The installer sets up the Python environment for `measure.py` on Linux x64 and Windows x64, the platforms the other
+binaries ship for. It's a toggle on the tools page, on by default when flows is selected, because the environment is
+about 1.5 GB. Ticking it is the consent; there is no second question. Once the user unticks it, it stays off on later
+runs.
 
-- **uv.** The installer uses `uv` from PATH when it's there (graphify needs it too) and otherwise downloads Astral's
-  release into `~/.claude/bin`, pinned with its sha256 like agent-browser. A weekly workflow bumps the pin, as
-  `sync-agent-browser.yml` does.
-- **The environment.** A small Python project in `installer/assets/prose/`, a `pyproject.toml` and a `uv.lock`, pins
+- **On NixOS,** uv's Python and PyTorch's Linux wheels don't run: they expect the system library layout other Linux
+  distributions have. nixpkgs packages spaCy and `en_core_web_trf` 3.8.0, so the repo's `flake.nix` gains a package,
+  `flows-prose`, whose `flows-prose-python` command is a Python with both. The installer checks for that command and,
+  when it's missing, prints the Nix command that installs it, as it does for other tools.
+- **Elsewhere,** the installer uses `uv` from PATH, and when it's missing prints the command that installs it, as it
+  does for graphify. A small Python project in `installer/assets/prose/`, a `pyproject.toml` and a `uv.lock`, pins
   CPython 3.13 (uv-managed, not the system one), spaCy 3.8, CPU-only PyTorch from PyTorch's own index, and
   `en_core_web_trf` 3.8.0 from its GitHub release wheel with its hash. On Linux, PyPI's default PyTorch wheel pulls in
   about 1.8 GB of CUDA libraries, so the CPU index is required. The installer runs `uv sync --frozen` into
-  `~/.claude/flows-prose/`.
-- **Finding it.** `/copyedit` runs the environment's Python from that folder. A missing folder means the measure step
-  is skipped.
+  `~/.claude/flows-prose/`, with uv's cache and its Python inside that folder too, so unticking the toggle frees the
+  whole 1.5 GB and never touches graphify's uv files.
+- **Installed** means the model loads: the installer's last check, and the summary line, run spaCy, not just look for
+  the folder. The step runs last, after the settings, so cancelling the download leaves everything else applied.
+- **Finding it.** `/copyedit` runs `flows-prose-python` when it's on PATH, and otherwise the Python in
+  `~/.claude/flows-prose/`. Neither means spaCy's measures are skipped.
+
+The installer managing a Python toolchain is recorded in [ADR 0005](../../adr/0005-prose-python-environment.md).
 
 ## Where each concern is resolved
 
@@ -275,27 +289,28 @@ about 1.5 GB.
 - When a document is copyedited: resolved in `flow-rules.md`; never seen by the hook or by each conductor's own gate
   text.
 - How a document is edited: resolved in `/copyedit` and its guide; the conductors run it and never restate its steps.
-- Where the Python environment is: resolved in the installer's prose step and in `/copyedit`'s measure step; never
-  seen by `measure.py`, the editor agent or the conductors.
+- Where the Python environment is: resolved in the installer's prose step, `flake.nix`, and `/copyedit`'s measure
+  step; never seen by `measure.py`, the editor agent or the conductors.
 - What the writing standard says: resolved in the `writing` skill and the editing guide; the conductors name them and
   never restate their rules.
 
 ## Where it lives
 
 - The plugin parts ship in flows, because they improve every flow: `skills/writing/`, `skills/copyedit/` with its
-  script, data and guide, `hooks/hooks.json`, `hooks/prose.mjs` and `prose-check.mjs` with their test, and the
+  scripts, phrase data and guide, `hooks/hooks.json`, `hooks/prose.mjs` and `prose-check.mjs` with their test, and the
   common-terms list. There is no separate plugin.
-- Every flows user gets the check in every project. It costs no model call. flows' README says how to turn it off.
+- Every flows user gets the check in every project. It costs no model call. Setting `FLOWS_PROSE_CHECK=off` in the
+  environment turns it off without turning off flows or other hooks; flows' README says so.
 - `scripts/flows-uses.mjs` learns that a skill Claude may load on its own (no `disable-model-invocation`) is not a
   conductor, so the writing skill needs no `uses.json`, and conductors may list it under `flows`.
-- The installer gets one step and one toggle, the prose environment's project files and the uv pin; the repo gets the
-  pin's sync workflow. No crate and no release change.
-- `npm test` runs the check's test, and tests for the parts of `measure.py` that need no spaCy. The spaCy measures
-  are tested against a fixture when the environment exists, and skip otherwise.
+- The installer gets one step, one toggle and the prose environment's project files; `flake.nix` gets the
+  `flows-prose` package. No crate and no release change.
+- `npm test` runs the check's and `/copyedit`'s Node tests. The spaCy measures are tested against a fixture when the
+  environment exists, and skip otherwise.
 - flows' version already follows the one-version scheme.
 - flows' README describes the skill, the check and `/copyedit`. README.md, CLAUDE.md and THIRD_PARTY.md describe the
-  change, the credit to technical-writing-density, the phrase and WordNet data, and the two pstack skills no longer
-  vendored.
+  change, the credit to technical-writing-density, the phrase data, the downloaded Python packages, and the two pstack skills
+  no longer vendored.
 
 ## Success criteria
 
@@ -304,8 +319,9 @@ about 1.5 GB.
 2. The skill and the editing guide pass a source check before they ship. A fresh agent compares them with the free
    sources (each lesson of _Style_ stated faithfully, no copied passages) and the skill with `technical-writing` and
    `unslop` (nothing worth keeping lost). Its findings are fixed or answered.
-3. The installer sets up the environment on Linux, and `measure.py` runs from it on a fixture. On Windows the user
-   runs the installer once and the same command; until then, Windows is marked untested.
+3. The installer sets up the environment on Linux, and `measure.py` runs from it on a fixture; `nix build .#flows-prose`
+   builds and its `flows-prose-python` runs the same fixture. On Windows and on the user's NixOS machine the user runs
+   the installer once; until then, those are marked untested.
 4. The editor test, re-run with the shipped pieces (the shipped `measure.py`, guide and `/copyedit` prompt) on the
    same two documents: `/copyedit`'s version has a better mean rank than the plain prompt's over the four blind
    rankings (two judges, two documents) and a worse one in none, and loses or changes no more than 1 of the 304
@@ -330,6 +346,12 @@ The user decided:
 - No hard limits on length either: "I dont mind a long text for a long feautre. I just dont want slop text".
 - The book's method inside the agents, tested before it was chosen; the editor with code candidates, as tested.
 - The measures in Python with spaCy, not Rust ("Let's just stay on python"), with the large model ("Large pls").
+- After the second plan review (2026-10-28, "a, all as recommended"): on NixOS the environment comes from a
+  `flake.nix` package built from nixpkgs; uv comes from PATH, with an install hint, not a pinned download; the core is
+  built before the Python half; the editor writes its version to a scratchpad file and code checks it before it
+  replaces the document; masking and phrase matching run in Node, shared with the check, and only the tested
+  candidate kinds ship, without a WordNet table; pstack's upstream update rides along with retiring its two writing
+  skills; `FLOWS_PROSE_CHECK=off` turns the check off; the toggle's behaviour above; an ADR for the Python toolchain.
 - A check on every write plus an editor before the gates, rather than an agent that writes every document.
 - The unified skill replaces pstack's `technical-writing` and `unslop`, keeping and dropping their rules as listed
   above; the pack stops vendoring them.
@@ -353,8 +375,8 @@ Claude decided, open to change:
   out before; the user reads them at Gate 2 too.
 - The editor runs on Opus: Sonnet's edit was the weakest in the test.
 - The editor leaves conversation labels alone instead of guessing what they meant.
-- Python setup: a toggle on by default with flows; uv from PATH or a pinned download; a uv project with a lock in
-  `installer/assets/prose/`; CPython 3.13 managed by uv; the environment in `~/.claude/flows-prose/`.
+- Python setup: a toggle on by default with flows; a uv project with a lock in `installer/assets/prose/`; CPython
+  3.13 managed by uv; the environment in `~/.claude/flows-prose/`.
 - Density's test is paraphrased with credit, not vendored, because it is one paragraph and needs no sync.
 
 ## Left to the builder
@@ -363,7 +385,7 @@ Claude decided, open to change:
 - The measures' thresholds, within the table above, and the candidate list's format.
 - How `/copyedit` finds the Claude config folder when `CLAUDE_CONFIG_DIR` is set, and the Python path inside the
   environment on Windows (`Scripts\python.exe`).
-- Which file of uv's release archive `downloadBin` extracts, and whether its one-file extraction fits.
+- The nixpkgs attribute names for spaCy and the model, checked with `nix eval`.
 - How the sync transform rewrites the three "through unslop" lines, and the pstack-picks plugin description that names
   `unslop`.
 - The before/after examples in the skill, picked from existing flow documents.

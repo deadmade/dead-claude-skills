@@ -28,6 +28,8 @@ Started 2026-10-27 on branch `claude/relaxed-newton-cr62u9` (from `main` 753ba2c
   Reopened 2026-10-27: the Task 3 sample gate missed (Haiku hook); Options reopened, see the editor test and
   Deviations. Re-approved 2026-10-28 ("Large pls and I approve"): code check only at write time, the book's method in
   the writing skill, an Opus editor agent fed spaCy candidates (`en_core_web_trf`), Python set up by the installer.
+- Gate 1, reopened 2026-10-28 for the second plan review's decisions (NixOS, uv, the editor's hand-back, the
+  measures' scope, the off switch, the toggle); approved the same day ("a, all as recommended").
 - Gate 2, plan approved: 2026-10-27, by the user ("approve, subagent-driven"), after plan review round 1.
   Execution: subagent-driven (my recommendation). Commits: one per task on `claude/relaxed-newton-cr62u9`.
 
@@ -322,6 +324,41 @@ handler structure and equal prompt copies; the wall-clock test becomes a one-tim
 
 The user's decision (2026-10-27): "yes to all". The spec and plan were revised the same day. The plan keeps its task
 order and modules (`flows-uses.mjs` joins Task 4), so no second review round; I checked the edits myself.
+
+### Plan review round 2 (2026-10-28, the rewritten plan)
+
+Three reviewers: Correctness (Fable), Fit (Opus, with pstack `blast-radius`), Simpler (Sonnet, with ponytail
+`ponytail-review`). 40 findings; duplicates merged, none dropped. Every `file:line` the plan cited matched the tree.
+
+- **Blocking:** the environment won't run on NixOS, the installer's Linux (`installer/core/binaries.ts:12,36,106`):
+  uv's Python and PyTorch's manylinux wheels need the usual system library layout. nixpkgs packages spaCy and
+  `en_core_web_trf` 3.8.0 (`pkgs/development/python-modules/spacy/models.json`, `models.nix`, fetched). Decided: (a), a
+  `flake.nix` package `flows-prose` on NixOS; uv everywhere else.
+- **Decided as recommended** ("a, all as recommended"):
+  - uv from PATH with an install hint; no pin, no helper renames, no sync workflow.
+  - Core first (check, skill, `/copyedit` without measures, gates, pstack, docs), then the Python half, then
+    acceptance; this also fixes `npm test` breaking on a skill folder without `SKILL.md`.
+  - The editor writes its version to a scratchpad `.txt` file (subagents may not write `.md`); the original is saved
+    first; code checks headings, code, links, numbers, checkbox steps and table rows before a `cp` replaces the
+    document, so the write-time check doesn't report the whole document; only findings new against the saved copy
+    are reported; the prompt protects checkbox steps, numbered items and tables.
+  - Masking and phrase matching in Node, shared with the check; Python only for spaCy; only the tested candidate
+    kinds, without shorthand and abbreviations; no WordNet table.
+  - pstack's upstream moved (`519d36a` → `c742dd6`: `arena`, `interrogate`, four deleted reference files, none used by
+    a conductor); the update rides along with retiring the two writing skills.
+  - `FLOWS_PROSE_CHECK=off` turns the check off (`disableAllHooks` would also turn off dcg and the notifications).
+  - The toggle: on by default only with flows; off stays off once unticked (a marker, written only when the user
+    unticks); no second question; uv's cache and Python inside `~/.claude/flows-prose/`; "installed" is the
+    environment's Python, confirmed by loading the model after a sync; Windows-safe removal; the step runs last.
+  - ADR 0005 for the Python toolchain.
+- **Fixes without a decision:** the `flows-uses` test fixture gains frontmatter; `/copyedit`'s paths work when another
+  conductor reads it (`${CLAUDE_SKILL_DIR}/../copyedit/`); tests and process-spawning code stay out of skill folders
+  (the skill scanner); the installer tests run on Node 22 here, and the typecheck is `npm ci && npm run typecheck`;
+  the project path goes through `UV_PROJECT`; the measure step has a timeout; THIRD_PARTY.md changes with the data it
+  credits; CI checks the lock ships in the installer package; the wording tests keep only what a machine reads; the
+  test environment comes from the real project files; a summary line when prose is ticked without flows.
+
+The decisions changed the plan's shape (task order, new modules), so the review runs again on the revised plan.
 
 ## Tasks
 
