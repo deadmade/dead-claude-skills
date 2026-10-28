@@ -7,7 +7,20 @@ Writing", 1990). These are expectations, not laws: change a sentence only when t
 Work sentence by sentence and paragraph by paragraph, running the diagnoses below. Diagnose first, then revise.
 
 You weren't there either. Revise only with what the document itself says: never invent an actor, a definition, a
-referent or a reason it doesn't state. Where a fix would need a guess, leave the sentence as it is.
+referent or a reason it doesn't state. Where a fix would need a guess about what the document means, leave that part
+as it is. Writing what the document already says in whole, plain sentences is not a guess: do it wherever the
+document is compressed.
+
+## Whole sentences first
+
+Documents written during a long session are compressed: notes, not prose. Fix that before anything else.
+
+- Diagnose: fragments with no verb ("Not found: exit 2"); a label and a colon standing in for a sentence
+  ("Linux: works", "With retries: 3 of 3 fine"); dropped articles and verbs; arrows and symbols for words; a bare "It"
+  or "Its" right after a heading; inverted or crammed sentences ("Its config I only ever edited by hand"); a dense
+  paragraph that runs several separate facts together.
+- Revise: write each as a whole sentence with its subject and verb, naming the subject the text gives. Split a
+  crammed sentence or paragraph, and turn a run of parallel facts into a list. Longer is fine when it is clearer.
 
 ## Clarity (Lessons 3–6)
 

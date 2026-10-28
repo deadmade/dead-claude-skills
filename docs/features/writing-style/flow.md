@@ -1,6 +1,6 @@
 ---
 flow: feature
-phase: execute
+phase: verify
 ---
 
 # Writing style: flow
@@ -421,13 +421,21 @@ state.chosen)` runs first (`install.ts:225`); the marker would never be written.
   7,800 words. Execution stopped after Task 3; see Deviations.
 - 2026-10-28: the plan was rewritten for the re-approved design (Tasks 1 and 2 kept as built; Tasks 3–12 new). The
   first plan's Task 3 (the sample review) is the gate that missed, recorded above.
-- 2026-10-28, Task 13: criterion 4 missed. In blind rankings `/copyedit`'s edits lost to the plain prompt's on both
-  documents (mean ranks 1.9–2.3 against 1.2–1.6 over three versions); no claim was lost by either. The judges' reasons
-  point at compressed fragments the shipped guide's editor left alone. A revised guide ("Whole sentences first", and
-  "don't guess" narrowed to meaning) came within about 0.1 of plain without beating it (four versions per section:
-  plain 1.56–2.00, variant 1.69–2.42). Decided by the user ("Variant + test labels (Recommended)"): adopt the revised
-  guide and test one more change, letting the editor say what a conversation label stands for when the document itself
-  says it. Runs in `editor-test/acceptance/`.
+- v2 execution (mixed, per Gate 2), all on `claude/relaxed-newton-cr62u9`, each task reviewed (ledger in
+  `.superpowers/sdd/plan/progress.md`, git-ignored):
+  - Task 3: dbf8417..74aec84, review clean after one fix round (CRLF cases).
+  - Task 4 (controller): 74aec84..c735595; source check fixed in a3d381e; review clean.
+  - Tasks 5–6 (controller): a3d381e..feb51a0; review found rewrap false alarms, lost versions and labels, and no
+    path for a refused edit; fixed and re-reviewed clean.
+  - Task 7: 9dbd709..622b067, review clean after one fix round (Windows `file://` URL, depth assertion).
+  - Task 8 (controller): e7aaeec and ef9afc2, review clean.
+  - Task 9: 622b067..9844327, review clean.
+  - Task 10: feb51a0..6951165, review clean after one fix round (nominalization suffixes, see Rulings).
+  - Task 11: e1e359a..9ec7716, review clean after one fix round (marker on re-tick, partial folder).
+  - Task 12: 9ec7716..47dcbe6, review clean.
+  - Task 13 (controller): criterion 3 passed (27 tests with `FLOWS_PROSE_PYTHON`, none skipped; Task 11's real
+    install run on Linux; Windows untested; NixOS hidden); criterion 4 see Deviations; criterion 5 passed (one round
+    of findings, Claude restated each decision, no second report).
 
 ## Rulings
 
@@ -481,6 +489,11 @@ state.chosen)` runs first (`install.ts:225`); the marker would never be written.
   plain 1.56–2.00, variant 1.69–2.42). Decided by the user ("Variant + test labels (Recommended)"): adopt the revised
   guide and test one more change, letting the editor say what a conversation label stands for when the document itself
   says it. Runs in `editor-test/acceptance/`.
+- 2026-10-28, Task 13, after the label round: fresh judges ranked the revised guide's edits (the same text) ahead of
+  plain on the findings report and slightly behind it on the spec; across both rounds the revised guide is at parity
+  with plain within judge noise (the same edit moved 0.6 rank between rounds), and the label rule changed nothing
+  measurable. No version lost any of the 304 claims. Decided by the user ("Revised guide, no labels (Recommended)"):
+  ship the revised guide, keep the prompt's label rule, and record criterion 4 as parity with plain rather than a win.
 
 ## Walkthrough
 
