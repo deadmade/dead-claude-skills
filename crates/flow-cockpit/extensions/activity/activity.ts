@@ -189,7 +189,8 @@ function turns(ctx: ViewContext, id: string, page: Activity | null, kept: Map<nu
         'p',
         'live-wait',
         wait.kind === 'Question'
-          ? `Waiting on you: ${wait.text}${wait.cut ? '…' : ''}`
+          ? // A cut drops every question's options (the capture hook keeps only question and header).
+            `Waiting on you: ${wait.text}${wait.cut ? ' (options left out)' : ''}`
           : `Waiting on you to allow ${wait.tool}.`,
       ),
     );

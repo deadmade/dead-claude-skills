@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 
 use jiff::Timestamp;
 
-use crate::activity::Live;
+use crate::activity::SessionLive;
 
 pub use config::{Config, Home};
 pub use entries::{AuditSummary, DocName, Entry, FlowRun, FlowRunSummary, SessionSummary};
@@ -48,7 +48,7 @@ pub struct Index {
     /// Session id to the slugs of the flow.md files it edited, from the link scans.
     links: HashMap<String, Vec<String>>,
     /// Session id to what it waits for, from the capture: set by [`Index::set_live`].
-    live: HashMap<String, Live>,
+    live: HashMap<String, SessionLive>,
 }
 
 impl Index {
@@ -157,7 +157,7 @@ impl Index {
 
     /// What the sessions wait for, read from their capture files outside the index's lock (a session left out waits
     /// for nothing). The statuses take it in at the next [`Index::refresh`].
-    pub fn set_live(&mut self, live: HashMap<String, Live>) {
+    pub fn set_live(&mut self, live: HashMap<String, SessionLive>) {
         self.live = live;
     }
 

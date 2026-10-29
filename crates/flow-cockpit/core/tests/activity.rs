@@ -594,9 +594,76 @@ fn permission_wait_clears_when_its_transcript_moves_on() {
     set_mtime(&transcript, 30);
     set_mtime(&agent, 3);
     let mut cache = CaptureCache::default();
-    assert_eq!(cache.live(&file, &transcript).waiting, permission("Bash"));
+    assert_eq!(
+        cache.live(&file, &transcript).live.waiting,
+        permission("Bash")
+    );
     set_mtime(&agent, 7);
-    assert_eq!(cache.live(&file, &transcript).waiting, None);
+    assert_eq!(cache.live(&file, &transcript).live.waiting, None);
+}
+
+#[test]
+fn a_late_line_older_than_what_followed_opens_nothing() {
+    let t = Temp::new("capture-order");
+    // Each hook is its own process: a prompt decided at once can have its Stop written before the prompt's own line.
+    let stopped_first = with(
+        &t,
+        "open-question.jsonl",
+        &[
+            line(9, "Stop", ""),
+            line(8, "PermissionRequest", r#","permission_tool":"Bash""#),
+        ],
+    );
+    assert_eq!(
+        waiting(&stopped_first),
+        question(COLOUR, false),
+        "the prompt is older than the Stop"
+    );
+    let answered_first = with(
+        &t,
+        "permission.jsonl",
+        &[
+            line(9, "PostToolUse", r#","tool_use_id":"toolu_q9""#),
+            line(
+                8,
+                "PreToolUse",
+                r#","tool_use_id":"toolu_q9","questions":[{"question":"Late?"}]"#,
+            ),
+        ],
+    );
+    assert_eq!(waiting(&answered_first), None);
+    // Another agent's newer event doesn't hold back this agent's prompt.
+    let other = with(
+        &t,
+        "subagent-permission.jsonl",
+        &[
+            line(9, "SubagentStart", r#","agent":"a2","agent_type":"Plan""#),
+            line(8, "PermissionRequest", r#","permission_tool":"Edit""#),
+        ],
+    );
+    assert_eq!(waiting(&other), permission("Edit"));
+}
+
+#[test]
+fn session_last_wrote_at_its_newest_file() {
+    // The capture file, the session's transcript and the waiting subagent's transcript all count.
+    let t = Temp::new("capture-written");
+    let transcript = t.0.join("s-q.jsonl");
+    let agent = t.0.join("s-q/subagents/agent-a1.jsonl");
+    fs::create_dir_all(agent.parent().unwrap()).unwrap();
+    fs::write(&transcript, "").unwrap();
+    fs::write(&agent, "").unwrap();
+    let file = t.0.join("capture.jsonl");
+    fs::copy(capture_fixture("subagent-permission.jsonl"), &file).unwrap();
+    set_mtime(&file, 4);
+    set_mtime(&transcript, 1);
+    set_mtime(&agent, 5);
+    let mut cache = CaptureCache::default();
+    assert_eq!(cache.live(&file, &transcript).written, Some(at(5)));
+    set_mtime(&transcript, 6);
+    assert_eq!(cache.live(&file, &transcript).written, Some(at(6)));
+    set_mtime(&file, 7);
+    assert_eq!(cache.live(&file, &transcript).written, Some(at(7)));
 }
 
 #[test]
@@ -634,15 +701,18 @@ fn capture_ignores_partial_last_line() {
     let transcript = t.0.join("s-q.jsonl");
     let mut cache = CaptureCache::default();
     assert_eq!(
-        cache.live(&file, &transcript).waiting,
+        cache.live(&file, &transcript).live.waiting,
         question(COLOUR, false)
     );
     // The line completes: the cache reads on from where it stopped.
     append(&file, rest.as_bytes());
-    assert_eq!(cache.live(&file, &transcript).waiting, None);
+    assert_eq!(cache.live(&file, &transcript).live.waiting, None);
     // A file that shrank is read again from its start; a missing one waits for nothing.
     fs::copy(capture_fixture("permission.jsonl"), &file).unwrap();
-    assert_eq!(cache.live(&file, &transcript).waiting, permission("Bash"));
+    assert_eq!(
+        cache.live(&file, &transcript).live.waiting,
+        permission("Bash")
+    );
     fs::remove_file(&file).unwrap();
-    assert_eq!(cache.live(&file, &transcript).waiting, None);
+    assert_eq!(cache.live(&file, &transcript).live.waiting, None);
 }

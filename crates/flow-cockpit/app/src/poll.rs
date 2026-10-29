@@ -16,7 +16,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
-use flow_cockpit_core::activity::Live;
+use flow_cockpit_core::activity::SessionLive;
 use flow_cockpit_core::index::{Config, Entry, Home, Index, LinkCache, Project};
 use jiff::Timestamp;
 use serde::Serialize;
@@ -272,7 +272,7 @@ impl Poller {
 
 /// What each session linked to a flow run waits for, from its capture file. The index lock is held only to look up
 /// the paths.
-fn read_live(shared: &Shared) -> HashMap<String, Live> {
+fn read_live(shared: &Shared) -> HashMap<String, SessionLive> {
     let linked = shared.read().linked_sessions();
     linked
         .into_iter()

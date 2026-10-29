@@ -13,7 +13,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use flow_cockpit_core::activity::{
-    Activity, CaptureCache, Live, PAGE, ToolDetail, TranscriptCache,
+    Activity, CaptureCache, PAGE, SessionLive, ToolDetail, TranscriptCache,
 };
 use flow_cockpit_core::index::{DocName, Entry, FlowRun, Index, Project};
 use tauri::State;
@@ -61,13 +61,14 @@ impl Shared {
         let mut page = self
             .transcripts()
             .page(&path, before, limit.unwrap_or(PAGE));
-        page.live = self.live(id).unwrap_or_default();
+        page.live = self.live(id).map(|s| s.live).unwrap_or_default();
         Some(page)
     }
 
-    /// What the session waits for, from its capture file; `None` for a session the index doesn't know. Like
+    /// What the session waits for, from its capture file, and when it last wrote anything; `None` for a session the
+    /// index doesn't know. Like
     /// [`Shared::session`], the read never holds the index lock.
-    pub fn live(&self, id: &str) -> Option<Live> {
+    pub fn live(&self, id: &str) -> Option<SessionLive> {
         let (path, capture) = {
             let index = self.read();
             (index.session_path(id)?, index.capture_path(id))

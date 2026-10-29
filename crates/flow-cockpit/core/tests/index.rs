@@ -521,6 +521,33 @@ fn status_waiting_from_capture() {
 }
 
 #[test]
+fn wait_stops_counting_after_a_quiet_day() {
+    let w = World::new("quiet-wait");
+    let mut index = w.scanned();
+    let alpha = project(&index, "alpha");
+    fs::create_dir_all(&w.home.capture_dir).unwrap();
+    let capture = w.home.capture_dir.join("s-link.jsonl");
+    fs::copy(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/capture/open-question.jsonl"),
+        &capture,
+    )
+    .unwrap();
+    let transcript = w.path("claude/projects/-work-alpha/s-link.jsonl");
+    let mut cache = CaptureCache::default();
+    // Neither the session's transcript nor its capture file was written for this long.
+    for (quiet, want) in [(23 * HOUR, Status::Waiting), (25 * HOUR, Status::Idle)] {
+        touch(&capture, ago(quiet));
+        touch(&transcript, ago(quiet));
+        read_live(&mut index, &mut cache);
+        assert_eq!(
+            run(&runs(&index, &alpha), "login").status,
+            want,
+            "quiet for {quiet} s"
+        );
+    }
+}
+
+#[test]
 fn rebuild_project_touches_one_project() {
     let w = World::new("rebuild");
     let mut index = w.index();

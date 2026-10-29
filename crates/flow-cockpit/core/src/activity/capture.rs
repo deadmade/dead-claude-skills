@@ -28,7 +28,9 @@ use super::transcript::{agent_path, file_id};
 use super::{Live, Waiting};
 
 /// How long after a permission prompt a write to its transcript is still the entry that raised it: Claude Code
-/// finishes writing that entry after the hook took its time (37 ms later in a real session).
+/// finishes writing that entry after the hook took its time (37 ms later in a real session). It assumes the hook's
+/// `ts` and the file's mtime come from one wall clock that doesn't jump: a forward jump of more than this ends a fresh
+/// prompt at once, a backward one keeps it until the next event.
 const FLUSH: SignedDuration = SignedDuration::from_secs(2);
 
 /// One capture line: the facts the waits are read from.
@@ -124,26 +126,48 @@ struct Wait {
 
 /// The waits still open after the events read so far, oldest first.
 #[derive(Debug, Clone, Default)]
-struct Open(Vec<Wait>);
+struct Open {
+    waits: Vec<Wait>,
+    /// Per agent (`None` for the main session), the newest `ts` of its events applied so far.
+    latest: HashMap<Option<String>, Timestamp>,
+    /// The newest `ts` of an event that ended every wait: a session's start or end, or a prompt.
+    cleared: Option<Timestamp>,
+}
 
 impl Open {
     fn add(&mut self, e: &CaptureEvent) {
-        match e.event.as_str() {
-            "Notification" => return,
-            "SessionStart" | "SessionEnd" => {
-                self.0.clear();
-                return;
-            }
-            _ => {}
+        if e.event == "Notification" {
+            return;
+        }
+        // Each hook is its own process and appends when it is done, so a line can land after a newer event of its
+        // agent (a prompt decided at once, then the turn's Stop): the wait it would open has already ended.
+        let late = self.latest.get(&e.agent).is_some_and(|t| *t > e.at)
+            || self.cleared.is_some_and(|t| t > e.at);
+        let latest = self.latest.entry(e.agent.clone()).or_insert(e.at);
+        *latest = (*latest).max(e.at);
+        if matches!(
+            e.event.as_str(),
+            "SessionStart" | "SessionEnd" | "UserPromptSubmit"
+        ) {
+            self.waits.clear();
+            self.cleared = self.cleared.max(Some(e.at));
+            return;
         }
         let question = |w: &Wait| matches!(w.waiting, Waiting::Question { .. });
         // Any other event is the agent it came from moving on from its permission prompt.
-        self.0.retain(|w| question(w) || w.agent != e.agent);
+        self.waits.retain(|w| question(w) || w.agent != e.agent);
+        if matches!(e.event.as_str(), "PostToolUse" | "PostToolUseFailure") {
+            self.waits
+                .retain(|w| !question(w) || w.tool_use_id != e.tool_use_id);
+        }
+        if late {
+            return;
+        }
         match e.event.as_str() {
             // Only `AskUserQuestion`'s are captured; one without its questions asks nothing to show.
             "PreToolUse" => {
                 if let Some((text, cut)) = &e.question {
-                    self.0.push(Wait {
+                    self.waits.push(Wait {
                         at: e.at,
                         agent: e.agent.clone(),
                         tool_use_id: e.tool_use_id.clone(),
@@ -154,12 +178,7 @@ impl Open {
                     });
                 }
             }
-            "PostToolUse" | "PostToolUseFailure" => {
-                self.0
-                    .retain(|w| !question(w) || w.tool_use_id != e.tool_use_id);
-            }
-            "UserPromptSubmit" => self.0.clear(),
-            "PermissionRequest" => self.0.push(Wait {
+            "PermissionRequest" => self.waits.push(Wait {
                 at: e.at,
                 agent: e.agent.clone(),
                 tool_use_id: None,
@@ -173,19 +192,13 @@ impl Open {
 
     /// The newest wait, a permission prompt left out once its transcript was written more than [`FLUSH`] after it.
     /// `written` gives the time a transcript was last written: the agent's, or the session's for `None`.
-    fn live(&self, written: impl Fn(Option<&str>) -> Option<Timestamp>) -> Live {
-        let waiting = self
-            .0
-            .iter()
-            .rev()
-            .find(|w| match w.waiting {
-                Waiting::Question { .. } => true,
-                Waiting::Permission { .. } => {
-                    written(w.agent.as_deref()).is_none_or(|t| t.duration_since(w.at) <= FLUSH)
-                }
-            })
-            .map(|w| w.waiting.clone());
-        Live { waiting }
+    fn shown(&self, written: impl Fn(Option<&str>) -> Option<Timestamp>) -> Option<&Wait> {
+        self.waits.iter().rev().find(|w| match w.waiting {
+            Waiting::Question { .. } => true,
+            Waiting::Permission { .. } => {
+                written(w.agent.as_deref()).is_none_or(|t| t.duration_since(w.at) <= FLUSH)
+            }
+        })
     }
 }
 
@@ -198,7 +211,18 @@ pub fn live(events: &[CaptureEvent], written: impl Fn(Option<&str>) -> Option<Ti
     for e in events {
         open.add(e);
     }
-    open.live(written)
+    Live {
+        waiting: open.shown(written).map(|w| w.waiting.clone()),
+    }
+}
+
+/// What a session waits for, and when it last wrote anything: its capture file, its transcript, or the transcript of
+/// the subagent its wait belongs to. A wait whose session went quiet long ago was left behind by a process that is
+/// gone; the run's status stops counting it (see the index's status rules).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SessionLive {
+    pub live: Live,
+    pub written: Option<Timestamp>,
 }
 
 /// The capture files read so far, by path: each one's waits, and how far it was read.
@@ -226,10 +250,10 @@ impl CaptureCache {
     /// What the session waits for, from its capture file (read from where the last read stopped, or again from its
     /// start when it shrank or was replaced) and its transcript at `transcript`. A missing capture file waits for
     /// nothing.
-    pub fn live(&mut self, capture: &Path, transcript: &Path) -> Live {
+    pub fn live(&mut self, capture: &Path, transcript: &Path) -> SessionLive {
         let Ok(meta) = fs::metadata(capture) else {
             self.files.remove(capture);
-            return Live::default();
+            return SessionLive::default();
         };
         let (size, mtime, id) = (meta.len(), meta.modified().ok(), file_id(&meta));
         let file = self.files.entry(capture.to_path_buf()).or_default();
@@ -241,9 +265,21 @@ impl CaptureCache {
             file.offset = read_from(capture, file.offset, |e| open.add(&e));
             (file.size, file.mtime, file.id) = (size, mtime, id);
         }
-        file.open.live(|agent| match agent {
+        let stat = |agent: Option<&str>| match agent {
             Some(a) => written(&agent_path(transcript, a)),
             None => written(transcript),
-        })
+        };
+        let shown = file.open.shown(stat);
+        let last = [
+            mtime.and_then(|t| Timestamp::try_from(t).ok()),
+            stat(None),
+            shown.and_then(|w| stat(Some(w.agent.as_deref()?))),
+        ];
+        SessionLive {
+            live: Live {
+                waiting: shown.map(|w| w.waiting.clone()),
+            },
+            written: last.into_iter().flatten().max(),
+        }
     }
 }

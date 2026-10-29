@@ -14,7 +14,7 @@ use ts_rs::TS;
 
 use super::projects::subdirs;
 use super::status::{Facts, Status, status};
-use crate::activity::{Live, prompt_of};
+use crate::activity::{SessionLive, prompt_of};
 use crate::doc::{
     self, DeviationStatus, FlowDoc, Gate, Ledger, PlanDoc, TaskState, parse_audit, parse_flow,
     parse_ledger, parse_plan,
@@ -372,7 +372,7 @@ pub(crate) fn derive(
     docs: &Docs,
     sessions: &[(&str, &Session)],
     links: &HashMap<String, Vec<String>>,
-    live: &HashMap<String, Live>,
+    live: &HashMap<String, SessionLive>,
     now: Timestamp,
 ) -> Derived {
     let mut runs: Vec<(Timestamp, FlowRunSummary)> = Vec::new();
@@ -396,7 +396,10 @@ pub(crate) fn derive(
                 transcript: grew,
                 asked: mine
                     .iter()
-                    .any(|(id, _)| live.get(*id).is_some_and(|l| l.waiting.is_some())),
+                    .filter_map(|(id, _)| live.get(*id))
+                    .filter(|s| s.live.waiting.is_some())
+                    .filter_map(|s| s.written)
+                    .max(),
             },
             now,
         );

@@ -563,7 +563,10 @@ test('activity_says_what_the_session_waits_for', async () => {
   };
   const route = { to: 'session', project: ALPHA, id: 's-mention' };
   const asked = await draw('activity', route, waiting({ kind: 'Question', text: 'Tabs or spaces?', cut: true }));
-  assert.equal(text(asked.box.querySelector('.live-wait')), 'Waiting on you: Tabs or spaces?…');
+  // A cut drops every question's options (lib.mjs): the question itself reads whole.
+  assert.equal(text(asked.box.querySelector('.live-wait')), 'Waiting on you: Tabs or spaces? (options left out)');
+  const whole = await draw('activity', route, waiting({ kind: 'Question', text: 'Tabs or spaces?', cut: false }));
+  assert.equal(text(whole.box.querySelector('.live-wait')), 'Waiting on you: Tabs or spaces?');
   const allow = await draw('activity', route, waiting({ kind: 'Permission', tool: 'Bash' }));
   assert.equal(text(allow.box.querySelector('.live-wait')), 'Waiting on you to allow Bash.');
   const none = await draw('activity', route);

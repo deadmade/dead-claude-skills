@@ -17,7 +17,7 @@ use serde::Serialize;
 use serde_json::Value;
 use ts_rs::TS;
 
-pub use capture::{CaptureCache, CaptureEvent, live, read_capture};
+pub use capture::{CaptureCache, CaptureEvent, SessionLive, live, read_capture};
 pub use transcript::TranscriptCache;
 
 /// How many turns a page holds when the window doesn't say.
@@ -90,7 +90,8 @@ pub struct AgentInfo {
 #[serde(tag = "kind")]
 pub enum Waiting {
     /// An `AskUserQuestion`: its first question (its header when the question is empty), and whether the capture hook
-    /// cut the questions short.
+    /// cut the questions short (it then drops every question's options, and shortens the question's own text only
+    /// when that is very long).
     Question { text: String, cut: bool },
     /// A permission prompt for this tool.
     Permission { tool: String },
