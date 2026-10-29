@@ -31,7 +31,8 @@ you start; if it doesn't, tell the user how to get it and stop.
 
 ## Before you write
 
-Run these in one shell, so `$dir` is set for each line:
+Run this as one command: a variable set in one shell call is gone in the next, so every command block here starts
+by setting `dir`.
 
 ```sh
 dir="${XDG_CONFIG_HOME:-$HOME/.config}/flow-cockpit/views"
@@ -52,12 +53,23 @@ like this:
 
 - **Something about one flow run:** write a `run-tab` view. It becomes a tab of the run view, next to Docs and
   Activity.
-- **Something inside the list or the run view:** change a copy of that built-in:
-  `flow-cockpit --print-view list > "$dir/list.ts"` (or `run`), then edit the copy. The copy imports its types from
-  `../../shell/api` and `../../../bindings/*`: point every one of those imports at `./flow-cockpit`. Deleting the copy
-  restores the built-in. If the copy breaks, the window shows its error with the built-in drawn below it. App updates
-  never touch the copy, so it keeps the old built-in's code until you print it again.
-- A `doc` view (one document of a run) has no built-in, so it has the screen to itself.
+- **Something inside the list or the run view:** change a copy of that built-in (`run` instead of `list` for the run
+  view), then edit the copy:
+
+  ```sh
+  dir="${XDG_CONFIG_HOME:-$HOME/.config}/flow-cockpit/views"
+  mkdir -p "$dir"
+  flow-cockpit --print-view list > "$dir/list.ts"
+  ```
+
+  The copy imports its types from `../../shell/api` and `../../../bindings/*`: point every one of those imports at
+  `./flow-cockpit`. Deleting the copy restores the built-in. If the copy breaks, the window shows its error with the
+  built-in drawn below it. App updates never touch the copy, so it keeps the old built-in's code until you print it
+  again.
+
+- A `doc` view (one document of a run) has the screen to itself, but no built-in leads there. It shows only when
+  another view calls `ctx.navigate({ to: 'doc', project, slug, name })`, with `name` one of `'Spec'`, `'Plan'` or
+  `'Flow'`, for example from a link in a changed copy of `run`.
 
 ## The view
 
@@ -140,8 +152,14 @@ export default view;
 
 ## Check it
 
-- If `tsc` is at hand, type-check the view from the views folder:
-  `tsc --noEmit --strict --target es2023 --lib es2023,dom,dom.iterable --module esnext --moduleResolution bundler --verbatimModuleSyntax --erasableSyntaxOnly flow-cockpit.d.ts <id>.ts`.
+- If `tsc` is at hand, type-check the view in the views folder:
+
+  ```sh
+  cd "${XDG_CONFIG_HOME:-$HOME/.config}/flow-cockpit/views" &&
+    tsc --noEmit --strict --target es2023 --lib es2023,dom,dom.iterable --module esnext --moduleResolution bundler \
+      --verbatimModuleSyntax --erasableSyntaxOnly flow-cockpit.d.ts <id>.ts
+  ```
+
 - Save, and tell the user where to look: the run's new tab, or the screen whose copy you changed.
 - A view that fails to load or draw shows its error in its own place, and the other views keep working. Fix the file
   and save again; the window needs no restart.
