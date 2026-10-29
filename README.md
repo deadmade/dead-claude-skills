@@ -14,7 +14,7 @@ like hallmark and graphify, and tools such as
 [tui-review](plugins/shared/tui-review/README.md), [md-pane](plugins/opt-in/md-pane/README.md) for reading the `.md` files
 Claude names in a pane beside the chat, [web-mcp](plugins/shared/web-mcp/README.md) for web search read in its own browser, page fetching,
 passive lookups and a browser with an archive of everything it pulled, and
-[flow-cockpit](plugins/opt-in/flow-cockpit/README.md), whose skill writes the views of the flow cockpit, a window
+[flow-cockpit](plugins/opt-in/flow-cockpit/README.md), whose skill writes the views of the flow cockpit (it also installs hooks that record questions, permission prompts and agent starts and stops per session into a local capture folder, read only by the window), a window
 over your flow runs, audits and Claude sessions (Linux for now; the app comes from the flake:
 `nix run github:deadmade/dead-claude-skills#flow-cockpit`).
 

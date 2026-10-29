@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import {
   mkdtempSync,
   writeFileSync,
@@ -10,11 +10,16 @@ import {
   readdirSync,
   rmSync,
   statSync,
+  openSync,
+  closeSync,
+  symlinkSync,
+  mkdirSync,
+  chmodSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { captureDir, toLine, prune, main, MAX_QUESTIONS } from './lib.mjs';
+import { captureDir, toLine, prune, main, MAX_QUESTIONS, MAX_MESSAGE } from './lib.mjs';
 
 const NOW = Date.UTC(2026, 9, 29, 12, 0, 0);
 const scratch = () => mkdtempSync(join(tmpdir(), 'flow-cockpit-hook-'));
@@ -45,11 +50,50 @@ test('toLine maps PreToolUse AskUserQuestion with tool_use_id', () => {
   });
 });
 
-test('toLine cuts questions at 16 KiB', () => {
-  const questions = [{ question: 'x'.repeat(40000) }];
-  const got = JSON.parse(toLine({ ...base, hook_event_name: 'PreToolUse', tool_input: { questions } }, NOW));
-  assert.equal(typeof got.questions, 'string');
-  assert.equal(Buffer.byteLength(got.questions), MAX_QUESTIONS);
+const ask = (questions) => ({ ...base, hook_event_name: 'PreToolUse', tool_input: { questions } });
+
+test('toLine keeps questions an array and cuts a big one down to question and header', () => {
+  const questions = Array.from({ length: 6 }, (_, i) => ({
+    question: `Q${i} ` + 'x'.repeat(3000),
+    header: `H${i}`,
+    options: Array.from({ length: 4 }, () => ({ label: 'l', description: 'd'.repeat(500) })),
+  }));
+  const got = JSON.parse(toLine(ask(questions), NOW));
+  assert.ok(Array.isArray(got.questions));
+  assert.equal(got.questions_cut, true);
+  assert.ok(Buffer.byteLength(JSON.stringify(got.questions)) <= MAX_QUESTIONS);
+  assert.ok(got.questions.length >= 1);
+  assert.deepEqual(Object.keys(got.questions[0]).sort(), ['header', 'question']);
+  assert.ok(got.questions[0].question.startsWith('Q0 '));
+});
+
+test('toLine does not flag questions that fit', () => {
+  assert.equal(JSON.parse(toLine(ask([{ question: 'a' }]), NOW)).questions_cut, undefined);
+});
+
+test('toLine cuts multi-byte questions by characters and stays valid and under the cap', () => {
+  for (const ch of ['€', '\u{1F600}', 'q"\n\\']) {
+    const line = toLine(ask([{ question: ch.repeat(30000), header: 'h' }]), NOW);
+    const got = JSON.parse(line);
+    assert.ok(Array.isArray(got.questions));
+    assert.equal(got.questions_cut, true);
+    assert.ok(Buffer.byteLength(JSON.stringify(got.questions)) <= MAX_QUESTIONS);
+    const q = got.questions[0].question;
+    assert.ok(q.length > 0);
+    assert.ok(!q.includes('�'));
+    assert.equal(q, ch.repeat(Array.from(q).length / Array.from(ch).length)); // whole characters only
+    assert.ok(!/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/.test(q));
+  }
+});
+
+test('toLine cuts a long Notification message by characters', () => {
+  const got = JSON.parse(toLine({ ...base, hook_event_name: 'Notification', message: '\u{1F600}'.repeat(5000) }, NOW));
+  assert.equal(got.message_cut, true);
+  assert.equal(Array.from(got.message).length, MAX_MESSAGE);
+  assert.equal(
+    JSON.parse(toLine({ ...base, hook_event_name: 'Notification', message: 'short' }, NOW)).message_cut,
+    undefined,
+  );
 });
 
 test('toLine maps PermissionRequest without deciding', () => {
@@ -62,6 +106,13 @@ test('toLine maps PermissionRequest without deciding', () => {
   assert.equal(got.event, 'PermissionRequest');
   assert.equal(got.permission_tool, 'Bash');
   assert.ok(!JSON.stringify(got).includes('secret'));
+});
+
+test('a PermissionRequest prints nothing', async () => {
+  const state = scratch();
+  const input = { ...base, hook_event_name: 'PermissionRequest', tool_name: 'Bash', tool_input: { command: 'x' } };
+  assert.deepEqual(await run(JSON.stringify(input), envFor(state)), []);
+  rmSync(state, { recursive: true });
 });
 
 test('toLine maps SubagentStart with agent_type', () => {
@@ -124,18 +175,34 @@ test('captureDir is null when it would need a missing home', () => {
   assert.equal(captureDir({}, 'win32'), null);
 });
 
-test('prune deletes files older than 30 days only', () => {
+test('prune deletes capture files older than 30 days only', () => {
   const dir = scratch();
-  const old = join(dir, 'old.jsonl');
-  const fresh = join(dir, 'fresh.jsonl');
-  writeFileSync(old, 'x');
-  writeFileSync(fresh, 'x');
   const t = (days) => new Date(NOW - days * 86400000);
-  utimesSync(old, t(31), t(31));
-  utimesSync(fresh, t(29), t(29));
+  const put = (name, days) => {
+    writeFileSync(join(dir, name), 'x');
+    utimesSync(join(dir, name), t(days), t(days));
+  };
+  put('old.jsonl', 31);
+  put('fresh.jsonl', 29);
+  put('notes.txt', 90);
+  mkdirSync(join(dir, 'dir.jsonl'));
+  utimesSync(join(dir, 'dir.jsonl'), t(90), t(90));
   prune(dir, NOW);
-  assert.deepEqual(readdirSync(dir), ['fresh.jsonl']);
+  assert.deepEqual(readdirSync(dir).sort(), ['dir.jsonl', 'fresh.jsonl', 'notes.txt']);
   prune(join(dir, 'missing'), NOW);
+  rmSync(dir, { recursive: true });
+});
+
+test('prune leaves a .jsonl link alone and never touches its target', { skip: process.platform === 'win32' }, () => {
+  const dir = scratch();
+  const target = join(dir, 'target.txt');
+  writeFileSync(target, 'x');
+  symlinkSync(target, join(dir, 'link.jsonl'));
+  const old = new Date(NOW - 90 * 86400000);
+  utimesSync(target, old, old);
+  prune(dir, NOW);
+  assert.ok(existsSync(target));
+  assert.ok(readdirSync(dir).includes('link.jsonl'));
   rmSync(dir, { recursive: true });
 });
 
@@ -167,6 +234,16 @@ test('main writes one line per event to <session>.jsonl, files 0600, and prints 
   rmSync(state, { recursive: true });
 });
 
+test('main tightens an existing capture folder to 0700', { skip: process.platform === 'win32' }, async () => {
+  const state = scratch();
+  const dir = join(state, 'flow-cockpit', 'capture');
+  mkdirSync(dir, { recursive: true });
+  chmodSync(dir, 0o755);
+  await run(JSON.stringify({ ...base, hook_event_name: 'Stop' }), envFor(state));
+  assert.equal(statSync(dir).mode & 0o777, 0o700);
+  rmSync(state, { recursive: true });
+});
+
 test('main writes nothing without a home or on bad input', async () => {
   assert.deepEqual(await run(JSON.stringify({ ...base, hook_event_name: 'Stop' }), {}), []);
   const state = scratch();
@@ -186,7 +263,9 @@ test('parallel_appends_stay_whole', async () => {
   const state = scratch();
   const env = { ...process.env, ...envFor(state) };
   const lib = pathToFileURL(join(import.meta.dirname, 'lib.mjs')).href;
-  const questions = [{ question: 'q"\n\\'.repeat(2500) }]; // JSON-escaped, near 16 KiB
+  // Over 16 KiB before the cut, so the line takes the cut path and is about the largest the format allows (16 KiB of
+  // JSON-escaped questions plus the fixed fields).
+  const questions = Array.from({ length: 10 }, () => ({ question: 'q"\n\\'.repeat(400), header: 'h' }));
   const payload = JSON.stringify({
     ...base,
     hook_event_name: 'PreToolUse',
@@ -206,5 +285,37 @@ for (let i = 0; i < 50; i++) await main({ stdin: process.argv[1], env: process.e
     .filter(Boolean);
   assert.equal(lines.length, 1000);
   for (const l of lines) assert.equal(JSON.parse(l).tool_use_id, 'x');
+  rmSync(state, { recursive: true });
+});
+
+const script = join(import.meta.dirname, 'capture.mjs');
+
+test('capture.mjs writes a line, exits 0 and prints nothing', () => {
+  const state = scratch();
+  const r = spawnSync(process.execPath, [script], {
+    input: JSON.stringify({ ...base, hook_event_name: 'Stop' }),
+    env: { ...process.env, ...envFor(state) },
+  });
+  assert.equal(r.status, 0);
+  assert.equal(r.stdout.length + r.stderr.length, 0);
+  assert.equal(
+    readFileSync(join(state, 'flow-cockpit', 'capture', 's1.jsonl'), 'utf8')
+      .trim()
+      .split('\n').length,
+    1,
+  );
+  rmSync(state, { recursive: true });
+});
+
+test('capture.mjs exits 0 and prints nothing when stdin cannot be read', () => {
+  const state = scratch();
+  const fd = openSync(join(state, 'writeonly'), 'w'); // reading it fails with EBADF
+  const r = spawnSync(process.execPath, [script], {
+    stdio: [fd, 'pipe', 'pipe'],
+    env: { ...process.env, ...envFor(state) },
+  });
+  closeSync(fd);
+  assert.equal(r.status, 0);
+  assert.equal(r.stdout.length + r.stderr.length, 0);
   rmSync(state, { recursive: true });
 });

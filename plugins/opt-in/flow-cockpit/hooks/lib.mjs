@@ -1,9 +1,12 @@
 // Records what transcripts lack (questions, permission prompts, agents, turn ends) into one file per Claude session.
 // Watch only: nothing here decides, blocks or prints. The folder rules match the app's `capture_dir` (paths.rs).
-import { appendFileSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'node:fs';
+import { appendFileSync, chmodSync, lstatSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
 import { join, posix, win32 } from 'node:path';
 
 export const MAX_QUESTIONS = 16 * 1024;
+// A Notification message can come from an MCP server (an elicitation dialog): untrusted and of any length. The window
+// needs only the gist of it, so it is cut at 1024 characters and the line gets `message_cut: true`.
+export const MAX_MESSAGE = 1024;
 const EVENTS = new Set([
   'SessionStart',
   'SessionEnd',
@@ -33,15 +36,38 @@ export function captureDir(env, platform) {
   return p.join(base, 'flow-cockpit', 'capture');
 }
 
-// AskUserQuestion's questions; past 16 KiB of JSON, the JSON text cut at 16 KiB (a string, no longer an array).
+const size = (v) => Buffer.byteLength(JSON.stringify(v));
+// Cut by characters (code points), so a UTF-8 character or surrogate pair is never split.
+const cutChars = (s, n) => (s.length <= n ? s : Array.from(s).slice(0, n).join(''));
+
+// AskUserQuestion's questions, always an array. Past 16 KiB of JSON each entry keeps only `question` and `header`
+// (the options carry most of the size), trailing entries are dropped until it fits, and the line gets
+// `questions_cut: true`.
 function questionsOf(input) {
   const q = input.tool_input?.questions;
-  if (q === undefined) return undefined;
-  const bytes = Buffer.from(JSON.stringify(q));
-  return bytes.length <= MAX_QUESTIONS ? q : bytes.subarray(0, MAX_QUESTIONS).toString();
+  if (!Array.isArray(q)) return {};
+  if (size(q) <= MAX_QUESTIONS) return { questions: q };
+  const kept = q.map((e) => ({ question: cutChars(String(e?.question ?? ''), 4096), header: str(e?.header) }));
+  while (kept.length > 1 && size(kept) > MAX_QUESTIONS) kept.pop();
+  // One entry left and still too big: halve its question until it fits.
+  let n = Array.from(kept[0]?.question ?? '').length;
+  while (kept.length === 1 && size(kept) > MAX_QUESTIONS && n > 0)
+    kept[0].question = cutChars(kept[0].question, (n >>= 1));
+  return { questions: kept, questions_cut: true };
 }
 
-/** One capture line (no trailing newline) for a hook payload, or null when there is nothing to record. */
+function messageOf(input) {
+  const m = str(input.message);
+  if (m === undefined || Array.from(m).length <= MAX_MESSAGE) return { message: m };
+  return { message: cutChars(m, MAX_MESSAGE), message_cut: true };
+}
+
+/**
+ * One capture line (no trailing newline) for a hook payload, or null when there is nothing to record.
+ * Shape: { v: 1, ts, session, cwd, event, agent?, agent_type?, tool_use_id?, questions?, questions_cut?,
+ * notification_type?, message?, message_cut?, permission_tool?, transcript?, agent_transcript? }.
+ * `questions` is always an array; `questions_cut` and `message_cut` are true when the text was shortened.
+ */
 export function toLine(input, now) {
   try {
     if (typeof input === 'string') input = JSON.parse(input);
@@ -60,9 +86,9 @@ export function toLine(input, now) {
       agent: str(input.agent_id),
       agent_type: str(input.agent_type),
       tool_use_id: str(input.tool_use_id),
-      questions: questionsOf(input),
+      ...questionsOf(input),
       notification_type: str(input.notification_type),
-      message: str(input.message),
+      ...messageOf(input),
       permission_tool: event === 'PermissionRequest' ? str(input.tool_name) : undefined,
       transcript: str(input.transcript_path),
       agent_transcript: str(input.agent_transcript_path),
@@ -79,7 +105,8 @@ export function prune(dir, now, maxAgeDays = 30) {
       if (!name.endsWith('.jsonl')) continue;
       try {
         const file = join(dir, name);
-        if (now - statSync(file).mtimeMs > maxAgeDays * 86400000) unlinkSync(file);
+        const st = lstatSync(file);
+        if (st.isFile() && now - st.mtimeMs > maxAgeDays * 86400000) unlinkSync(file);
       } catch {}
     }
   } catch {}
@@ -92,6 +119,8 @@ export async function main({ stdin, env, platform, now }) {
     const dir = captureDir(env, platform);
     if (line === null || dir === null) return;
     mkdirSync(dir, { recursive: true, mode: 0o700 });
+    // Our own folder, so a looser mode left by hand or an earlier build is tightened. No effect on Windows.
+    if (platform !== 'win32') chmodSync(dir, 0o700);
     const p = platform === 'win32' ? win32 : posix;
     appendFileSync(p.join(dir, `${input.session_id}.jsonl`), line + '\n', { mode: 0o600 });
     if (input.hook_event_name === 'SessionStart') prune(dir, now);
