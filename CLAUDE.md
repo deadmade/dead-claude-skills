@@ -60,10 +60,11 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   (debug builds or the `test-hooks` feature) treats a comma-separated list of IPs as public; `WEB_MCP_FALLBACK_MS` shortens the fetch browser fallback's deadline, `WEB_MCP_PAPERS_MS` each paper source's (8 s), `WEB_MCP_LOOKUP_MS` each lookup source's.
 - `plugins/opt-in/mcp/mcp-azure/`: `.mcp.json` and settings for `ado-mcp` (Rust, `crates/ado-mcp/`), a stdio MCP server
   for one Azure DevOps Server collection and PAT: `pr_*`, `wi_*`, `pipeline_*`, `repo_list` and `project_list` (both
-  in `pipeline.rs`; no default project: outside an Azure DevOps clone the model passes `project`), `search`
-  (`search.rs`), `repo_file` (`file.rs`) and `wiki` (`wiki.rs`), built for Windows and Linux x64 only
-  (`build-ado-mcp.yml`). The installer asks for its settings itself (`SELF_CONFIGURED` in `core.mjs`),
-  downloads the binary and saves both, `binPath` included, in one `claude plugin configure --values-stdin` call.
+  in `pipeline.rs`; no default project: outside an Azure DevOps clone the model passes `project`, but `search`
+  without one searches the whole collection), `search` (`search.rs`), `repo_file` (`file.rs`) and `wiki`
+  (`wiki.rs`), built for Windows and Linux x64 only (`build-ado-mcp.yml`). The installer asks for its settings itself
+  (`SELF_CONFIGURED` in `core.mjs`), downloads the binary and saves both, `binPath` included, in one
+  `claude plugin configure --values-stdin` call.
   - Calls go through Microsoft's `azure_devops_rust_api` (`=0.39.1`, sending `api-version=7.1-preview`) on our own
     reqwest client via `.transport()`. Its features include `search`, `wiki` and `test`, never `test_results` (its
     default host is the Services-only `vstmr`). Pins are exact (`rmcp`, `reqwest`, `azure_core` too), and `reqwest`
@@ -71,6 +72,9 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
     code). Its repo was archived on 2026-10-26, so no fix comes from upstream: a model the server's answer doesn't fit is read
     from the raw body into our own struct (`api::json`; `Batch` and `RawComments` in `wi.rs`, `Props` beside the
     crate model in `pr.rs`).
+  - The crate's enums are closed (D8 in `docs/features/ado-mcp/flow.md`): one value it doesn't know in a `search`,
+    `wiki` or test answer fails that whole answer. Fixtures can't show it, so `docs/features/ado-mcp/smoke.md` checks
+    live answers; the fix is the D1 fallback.
   - Where the crate falls short a call is sent or read by hand (`pr_list status=all`, `pr_threads`, the work-item
     batch, work-item comments, build log text, `pipeline_cancel`, `/vsts/info`, `connectionData`, `repo_file`'s items
     GET); why each is in `docs/features/ado-mcp/flow.md` (D1-D5, D7), and for `repo_file` in `file.rs` (the crate

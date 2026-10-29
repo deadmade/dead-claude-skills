@@ -129,8 +129,9 @@ downloaded when it runs. The user doesn't need a terminal tool: "goal is for cla
      configured server (plan review round 1).
    - Every tool but `project_list` and `wi_update` takes an optional `project` argument, and the `pr_*` tools also
      `repo`, that override the remote. Outside an Azure DevOps clone, `project` is required (`wi_view` takes the
-     work item's own); there is no default project (removed 2026-10-28, fix-flow `ado-mcp-default-project-400`:
-     the user switches projects often, and a bad default only showed as a bare HTTP 400).
+     work item's own; `search` without it searches the whole collection); there is no default project (removed
+     2026-10-28, fix-flow `ado-mcp-default-project-400`: the user switches projects often, and a bad default only
+     showed as a bare HTTP 400).
    - Every tool that infers the current branch also takes an optional `branch`. In a worktree the project folder's
      branch isn't Claude's (grill Q2).
    - One server and one PAT (grill Q9). A remote on a different server from `ado_org_url` is an error that names
