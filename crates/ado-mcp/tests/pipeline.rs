@@ -74,7 +74,7 @@ fn view_base() -> String {
     )
 }
 
-/// The run's test runs (`Unit` twice: a retried job) and the newest `Unit`'s failed test.
+/// The run's test runs (`Unit` twice: a retried job) and the latest attempt's failed test.
 fn test_routes(fx: &Fixture) {
     fx.route(TEST_RUNS, vec![fixture("test-runs.json")]);
     fx.route(&results(42), vec![fixture("test-results.json")]);
@@ -181,7 +181,7 @@ fn tests_summary_and_failures() {
     run_routes(&fx);
     test_routes(&fx);
     let text = ok(&mut env(&fx), "pipeline_view", json!({"run": 77}));
-    // Skipped: 5 − 3 − 0 of Integration; the newest Unit's 10 − 9 − 1 none. Five stack lines of seven.
+    // Skipped: 5 − 3 − 0 of Integration; the latest attempt's 10 − 9 − 1 none. Five stack lines of seven.
     assert_eq!(
         text,
         format!(
@@ -262,7 +262,7 @@ fn retried_job_counts_latest_attempt() {
         "{text}"
     );
     assert_eq!(sent(&fx, &results(41)).len(), 0);
-    // Run 41 from another job of the same name (one per result file, or the default title): it counts too.
+    // Run 41 renamed to another job: it counts too.
     runs["value"][0]["pipelineReference"]["phaseReference"]["phaseName"] = json!("Test Linux");
     fx.route(TEST_RUNS, vec![Resp::json(&runs)]);
     fx.route(&results(41), vec![fixture("test-results.json")]);
@@ -389,7 +389,7 @@ fn results_failure_keeps_failures_read() {
     );
 }
 
-/// Review Focus 4: a test-results call that fails keeps the stages and issues, plus one line.
+/// A test-runs call that fails keeps the stages and issues, plus one line.
 #[test]
 fn test_403_keeps_stages() {
     let fx = Fixture::start();

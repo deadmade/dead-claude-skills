@@ -57,7 +57,7 @@ fn values<'a>(q: &'a [(String, String)], k: &str) -> Vec<&'a str> {
         .collect()
 }
 
-/// Review Focus 3: `My Proj` is resolved to ids for the path.
+/// `My Proj` is resolved to ids for the path.
 #[test]
 fn reads_lines() {
     let fx = Fixture::start();
@@ -112,7 +112,7 @@ fn branch_passed() {
     );
 }
 
-/// Review Focus 6: the path arrives as exactly one `path` value, escaped once.
+/// The path arrives as exactly one `path` value, escaped once.
 #[test]
 fn odd_path() {
     let fx = Fixture::start();
@@ -253,7 +253,7 @@ fn needs_repo() {
     assert!(fx.requests().is_empty());
 }
 
-/// Review Focus 5: one line longer than the reply cap is cut, and the reply still ends with the next call.
+/// One line longer than the reply cap is cut, and the reply still ends with the next call.
 #[test]
 fn long_line_more() {
     let fx = Fixture::start();

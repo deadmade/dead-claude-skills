@@ -191,7 +191,7 @@ fn no_hits() {
     assert_eq!(text, "0 hits");
 }
 
-/// Review Focus 7: a rejected query answers 200 with no results; the reply says it was rejected.
+/// A rejected query answers 200 with no results; the reply says it was rejected.
 #[test]
 fn query_rejected() {
     let fx = Fixture::start();
@@ -305,7 +305,7 @@ fn code_hits() {
     assert!(body.get("filters").is_none(), "{body}");
 }
 
-/// Review Focus 3: the path takes the project id, the filters the names as given.
+/// The path takes the project id, the filters the names as given.
 #[test]
 fn code_repo_filter() {
     let fx = Fixture::start();
@@ -326,7 +326,7 @@ fn code_repo_filter() {
     assert!(requests(&fx, STATUS).is_empty());
 }
 
-/// Review Focus 1: a quoted phrase and the scope repeat exactly in the more line.
+/// A quoted phrase and the scope repeat exactly in the more line.
 #[test]
 fn code_more_repeats_scope() {
     let fx = Fixture::start();

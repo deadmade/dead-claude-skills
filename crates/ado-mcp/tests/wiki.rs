@@ -69,7 +69,7 @@ fn root(pages: &[String]) -> Resp {
     )
 }
 
-/// Review Focus 3: `My Proj` is resolved to its id for the paths.
+/// `My Proj` is resolved to its id for the paths.
 #[test]
 fn page_text() {
     let fx = Fixture::start();

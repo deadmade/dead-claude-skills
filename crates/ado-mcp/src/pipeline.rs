@@ -418,9 +418,9 @@ fn latest_attempts(mut runs: Vec<TestRun>) -> Vec<TestRun> {
         .collect()
 }
 
-/// `tests: <passed> passed, <failed> failed, <skipped> skipped` over `runs`, then the first 20 failed tests (the
-/// error's first line, the stack trace's first 5 lines), then how many of the counted failures weren't shown, when
-/// `rest` is given (the failed tests couldn't all be read otherwise).
+/// `tests: <passed> passed, <failed> failed, <skipped> skipped` over `runs`, then the first `FAILED_MAX` failed tests
+/// (the error's first line, the stack trace's first `STACK_MAX` lines), then how many of the counted failures weren't
+/// shown, when `rest` is given (the failed tests couldn't all be read otherwise).
 fn test_lines(runs: &[TestRun], failed: &[TestCaseResult], rest: Option<&str>) -> Vec<String> {
     let n = |v: Option<i32>| usize::try_from(v.unwrap_or(0)).unwrap_or(0);
     let (mut passed, mut fails, mut skipped) = (0, 0, 0);

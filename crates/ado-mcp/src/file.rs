@@ -176,7 +176,7 @@ mod tests {
         let content = format!("{}\nnext", "é".repeat(50_000));
         let (text, next) = numbered(&content, 1, 200, 39_000);
         assert_eq!(next, Some(2));
-        // The cut row and its line end fit the budget: 7 for the number, 1 for the `…`.
+        // The cut row and its line end fit the budget: 7 for the number, 1 for the `…` and 1 for the line end.
         assert_eq!(text, format!("    1  {}…", "é".repeat(39_000 - 9)));
         assert_eq!(text.chars().count(), 39_000 - 1);
         // Alone at the end of the file, a cut line leaves nothing to page to.

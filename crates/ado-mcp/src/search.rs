@@ -54,7 +54,8 @@ pub(crate) struct SearchArgs {
     pub limit: Option<u16>,
 }
 
-/// A highlight as one line of plain text: no `<highlighthit>` markers, entities decoded, at most 200 characters.
+/// A highlight as one line of plain text: no `<highlighthit>` markers, entities decoded, at most `SNIPPET_MAX`
+/// characters.
 fn plain(highlight: &str) -> String {
     let text = html_to_text(
         &highlight
@@ -155,7 +156,7 @@ fn code_hit(r: &CodeResult) -> String {
 
 /// The page path the wiki tool takes, from a hit's git file path: a code wiki's folder `mapped` (any case) cut from
 /// the front, `.md` cut, then in each segment `-` read as a space and percent-decoded (the wiki stores a literal `-`
-/// as `%2D`). A segment that isn't UTF-8 decoded keeps it raw.
+/// as `%2D`). When any segment isn't UTF-8 once decoded, the whole path stays raw, the folder and `.md` still cut.
 fn page_path(file_path: &str, mapped: Option<&str>) -> String {
     let folder = mapped.map_or("", |m| m.trim_end_matches('/'));
     let rest = file_path
@@ -203,8 +204,8 @@ fn wiki_hit(r: &WikiResult) -> String {
     out
 }
 
-/// A failed search: a 404 says Search is missing, or names the project or, in a clone, the repo too (a stale cached
-/// id, or no Search: the 404 can't tell which).
+/// A failed search: a 404 says Search is missing, or names the project, or the repo when only `repo` was given (a
+/// stale cached id, or no Search: the 404 can't tell which). A clone alone names neither.
 fn missing(mut e: ApiError, named: Option<&str>, repo: Option<&str>) -> ApiError {
     let what = named
         .map(|p| format!("project {p}"))
@@ -383,7 +384,7 @@ mod tests {
     }
 
     #[test]
-    fn plain_keeps_200_characters_whole() {
+    fn plain_keeps_snippet_max_characters_whole() {
         let line = plain(&"c".repeat(SNIPPET_MAX));
         assert_eq!(line, "c".repeat(SNIPPET_MAX));
         let line = plain(&"c".repeat(SNIPPET_MAX + 1));

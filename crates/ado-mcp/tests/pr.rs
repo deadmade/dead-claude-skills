@@ -289,7 +289,7 @@ fn view_concurrent() {
     let fx = Fixture::start();
     view_routes(&fx);
     // The first call answers at once and measures the rest (process, git, scope); the second waits 1000 ms on each of
-    // four calls: 4000 ms one after the other, about 1000 together, 2000 with one call outside the join.
+    // four calls: 4000 ms one after the other, about 1000 together.
     let slow = Duration::from_millis(1000);
     let twice = |name: &str| vec![fixture(name), fixture(name).delay(slow)];
     fx.route(POLICY, twice("policy-evaluations.json"));
