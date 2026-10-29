@@ -83,6 +83,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   - The PAT goes only to `ADO_ORG_URL`: crate calls pass the `Guard` policy, hand-sent ones `Api::url`'s check
     (`api.rs`), and redirects aren't followed.
   - Writes carry `anthropic/requiresUserInteraction` through `WRITES` in `tools.rs`; a new write tool goes there.
+    A new read tool needs `annotations(read_only_hint = true)` and a `READS` entry in `tests/mcp.rs`, which also catches a mistyped `WRITES` name that `tools.rs` would skip silently.
   - Tests run the binary over stdio against a fake server (`tests/common/mod.rs`) serving `tests/fixtures/`.
     `tests/fixtures.rs` maps each fixture to the crate model its route returns, so every fixture must fit that model;
     fixtures no crate model reads are listed apart, in `HAND_WRITTEN`. Fitting the model doesn't prove the server's

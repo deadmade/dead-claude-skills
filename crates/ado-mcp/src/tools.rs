@@ -41,7 +41,7 @@ const INSTRUCTIONS: &str = "\
 Azure DevOps Server tools: pull requests (pr_*), work items (wi_*), pipeline runs (pipeline_*), repos and \
 projects, search, wiki pages and files in any repo. Use them instead of curl or az for anything on the Azure DevOps server; they read the git remote, so they \
 work inside a clone without extra arguments (pass project, and repo for the pr_* tools, repo_file and code search, to \
-override it). Outside an Azure DevOps clone, pass project: project_list names them (wi_view takes the work item's own, wi_update needs none, and search without it covers the whole collection).\n\
+override it). Outside an Azure DevOps clone, pass project: project_list names them (wi_view takes the work item's own, wi_update needs none, and search without project and repo covers the whole collection).\n\
 - There is no diff tool. To read a pull request's patch, run a local `git diff` against the target branch \
 (pr_files lists the changed files).\n\
 - search finds work items, wiki pages and code in repos that aren't cloned; for the clone itself, search locally.\n\
@@ -53,7 +53,7 @@ the project folder's branch is not necessarily yours.\n\
 wi_update, wi_comment, pipeline_run, pipeline_cancel) asks the user for approval on every call. Say what you are \
 about to do, then call it once; in dontAsk mode these calls are denied.\n\
 - Lists show 20 items and say how to get more (limit); repo_list and project_list show all, pr_files up to 2000 \
-files, the wiki tree 100, pipeline_view 20 issues (pipeline_log shows the rest) and 20 failed tests. Long text is cut with the call that shows the rest.";
+files, the wiki tree 100, pipeline_view 20 issues (pipeline_log shows the failing steps' logs) and 20 failed tests. Long text is cut with the call that shows the rest.";
 
 pub struct Server {
     ctx: Arc<Ctx>,
@@ -241,7 +241,7 @@ impl Server {
     }
 
     #[tool(
-        description = "Read a pipeline run's logs, cleaned: by default each failed step's error lines with 5 lines of context and its last 50 lines, from at most its last 20,000 lines (and a failed job's issues when no step failed). step picks a step; full pages through the whole log, 2000 lines per call.",
+        description = "Read a pipeline run's logs, cleaned: by default each failed step's error lines with 5 lines of context and its last 50 lines, from at most its last 20,000 lines when the server reports the log's length (and a failed job's issues when no step failed). step picks a step; full pages through the whole log, 2000 lines per call.",
         annotations(read_only_hint = true)
     )]
     async fn pipeline_log(&self, Parameters(a): Parameters<LogArgs>) -> CallToolResult {
@@ -281,7 +281,7 @@ impl Server {
     }
 
     #[tool(
-        description = "Read a wiki page (path) as markdown, or list the wiki's pages without path. One wiki per project is picked automatically.",
+        description = "Read a wiki page (path) as markdown, or list the wiki's pages without path. A project's only wiki is used; with several, pass wiki= (name or id).",
         annotations(read_only_hint = true)
     )]
     async fn wiki(&self, Parameters(a): Parameters<WikiArgs>) -> CallToolResult {

@@ -34,7 +34,7 @@ and projects, search, wiki pages and files in any repo."
     );
     assert!(
         instructions.contains(
-            "(wi_view takes the work item's own, wi_update needs none, and search without it covers the whole collection)"
+            "(wi_view takes the work item's own, wi_update needs none, and search without project and repo covers the whole collection)"
         ),
         "{instructions}"
     );
@@ -55,7 +55,7 @@ and projects, search, wiki pages and files in any repo."
     );
     assert!(
         instructions
-            .contains("pipeline_view 20 issues (pipeline_log shows the rest) and 20 failed tests."),
+            .contains("pipeline_view 20 issues (pipeline_log shows the failing steps' logs) and 20 failed tests."),
         "{instructions}"
     );
     assert!(instructions.chars().count() < 4096);

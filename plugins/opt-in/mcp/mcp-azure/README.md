@@ -6,19 +6,19 @@ personal access token. It calls the REST API through Microsoft's `azure_devops_r
 by hand where the crate falls short.
 
 Inside a clone, the tools read the git remote (`origin`), so they need no project or repo; pass `project` (and `repo`
-for the `pr_*` tools, `repo_file` and code `search`) to override it. `search` is the exception: with neither, it
-searches the whole collection. When the clone names no project of this collection, pass `project`
+for the `pr_*` tools, `repo_file` and code `search`) to override it. `search` is the exception: with neither
+`project` nor `repo`, it searches the whole collection. When the clone names no project of this collection, pass `project`
 (`project_list` names them); `wi_view` takes the work item's own and `wi_update` needs none. Output is plain text,
 one line per item, id first; lists show 20 and say how to get more, except `repo_list` and `project_list`, which show
 all, `pr_files` (up to 2000 files), the `wiki` page tree (100) and `pipeline_view`'s issues (20; `pipeline_log` shows
-the rest) and failed tests (20).
+the failing steps' logs) and failed tests (20).
 
 ## Tools
 
 Reads, each named `mcp__plugin_mcp-azure_ado__<tool>`:
 
 - `pr_list`: pull requests in the repo, by status (default active), creator, reviewer, source or target branch.
-- `pr_view`: the latest iteration (`iteration: <n>`), reviewers and votes, policy checks, linked work items, the
+- `pr_view`: the latest iteration and its number, reviewers and votes, policy checks, linked work items, the
   latest run and the description.
 - `pr_threads`: review threads with file and line; system threads, and unless `all` resolved ones, are left out.
   Comments are cut at 2000 characters unless `full`.
@@ -39,14 +39,15 @@ Reads, each named `mcp__plugin_mcp-azure_ado__<tool>`:
 - `repo_list`: the project's repos with their default branch.
 - `project_list`: every project the PAT can see, by name.
 - `search`: the server's own Search, ranked. `kind` is `code`, `wi` (work items) or `wiki`, and `text` is in the
-  server's search syntax; `project`, and `repo` for code, narrow it. It prints `1 hit` or `N hits`, then a line per
+  server's search syntax; `project`, and `repo` for code, narrow it (`repo` is refused for other kinds). It prints `1 hit` or `N hits`, then a line per
   hit: `#id [type] state  title`, `<project>/<repo>:<path>  (N matches)` or `<project>/<wiki>:<page path>`, with a
   snippet under it where there is one. When the server reports something about the index or the query, a line saying
   so comes first, and with no hits that line is the whole answer. An info code the tool doesn't know is named
   (`the server answered with info code N`) only when there are no hits, above `0 hits`. A wiki hit's page path is
   the one `wiki` takes, relative to a code wiki's published folder.
 - `repo_file`: a file of any repo on the server, as 200 numbered lines per call from `start` (default 1), on the
-  repo's default branch unless `branch`. For code hits in repos that aren't cloned; with `project`, `repo` is needed.
+  repo's default branch unless `branch`. It refuses folders and binary files, and a call can stop before 200 lines at the reply's size
+  limit. For code hits in repos that aren't cloned; with `project`, `repo` is needed.
 - `wiki`: a wiki page by `path`, as markdown (cut at 4000 characters unless `full`), or without `path` the wiki's
   page tree (100 pages unless `limit`). A project's only wiki is picked automatically; with several, pass `wiki`.
 

@@ -46,7 +46,7 @@ pub(crate) struct SearchArgs {
     pub kind: Kind,
     /// The search text, in the server's search syntax.
     pub text: String,
-    /// Project name or id. Default: the whole collection.
+    /// Project name or id. Default: the whole collection, if repo is not given either.
     pub project: Option<String>,
     /// Repo name, for code; needs project or a clone of it.
     pub repo: Option<String>,
