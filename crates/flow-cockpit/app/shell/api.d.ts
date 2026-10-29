@@ -79,6 +79,10 @@ export interface View {
   /**
    * Where it draws. A list serves each of its slots with the same render, which tells them apart by `ctx.route`: the
    * built-in activity view is `['run-tab', 'session']`, a run's Activity tab and a session's own screen.
+   *
+   * A `run-tab` view fills the run view's lower row, laid onto the run's two-column grid (the slot and the view's
+   * section don't box their children): its render returns a `DocumentFragment` holding an `aside.left` (the rail) and
+   * a `div.content`, in that order. A single element lands in the rail column only.
    */
   slot: Slot | readonly Slot[];
   render(ctx: ViewContext): Node | Promise<Node>;

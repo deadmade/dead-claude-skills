@@ -151,7 +151,11 @@ const view: View = {
     let which = picked.get(key) ?? DOCS.find(([name]) => text.get(name))?.[0] ?? 'Spec';
 
     const rows = el('ol', 'rows');
-    left.append(el('section', 'group', el('h2', 'group-h', 'Documents'), rows));
+    const docsHead = el('h2', 'group-h', 'Documents');
+    docsHead.id = 'docs-h';
+    const docsGroup = el('section', 'group', docsHead, rows);
+    docsGroup.setAttribute('aria-labelledby', 'docs-h');
+    left.append(docsGroup);
     for (const [name, file] of DOCS) {
       const b = el('button', 'row plain', el('span', 'ttl', name), el('span', 'mark', text.get(name) ? file : 'None'));
       b.type = 'button';
@@ -189,8 +193,10 @@ const view: View = {
           });
           toc.append(el('li', head.tagName === 'H3' ? 'h3' : '', a));
         });
-        const chapters = el('nav', 'chapters', el('h2', 'group-h', 'Chapters'), toc);
-        chapters.setAttribute('aria-label', 'Chapters');
+        const tocHead = el('h2', 'group-h', 'Chapters');
+        tocHead.id = 'toc-h';
+        const chapters = el('nav', 'chapters', tocHead, toc);
+        chapters.setAttribute('aria-labelledby', 'toc-h');
         layout.append(chapters);
       }
       content.replaceChildren(layout);

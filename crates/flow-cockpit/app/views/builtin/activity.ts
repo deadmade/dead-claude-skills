@@ -62,7 +62,7 @@ function detail(ctx: ViewContext, call: ToolCall): Node {
   return pre;
 }
 
-function toolRow(ctx: ViewContext, agents: AgentInfo[], call: ToolCall): HTMLLIElement {
+function toolRow(ctx: ViewContext, agents: AgentInfo[], call: ToolCall, key: string): HTMLLIElement {
   const label = el('span', 'tool', el('span', 'tool-name', call.tool), ' ', call.summary);
   const marks = [call.agent !== null ? agentName(agents, call.agent) : '', call.failed ? 'Failed' : '']
     .filter(Boolean)
@@ -70,6 +70,7 @@ function toolRow(ctx: ViewContext, agents: AgentInfo[], call: ToolCall): HTMLLIE
   const body = el('div');
   const row = fold(label, marks, body, call.failed ? 'unfold tool-call failed' : 'unfold tool-call');
   row.title = `${call.tool}: ${call.summary}`;
+  row.dataset.keep = key;
   // Drawn when it opens: a long session holds hundreds of calls, and a diff costs.
   row.addEventListener('toggle', () => {
     if (row.open && !body.childNodes.length) body.append(detail(ctx, call));
@@ -84,8 +85,12 @@ function reply(ctx: ViewContext, agents: AgentInfo[], text: Text, labelled: bool
   return box;
 }
 
-/** One turn: the prompt, the main session's last reply at full contrast, everything else folded. */
-function turn(ctx: ViewContext, agents: AgentInfo[], t: Turn): HTMLLIElement {
+/**
+ * One turn: the prompt, the main session's last reply at full contrast, everything else folded. `n` counts from the
+ * oldest turn, so the keys a redraw restores open folds by stay on this turn when newer turns arrive.
+ */
+function turn(ctx: ViewContext, agents: AgentInfo[], t: Turn, n: number): HTMLLIElement {
+  const key = `turn-${n}`;
   const head = el(
     'div',
     'turn-head',
@@ -99,24 +104,28 @@ function turn(ctx: ViewContext, agents: AgentInfo[], t: Turn): HTMLLIElement {
   const last = mine.at(-1);
   if (last) main.append(el('div', 'turn-reply', ctx.blocks.markdown(last.text)));
   else if (!t.tools.length) main.append(el('p', 'quiet', 'No reply yet.'));
-  if (t.tools.length)
-    side.append(
-      fold(
-        'Tool calls',
-        plural(t.tools.length, 'tool call'),
-        el('ol', 'tool-list', ...t.tools.map((c) => toolRow(ctx, agents, c))),
-      ),
+  if (t.tools.length) {
+    const tools = fold(
+      'Tool calls',
+      plural(t.tools.length, 'tool call'),
+      el('ol', 'tool-list', ...t.tools.map((c, i) => toolRow(ctx, agents, c, `${key}-call-${i}`))),
     );
+    tools.dataset.keep = `${key}-tools`;
+    side.append(tools);
+  }
   const rest = t.replies.filter((r) => r !== last);
-  if (rest.length)
-    side.append(
-      fold(
-        'Other replies',
-        plural(rest.length, 'reply', 'replies'),
-        el('div', '', ...rest.map((r) => reply(ctx, agents, r, true))),
-      ),
+  if (rest.length) {
+    const others = fold(
+      'Other replies',
+      plural(rest.length, 'reply', 'replies'),
+      el('div', '', ...rest.map((r) => reply(ctx, agents, r, true))),
     );
-  return el('li', 'turn', main, ...(side.childNodes.length ? [side] : []));
+    others.dataset.keep = `${key}-replies`;
+    side.append(others);
+  }
+  const box = el('li', 'turn', main, ...(side.childNodes.length ? [side] : []));
+  box.dataset.keep = key;
+  return box;
 }
 
 function turns(ctx: ViewContext, activity: Activity | null): Node {
@@ -127,7 +136,8 @@ function turns(ctx: ViewContext, activity: Activity | null): Node {
     box.append(empty('Nothing happened in this session yet.', 'Its turns show once a prompt is sent.'));
     return box;
   }
-  box.append(el('ol', 'turns', ...[...activity.turns].reverse().map((t) => turn(ctx, activity.agents, t))));
+  const all = activity.turns.map((t, n) => turn(ctx, activity.agents, t, n));
+  box.append(el('ol', 'turns', ...all.reverse()));
   return box;
 }
 
@@ -198,9 +208,27 @@ async function runTab(ctx: ViewContext, project: string, slug: string): Promise<
   });
 
   async function paint() {
+    const id = current;
     for (const b of rows.querySelectorAll<HTMLElement>('[data-session]'))
-      b.setAttribute('aria-current', String(b.dataset.session === current));
-    const activity = await ctx.data.session(current);
+      b.setAttribute('aria-current', String(b.dataset.session === id));
+    let activity: Activity | null;
+    try {
+      activity = await ctx.data.session(id);
+    } catch (err) {
+      if (id !== current) return;
+      left.replaceChildren(sessionsGroup);
+      const box = el(
+        'div',
+        'error',
+        el('h2', '', "This session couldn't be read."),
+        el('p', '', err instanceof Error ? err.message : String(err)),
+      );
+      box.setAttribute('role', 'alert');
+      content.replaceChildren(box);
+      return;
+    }
+    // A read that answers after the user picked another session is dropped.
+    if (id !== current) return;
     const agents = agentsGroup(activity);
     left.replaceChildren(sessionsGroup, ...(agents ? [agents] : []));
     content.replaceChildren(turns(ctx, activity));

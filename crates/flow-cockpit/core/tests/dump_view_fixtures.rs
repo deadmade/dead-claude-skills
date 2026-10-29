@@ -97,7 +97,8 @@ fn world(root: &Path) -> (Home, Config) {
             "work/alpha/.claude/worktrees/x/docs/features/login/flow.md",
             2 * HOUR,
         ),
-        ("work/alpha/docs/features/signup/flow.md", 30 * 60),
+        // Waiting, but older than login's session: "needs you first" and "latest activity" order the runs apart.
+        ("work/alpha/docs/features/signup/flow.md", 4 * HOUR),
         (
             "work/alpha/.worktrees/y/docs/features/spiky/flow.md",
             5 * DAY,

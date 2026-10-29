@@ -511,6 +511,12 @@ test('a_slot_list_with_an_unknown_slot_is_a_load_error', async () => {
   assert.match(section(root, 'odd')?.textContent ?? '', /"nope" isn't one of/);
 });
 
+test('an_empty_slot_list_is_a_load_error', async () => {
+  const app = fakeApp({ none: { source: viewOf('none', [], '() => document.createElement("p")') } });
+  const { root } = await started(app, { to: 'list' });
+  assert.match(section(root, 'none')?.textContent ?? '', /its slot list is empty/);
+});
+
 test('a_route_without_views_says_so', async () => {
   const app = fakeApp({});
   const { root } = await started(app, { to: 'list' });

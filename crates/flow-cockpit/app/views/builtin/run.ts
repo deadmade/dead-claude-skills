@@ -29,6 +29,8 @@ const OWN_TABS: [string, string][] = [
   ['decisions', 'Decisions'],
 ];
 const TAB_ORDER = ['docs', 'activity'];
+/** The element the tabs control: this view's content, or the slot another view's tab draws in. */
+const PANEL = 'run-panel';
 const STATUS_LABEL: Record<Status, string> = {
   Waiting: 'Waiting on you',
   Working: 'Working',
@@ -96,9 +98,18 @@ function fold(label: string, count: string, body: Node): HTMLDetailsElement {
   return details;
 }
 
-function part(title: string, ...body: Node[]): HTMLElement {
-  const section = el('section', 'part');
-  section.append(el('h3', 'part-h', title), ...body);
+/** `node`, named by the element with id `id`. */
+function labelled<T extends Element>(node: T, id: string): T {
+  node.setAttribute('aria-labelledby', id);
+  return node;
+}
+
+/** A section of the content, named by its heading as in the design. */
+function part(id: string, title: string, ...body: Node[]): HTMLElement {
+  const head = el('h3', 'part-h', title);
+  head.id = id;
+  const section = el('section', 'part', head, ...body);
+  section.setAttribute('aria-labelledby', id);
   return section;
 }
 
@@ -185,6 +196,7 @@ function track(flow: FlowDoc): Node[] {
   const segs = el('span', 'segs');
   segs.setAttribute('aria-hidden', 'true');
   const list = el('ol', 'rows phase-list');
+  list.id = 'phase-list';
   list.hidden = true;
   flow.phases.forEach((p, i) => {
     const cls = p.state === 'Done' ? 'done' : p.state === 'Now' ? 'current' : '';
@@ -222,7 +234,7 @@ function track(flow: FlowDoc): Node[] {
   else where.textContent = 'No phase is under way.';
   const toggle = button('track', segs, where);
   toggle.setAttribute('aria-expanded', 'false');
-  toggle.setAttribute('aria-label', `Phases: ${where.textContent} Show every phase and gate.`);
+  toggle.setAttribute('aria-controls', 'phase-list');
   toggle.addEventListener('click', () => {
     const open = toggle.getAttribute('aria-expanded') === 'true';
     toggle.setAttribute('aria-expanded', String(!open));
@@ -274,8 +286,13 @@ function graph(ctx: ViewContext, all: Pair[], selected: number, select: (n: numb
       g.prepend(tip);
     }
   };
-  new window.MutationObserver(wire).observe(box, { childList: true, subtree: true });
+  // Watched until the drawing is in (or failed), or the box has left the page; a cached drawing is in already.
+  const watch = new window.MutationObserver(() => {
+    wire();
+    if (box.querySelector('svg, .diagram > .quiet') || !box.isConnected) watch.disconnect();
+  });
   wire();
+  if (!box.querySelector('svg')) watch.observe(box, { childList: true, subtree: true });
   const go = (event: Event) => {
     const node = event.target instanceof window.Element ? event.target.closest('g.node') : null;
     const n = node ? taskOf(node) : NaN;
@@ -308,13 +325,14 @@ function taskView(ctx: ViewContext, all: Pair[], n: number | null, select: (n: n
     el(tag, 'items', ...xs.map((s) => el('li', '', inline(ctx, capital(s)))));
 
   const title = el('h2', '', el('span', 'n num', String(p.n)), inline(ctx, p.title));
+  title.id = 'task-title';
   const main = el('div', '', el('div', 'task-h', title, el('span', `state ${st.cls}`, st.text)));
   main.append(
     p.does ? el('p', 'does', inline(ctx, p.does)) : el('p', 'does quiet', "The plan doesn't say what this task does."),
   );
   if (facts.length) main.append(el('p', 'facts', facts.join(' ')));
 
-  const hap = part('What happened', el('p', '', happened(t)));
+  const hap = part('hap-h', 'What happened', el('p', '', happened(t)));
   if (t?.security.length)
     hap.append(el('p', 'sec', `${capital(plural(t.security.length, 'security note'))} came up in review.`));
   // Short content shows as it is; longer content folds behind a row in the page's own style.
@@ -328,19 +346,22 @@ function taskView(ctx: ViewContext, all: Pair[], n: number | null, select: (n: n
   if (t?.later.length)
     main.append(
       part(
+        'later-h',
         'Left for later',
         t.later.length <= 3
           ? items('ul', t.later)
           : fold('As the reviews wrote them', plural(t.later.length, 'small issue'), items('ul', t.later)),
       ),
     );
-  main.append(part('In the plan', fold('Files, steps and tests', '', md(ctx, p.markdown))));
+  main.append(part('plan-h', 'In the plan', fold('Files, steps and tests', '', md(ctx, p.markdown))));
 
   const card = el('article', 'task', main);
-  card.setAttribute('aria-label', `Task ${p.n}`);
+  card.setAttribute('aria-labelledby', 'task-title');
   if (graphable(all)) {
-    const where = el('section', 'where-graph');
-    where.setAttribute('aria-label', 'Where it sits in the plan');
+    const head = el('h3', 'visually-hidden', 'Where it sits in the plan');
+    head.id = 'graph-h';
+    const where = el('section', 'where-graph', head);
+    where.setAttribute('aria-labelledby', 'graph-h');
     where.append(
       el(
         'p',
@@ -398,13 +419,17 @@ function decisionItems(run: FlowRun) {
     .map((d, i) => ({ id: `dev-${i}`, kind: 'dev' as const, d }))
     .sort((a, b) => rank(a.d) - rank(b.d));
   const decs: Item[] = flow.decisions.map((d, i) => ({ id: `dec-${i}`, kind: 'dec' as const, d }));
-  // flow.md's own calls, then any the build log holds that flow.md doesn't.
-  const calls = [
-    ...flow.rulings,
-    ...(run.ledger?.rulings ?? []).filter((r) => !flow.rulings.some((f) => f.call === r.call)),
-  ];
+  // flow.md's own calls, as the approved design lists them.
+  const calls = flow.rulings;
   const rules: Item[] = calls.map((d, i) => ({ id: `rul-${i}`, kind: 'rul' as const, d }));
   return { devs, decs, rules };
+}
+
+/** The selected item's heading, which names its article. */
+function itemHead(title: Node): HTMLHeadingElement {
+  const head = el('h2', 'item-h', title);
+  head.id = 'item-h';
+  return head;
 }
 
 function itemDetail(ctx: ViewContext, x: Item): Node[] {
@@ -413,12 +438,8 @@ function itemDetail(ctx: ViewContext, x: Item): Node[] {
     const lead = d.picked
       ? el('p', 'item-lead', el('span', 'tag', 'Picked'), inline(ctx, capital(d.picked)))
       : el('p', 'item-lead', el('span', 'tag open', 'Not picked yet'), 'It waits for your choice.');
-    const nodes: Node[] = [
-      el('h2', 'item-h', inline(ctx, d.title)),
-      el('p', 'item-meta', 'A decision in Options'),
-      lead,
-    ];
-    if (d.body) nodes.push(part('Why, and what else was offered', md(ctx, d.body)));
+    const nodes: Node[] = [itemHead(inline(ctx, d.title)), el('p', 'item-meta', 'A decision in Options'), lead];
+    if (d.body) nodes.push(part('why-h', 'Why, and what else was offered', md(ctx, d.body)));
     return nodes;
   }
   if (x.kind === 'dev') {
@@ -428,23 +449,23 @@ function itemDetail(ctx: ViewContext, x: Item): Node[] {
     if (s === 'Open') meta.append(el('span', 'tag open', 'Open'), 'It needs your decision before the build goes on.');
     else if (s === 'Unknown') meta.append('Written before the format had a status line.');
     else meta.append(el('span', 'tag', `Decided${s.Decided.date ? ` ${day(s.Decided.date)}` : ''}`));
-    const nodes: Node[] = [el('h2', 'item-h', inline(ctx, d.title)), meta];
-    if (d.body) nodes.push(part('What happened', md(ctx, d.body)));
+    const nodes: Node[] = [itemHead(inline(ctx, d.title)), meta];
+    if (d.body) nodes.push(part('hap-h', 'What happened', md(ctx, d.body)));
     if (s !== 'Open' && s !== 'Unknown')
-      nodes.push(part('How it was decided', el('p', 'item-lead', inline(ctx, `${capital(s.Decided.what)}.`))));
+      nodes.push(part('how-h', 'How it was decided', el('p', 'item-lead', inline(ctx, `${capital(s.Decided.what)}.`))));
     return nodes;
   }
   const d = x.d;
   const nodes: Node[] = [
-    el('h2', 'item-h', inline(ctx, capital(d.call))),
+    itemHead(inline(ctx, capital(d.call))),
     el(
       'p',
       'item-meta',
       `A call the build made on its own${d.scope ? `, ${d.scope}` : ''}${d.date ? `, ${day(d.date)}` : ''}.`,
     ),
   ];
-  if (d.why) nodes.push(part('Why', md(ctx, `${capital(d.why).replace(/\.$/, '')}.`)));
-  if (d.cost) nodes.push(part('If it was the wrong call', md(ctx, `It costs ${d.cost.replace(/\.$/, '')}.`)));
+  if (d.why) nodes.push(part('why-h', 'Why', md(ctx, `${capital(d.why).replace(/\.$/, '')}.`)));
+  if (d.cost) nodes.push(part('cost-h', 'If it was the wrong call', md(ctx, `It costs ${d.cost.replace(/\.$/, '')}.`)));
   return nodes;
 }
 
@@ -468,26 +489,28 @@ function frame(
   const where = el('p', 'where');
   const left = el('aside', 'left');
   const content = el('div', 'content');
+  content.id = PANEL;
   content.setAttribute('role', 'tabpanel');
 
   if (!run) {
     win.append(el('div', 'tabs-bar', tabs, where), left, content);
-    content.append(
-      el(
-        'div',
-        'error',
-        el('h2', '', "This run can't be shown."),
-        el('p', '', `No flow run named ${slug} is in this project now.`),
-        el('p', '', 'Go back to the list to pick another.'),
-      ),
+    const error = el(
+      'div',
+      'error',
+      el('h2', '', "This run can't be shown."),
+      el('p', '', `No flow run named ${slug} is in this project now.`),
+      el('p', '', 'Go back to the list to pick another.'),
     );
+    error.setAttribute('role', 'alert');
+    content.append(error);
     return win;
   }
 
   const { flow, summary } = run;
   const st = summary.status;
+  const kind = flow.flow || summary.conductor;
   where.append(
-    `${capital(flow.flow ?? summary.conductor)} flow${flow.phase ? `, in ${phaseName(flow)}` : ''}`,
+    `${kind ? `${capital(kind)} flow` : 'Flow run'}${flow.phase ? `, in ${phaseName(flow)}` : ''}`,
     el('span', `status st-${st}`, STATUS_LABEL[st]),
   );
   const selected = tab ?? mem.tab;
@@ -498,6 +521,8 @@ function frame(
   for (const [id, label] of all) {
     const b = button('tab', label);
     b.setAttribute('role', 'tab');
+    b.id = `run-tab-${id}`;
+    b.setAttribute('aria-controls', PANEL);
     b.dataset.tab = id;
     b.setAttribute('aria-selected', String(id === selected));
     b.addEventListener('click', () => {
@@ -517,6 +542,7 @@ function frame(
     // Another view draws this tab, across both columns.
     const slot = el('div');
     slot.dataset.slot = 'run-tab';
+    slot.id = PANEL;
     win.append(slot);
     return win;
   }
@@ -545,23 +571,22 @@ function frame(
       content.scrollTop = 0;
     };
 
-    const group = el('section', 'group');
-    group.setAttribute('aria-label', 'Tasks');
+    const group = labelled(el('section', 'group'), 'tk-h');
     if (!pairs.length) {
       group.append(
-        el('h2', 'group-h', 'Tasks'),
+        Object.assign(el('h2', 'group-h', 'Tasks'), { id: 'tk-h' }),
         empty('No plan with tasks yet.', 'They show once plan.md holds its tasks under task headings.'),
       );
     } else {
       const done = pairs.filter((x) => x.t?.state === 'Done').length;
-      group.append(
-        el(
-          'h2',
-          'group-h',
-          el('span', '', 'Tasks'),
-          el('span', 'aside', run!.ledger ? `${done} of ${pairs.length} done` : 'Not started in this checkout'),
-        ),
+      const head = el(
+        'h2',
+        'group-h',
+        el('span', '', 'Tasks'),
+        el('span', 'aside', run!.ledger ? `${done} of ${pairs.length} done` : 'Not started in this checkout'),
       );
+      head.id = 'tk-h';
+      group.append(head);
       const rows = el('ol', 'rows');
       for (const { p, t } of pairs) {
         const state = t?.state ?? 'NotStarted';
@@ -596,7 +621,7 @@ function frame(
     const show = (x: Item | undefined) => {
       content.replaceChildren(
         x
-          ? el('article', 'reading item', ...itemDetail(ctx, x))
+          ? labelled(el('article', 'reading item', ...itemDetail(ctx, x)), 'item-h')
           : el(
               'div',
               'reading empty',
@@ -623,16 +648,17 @@ function frame(
       b.addEventListener('click', () => select(x.id));
       return el('li', '', b);
     };
-    const group = (title: string, aside: string, body: Node) => {
-      const g = el('section', 'group', el('h2', 'group-h', el('span', '', title), el('span', 'aside', aside)), body);
-      g.setAttribute('aria-label', title);
-      return g;
+    const group = (id: string, title: string, aside: string, body: Node) => {
+      const head = el('h2', 'group-h', el('span', '', title), el('span', 'aside', aside));
+      head.id = id;
+      return labelled(el('section', 'group', head, body), id);
     };
     const open = devs.filter((x) => x.kind === 'dev' && x.d.status === 'Open').length;
     const unpicked = decs.filter((x) => x.kind === 'dec' && !x.d.picked).length;
     left.setAttribute('aria-label', "Deviations, decisions and the build's own calls");
     left.append(
       group(
+        'dev-h',
         'Deviations',
         open ? `${open} open` : 'None open',
         devs.length
@@ -649,6 +675,7 @@ function frame(
           : el('p', 'quiet', 'None so far. The plan has held.'),
       ),
       group(
+        'dec-h',
         'Decisions',
         unpicked ? `${unpicked} not picked` : plural(decs.length, 'decision'),
         decs.length
@@ -666,6 +693,7 @@ function frame(
     if (rules.length)
       left.append(
         group(
+          'rul-h',
           'Calls the build made',
           String(rules.length),
           el(
@@ -684,6 +712,7 @@ function frame(
   function paint() {
     for (const b of tabs.querySelectorAll<HTMLElement>('[data-tab]'))
       b.setAttribute('aria-selected', String(b.dataset.tab === mem.tab));
+    content.setAttribute('aria-labelledby', `run-tab-${mem.tab}`);
     left.replaceChildren();
     content.replaceChildren();
     left.scrollTop = 0;

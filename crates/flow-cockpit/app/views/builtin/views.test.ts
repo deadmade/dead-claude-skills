@@ -39,8 +39,8 @@ let fresh = 0;
 /** Each test gets its own copy of the view module, so what one test picked doesn't carry into the next. */
 const load = async (name: string) => (await import(`./${name}.ts?t=${++fresh}`)).default;
 
-/** A ViewContext over the fixtures; `data` overrides parts of them. */
-function context(route: any, data: Partial<typeof DATA> = {}) {
+/** A ViewContext over the fixtures; `data` overrides parts of them, `api` replaces calls. */
+function context(route: any, data: Partial<typeof DATA> = {}, api: Record<string, any> = {}) {
   const d = { ...DATA, ...data };
   const navigations: any[] = [];
   const ctx = {
@@ -52,6 +52,7 @@ function context(route: any, data: Partial<typeof DATA> = {}) {
       session: async (id: string) => d.sessions[id] ?? null,
       views: async () => [],
       viewSource: async () => '',
+      ...api,
     },
     blocks,
     navigate: (to: any) => navigations.push(to),
@@ -61,10 +62,10 @@ function context(route: any, data: Partial<typeof DATA> = {}) {
   return { ctx, navigations };
 }
 
-/** Draws a view into the page, in a section as the runtime does. */
-async function draw(name: string, route: any, data?: Partial<typeof DATA>) {
-  const view = await load(name);
-  const { ctx, navigations } = context(route, data);
+/** Draws a view (by name, freshly loaded, or one already loaded) into the page, in a section as the runtime does. */
+async function draw(name: string | any, route: any, data?: Partial<typeof DATA>, api?: Record<string, any>) {
+  const view = typeof name === 'string' ? await load(name) : name;
+  const { ctx, navigations } = context(route, data, api);
   const box = document.createElement('section');
   box.className = 'view';
   box.dataset.view = view.id;
@@ -97,7 +98,7 @@ test('views_import_types_only', () => {
 
 test('list_groups_runs_audits_loose', async () => {
   const { box, navigations } = await draw('list', { to: 'list', project: ALPHA });
-  assert.deepEqual(names(box, 'Flow runs'), ['Signup', 'Login', 'Spiky']);
+  assert.deepEqual(names(box, 'Flow runs'), ['Login', 'Signup', 'Spiky']);
   assert.equal(rowsOf(box, 'Audits').length, 2);
   assert.deepEqual(names(box, 'Loose sessions'), [
     'Read docs/features/login/flow.md and summarise it.',
@@ -105,9 +106,9 @@ test('list_groups_runs_audits_loose', async () => {
   ]);
   // Unfinished runs stand out; a done one is quiet.
   assert.ok(rowsOf(box, 'Flow runs')[2].classList.contains('done'));
-  assert.match(text(rowsOf(box, 'Flow runs')[0]), /Needs you/);
+  assert.match(text(rowsOf(box, 'Flow runs')[1]), /Needs you/);
 
-  (rowsOf(box, 'Flow runs')[1] as HTMLElement).click();
+  (rowsOf(box, 'Flow runs')[0] as HTMLElement).click();
   (rowsOf(box, 'Loose sessions')[0] as HTMLElement).click();
   assert.deepEqual(navigations, [
     { to: 'run', project: ALPHA, slug: 'login' },
@@ -128,13 +129,13 @@ test('list_groups_runs_audits_loose', async () => {
 test('list_filters_and_sorts', async () => {
   const { box } = await draw('list', { to: 'list', project: ALPHA });
   const runs = () => names(box, 'Flow runs');
-  assert.deepEqual(runs(), ['Signup', 'Login', 'Spiky'], 'latest activity first');
+  assert.deepEqual(runs(), ['Login', 'Signup', 'Spiky'], 'latest activity first');
   press(box, 'Name');
   assert.deepEqual(runs(), ['Login', 'Signup', 'Spiky']);
   press(box, 'Furthest along');
   assert.deepEqual(runs(), ['Spiky', 'Login', 'Signup']);
   press(box, 'Needs you first');
-  assert.deepEqual(runs(), ['Signup', 'Login', 'Spiky']);
+  assert.deepEqual(runs(), ['Signup', 'Login', 'Spiky'], 'the waiting run first, though it is older');
   assert.equal(group(box, 'Flow runs')?.querySelector('[aria-pressed="true"]'), null);
   assert.equal(
     text([...box.querySelectorAll('button[aria-pressed="true"]')].find((b) => text(b).startsWith('Needs'))),
@@ -147,7 +148,7 @@ test('list_filters_and_sorts', async () => {
   assert.equal(group(box, 'Audits'), undefined);
   assert.equal(group(box, 'Loose sessions'), undefined);
   press(box, 'Done');
-  assert.deepEqual(runs(), ['Signup', 'Login', 'Spiky']);
+  assert.deepEqual(runs(), ['Signup', 'Login', 'Spiky'], 'still needs-you-first');
 
   // Conductor: runs and audits have one.
   press(box, 'Research');
@@ -258,6 +259,15 @@ test('run_decisions_list_and_detail', async () => {
   assert.deepEqual(names(box, 'Deviations'), ['The form needs a second field', 'Pick a hash']);
   assert.deepEqual(names(box, 'Decisions'), ['Where the form lives', 'Remember me']);
   assert.deepEqual(names(box, 'Calls the build made'), ["The form keeps the browser's own validation"]);
+
+  // flow.md's own calls only, as the approved design lists them; the build log's are not merged in.
+  const runs = clone(DATA.runs);
+  runs[`${ALPHA}/login`].ledger.rulings = [
+    { date: null, scope: null, call: 'the log keeps its own wording', why: null, cost: null, raw: 'x' },
+  ];
+  const merged = await draw('run', { to: 'run', project: ALPHA, slug: 'login' }, { runs });
+  press(merged.box, 'Decisions');
+  assert.deepEqual(names(merged.box, 'Calls the build made'), ["The form keeps the browser's own validation"]);
   // The open deviation is selected first.
   assert.equal(text(box.querySelector('.item-h')), 'The form needs a second field');
   press(box, 'Remember me');
@@ -336,4 +346,166 @@ test('activity_groups_turns_newest_first', async () => {
 
   const none = await draw('activity', { to: 'session', project: ALPHA, id: 'nope' });
   assert.match(text(none.box), /isn't there any more/);
+});
+
+/** A promise per call, settled by the test. */
+function deferred() {
+  const calls: { id: string; resolve: (v: any) => void; reject: (e: any) => void }[] = [];
+  const session = (id: string) => new Promise((resolve, reject) => calls.push({ id, resolve, reject }));
+  return { calls, session };
+}
+const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+const twoSessions = () => {
+  const runs = clone(DATA.runs);
+  runs[`${ALPHA}/login`].sessions = ['s-link', 's-mention'];
+  return runs;
+};
+
+test('activity_keeps_a_late_read_from_replacing_the_pick', async () => {
+  const reads = deferred();
+  const route = { to: 'run', project: ALPHA, slug: 'login', tab: 'activity' };
+  const drawn = draw('activity', route, { runs: twoSessions() }, { session: reads.session });
+  await tick();
+  reads.calls[0].resolve(DATA.sessions['s-link']);
+  const { box } = await drawn;
+  const shown = () => text(box.querySelector('.turn-h'));
+  assert.equal(shown(), 'Now run the tests.');
+
+  // A slow read of the other session, then a pick back to the first, which answers first.
+  press(box, 'Session s-mentio');
+  press(box, 'Latest session');
+  const [slow, fast] = reads.calls.slice(1);
+  assert.deepEqual([slow.id, fast.id], ['s-mention', 's-link']);
+  fast.resolve(DATA.sessions['s-link']);
+  await tick();
+  slow.resolve(DATA.sessions['s-mention']);
+  await tick();
+  assert.equal(shown(), 'Now run the tests.', 'the late read is dropped');
+  assert.equal(box.querySelector('[aria-current="true"]')?.getAttribute('data-session'), 's-link');
+
+  // A read that fails says so where the turns go.
+  press(box, 'Session s-mentio');
+  reads.calls.at(-1)!.reject(new Error('the transcript is gone'));
+  await tick();
+  assert.match(text(box.querySelector('.content')), /couldn't be read.*the transcript is gone/);
+});
+
+test('activity_reads_only_the_selected_session', async () => {
+  const read: string[] = [];
+  const session = async (id: string) => {
+    read.push(id);
+    return DATA.sessions[id] ?? null;
+  };
+  await draw(
+    'activity',
+    { to: 'run', project: ALPHA, slug: 'login', tab: 'activity' },
+    { runs: twoSessions() },
+    { session },
+  );
+  assert.deepEqual(read, ['s-link']);
+});
+
+test('activity_folds_stay_on_their_turn_across_a_redraw', async () => {
+  const { createRuntime } = await import('../../shell/runtime.js');
+  const sessions = clone(DATA.sessions);
+  const handlers = new Map<string, (event: any) => void>();
+  const invoke = async (cmd: string, args: any = {}) => {
+    if (cmd === 'views') return [{ id: 'activity', source: 'Builtin', replaced: false }];
+    if (cmd === 'view_source') return '';
+    if (cmd === 'session') return sessions[args.id] ?? null;
+    return null;
+  };
+  const root = document.createElement('main');
+  document.body.replaceChildren(root);
+  const runtime = createRuntime({
+    root,
+    invoke,
+    listen: async (name: string, handler: any) => handlers.set(name, handler),
+    importModule: () => import(`./activity.ts?t=${++fresh}`),
+  });
+  await runtime.start({ to: 'session', project: ALPHA, id: 's-link' });
+  const fold = (prompt: string) =>
+    [...root.querySelectorAll('.turn')]
+      .find((t) => text(t.querySelector('.turn-h')) === prompt)
+      ?.querySelector('details') as HTMLDetailsElement;
+  fold('Build the login form.').open = true;
+
+  // A new prompt arrives and a question waits: both move every turn down.
+  const prompt = { at: '2026-01-19T10:09:00.000Z', text: 'One more.', agent: null };
+  sessions['s-link'].turns.push({ prompt, replies: [], tools: [] });
+  sessions['s-link'].live.waiting = 'A question';
+  handlers.get('changed')!({ payload: { project: ALPHA } });
+  await runtime.idle();
+  assert.equal(text(root.querySelector('.turn-h')), 'One more.');
+  assert.equal(fold('Build the login form.').open, true, 'the fold stays on its turn');
+  assert.equal(fold('Now run the tests.').open, false);
+});
+
+test('list_clears_filters_the_new_project_has_no_row_for', async () => {
+  const list = await load('list');
+  const alpha = await draw(list, { to: 'list', project: ALPHA });
+  press(alpha.box, 'Research');
+  press(alpha.box, 'Done');
+  const solo = await draw(list, { to: 'list', project: 'folder-solo' });
+  assert.equal(solo.box.querySelector('[aria-pressed="true"]:not([data-sort])'), null);
+  assert.deepEqual(names(solo.box, 'Loose sessions'), ['Solo A.', 'Solo B.']);
+});
+
+test('run_wires_accessibility_like_the_design', async () => {
+  const resolves = (box: Element) => {
+    for (const el of box.querySelectorAll('[aria-labelledby], [aria-controls]')) {
+      for (const attr of ['aria-labelledby', 'aria-controls']) {
+        const id = el.getAttribute(attr);
+        if (id) assert.ok(box.querySelector(`#${id}`), `${attr}="${id}" names nothing`);
+      }
+    }
+  };
+  const { box } = await draw('run', { to: 'run', project: ALPHA, slug: 'signup' });
+  const tab = box.querySelector('.tab[aria-selected="true"]');
+  assert.equal(tab?.id, 'run-tab-build');
+  assert.equal(tab?.getAttribute('aria-controls'), 'run-panel');
+  assert.equal(box.querySelector('#run-panel')?.getAttribute('aria-labelledby'), 'run-tab-build');
+  assert.equal(box.querySelector('#run-panel')?.getAttribute('role'), 'tabpanel');
+  assert.ok(box.querySelector('.track')?.getAttribute('aria-controls'));
+  resolves(box);
+
+  const login = await draw('run', { to: 'run', project: ALPHA, slug: 'login' });
+  assert.equal(login.box.querySelector('article.task')?.getAttribute('aria-labelledby'), 'task-title');
+  resolves(login.box);
+  press(login.box, 'Decisions');
+  assert.equal(login.box.querySelector('article.item')?.getAttribute('aria-labelledby'), 'item-h');
+  resolves(login.box);
+
+  const gone = await draw('run', { to: 'run', project: ALPHA, slug: 'nope' });
+  assert.equal(gone.box.querySelector('.error')?.getAttribute('role'), 'alert');
+  const docs = await draw('docs', { to: 'run', project: ALPHA, slug: 'login', tab: 'docs' });
+  resolves(docs.box);
+});
+
+test('run_graph_nodes_select_their_task', async () => {
+  const w = window as any;
+  w.mermaid = {
+    initialize() {},
+    render: async (id: string) => ({
+      svg: `<svg id="${id}"><g class="node" id="flowchart-T1-0"></g><g class="node" id="flowchart-T2-1"></g></svg>`,
+    }),
+  };
+  try {
+    const { box } = await draw('run', { to: 'run', project: ALPHA, slug: 'login' });
+    await tick();
+    const node = box.querySelector('#flowchart-T1-0') as Element;
+    assert.equal(node.getAttribute('role'), 'link');
+    assert.match(node.getAttribute('aria-label') ?? '', /^Task 1, The form: done after 1 fix round$/);
+    // Wired once: later changes to the drawing aren't watched.
+    const late = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    late.setAttribute('class', 'node');
+    late.id = 'flowchart-T2-9';
+    box.querySelector('.graph svg')?.append(late);
+    await tick();
+    assert.equal(late.getAttribute('tabindex'), null);
+    node.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    assert.equal(text(box.querySelector('.task .does')), 'Draws the form.');
+  } finally {
+    delete w.mermaid;
+  }
 });

@@ -13,6 +13,8 @@ import type { Status } from '../../../bindings/Status';
 type Sort = 'activity' | 'needs' | 'furthest' | 'name';
 /** The filters and sort, kept while the window is open so a redraw with fresh data keeps them. */
 const state = {
+  /** The project the filters were picked in. */
+  project: '',
   statuses: new Set<Status>(),
   conductors: new Set<string>(),
   sort: 'activity' as Sort,
@@ -209,6 +211,14 @@ function frame(ctx: ViewContext, projects: Project[], project: Project | undefin
   const runs = entries.flatMap((e) => (e.kind === 'FlowRun' ? [e] : []));
   const audits = entries.flatMap((e) => (e.kind === 'Audit' ? [e] : []));
   const loose = entries.flatMap((e) => (e.kind === 'Loose' ? [e] : []));
+
+  // Moving to another project drops a filter it has no row for, which could not be unpressed there.
+  if (state.project !== project.id) {
+    state.project = project.id;
+    for (const s of state.statuses) if (!runs.some((r) => r.status === s)) state.statuses.delete(s);
+    for (const c of state.conductors)
+      if (![...runs, ...audits].some((x) => x.conductor === c)) state.conductors.delete(c);
+  }
 
   const search = el('input');
   search.type = 'search';
