@@ -85,7 +85,19 @@ fn run() -> ExitCode {
     );
     let shared = Arc::new(Shared::new(index, views));
     let poll_shared = Arc::clone(&shared);
+    // Tauri allows every navigation unless a plugin refuses it. `window.open` needs no guard: without a new-window
+    // handler, WebKitGTK opens nothing and wry marks WebView2's request handled.
+    let stay_local = tauri::plugin::Builder::<tauri::Wry>::new("stay-local")
+        .on_navigation(|_, url| {
+            let allowed = stays_in_app(url);
+            if !allowed {
+                eprintln!("flow-cockpit: refused to leave the app for {url}");
+            }
+            allowed
+        })
+        .build();
     let result = tauri::Builder::default()
+        .plugin(stay_local)
         .manage(shared)
         .invoke_handler(tauri::generate_handler![
             commands::projects,
@@ -119,6 +131,18 @@ fn run() -> ExitCode {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => fail(&format!("flow-cockpit: {e}\n")),
     }
+}
+
+/// Whether the window may go to `url`: only the app's own origin, which is `tauri://localhost` on Linux and
+/// `http://tauri.localhost` (`https://` when asked for) on Windows. Anything else, a link in untrusted text or a
+/// view's `location.assign()`, would replace the app with a page from elsewhere, so it is refused.
+fn stays_in_app(url: &tauri::Url) -> bool {
+    let host = match url.scheme() {
+        "tauri" => "localhost",
+        "http" | "https" => "tauri.localhost",
+        _ => return false,
+    };
+    url.host_str() == Some(host) && url.port().is_none()
 }
 
 /// Where the window reads: Claude's transcripts and the capture files, and the folder of the user's extensions and
@@ -250,6 +274,37 @@ mod tests {
         assert!(should_disable_dmabuf(None));
         for value in ["1", "0", ""] {
             assert!(!should_disable_dmabuf(Some(value.as_ref())), "{value:?}");
+        }
+    }
+
+    #[test]
+    fn navigation_stays_on_the_apps_own_origin() {
+        let allowed = |url: &str| stays_in_app(&tauri::Url::parse(url).unwrap());
+        for url in [
+            "tauri://localhost",
+            "tauri://localhost/",
+            "tauri://localhost/index.html#/run/p/feature",
+            "http://tauri.localhost/",
+            "https://tauri.localhost/index.html#/list",
+        ] {
+            assert!(allowed(url), "{url} refused");
+        }
+        for url in [
+            "https://example.invalid/x",
+            "http://localhost:1420/",
+            "http://localhost/",
+            "tauri://example.invalid/",
+            "http://tauri.localhost.example.invalid/",
+            "http://tauri.localhost:8080/",
+            "tauri://localhost:8080/",
+            "ftp://tauri.localhost/",
+            "blob:tauri://localhost/0b6c1f9e-2f7a-4c55-9d8e-3a1f2b4c5d6e",
+            "data:text/html,<p>hi</p>",
+            "javascript:alert(1)",
+            "file:///etc/passwd",
+            "about:blank",
+        ] {
+            assert!(!allowed(url), "{url} allowed");
         }
     }
 

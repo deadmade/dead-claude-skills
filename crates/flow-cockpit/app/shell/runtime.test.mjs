@@ -195,6 +195,8 @@ test('markdown_strips_script_and_handlers', () => {
       '',
       '<form action="https://example.com/"><button formaction="javascript:alert(4)">go</button></form>',
       '<style>body { display: none }</style><p style="position: fixed">styled</p>',
+      '',
+      '<map name="m"><area shape="default" href="https://example.invalid/x"></map><img usemap="#m" width="400" height="300" alt="x">',
     ].join('\n'),
   );
   document.body.replaceChildren(node);
@@ -209,6 +211,9 @@ test('markdown_strips_script_and_handlers', () => {
     'formaction',
     '<style',
     'style=',
+    '<map',
+    '<area',
+    'example.invalid',
   ]) {
     assert.ok(!html.includes(bad), `${bad} survived: ${html}`);
   }
@@ -219,6 +224,13 @@ test('markdown_strips_script_and_handlers', () => {
   const click = new window.MouseEvent('click', { bubbles: true, cancelable: true });
   node.querySelector('a[href="https://example.com/"]').dispatchEvent(click);
   assert.ok(click.defaultPrevented);
+  // Nor does an image map's area, should one ever get past the sanitiser.
+  const map = document.createElement('map');
+  map.innerHTML = '<area shape="default" href="https://example.invalid/y">';
+  node.append(map);
+  const areaClick = new window.MouseEvent('click', { bubbles: true, cancelable: true });
+  map.querySelector('area').dispatchEvent(areaClick);
+  assert.ok(areaClick.defaultPrevented, 'a click on an area is cancelled');
 });
 
 test('mermaid_fences_become_diagram_nodes', async () => {
