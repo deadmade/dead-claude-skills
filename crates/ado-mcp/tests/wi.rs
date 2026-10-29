@@ -139,7 +139,7 @@ fn view_all_links() {
             "Tested By: #130",
             "commits: 2d9e7b10",
             "branches: feature/proxy-fix",
-            "links: 1  attachments: 2",
+            "hyperlinks: 1  attachments: 2",
         ],
         "{text}"
     );
@@ -712,4 +712,21 @@ fn view_dot_project_does_not_climb() {
             .any(|p| p.starts_with("/tfs/Coll/%252E%252E/_apis/wit/workItems/123/comments")),
         "{paths:?}"
     );
+}
+
+/// `wi_view`'s description words the count line as it reads: hyperlinks, not links.
+#[test]
+fn view_description_says_hyperlinks() {
+    let fx = Fixture::start();
+    let tools = ado(&fx, &[]).request("tools/list", json!({}))["tools"].take();
+    let desc = tools
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["name"] == "wi_view")
+        .unwrap()["description"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(desc.contains("hyperlink and attachment counts"), "{desc}");
 }

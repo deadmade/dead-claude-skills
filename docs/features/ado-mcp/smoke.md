@@ -153,7 +153,7 @@ Pick a work item linked to a commit and a branch (from the work item's Developme
 to a work item by a link other than parent or child (Related, Duplicate, …). Call `wi_view id=<wi>`.
 
 Paste back: the `commits:` and `branches:` lines with values replaced by `…`, the other link lines' names
-(`Related: …`), whether the counts on the `links:`/`attachments:` line match the web UI, and any link the web UI
+(`Related: …`), whether the counts on the `hyperlinks:`/`attachments:` line match the web UI, and any link the web UI
 shows that `wi_view` left out.
 
 ## 6. Writes

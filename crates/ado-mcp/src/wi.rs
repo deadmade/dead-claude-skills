@@ -191,7 +191,7 @@ fn other_links(w: &WorkItem) -> Vec<String> {
             out.push(format!("{title}: {}", list.join(", ")));
         }
     }
-    let counts: Vec<String> = [("links", hyperlinks), ("attachments", files)]
+    let counts: Vec<String> = [("hyperlinks", hyperlinks), ("attachments", files)]
         .into_iter()
         .filter(|&(_, n)| n > 0)
         .map(|(title, n)| format!("{title}: {n}"))
@@ -808,7 +808,7 @@ mod tests {
                 "Tested By: #12",
                 "commits: 2d9e7b10",
                 "branches: feature/x",
-                "links: 1  attachments: 2",
+                "hyperlinks: 1  attachments: 2",
             ]
         );
         let all = got.join("\n");

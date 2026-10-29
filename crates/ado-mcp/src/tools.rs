@@ -177,7 +177,7 @@ impl Server {
     }
 
     #[tool(
-        description = "Show a work item: type, state, title, assignee, area and iteration, parent, children, linked PRs, its other links (work item links by type, commits, branches, link and attachment counts), the description and acceptance criteria as plain text, and the last 5 comments (full: the whole texts and up to 200 comments).",
+        description = "Show a work item: type, state, title, assignee, area and iteration, parent, children, linked PRs, its other links (work item links by type, commits, branches, hyperlink and attachment counts), the description and acceptance criteria as plain text, and the last 5 comments (full: the whole texts and up to 200 comments).",
         annotations(read_only_hint = true)
     )]
     async fn wi_view(&self, Parameters(a): Parameters<WiViewArgs>) -> CallToolResult {
