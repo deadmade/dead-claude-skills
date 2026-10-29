@@ -168,7 +168,7 @@ impl Poller {
             *shared.write() = fresh;
         } else {
             let grown = transcripts != self.transcripts;
-            touched = self.touched_projects(&transcripts, &captures, &trees);
+            touched = self.touched_projects(&shared.read(), &transcripts, &captures, &trees);
             if !touched.is_empty() || (grown && self.scanned) {
                 let mut index = shared.write();
                 for id in &touched {
@@ -238,9 +238,11 @@ impl Poller {
         (switched || trust, reconfigured)
     }
 
-    /// The projects whose transcripts, capture files or documents changed since the last tick.
+    /// The projects whose transcripts, capture files or documents changed since the last tick; `index` says which
+    /// projects a Claude folder holds sessions of.
     fn touched_projects(
         &self,
+        index: &Index,
         transcripts: &HashMap<PathBuf, Sig>,
         captures: &HashMap<PathBuf, Sig>,
         trees: &HashMap<String, u64>,
@@ -259,11 +261,9 @@ impl Poller {
             changed_paths(&self.captures, captures)
                 .filter_map(|p| sessions.get(p.file_stem()?).cloned()),
         );
-        let mut touched: BTreeSet<String> = self
-            .projects
+        let mut touched: BTreeSet<String> = folders
             .iter()
-            .filter(|p| folders.iter().any(|f| holds_sessions_of(f, p)))
-            .map(|p| p.id.clone())
+            .flat_map(|f| index.projects_in_folder(f))
             .collect();
         touched.extend(
             trees
@@ -312,22 +312,6 @@ fn changed_paths<'a>(
 fn folder_of(root: &Path, path: &Path) -> Option<OsString> {
     let first = path.strip_prefix(root).ok()?.components().next()?;
     Some(first.as_os_str().to_os_string())
-}
-
-/// Claude Code names a working directory's folder by turning every character but letters and digits into `-`; a
-/// session in a project's root, or in a folder under it, lands in a folder named after that.
-fn holds_sessions_of(folder: &OsStr, project: &Project) -> bool {
-    let folder = folder.to_string_lossy();
-    project.roots.iter().any(|root| {
-        let name: String = root
-            .to_string_lossy()
-            .chars()
-            .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
-            .collect();
-        folder
-            .strip_prefix(name.as_str())
-            .is_some_and(|rest| rest.is_empty() || rest.starts_with('-'))
-    })
 }
 
 /// Every `<folder>/<session>.jsonl` and `<folder>/<session>/subagents/*.jsonl` under the projects folder.
@@ -816,7 +800,7 @@ mod tests {
     /// One capture line as the hooks write it, of invented content.
     fn capture_line(event: &str, extra: &str) -> String {
         format!(
-            "{{\"v\":1,\"ts\":\"{}\",\"session\":\"s-q\",\"event\":\"{event}\"{extra}}}\n",
+            "{{\"v\":1,\"ts\":\"{}\",\"event\":\"{event}\"{extra}}}\n",
             Timestamp::now()
         )
     }

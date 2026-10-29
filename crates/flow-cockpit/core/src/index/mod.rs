@@ -12,6 +12,7 @@ mod projects;
 mod status;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -221,6 +222,30 @@ impl Index {
     #[must_use]
     pub fn session_path(&self, id: &str) -> Option<PathBuf> {
         Some(self.sessions.get(id)?.path.clone())
+    }
+
+    /// The projects whose sessions Claude Code writes into the transcript folder named `folder` (a name directly
+    /// under its projects folder): each project with a root of that name, and each with a session read from there,
+    /// which is how a session started in a folder under a root is found. The name is never matched by its start:
+    /// `-work-app-beta` may be `/work/app-beta` as well as `/work/app/beta`.
+    #[must_use]
+    pub fn projects_in_folder(&self, folder: &OsStr) -> BTreeSet<String> {
+        let name = folder.to_string_lossy();
+        let mut out: BTreeSet<String> = self
+            .projects
+            .iter()
+            .filter(|(_, p)| p.roots.iter().any(|root| encode(root) == name))
+            .map(|(id, _)| id.clone())
+            .collect();
+        out.extend(
+            self.sessions
+                .values()
+                .filter(|s| {
+                    s.dir.file_name() == Some(folder) && self.projects.contains_key(&s.project)
+                })
+                .map(|s| s.project.clone()),
+        );
+        out
     }
 
     /// Adds the sessions in one `~/.claude/projects/<dir>`. With `only`, sessions of other projects are skipped.

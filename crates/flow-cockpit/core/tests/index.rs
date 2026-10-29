@@ -682,6 +682,70 @@ fn refresh_moves_statuses_and_cutoffs_with_the_clock() {
     assert_eq!(loose(&index, &alpha), Vec::<String>::new());
 }
 
+/// Claude Code's folder name for a working directory, written out here so the test checks the core's own rule.
+fn claude_folder(cwd: &Path) -> String {
+    cwd.to_string_lossy()
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+        .collect()
+}
+
+/// A session started in `cwd`, in the folder Claude Code would put it in; returns that folder's name.
+fn session_in(w: &World, cwd: &Path, id: &str) -> String {
+    fs::create_dir_all(cwd).unwrap();
+    let folder = claude_folder(cwd);
+    let dir = w.home.claude_projects.join(&folder);
+    fs::create_dir_all(&dir).unwrap();
+    let file = dir.join(format!("{id}.jsonl"));
+    let json = cwd.to_string_lossy().replace('\\', "\\\\");
+    fs::write(
+        &file,
+        format!(
+            r#"{{"type":"user","message":{{"role":"user","content":"Hi."}},"timestamp":"2026-01-20T11:00:00.000Z","cwd":"{json}"}}"#
+        ) + "\n",
+    )
+    .unwrap();
+    touch(&file, ago(60));
+    folder
+}
+
+/// A folder holds a project's sessions when it is named after one of its roots or a session of it was read from
+/// there (one started in a folder under a root); a name that only starts like a root's is another folder.
+#[test]
+fn projects_in_folder_match_whole_names() {
+    let w = World::new("folders");
+    // A checkout in the home folder (dotfiles, say) with two checkouts under it whose names share a start.
+    for repo in ["nest", "nest/work/app", "nest/work/app-beta"] {
+        git_dir(&w.path(repo), "[core]\n\tbare = false\n");
+    }
+    let home = session_in(&w, &w.path("nest"), "s-home");
+    let app = session_in(&w, &w.path("nest/work/app"), "s-app");
+    let beta = session_in(&w, &w.path("nest/work/app-beta"), "s-beta");
+    let sub = session_in(&w, &w.path("nest/work/app/sub"), "s-sub");
+    let index = w.index();
+    let id = |name: &str| project(&index, name).id;
+    let found = |folder: &str| -> Vec<String> {
+        index
+            .projects_in_folder(folder.as_ref())
+            .into_iter()
+            .collect()
+    };
+
+    assert_eq!(found(&home), [id("nest")]);
+    assert_eq!(found(&app), [id("app")]);
+    assert_eq!(
+        found(&beta),
+        [id("app-beta")],
+        "a root's name is not a prefix"
+    );
+    assert_eq!(
+        found(&sub),
+        [id("app")],
+        "a session under a root is its project's"
+    );
+    assert_eq!(found(&format!("{app}-unknown")), Vec::<String>::new());
+}
+
 #[test]
 fn rebuild_finds_a_session_in_a_worktree_made_since() {
     let w = World::new("newwt");
