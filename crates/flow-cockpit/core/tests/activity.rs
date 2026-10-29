@@ -383,9 +383,7 @@ fn waiting(events: &[CaptureEvent]) -> Option<Waiting> {
 
 /// One capture line of the hook's shape at 09:00:`sec`, with `extra` fields (each starting with a comma).
 fn line(sec: u32, event: &str, extra: &str) -> String {
-    format!(
-        "{{\"v\":1,\"ts\":\"2026-03-02T09:00:{sec:02}.000Z\",\"session\":\"s-q\",\"cwd\":\"/work/alpha\",\"event\":\"{event}\"{extra}}}\n"
-    )
+    format!("{{\"v\":1,\"ts\":\"2026-03-02T09:00:{sec:02}.000Z\",\"event\":\"{event}\"{extra}}}\n")
 }
 
 /// The fixture's lines followed by `more`, read back from a file in `t`.
@@ -531,35 +529,19 @@ fn any_later_event_clears_permission() {
     );
     assert_eq!(waiting(&asked), question("Keep going?", false));
     // A notification says the prompt is up; it is not the session moving on.
-    let notified = with(
-        &t,
-        "permission.jsonl",
-        &[line(
-            5,
-            "Notification",
-            r#","notification_type":"permission_prompt","message":"Claude needs your permission to use Bash""#,
-        )],
-    );
+    let notified = with(&t, "permission.jsonl", &[line(5, "Notification", "")]);
     assert_eq!(waiting(&notified), permission("Bash"));
     // A subagent's prompt ends with that subagent's next event, not another one's.
     let other = with(
         &t,
         "subagent-permission.jsonl",
-        &[line(
-            9,
-            "SubagentStart",
-            r#","agent":"a2","agent_type":"Plan""#,
-        )],
+        &[line(9, "SubagentStart", r#","agent":"a2""#)],
     );
     assert_eq!(waiting(&other), permission("Bash"));
     let stopped = with(
         &t,
         "subagent-permission.jsonl",
-        &[line(
-            9,
-            "SubagentStop",
-            r#","agent":"a1","agent_type":"Explore""#,
-        )],
+        &[line(9, "SubagentStop", r#","agent":"a1""#)],
     );
     assert_eq!(waiting(&stopped), None);
 }
@@ -637,7 +619,7 @@ fn a_late_line_older_than_what_followed_opens_nothing() {
         &t,
         "subagent-permission.jsonl",
         &[
-            line(9, "SubagentStart", r#","agent":"a2","agent_type":"Plan""#),
+            line(9, "SubagentStart", r#","agent":"a2""#),
             line(8, "PermissionRequest", r#","permission_tool":"Edit""#),
         ],
     );

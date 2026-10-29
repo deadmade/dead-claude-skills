@@ -50,7 +50,7 @@ pub struct CaptureEvent {
     pub permission_tool: Option<String>,
 }
 
-/// A line as the hook writes it; fields the waits don't need are left out.
+/// A line as the hook writes it (`toLine` in the plugin's `hooks/lib.mjs`), which records only these fields.
 #[derive(Deserialize)]
 struct Line {
     v: u32,

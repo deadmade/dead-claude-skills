@@ -20,7 +20,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { captureDir, toLine, prune, main, MAX_QUESTIONS, MAX_MESSAGE } from './lib.mjs';
+import { captureDir, toLine, prune, main, MAX_QUESTIONS } from './lib.mjs';
 
 const NOW = Date.UTC(2026, 9, 29, 12, 0, 0);
 const scratch = () => mkdtempSync(join(tmpdir(), 'flow-cockpit-hook-'));
@@ -42,12 +42,9 @@ test('toLine maps PreToolUse AskUserQuestion with tool_use_id', () => {
   assert.deepEqual(JSON.parse(line), {
     v: 1,
     ts: '2026-10-29T12:00:00.000Z',
-    session: 's1',
-    cwd: '/w',
     event: 'PreToolUse',
     tool_use_id: 'tu1',
     questions,
-    transcript: '/t/s1.jsonl',
   });
 });
 
@@ -102,14 +99,25 @@ test('toLine cuts a huge header so the cap holds for any input', () => {
   assert.equal(got.questions[0].header.length, 64);
 });
 
-test('toLine cuts a long Notification message by characters', () => {
-  const got = JSON.parse(toLine({ ...base, hook_event_name: 'Notification', message: '\u{1F600}'.repeat(5000) }, NOW));
-  assert.equal(got.message_cut, true);
-  assert.equal(Array.from(got.message).length, MAX_MESSAGE);
-  assert.equal(
-    JSON.parse(toLine({ ...base, hook_event_name: 'Notification', message: 'short' }, NOW)).message_cut,
-    undefined,
-  );
+// The window reads only these fields (core/src/activity/capture.rs, `Line`); nothing else is recorded.
+const READ = ['agent', 'event', 'permission_tool', 'questions', 'questions_cut', 'tool_use_id', 'ts', 'v'];
+
+test('toLine records only the fields the window reads', () => {
+  const everything = {
+    ...base,
+    agent_id: 'a1',
+    agent_type: 'Explore',
+    agent_transcript_path: '/t/a.jsonl',
+    notification_type: 'elicitation_dialog',
+    message: 'An MCP server asks for your token',
+    tool_use_id: 'tu1',
+    tool_name: 'AskUserQuestion',
+    tool_input: { questions: [{ question: 'q' }] },
+  };
+  for (const hook_event_name of ['PreToolUse', 'PermissionRequest', 'Notification', 'SubagentStop']) {
+    const got = JSON.parse(toLine({ ...everything, hook_event_name }, NOW));
+    for (const key of Object.keys(got)) assert.ok(READ.includes(key), `${hook_event_name} records ${key}`);
+  }
 });
 
 test('toLine maps PermissionRequest without deciding', () => {
@@ -131,12 +139,11 @@ test('a PermissionRequest prints nothing', async () => {
   rmSync(state, { recursive: true });
 });
 
-test('toLine maps SubagentStart with agent_type', () => {
+test('toLine maps SubagentStart and SubagentStop to their agent', () => {
   const got = JSON.parse(
     toLine({ ...base, hook_event_name: 'SubagentStart', agent_id: 'a1', agent_type: 'Explore' }, NOW),
   );
   assert.equal(got.agent, 'a1');
-  assert.equal(got.agent_type, 'Explore');
   const stop = JSON.parse(
     toLine(
       {
@@ -149,14 +156,14 @@ test('toLine maps SubagentStart with agent_type', () => {
       NOW,
     ),
   );
-  assert.equal(stop.agent_transcript, '/t/a.jsonl');
+  assert.deepEqual([stop.event, stop.agent], ['SubagentStop', 'a1']);
 });
 
 test('toLine maps Notification and Stop', () => {
   const n = JSON.parse(
     toLine({ ...base, hook_event_name: 'Notification', notification_type: 'permission_prompt', message: 'm' }, NOW),
   );
-  assert.deepEqual([n.notification_type, n.message], ['permission_prompt', 'm']);
+  assert.equal(n.event, 'Notification');
   assert.equal(JSON.parse(toLine({ ...base, hook_event_name: 'Stop' }, NOW)).event, 'Stop');
 });
 

@@ -4,9 +4,6 @@ import { appendFileSync, chmodSync, lstatSync, mkdirSync, readdirSync, unlinkSyn
 import { join, posix, win32 } from 'node:path';
 
 export const MAX_QUESTIONS = 16 * 1024;
-// A Notification message can come from an MCP server (an elicitation dialog): untrusted and of any length. The window
-// needs only the gist of it, so it is cut at 1024 characters and the line gets `message_cut: true`.
-export const MAX_MESSAGE = 1024;
 const EVENTS = new Set([
   'SessionStart',
   'SessionEnd',
@@ -59,17 +56,11 @@ function questionsOf(input) {
   return { questions: kept, questions_cut: true };
 }
 
-function messageOf(input) {
-  const m = str(input.message);
-  if (m === undefined || Array.from(m).length <= MAX_MESSAGE) return { message: m };
-  return { message: cutChars(m, MAX_MESSAGE), message_cut: true };
-}
-
 /**
  * One capture line (no trailing newline) for a hook payload, or null when there is nothing to record.
- * Shape: { v: 1, ts, session, cwd, event, agent?, agent_type?, tool_use_id?, questions?, questions_cut?,
- * notification_type?, message?, message_cut?, permission_tool?, transcript?, agent_transcript? }.
- * `questions` is always an array; `questions_cut` and `message_cut` are true when the text was shortened.
+ * Shape: { v: 1, ts, event, agent?, tool_use_id?, questions?, questions_cut?, permission_tool? }: only what the window
+ * reads (`Line` in core/src/activity/capture.rs). The session is the file's name.
+ * `questions` is always an array; `questions_cut` is true when the questions were shortened.
  */
 export function toLine(input, now) {
   try {
@@ -83,18 +74,11 @@ export function toLine(input, now) {
     return JSON.stringify({
       v: 1,
       ts: new Date(now).toISOString(),
-      session,
-      cwd: str(input.cwd),
       event,
       agent: str(input.agent_id),
-      agent_type: str(input.agent_type),
       tool_use_id: str(input.tool_use_id),
       ...questionsOf(input),
-      notification_type: str(input.notification_type),
-      ...messageOf(input),
       permission_tool: event === 'PermissionRequest' ? str(input.tool_name) : undefined,
-      transcript: str(input.transcript_path),
-      agent_transcript: str(input.agent_transcript_path),
     });
   } catch {
     return null;

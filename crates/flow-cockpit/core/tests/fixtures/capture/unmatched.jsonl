@@ -1,4 +1,4 @@
-{"v":1,"ts":"2026-03-02T09:00:01.000Z","session":"s-q","cwd":"/work/alpha","event":"PostToolUse","tool_use_id":"toolu_x","transcript":"/claude/projects/-work-alpha/s-q.jsonl"}
-{"v":1,"ts":"2026-03-02T09:00:02.000Z","session":"s-q","cwd":"/work/alpha","event":"Stop","transcript":"/claude/projects/-work-alpha/s-q.jsonl"}
-{"v":1,"ts":"2026-03-02T09:00:03.000Z","session":"s-q","cwd":"/work/alpha","event":"SubagentStop","agent":"a9","agent_type":"Explore","transcript":"/claude/projects/-work-alpha/s-q.jsonl","agent_transcript":"/claude/projects/-work-alpha/s-q/subagents/agent-a9.jsonl"}
-{"v":1,"ts":"2026-03-02T09:00:04.000Z","session":"s-q","cwd":"/work/alpha","event":"SessionEnd","transcript":"/claude/projects/-work-alpha/s-q.jsonl"}
+{"v":1,"ts":"2026-03-02T09:00:01.000Z","event":"PostToolUse","tool_use_id":"toolu_x"}
+{"v":1,"ts":"2026-03-02T09:00:02.000Z","event":"Stop"}
+{"v":1,"ts":"2026-03-02T09:00:03.000Z","event":"SubagentStop","agent":"a9"}
+{"v":1,"ts":"2026-03-02T09:00:04.000Z","event":"SessionEnd"}
