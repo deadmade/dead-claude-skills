@@ -16,8 +16,8 @@ prompts, agents starting and stopping, turns ending. Each Claude session gets on
 `<session id>.jsonl` in `$XDG_STATE_HOME/flow-cockpit/capture/` (default `~/.local/state/flow-cockpit/capture/`;
 `%LOCALAPPDATA%\flow-cockpit\capture\` on Windows), the folder readable by you only. A session start deletes capture
 files older than 30 days. The hooks only watch: they never answer a prompt, block a tool or print anything, and they
-write nothing outside that folder. A permission prompt records which tool asked, not its input. Long text is shortened: a question the user is asked keeps only its text and header (the options are
-dropped) once the questions pass 16 KiB, and a notification message is cut at 1,024 characters; such a line carries
+write nothing outside that folder. A permission prompt records which tool asked, not its input. Long text is shortened: once the questions pass 16 KiB each keeps only its text (cut to 4,096
+characters) and its header (cut to 64), the options are dropped and trailing questions are dropped until it fits, and a notification message is cut at 1,024 characters; such a line carries
 `questions_cut` or `message_cut`.
 
 ## Install

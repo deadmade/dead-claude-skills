@@ -41,13 +41,16 @@ const size = (v) => Buffer.byteLength(JSON.stringify(v));
 const cutChars = (s, n) => (s.length <= n ? s : Array.from(s).slice(0, n).join(''));
 
 // AskUserQuestion's questions, always an array. Past 16 KiB of JSON each entry keeps only `question` and `header`
-// (the options carry most of the size), trailing entries are dropped until it fits, and the line gets
+// (the options carry most of the size; `header` is cut to 64 characters), trailing entries are dropped until it fits, and the line gets
 // `questions_cut: true`.
 function questionsOf(input) {
   const q = input.tool_input?.questions;
   if (!Array.isArray(q)) return {};
   if (size(q) <= MAX_QUESTIONS) return { questions: q };
-  const kept = q.map((e) => ({ question: cutChars(String(e?.question ?? ''), 4096), header: str(e?.header) }));
+  const kept = q.map((e) => ({
+    question: cutChars(String(e?.question ?? ''), 4096),
+    header: cutChars(str(e?.header) ?? '', 64) || undefined,
+  }));
   while (kept.length > 1 && size(kept) > MAX_QUESTIONS) kept.pop();
   // One entry left and still too big: halve its question until it fits.
   let n = Array.from(kept[0]?.question ?? '').length;
@@ -120,7 +123,12 @@ export async function main({ stdin, env, platform, now }) {
     if (line === null || dir === null) return;
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     // Our own folder, so a looser mode left by hand or an earlier build is tightened. No effect on Windows.
-    if (platform !== 'win32') chmodSync(dir, 0o700);
+    // Best effort: writing the line is the job, so a failing chmod (another owner, no modes) must not drop it.
+    if (platform !== 'win32') {
+      try {
+        chmodSync(dir, 0o700);
+      } catch {}
+    }
     const p = platform === 'win32' ? win32 : posix;
     appendFileSync(p.join(dir, `${input.session_id}.jsonl`), line + '\n', { mode: 0o600 });
     if (input.hook_event_name === 'SessionStart') prune(dir, now);

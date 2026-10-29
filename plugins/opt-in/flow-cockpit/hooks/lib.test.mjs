@@ -15,6 +15,7 @@ import {
   symlinkSync,
   mkdirSync,
   chmodSync,
+  lutimesSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -84,6 +85,21 @@ test('toLine cuts multi-byte questions by characters and stays valid and under t
     assert.equal(q, ch.repeat(Array.from(q).length / Array.from(ch).length)); // whole characters only
     assert.ok(!/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/.test(q));
   }
+});
+
+test('toLine never splits a surrogate pair at an odd offset', () => {
+  const got = JSON.parse(toLine(ask([{ question: 'a' + '\u{1F600}'.repeat(30000) }]), NOW));
+  const q = got.questions[0].question;
+  assert.ok(Array.from(q).length > 1);
+  assert.ok(!/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/.test(q));
+});
+
+test('toLine cuts a huge header so the cap holds for any input', () => {
+  const got = JSON.parse(toLine(ask([{ question: 'q', header: 'h'.repeat(40000) }]), NOW));
+  assert.equal(got.questions_cut, true);
+  assert.ok(Buffer.byteLength(JSON.stringify(got.questions)) <= MAX_QUESTIONS);
+  assert.equal(got.questions[0].question, 'q');
+  assert.equal(got.questions[0].header.length, 64);
 });
 
 test('toLine cuts a long Notification message by characters', () => {
@@ -200,6 +216,7 @@ test('prune leaves a .jsonl link alone and never touches its target', { skip: pr
   symlinkSync(target, join(dir, 'link.jsonl'));
   const old = new Date(NOW - 90 * 86400000);
   utimesSync(target, old, old);
+  lutimesSync(join(dir, 'link.jsonl'), old, old); // the link itself looks old too
   prune(dir, NOW);
   assert.ok(existsSync(target));
   assert.ok(readdirSync(dir).includes('link.jsonl'));
