@@ -258,7 +258,8 @@ function graph(ctx: ViewContext, all: Pair[], selected: string, select: (id: str
   const kind = (t: LedgerTask | undefined) =>
     !t || t.state === 'NotStarted' ? 'todo' : t.state === 'Done' ? 'done' : t.state === 'Waiting' ? 'wait' : 'busy';
   const fill = (v: string) => `fill:${css('--color-paper-2')},stroke:${css(v)},color:${css('--color-ink-2')}`;
-  const lines = ['flowchart LR'];
+  // Top to bottom, so a long plan grows down the page instead of off its edge.
+  const lines = ['flowchart TB'];
   for (const { p } of all) lines.push(`  T${p.id}(("${p.id}"))`);
   for (const { p } of all) for (const d of p.depends_on ?? []) lines.push(`  T${d} --> T${p.id}`);
   for (const k of ['done', 'busy', 'wait', 'todo']) {
@@ -360,27 +361,43 @@ function taskView(ctx: ViewContext, all: Pair[], id: string | null, select: (id:
 
   const card = el('article', 'task', main);
   card.setAttribute('aria-labelledby', 'task-title');
-  if (graphable(all)) {
-    const head = el('h3', 'visually-hidden', 'Where it sits in the plan');
-    head.id = 'graph-h';
-    const where = el('section', 'where-graph', head);
-    where.setAttribute('aria-labelledby', 'graph-h');
-    where.append(
-      el(
-        'p',
-        'key',
-        el('span', 'k-done', 'Done'),
-        ', ',
-        el('span', 'k-now', 'being built'),
-        ', ',
-        el('span', 'k-wait', 'waiting on you'),
-        ', not started; ringed is this task.',
-      ),
-      graph(ctx, all, p.id, select),
-    );
-    card.append(where);
-  }
   return card;
+}
+
+/** The selected task's place in the plan: the legend over the graph, in a column of its own; null without a graph. */
+function whereGraph(
+  ctx: ViewContext,
+  all: Pair[],
+  id: string | null,
+  select: (id: string) => void,
+): HTMLElement | null {
+  if (!graphable(all) || id === null || !all.some((x) => x.p.id === id)) return null;
+  const head = el('h2', 'visually-hidden', 'Where it sits in the plan');
+  head.id = 'graph-h';
+  const where = el('section', 'where-graph', head);
+  where.setAttribute('aria-labelledby', 'graph-h');
+  where.append(
+    el(
+      'p',
+      'key',
+      el('span', 'k-done', 'Done'),
+      ', ',
+      el('span', 'k-now', 'being built'),
+      ', ',
+      el('span', 'k-wait', 'waiting on you'),
+      ', not started; ',
+      el('span', 'ring', 'ringed is this task.'),
+    ),
+    graph(ctx, all, id, select),
+  );
+  return where;
+}
+
+/** The Build tab's content: where the run stands and the selected task, with its place in the plan beside them. */
+function buildPanel(ctx: ViewContext, run: FlowRun, all: Pair[], id: string | null, select: (id: string) => void) {
+  const where = whereGraph(ctx, all, id, select);
+  const main = el('div', 'build-main', nowBlock(ctx, run, all), taskView(ctx, all, id, select));
+  return el('div', 'build', main, ...(where ? [where] : []));
 }
 
 function nowBlock(ctx: ViewContext, run: FlowRun, all: Pair[]): HTMLElement {
@@ -573,7 +590,7 @@ function frame(
       mem.task = id;
       for (const row of left.querySelectorAll<HTMLElement>('[data-task]'))
         row.setAttribute('aria-current', String(row.dataset.task === id));
-      content.replaceChildren(nowBlock(ctx, run!, pairs), taskView(ctx, pairs, id, select));
+      content.replaceChildren(buildPanel(ctx, run!, pairs, id, select));
       content.scrollTop = 0;
     };
 
@@ -613,7 +630,7 @@ function frame(
       group.append(rows);
     }
     left.append(group);
-    content.append(nowBlock(ctx, run!, pairs), taskView(ctx, pairs, mem.task, select));
+    content.append(buildPanel(ctx, run!, pairs, mem.task, select));
   }
 
   function decisions() {

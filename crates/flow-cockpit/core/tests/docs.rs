@@ -467,6 +467,11 @@ fn no_input_panics() {
         "| 1 | |",
         "Picks: 99999999999999\nFixed : ",
         "Task : x\nTask 5-99999999999: y\n",
+        "### Task 8é: x",
+        "### Task 4294967296b: x",
+        "### Task 8b",
+        "### Task 8b\n**Depends on:** Task 8b2, Task é, Task 4294967296b",
+        "Task 8b-8c: x\nTasks é: y\nTask 8é: z\n",
         "ünïcode ✓ ## Gates\n- Gate 1, é: 2026-10-13ü",
     ] {
         let _ = (
@@ -537,12 +542,26 @@ fn this_repos_plan_has_its_added_tasks() {
         .expect("this run's plan");
     let doc = parse_plan(&text);
     let ids: Vec<&str> = doc.tasks.iter().map(|t| t.id.as_str()).collect();
-    assert_eq!(
-        ids,
-        [
-            "1", "2", "3", "4", "5", "5b", "6", "7", "8", "8b", "8c", "8d", "8e", "8f", "8g", "9",
-            "10", "11", "12", "13"
-        ]
+    // In id order: by number, then the plain task before its lettered ones. Later added tasks may join.
+    let key = |id: &str| {
+        let digits = id.trim_end_matches(|c: char| c.is_ascii_lowercase());
+        (
+            digits.parse::<u32>().unwrap(),
+            id[digits.len()..].to_string(),
+        )
+    };
+    assert!(
+        ids.windows(2).all(|w| key(w[0]) < key(w[1])),
+        "not in order: {ids:?}"
+    );
+    let known = [
+        "1", "2", "3", "4", "5", "5b", "6", "7", "8", "8b", "8c", "8d", "8e", "8f", "8g", "9",
+        "10", "11", "12", "13",
+    ];
+    let mut rest = ids.iter();
+    assert!(
+        known.iter().all(|k| rest.any(|id| id == k)),
+        "the known tasks aren't all there in order: {ids:?}"
     );
     let eight_d = doc.tasks.iter().find(|t| t.id == "8d").unwrap();
     assert_eq!(eight_d.depends_on, Some(vec!["8f".to_string()]));
@@ -553,8 +572,8 @@ fn this_repos_plan_has_its_added_tasks() {
         .filter(|t| t.id.ends_with(char::is_alphabetic))
     {
         assert!(
-            t.markdown
-                .contains("**Added:** 2026-10-29, by the user's decision"),
+            t.markdown.contains("**Added:** ")
+                && t.markdown.contains(", by the user's decision \""),
             "Task {} has no Added line",
             t.id
         );

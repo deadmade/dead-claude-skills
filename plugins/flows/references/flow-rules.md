@@ -66,9 +66,8 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
     <!-- overrides superpowers/skills/executing-plans/SKILL.md: "Rulings, not stalls. Conflicts, ambiguities, plan defects — decide them." -->
     <!-- overrides superpowers/skills/executing-plans/SKILL.md: "Four things stop you, and only these: an irreversible or destructive operation;" -->
   - **Added tasks.** A task a decision adds during the build takes the number of the task it follows plus a letter
-    (`8b`, then `8c`) and goes into plan.md right after that task, under its `**Depends on:**` line a line
-    `**Added:** <date>, by the user's decision "<its heading under Deviations>".` Its `**Depends on:**` may name
-    lettered tasks. The flow cockpit orders it after its number.
+    (`8b`, then `8c`). It goes into plan.md right after that task. Below its `**Depends on:**` line, which may name
+    lettered tasks, write `**Added:** <date>, by the user's decision "<its heading under Deviations>".`
   - **Review findings and reports.** Where `subagent-driven-development` rules on what review or a subagent turns up,
     a deviation still goes to the user. In the fix loop (a plan-mandated finding), at the breaker and in the final
     review's fix wave, a finding whose fix is deviation-class goes to the user, not a ruling. A `NEEDS_CONTEXT` that

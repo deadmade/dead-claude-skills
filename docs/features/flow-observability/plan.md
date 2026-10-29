@@ -317,8 +317,9 @@ get typed data only (Global Constraint 1): the Rulings list, each conductor's ph
 - `LedgerTask.later` holds the item text without its `minor (deferred):` (or `minor:`) tag.
 - Phase lists: one per conductor that writes a flow.md (`flow:` values in the templates and the SKILL.md files under
   `plugins/flows/skills/`): its phases in order, the `phase:` key each one writes, its display name, and where its
-  gates sit, taken from each conductor's SKILL.md phase table and flow-rules. A test reads each conductor's SKILL.md
-  phase table and fails when `phases.rs` no longer matches it.
+  gates sit, taken from each conductor's SKILL.md phase table and flow-rules, never from memory. A test reads each
+  conductor's SKILL.md phase table and fails when `phases.rs` no longer matches it, so a changed conductor can't
+  drift silently.
 
 - [ ] **Step 1: Write the failing tests:** `rulings_split_into_parts` (flow.md shape, wrapped); `ledger_rulings_are_typed`;
       `unsplittable_ruling_keeps_raw`; `phases_follow_the_conductor` (feature flow at `phase: execute` → earlier
@@ -552,10 +553,11 @@ own; nothing about views depends on the Claude Code plugin.
 - **Default folder lookup, in order:** `FLOW_COCKPIT_EXTENSIONS` (a dev override: one folder, e.g. this repo's
   `crates/flow-cockpit/extensions`, so edits show live without a rebuild); then `<exe dir>/../share/flow-cockpit/extensions`
   (Nix and Linux installs); then `<exe dir>/extensions` (Windows, Task 13). The first that exists wins. None found: the
-  window draws a plain note naming where it looked; it never crashes.
+  window draws a plain note naming where it looked; it never crashes. Unit-test the lookup with a fake env and folders.
 - **Type imports:** views import their types from one bare module name, `import type { … } from 'flow-cockpit'`, not
   relative paths. In the repo a tsconfig `paths` entry maps it to the shell's `api.d.ts` and the bindings; for users,
-  `flow-cockpit --print-types` declares `module 'flow-cockpit'`. Type-only imports are stripped at load, as now.
+  `flow-cockpit --print-types` declares `module 'flow-cockpit'` so a user extension (or a copied default)
+  type-checks next to `flow-cockpit.d.ts` with no import to change. Type-only imports are stripped at load, as now.
 - **CLI:** `--print-view` goes (copying a default is copying its folder). Add `--print-paths`, printing the default
   extensions folder in use, the user extensions folder and `config.toml`'s path, one per line with a label. Keep
   `--version` and `--print-types`.
@@ -573,7 +575,8 @@ own; nothing about views depends on the Claude Code plugin.
       removes an extension's views; a `config.toml` change re-reads `disabled` and `hidden` (poll emits the right
       events); a change in either extension folder emits `views-changed`; `style.css` is added once and removed on
       disable; a disabled `list` draws the note; duplicate view ids; `--print-types` declares `module 'flow-cockpit'`;
-      `--print-paths` output; the Nix-installed tree holds the four defaults and no tests or fixtures.
+      `--print-paths` output; the Nix-installed tree holds the four defaults and no tests or fixtures (a check in the
+      flake or CI).
 - [ ] **Step 2:** Run; expect FAIL.
 - [ ] **Step 3: Implement**, move the files with `git mv` so history follows, update the skill (folders, extension
       shape, `disabled`, `--print-paths`, the bare `flow-cockpit` import, copying a default to change it), README and

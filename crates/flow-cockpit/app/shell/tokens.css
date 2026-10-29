@@ -143,9 +143,12 @@ a.row:active, button.row:active { background: var(--color-paper-3); }
 .now.waiting .sentence { color: var(--color-accent); }
 .now .summary { margin-top: var(--space-1); font-size: var(--text-sm); color: var(--color-muted); max-width: var(--measure); }
 
-/* The selected task: the one block at full contrast. Beside it on wide windows, its place in the graph. */
-.task { display: grid; grid-template-columns: minmax(0, var(--measure)); gap: var(--space-6) var(--space-7); align-items: start; }
-@media (min-width: 110rem) { .task { grid-template-columns: minmax(0, 64ch) minmax(0, 1fr); } .task .where-graph { position: sticky; top: 0; } }
+/* Build: where the run stands and the selected task, the one block at full contrast. From 1200px the task's place in
+ * the plan has a column of its own beside both, as tall as the visible content and pinned there; narrower, it goes
+ * under the card at full width. */
+.build { display: grid; gap: var(--space-6) var(--space-7); align-items: start; }
+.task { max-width: var(--measure); }
+@media (min-width: 75rem) { .build { grid-template-columns: minmax(0, 1fr) 22rem; } .where-graph { position: sticky; top: 0; height: calc(100vh - var(--bar-h) - var(--space-5) - var(--space-7)); display: grid; grid-template-rows: auto minmax(0, 1fr); } .where-graph .graph, .where-graph .diagram { height: 100%; min-height: 0; } }
 .task-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-4); }
 .task-h h2 { font-size: var(--text-lg); line-height: 1.35; }
 .task-h .n { color: var(--color-muted); font-weight: 400; margin-right: var(--space-2); }
@@ -177,8 +180,9 @@ details.unfold > .unfold-body { padding: var(--space-3) 0 var(--space-2); }
 .key .k-done { color: var(--color-done); }
 .key .k-now { color: var(--color-current); }
 .key .k-wait { color: var(--color-accent); }
-.graph { overflow-x: auto; }
-.graph svg { display: block; }
+.key .ring { display: block; }
+/* The task graph runs top to bottom with no scrollbar of its own: its drawing shrinks to fit the column, never grows. */
+.graph svg { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; }
 .graph .node { cursor: pointer; }
 
 /* ---------- Decisions: master and detail, like Docs ---------- */

@@ -96,18 +96,226 @@
       "raw": "Task 2: finding (from Task 5): parse_ledger glues `Ruling:` and `Note` lines into the task entry above them instead of `rulings` — fix after the Task 5 stop.",
       "scope": null,
       "why": "fix after the Task 5 stop."
+    },
+    {
+      "call": "\") anywhere in an entry; no multi-byte or `minor:`-not-in-story test",
+      "cost": null,
+      "date": null,
+      "raw": "Task 5b: minor (deferred): deferred() keeps the tag on colon-less shapes; split_once(\"Ruling:\") anywhere in an entry; no multi-byte or `minor:`-not-in-story test",
+      "scope": null,
+      "why": null
+    },
+    {
+      "call": "ts-rs =12.0.1, jiff 0.2.38 and serde in app/Cargo.toml are implied by the brief (ViewInfo derives TS; Index's API takes jiff::Timestamp)",
+      "cost": null,
+      "date": null,
+      "raw": "Ruling: ts-rs =12.0.1, jiff 0.2.38 and serde in app/Cargo.toml are implied by the brief (ViewInfo derives TS; Index's API takes jiff::Timestamp) — costs three deps the Files line didn't name.",
+      "scope": null,
+      "why": "costs three deps the Files line didn't name."
+    },
+    {
+      "call": "the implementer's calls stand",
+      "cost": "a few lines of unsafe FFI.",
+      "date": null,
+      "raw": "Ruling: the implementer's calls stand — `changed` payload derives TS (it crosses to views); --print-types prints the bindings only until Task 7 adds api.d.ts; AttachConsole via a direct kernel32 extern instead of windows-sys — costs a few lines of unsafe FFI.",
+      "scope": null,
+      "why": "`changed` payload derives TS (it crosses to views); --print-types prints the bindings only until Task 7 adds api.d.ts; AttachConsole via a direct kernel32 extern instead of windows-sys"
+    },
+    {
+      "call": "`claude_projects` honours $CLAUDE_CONFIG_DIR and config_dir honours $XDG_CONFIG_HOME",
+      "cost": "Tasks 10, 12 and the views skill using the same rule (note for their briefs).",
+      "date": null,
+      "raw": "Ruling: `claude_projects` honours $CLAUDE_CONFIG_DIR and config_dir honours $XDG_CONFIG_HOME — reasonable and matches how Claude Code and XDG work — costs Tasks 10, 12 and the views skill using the same rule (note for their briefs).",
+      "scope": null,
+      "why": "reasonable and matches how Claude Code and XDG work"
+    },
+    {
+      "call": "`incognito: true` stays",
+      "cost": "view state per session only (note for Task 7).",
+      "date": null,
+      "raw": "Ruling: `incognito: true` stays — views keep no localStorage between runs, in line with the app writing nothing — costs view state per session only (note for Task 7).",
+      "scope": null,
+      "why": "views keep no localStorage between runs, in line with the app writing nothing"
+    },
+    {
+      "call": "three minors join fix round 1",
+      "cost": "a larger fix round.",
+      "date": null,
+      "raw": "Ruling: three minors join fix round 1 — Windows clippy cast_sign_loss (main.rs:154; would fail the first Windows clippy run), dynamic import()/import-equals rejected in strip.rs (letter of Global Constraint, Review Focus 4), and a panicking tick no longer kills the poll thread silently (catch and continue, the window would go stale) — costs a larger fix round.",
+      "scope": null,
+      "why": "Windows clippy cast_sign_loss (main.rs:154; would fail the first Windows clippy run), dynamic import()/import-equals rejected in strip.rs (letter of Global Constraint, Review Focus 4), and a panicking tick no longer kills the poll thread silently (catch and continue, the window would go stale)"
+    },
+    {
+      "call": "the implementer's shapes for Route, Step and CardOpts in api.d.ts stand (the plan names the types without defining them; Step mirrors the bindings' Phase/Gate; CardOpts strings are text, never HTML)",
+      "cost": null,
+      "date": null,
+      "raw": "Ruling: the implementer's shapes for Route, Step and CardOpts in api.d.ts stand (the plan names the types without defining them; Step mirrors the bindings' Phase/Gate; CardOpts strings are text, never HTML) — costs nothing.",
+      "scope": null,
+      "why": "costs nothing."
+    },
+    {
+      "call": "three minors join fix round 1",
+      "cost": "cheap and user-visible — costs a larger fix round.",
+      "date": null,
+      "raw": "Ruling: three minors join fix round 1 — a render that never settles gets a timeout error card (else the window freezes silently), the diff fold summary uses the design's label + .count row, an unknown route.tab says so in the slot — cheap and user-visible — costs a larger fix round.",
+      "scope": null,
+      "why": "a render that never settles gets a timeout error card (else the window freezes silently), the diff fold summary uses the design's label + .count row, an unknown route.tab says so in the slot"
+    },
+    {
+      "call": "Task 8's docs view is a `run-tab` titled \"Docs\" rather than the `doc` slot",
+      "cost": "the `doc` route having no built-in view.",
+      "date": null,
+      "raw": "Ruling: Task 8's docs view is a `run-tab` titled \"Docs\" rather than the `doc` slot — the approved design shows Docs as a tab of the run, and the user picked \"run view hosts the tabs\" — costs the `doc` route having no built-in view.",
+      "scope": null,
+      "why": "the approved design shows Docs as a tab of the run, and the user picked \"run view hosts the tabs\""
+    },
+    {
+      "call": "app/shell/tokens.css joins Task 8's files",
+      "cost": "one more shared file.",
+      "date": null,
+      "raw": "Ruling: app/shell/tokens.css joins Task 8's files — Task 7 put the house stylesheet there and the list and activity views need their rows styled in it — costs one more shared file.",
+      "scope": null,
+      "why": "Task 7 put the house stylesheet there and the list and activity views need their rows styled in it"
+    },
+    {
+      "call": "the implementer's calls stand (Build/Decisions selection in module state per run, run-tabs via display: contents, list defaults to the first project, Activity reads only the selected session)",
+      "cost": null,
+      "date": null,
+      "raw": "Ruling: the implementer's calls stand (Build/Decisions selection in module state per run, run-tabs via display: contents, list defaults to the first project, Activity reads only the selected session) — costs nothing.",
+      "scope": null,
+      "why": "costs nothing."
+    },
+    {
+      "call": "\"Calls the build made\" shows flow.md's rulings only, as the approved design does",
+      "cost": "ledger-only rulings not yet copied being invisible until copied.",
+      "date": null,
+      "raw": "Ruling: \"Calls the build made\" shows flow.md's rulings only, as the approved design does — the ledger's rulings are the same calls worded for the log and the flow rules copy them into flow.md, so merging double-counts (41 here, mostly near-duplicates) — costs ledger-only rulings not yet copied being invisible until copied.",
+      "scope": null,
+      "why": "the ledger's rulings are the same calls worded for the log and the flow rules copy them into flow.md, so merging double-counts (41 here, mostly near-duplicates)"
+    },
+    {
+      "call": "the Task 4 fixture home edits and core/tests/index.rs stand (review M9)",
+      "cost": "Task 4's fixtures carrying view-only cases.",
+      "date": null,
+      "raw": "Ruling: the Task 4 fixture home edits and core/tests/index.rs stand (review M9) — index.rs was named in the user's picks/fixed decision and the views' fixtures are dumped from that home — costs Task 4's fixtures carrying view-only cases.",
+      "scope": null,
+      "why": "index.rs was named in the user's picks/fixed decision and the views' fixtures are dumped from that home"
+    },
+    {
+      "call": "each root belongs to exactly one project",
+      "cost": "a root in two projects is a core bug against the spec, not a model change — costs core/src/index and core/tests/index.rs joining fix round 1 (Task 4 code).",
+      "date": null,
+      "raw": "Ruling: each root belongs to exactly one project — its git remote's when one resolves, else its folder name's (spec: \"checkouts folded by git remote, by folder name without one\"); same-named projects that remain are told apart in the rail by a short path tail from typed fields — a root in two projects is a core bug against the spec, not a model change — costs core/src/index and core/tests/index.rs joining fix round 1 (Task 4 code).",
+      "scope": null,
+      "why": "its git remote's when one resolves, else its folder name's (spec: \"checkouts folded by git remote, by folder name without one\"); same-named projects that remain are told apart in the rail by a short path tail from typed fields"
+    },
+    {
+      "call": "a project keeps a root only when checkout_of(root) is one of its checkouts (the reviewer's fix for N4)",
+      "cost": "one cached path walk per root.",
+      "date": null,
+      "raw": "Ruling: a project keeps a root only when checkout_of(root) is one of its checkouts (the reviewer's fix for N4) — roots then follow the same rule sessions already do, so one project per root holds in general without re-homing sessions — costs one cached path walk per root.",
+      "scope": null,
+      "why": "roots then follow the same rule sessions already do, so one project per root holds in general without re-homing sessions"
+    },
+    {
+      "call": "a worktree of repo B inside repo A's .claude/worktrees/ belongs to A, documents included (A lists B's run from that folder once; B doesn't)",
+      "cost": "a rare misplaced run.",
+      "date": null,
+      "raw": "Ruling: a worktree of repo B inside repo A's .claude/worktrees/ belongs to A, documents included (A lists B's run from that folder once; B doesn't) — that is the ruled one-project-per-root rule's consequence and keeps sessions where Task 4 puts them — costs a rare misplaced run.",
+      "scope": null,
+      "why": "that is the ruled one-project-per-root rule's consequence and keeps sessions where Task 4 puts them"
+    },
+    {
+      "call": "the skill-text and test minors M1-M7 join fix round 1 with I1",
+      "cost": "a slightly larger fix round.",
+      "date": null,
+      "raw": "Ruling: the skill-text and test minors M1-M7 join fix round 1 with I1 — all are wrong or missing lines in the skill an agent would act on, or one-line test/CI fixes — costs a slightly larger fix round.",
+      "scope": null,
+      "why": "all are wrong or missing lines in the skill an agent would act on, or one-line test/CI fixes"
+    },
+    {
+      "call": "the app sets WEBKIT_DISABLE_DMABUF_RENDERER=1 on Linux before the window opens unless the user has set it",
+      "cost": "WebKitGTK's faster DMA-BUF path on every Linux machine (the user can set it to 0 to get it back).",
+      "date": null,
+      "raw": "Ruling: the app sets WEBKIT_DISABLE_DMABUF_RENDERER=1 on Linux before the window opens unless the user has set it — WebKitGTK's DMA-BUF renderer crashes the window on NVIDIA under Wayland, and the app must open without the user knowing the variable — costs WebKitGTK's faster DMA-BUF path on every Linux machine (the user can set it to 0 to get it back).",
+      "scope": null,
+      "why": "WebKitGTK's DMA-BUF renderer crashes the window on NVIDIA under Wayland, and the app must open without the user knowing the variable"
+    },
+    {
+      "call": "a cut `questions` stays an array (past 16 KiB keep only question and header, cut each question by characters, drop trailing entries until it fits) and the line gains `questions_cut: true`",
+      "cost": "one optional field in the capture line.",
+      "date": null,
+      "raw": "Ruling: a cut `questions` stays an array (past 16 KiB keep only question and header, cut each question by characters, drop trailing entries until it fits) and the line gains `questions_cut: true` — the brief leaves how to cut open, Task 11 reads it typed, and a broken-JSON string would drop the open question — costs one optional field in the capture line.",
+      "scope": null,
+      "why": "the brief leaves how to cut open, Task 11 reads it typed, and a broken-JSON string would drop the open question"
+    },
+    {
+      "call": "plugin.json's description, the marketplace entry and the root README join Task 10's fix round to name the capture hooks",
+      "cost": "three more files.",
+      "date": null,
+      "raw": "Ruling: plugin.json's description, the marketplace entry and the root README join Task 10's fix round to name the capture hooks — CLAUDE.md asks descriptions to stay true and an opt-in user must know the plugin installs hooks; check-repo compares the first two — costs three more files.",
+      "scope": null,
+      "why": "CLAUDE.md asks descriptions to stay true and an opt-in user must know the plugin installs hooks; check-repo compares the first two"
+    },
+    {
+      "call": "Task 10 minors 1, 3, 4, 5 and 6 get a quick fix round 2 now (5 loses every capture line when chmod fails; the rest are one-liners); minor 2 (quadratic drop, unreachable under the 4-question schema) deferred",
+      "cost": null,
+      "date": null,
+      "raw": "Ruling: Task 10 minors 1, 3, 4, 5 and 6 get a quick fix round 2 now (5 loses every capture line when chmod fails; the rest are one-liners); minor 2 (quadratic drop, unreachable under the 4-question schema) deferred — costs one more short round.",
+      "scope": null,
+      "why": "costs one more short round."
+    },
+    {
+      "call": "Task 8b's five minors join fix round 1 with I1 (M1 rail mark on its own line, list-scoped; M2 audits-only tab label; M3 clear search clears only the search; M4 row buttons keep focus by a stable key; M5 State column width)",
+      "cost": "a slightly larger round.",
+      "date": null,
+      "raw": "Ruling: Task 8b's five minors join fix round 1 with I1 (M1 rail mark on its own line, list-scoped; M2 audits-only tab label; M3 clear search clears only the search; M4 row buttons keep focus by a stable key; M5 State column width) — all list-only and cheap — costs a slightly larger round.",
+      "scope": null,
+      "why": "all list-only and cheap"
+    },
+    {
+      "call": "the new read-only `extensions` command with its `Extensions`/`Style` bindings, and `dump_view_fixtures.rs` following the moved fixtures, stand",
+      "cost": "one more command and two generated types.",
+      "date": null,
+      "raw": "Ruling: the new read-only `extensions` command with its `Extensions`/`Style` bindings, and `dump_view_fixtures.rs` following the moved fixtures, stand — the runtime needs styles, disabled names and the folders looked in, and views can't call it — costs one more command and two generated types.",
+      "scope": null,
+      "why": "the runtime needs styles, disabled names and the folders looked in, and views can't call it"
+    },
+    {
+      "call": "Task 8c minors 1-7 get one fix round now (2 and 3 lose config edits, 3 hits this user's NixOS home-manager links; the rest are cheap)",
+      "cost": null,
+      "date": null,
+      "raw": "Ruling: Task 8c minors 1-7 get one fix round now (2 and 3 lose config edits, 3 hits this user's NixOS home-manager links; the rest are cheap) — costs one short round.",
+      "scope": null,
+      "why": "costs one short round."
+    },
+    {
+      "call": "the Build tab's task graph scales down to its box's width (never up), keeping the approved left-to-right layout; joins Task 8d's fix round",
+      "cost": null,
+      "date": null,
+      "raw": "User request 2026-10-29: the task graph should fit without a scrollbar. Ruling: the Build tab's task graph scales down to its box's width (never up), keeping the approved left-to-right layout; joins Task 8d's fix round — costs smaller labels on long plans.",
+      "scope": null,
+      "why": "costs smaller labels on long plans."
+    },
+    {
+      "call": "the approved mockup design/run-view.html moves from `.n` to `.id` and its JSON is re-dumped in this fix round (review M3)",
+      "cost": "the design files joining Task 8d.",
+      "date": null,
+      "raw": "Ruling: the approved mockup design/run-view.html moves from `.n` to `.id` and its JSON is re-dumped in this fix round (review M3) — the next dump_this_run would otherwise break its task pairing and graph ids — costs the design files joining Task 8d.",
+      "scope": null,
+      "why": "the next dump_this_run would otherwise break its task pairing and graph ids"
     }
   ],
   "tasks": [
     {
       "fix_rounds": 0,
+      "id": "1",
       "later": [
         "implement/SKILL.md:52 \"Record both as … gate lines\" reads as two lines; say the execution method is the `, execution: …` extra (same in upgrade/SKILL.md:41)",
         "checkTemplates accepts a part anywhere in the file, not only in the template comment",
         "several edited prose lines run past the 120-column wrap (flow-rules fifth stop, feature-flow Phase 4, fix-flow and upgrade gate lines)"
       ],
       "model": "sonnet",
-      "n": 1,
       "security": [],
       "state": "Done",
       "story": [
@@ -119,6 +327,7 @@
     },
     {
       "fix_rounds": 1,
+      "id": "2",
       "later": [
         "text before the first `## ` dropped from sections (flow.rs:85)",
         "frontmatter placeholders (`phase: <…>`, `now: <…>`) read as values",
@@ -129,7 +338,6 @@
         "ledger security rule `starts_with(\"security\")` misses \"review: security finding …\" shapes"
       ],
       "model": "sonnet",
-      "n": 2,
       "security": [],
       "state": "Done",
       "story": [
@@ -143,12 +351,12 @@
     },
     {
       "fix_rounds": 1,
+      "id": "3",
       "later": [
         "failures map could be a HashSet; tests index turns[0] directly; agent started/ended taken from any entry kind",
         "`<` check runs on the joined text of an array prompt (reminder block first hides the prompt); \"[Request interrupted by user]\" entries open turns if they exist"
       ],
       "model": "sonnet",
-      "n": 3,
       "security": [],
       "state": "Done",
       "story": [
@@ -162,12 +370,12 @@
     },
     {
       "fix_rounds": 1,
+      "id": "4",
       "later": [
         "encode/slug near-duplicate; Index::doc re-implements entries::read_text; no negative cache for other projects' sessions in rebuild_project",
         "tail scan resumes from a stale offset after truncate-and-regrow; read_head early stop on an empty cwd or a tool_result user entry; skip_line reads a huge newline-less line through once; a failed File::open in scan still caches size/mtime"
       ],
       "model": "sonnet",
-      "n": 4,
       "security": [],
       "state": "Done",
       "story": [
@@ -181,14 +389,200 @@
     },
     {
       "fix_rounds": 0,
+      "id": "5",
       "later": [],
       "model": "opus",
-      "n": 5,
       "security": [],
       "state": "Done",
       "story": [
         "dispatched Steps 1-2 only (base b1f0975, implementer opus; no commit — Step 3 stop is the controller's, Step 4 commit after approval)",
         "complete (c7c89b8)"
+      ]
+    },
+    {
+      "fix_rounds": 0,
+      "id": "5b",
+      "later": [
+        "deferred() keeps the tag on colon-less shapes; split_once(\"Ruling:\") anywhere in an entry; no multi-byte or `minor:`-not-in-story test"
+      ],
+      "model": null,
+      "security": [],
+      "state": "Done",
+      "story": [
+        "DONE_WITH_CONCERNS 5bd5303; files check clean (all listed, nothing ignored); review dispatched (sonnet, package review-c7c89b8..5bd5303.diff without design JSON)",
+        "review Approved (phase lists match all 5 SKILL.md tables; drift test reads real files; one shared ruling splitter).",
+        "complete (5bd5303)"
+      ]
+    },
+    {
+      "fix_rounds": 1,
+      "id": "6",
+      "later": [
+        "holds_sessions_of prefix match (a root of ~ matches everything; -work-alpha vs -work-alpha-beta); session under the read lock blocks a tokio worker; bad config.toml only on stderr; fail() attaches by stdout alone; home() falls back to cwd (pin with Task 10); no semantic syntax check in strip",
+        "a pending folder whose growing transcripts never yield a loaded session rebuilds the index each tick while active; a queue-only tick followed by a quiet tick marks the folder known before its user line arrives"
+      ],
+      "model": "opus",
+      "security": [],
+      "state": "Done",
+      "story": [
+        "dispatched (base 5bd5303, implementer opus) with: poll calls Index::refresh each tick (user decision), build on a new claude-projects folder (Task 4 ruling), scan_links again when transcripts change (cheap tail scan)",
+        "NEEDS_CONTEXT before code: core's export_bindings wipes the shared bindings/ folder and bindings_are_current fails on any app file. Deviation to the user: picked \"Each crate owns its files\" 2026-10-29 — core writes and checks only its own files (~10 lines in core/src/bindings.rs, added to Task 6's files); the app's check covers the whole folder.",
+        "DONE_WITH_CONCERNS 82a9944; files check clean (listed + decided additions; ignored only target/ and app/gen/); review dispatched (opus, package review-5bd5303..82a9944.diff without lock/icons)",
+        "fix round 1 (resume implementer)",
+        "fix round 1 implemented efa6b6b (pending new folders, Windows cast, dynamic import/import-equals rejected, catch_unwind per tick); re-review dispatched",
+        "fix round 1/5 (4 addressed, 0 open; commits 82a9944..efa6b6b)",
+        "complete (efa6b6b)"
+      ]
+    },
+    {
+      "fix_rounds": 1,
+      "id": "7",
+      "later": [
+        "mermaid.min.js loads eagerly and delays the first draw (lazy load changes the brief's index.html contract; not worth a user stop now)",
+        "restore() clicks [aria-expanded] elements (a custom view's handler could fire; skill should say aria-expanded only on plain toggles); same diagram twice shares one SVG id; content added after render resolves isn't restored; 5 s render timeout"
+      ],
+      "model": "opus",
+      "security": [],
+      "state": "Done",
+      "story": [
+        "dispatched (base efa6b6b, implementer opus)",
+        "NEEDS_CONTEXT before code: view_source(id) always returns a global copy, so a broken copy can't fall back to the built-in (Review Focus 4). Deviation to the user: picked \"Option on view_source\" 2026-10-29 — view_source(id, builtin: Option<bool>); app/src/commands.rs and app/src/views.rs join Task 7's files, plus a Rust test builtin_source_ignores_global; runtime-only, not in views' DataApi.",
+        "NEEDS_CONTEXT 2 (api.d.ts): views had no route; run-tab placement undefined. User picked 2026-10-29: `ctx.route` (read-only Route), and \"run view hosts the tabs\" (ctx.tabs; run-tab view drawn into the run view's data-slot=\"run-tab\", appended if absent; each view in its own section). Mermaid 12.2.0 ships classic dist/mermaid.min.js; all three tarballs match registry integrity.",
+        "DONE_WITH_CONCERNS 506b0dd; files check clean (listed + decided commands.rs/views.rs; ignored only target/ and app/gen/); real window checked under Xvfb (test view, Mermaid, error card, reload); review dispatched (opus, package without vendor/lock)",
+        "fix round 1 (resume implementer)",
+        "fix round 1 implemented 9d41dc2 (state kept across same-route redraws, SVG cache, collapsed draws, 5 s render timeout, design fold row, unknown-tab note); re-review dispatched",
+        "fix round 1/5 (4 addressed, 0 open; commits 506b0dd..9d41dc2). Re-reviewer's \"no .unfold/.count CSS\" checked by the controller: tokens.css has them (10 matches) — not a finding.",
+        "complete (9d41dc2)"
+      ]
+    },
+    {
+      "fix_rounds": 2,
+      "id": "8",
+      "later": [
+        "the list shows the phase key (\"In execute.\") where the run view says \"Build\"; FlowRunSummary carries only the key",
+        "M2 run-tab of a gone run draws outside the grid; M5 picks counted with duplicates and fixed not limited to picks; M6 Docs stepper drops gates no phase names; M8 dumped fixtures need nix fmt after regeneration",
+        "roots rule compares paths as written, so a worktree git recorded through a symlink (outside .claude/worktrees and .worktrees) is dropped",
+        "R1 relative-paths test passes silently on git < 2.48 (should #[ignore] or fail under CI); R2 `..` folded by name in relative records, missed through a symlinked main checkout"
+      ],
+      "model": "opus",
+      "security": [],
+      "state": "Done",
+      "story": [
+        "dispatched (base 9d41dc2, implementer opus)",
+        "NEEDS_CONTEXT before code. To the user, picked 2026-10-29: \"A real session route\" (Route gains { to: 'session', project, id } in api.d.ts, activity view draws it; runtime.js, api.d.ts, runtime.test.mjs join Task 8's files) and \"Add picks and fixed\" (AuditSummary gains picks: Option<u32> and fixed: u32; core entries.rs, index.rs and bindings join).",
+        "implemented 79b6f24 (DONE_WITH_CONCERNS); files check clean (only target/ and app/gen/ ignored); review dispatched (opus)",
+        "review CHANGES_REQUESTED (0 Critical, 3 Important, 9 Minor; task-8-review.md). I3 (ledger rulings merged) already ruled: flow.md's only, as designed.",
+        "fix round 1 (resume implementer): I1 stale session read, I2 fold restore by stable key, I3 flow.md rulings only, duplicate project names, design's a11y wiring restored, M1 observer disconnect, M3 run-tab return shape in api.d.ts, M4 conductor filter reset, M7 tests",
+        "fix round 1 implemented 9feaa61 (I1, I2, I3, a11y wiring, M1, M3, M4, M7); item 4 NEEDS_CONTEXT: the old repo location's worktree root is listed under both the folder project and the remote project",
+        "fix round 1b implemented 0baeb59 (stale git worktree records ignored in roots_of; same-named projects show a path tail); files check clean; scoped re-review of 79b6f24..0baeb59 dispatched (same reviewer)",
+        "fix round 1/5 (re-review: I1, I2, I3, a11y, M1, M3, M4, M7 and the shared root fixed; new: 1 Important N1, 4 Minor N2-N5)",
+        "fix round 2 (resume implementer): N1 mark from the root's own path tail, N2 run-tab slot tabpanel wiring, N3 relative worktree gitdirs resolved against git's admin folder, N4 one project per root via checkout_of",
+        "fix round 2 implemented 6ecde9a (N1 own-path marks, N2 run-tab tabpanel, N3 relative worktree records, N4 roots follow checkout_of); files check clean",
+        "fix round 2/5 (N1-N4 fixed; re-review APPROVED, 0 Critical, 0 Important, 2 Minor)",
+        "complete (6ecde9a)"
+      ]
+    },
+    {
+      "fix_rounds": 1,
+      "id": "8b",
+      "later": [],
+      "model": "opus",
+      "security": [],
+      "state": "Done",
+      "story": [
+        "dispatched (base ab99d63, implementer opus); implemented 630194a (DONE_WITH_CONCERNS); files check clean; review dispatched (opus)",
+        "review CHANGES_REQUESTED (0 Critical, 1 Important, 5 Minor; task-8b-review.md)",
+        "fix round 1 (resume implementer)",
+        "fix round 1 implemented 94af2d7 (I1, M1-M5); scoped re-review dispatched",
+        "fix round 1/5 (re-review APPROVED, 0/0/0)",
+        "complete (94af2d7)"
+      ]
+    },
+    {
+      "fix_rounds": 1,
+      "id": "8c",
+      "later": [
+        "the config symlink test relies on the replaced link getting a later mtime (coarse-timestamp file systems could tie)"
+      ],
+      "model": "opus",
+      "security": [],
+      "state": "Done",
+      "story": [
+        "dispatched (base 94af2d7, implementer opus)",
+        "implemented 7c19545 (DONE); files check clean; 3 files outside the list (bindings.rs, bindings Extensions/Style, dump_view_fixtures.rs) follow from the new command and the move; review dispatched (opus)",
+        "review APPROVED (0 Critical, 0 Important, 7 Minor; task-8c-review.md)",
+        "fix round 1 (resume implementer)",
+        "fix round 1/5 implemented cedef5f (7 minors); controller checked the diff (ConfigFile signature before load, link+target signature, own views-changed test, flake install check runs the skill's tsc on copied defaults); no findings",
+        "complete (cedef5f)"
+      ]
+    },
+    {
+      "fix_rounds": 0,
+      "id": "8d",
+      "later": [],
+      "model": "opus",
+      "security": [],
+      "state": "Review",
+      "story": [
+        "dispatched (base 850fa13, implementer opus)",
+        "implemented af44507 (DONE); files check clean (12 paths, the 4 left files untouched); controller's look at task8d-build.png: 20 tasks in place, card on 8d; the graph is wider than its box and the ringed current task (8d) is off-screen to the right — review asks; review dispatched (opus)",
+        "review CHANGES_REQUESTED (0 Critical, 1 Important, 5 Minor; task-8d-review.md). I1 (ringed node off-screen) is answered by the user's top-to-bottom graph.",
+        "fix round 1 (resume implementer): top-to-bottom graph, M1 rule wording, M2 plan test as ordered subsequence, M3 mockup .id, M4 plan.md copies of 8c and 5b complete, M5 test names/inputs"
+      ]
+    },
+    {
+      "fix_rounds": 0,
+      "id": "8f",
+      "later": [],
+      "model": "opus",
+      "security": [],
+      "state": "Done",
+      "story": [
+        "dispatched (base cedef5f, implementer opus)",
+        "implemented 850fa13 (DONE_WITH_CONCERNS). Baseline vs final on a scratch copy of this session (34 MB + 90 subagents, release, 3 runs): cold open 571-587 ms -> 235-242 ms; live tick 321-325 ms -> 2.6-2.7 ms; JSON 4.2 MB -> 495 KB; index lock no longer held during reads. Real window: redraws were 3.6-4 s apart from runtime fold/scroll bookkeeping over ~21k elements; runtime.js fix -> redraws at the poll's 2 s, a fold opens in 8-9 ms.",
+        "review dispatched (opus)",
+        "review APPROVED (0 Critical, 0 Important, 7 Minor); reviewer's timing re-run matches the report's \"after\" column",
+        "complete (850fa13)"
+      ]
+    },
+    {
+      "fix_rounds": 2,
+      "id": "9",
+      "later": [
+        "M8 the app's three timing tests run in no CI job (per plan); M9 binary embeds shell/ test and config files (never loaded); M10 Windows clippy lints never-linted Windows code — watch the first PR run"
+      ],
+      "model": "opus",
+      "security": [],
+      "state": "Done",
+      "story": [
+        "dispatched (base 6ecde9a, implementer opus)",
+        "implemented a7ad06a (DONE_WITH_CONCERNS); files check clean; review dispatched (opus)",
+        "review CHANGES_REQUESTED (0 Critical, 1 Important, 10 Minor; task-9-review.md)",
+        "fix round 1 (resume implementer): I1 where added views land, M1-M5 skill accuracy, M6 sort in drift test, M7 package files in the CI paths filter",
+        "fix round 1 implemented 74f6abb (I1, M1-M7); files check clean; scoped re-review dispatched",
+        "fix round 1/5 (I1, M1-M7 fixed; re-review: 1 Important R1 doc route unreachable in skill text, 1 Minor R2 $dir across Bash calls) -> fix round 2",
+        "fix round 2/5 implemented b51defa (R1 doc route reachable only via navigate, R2 each block sets dir); controller checked the 27-line skill diff inline: both fixed, nothing else changed",
+        "complete (b51defa); Step 7 slice checkpoint: stopped for the user"
+      ]
+    },
+    {
+      "fix_rounds": 2,
+      "id": "10",
+      "later": ["dropping entries is quadratic (20k entries 6.7 s; schema allows 4)"],
+      "model": "sonnet",
+      "security": [],
+      "state": "Done",
+      "story": [
+        "dispatched (base 04231a0, implementer sonnet)",
+        "implemented 3435cf2 (DONE_WITH_CONCERNS: AskUserQuestion and Notification not raisable under -p; user to check interactively); files check clean; review dispatched (opus)",
+        "review CHANGES_REQUESTED (0 Critical, 2 Important, 5 Minor, 1 files deviation; task-10-review.md)",
+        "fix round 1 (resume implementer): I1 questions array + questions_cut, I2 stdin read inside the catch with a spawn test, M1-M5, the three descriptions",
+        "fix round 1 implemented b2eec27 (I1, I2, M1-M5, descriptions; implementer added message_cut with a 1024-char cap); files check clean; scoped re-review dispatched",
+        "fix round 1/5 (re-review APPROVED, 0 Critical, 0 Important, 6 Minor)",
+        "fix round 2 (resume implementer): header cut, odd-offset emoji test, lutimes on the old link, chmod in its own try, wording",
+        "fix round 2 implemented ab99d63 (header cut, odd-offset test, lutimes, chmod own try untested, wording); controller to check inline",
+        "fix round 2/5 checked inline by the controller (header cut 64 by code point, chmod in its own try, tests and wording); no findings. chmod-failure path untested (needs another owner)",
+        "complete (ab99d63)"
       ]
     }
   ]

@@ -637,7 +637,7 @@ fn rebuild_finds_a_session_in_a_worktree_made_since() {
 }
 
 #[test]
-fn build_on_a_lettered_task_is_the_current_task() {
+fn lettered_task_is_counted_and_building() {
     let w = World::new("lettered");
     let x = "work/alpha/.claude/worktrees/x";
     let plan = w.path(&format!("{x}/docs/features/login/plan.md"));

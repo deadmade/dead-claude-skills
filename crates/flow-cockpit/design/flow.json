@@ -34,6 +34,11 @@
       "body": "Mockup round 1 (2026-10-28, `crates/flow-cockpit/design/run-view.html`): the user likes the theme and the colouring,\nand hates the alignment: \"it 100% looks like ai and kinda lazy\", \"also half the screen is empty\" (a centred capped\ncolumn at ~1880 px). Fonts: installed ones, no bundled or downloaded font. Reworking it as an app window that fills\nthe width on one grid, with fewer boxes; not picked yet.\n\nMockup round 2 (2026-10-28): \"definetly a good step up but now its just bam 3 or 4 walls of text. Its overwhelming a\nbit but definetly the right direction\"; the user asked Claude to analyse it. Reworking for one focal point per\nscreen: the selected task on Build, phases as one line, one-line task rows, decisions as expandable lists, no task\nrail on Decisions and Docs.\n\nMockup round 3 (2026-10-28): \"Rest awesome except the decissions tab\". The user moved the chapters to the right on\nDocs, with the documents on the left. Two changes asked: the clickable inline links in Build (\"the build log, 1\nentry\") don't fit the scheme; Decisions should be decisions and deviations on the left with the text in the middle.",
       "picked": "the mockup in `crates/flow-cockpit/design/run-view.html` after three reworks, approved 2026-10-28 (\"its fucking awesome!!! lets goo\"): an app window on one grid; Build is a phase track and one-line task rail beside the selected task, with folds styled as rows; Decisions and Docs are master and detail; installed fonts; the Night City palette unchanged.",
       "title": "Flow run view"
+    },
+    {
+      "body": "",
+      "picked": "go for slice 2 (Tasks 10 to 13), user, 2026-10-29, after using slice 1's window (\"I like what you build\"). At the checkpoint the Nix-built window died on the user's NVIDIA card under Wayland (\"Error 71 (Protocol error)\"); `WEBKIT_DISABLE_DMABUF_RENDERER=1` fixed it, and the app now sets it itself (Rulings, Task 9 follow-up).",
+      "title": "Slice 2"
     }
   ],
   "deviations": [
@@ -76,6 +81,126 @@
         }
       },
       "title": "The approved mockup reads document format in the view"
+    },
+    {
+      "body": "The core's export wiped the whole `bindings/` folder and its check failed on any file it didn't write, so the app's\n`ViewInfo` would break it.",
+      "status": {
+        "Decided": {
+          "date": "2026-10-29",
+          "what": "each crate owns its files; the core writes and checks only its own, and the app's check covers the whole folder; `core/src/bindings.rs` joins Task 6's files"
+        }
+      },
+      "title": "Two crates share one bindings folder"
+    },
+    {
+      "body": "Tauri always creates the webview's data folder (`~/.local/share/dev.deadmade.flow-cockpit/`, `%LOCALAPPDATA%` on\nWindows), incognito or not; it can be moved, not stopped. \"The app writes nothing\" didn't hold.",
+      "status": {
+        "Decided": {
+          "date": "2026-10-29",
+          "what": "accepted; the rule reads \"our code writes nothing; the webview engine keeps its own small folder\""
+        }
+      },
+      "title": "The webview writes its own data folder"
+    },
+    {
+      "body": "`view_source(id)` always returns the global copy when one exists, and the built-ins live only inside the binary, so\nthe window couldn't draw the built-in under a broken copy's error.",
+      "status": {
+        "Decided": {
+          "date": "2026-10-29",
+          "what": "`view_source(id, builtin: Option<bool>)`; with `true` it returns the built-in; the runtime uses it, views don't see it; `commands.rs` and `views.rs` join Task 7's files"
+        }
+      },
+      "title": "A broken copy of a built-in view can't fall back"
+    },
+    {
+      "body": "The plan's `ViewContext` had no route, so a view couldn't tell which run or doc it draws; and the approved run view\ndraws the whole window, tab bar included, with no place for `run-tab` views.",
+      "status": {
+        "Decided": {
+          "date": "2026-10-29",
+          "what": "`ViewContext` gains a read-only `route` and `tabs` (the loaded run-tab views); the run view puts them in its tab bar, and a selected tab's view is drawn into the run view's `data-slot=\"run-tab\"` element"
+        }
+      },
+      "title": "Views don't know their route, and run tabs have no place"
+    },
+    {
+      "body": "The spec lists loose sessions \"so any Claude session's activity can be found\", but no route led to a session that\nbelongs to no run.",
+      "status": {
+        "Decided": {
+          "date": "2026-10-29",
+          "what": "`Route` gains `{ to: 'session', project, id }`, documented in `api.d.ts`; the activity view draws it; `runtime.js`, `api.d.ts` and `runtime.test.mjs` join Task 8's files"
+        }
+      },
+      "title": "Loose sessions can't be opened"
+    },
+    {
+      "body": "The spec's list shows each audit's picks and how many were fixed; `AuditSummary` carried only open, closed or unknown.",
+      "status": {
+        "Decided": {
+          "date": "2026-10-29",
+          "what": "`AuditSummary` gains `picks: Option<u32>` and `fixed: u32` from the parsed report"
+        }
+      },
+      "title": "Audit rows lack picks and fixed counts"
+    },
+    {
+      "body": "After using slice 1 the user asked for projects and runs to be apart, and for a switch between flow runs and loose\nsessions. Task 8's list puts projects, status and conductor filters and the sort in one left rail beside the rows.",
+      "status": {
+        "Decided": {
+          "date": "2026-10-29",
+          "what": "the left rail keeps only Projects; the runs side gets a switch, Flow runs or Loose sessions (audits stay under Flow runs), a filter bar (status, conductor, sort, search) and a table with column headings. Built as Task 8b, after Task 10 and before Task 11."
+        }
+      },
+      "title": "The list mixes projects, filters and runs"
+    },
+    {
+      "body": "The user asked for back and forward through the pages, and for a reload to keep the page. The runtime keeps the route\nin memory only, so a reload opens the list and there is no history.",
+      "status": {
+        "Decided": {
+          "date": "2026-10-29",
+          "what": "the route lives in the window's address (its hash), so the mouse's back and forward side buttons move through the pages and a reload (F5 or Ctrl+R) keeps the page; no top-bar buttons or keys. A fresh start opens the list, and nothing is written to disk. Built as Task 8e, after the extensions (Task 8c) and lettered task ids (Task 8d)."
+        }
+      },
+      "title": "No way back, and a reload loses the page"
+    },
+    {
+      "body": "Changing a default view needs a rebuild, a default can only be replaced, not switched off, and the views skill lives\nin a Claude Code plugin although the views belong to the app. The user wants the defaults shipped like extensions that\nanyone can disable, owned by the app so it runs on its own, not by a Claude Code plugin.",
+      "status": {
+        "Decided": {
+          "date": "2026-10-29",
+          "what": "the app gets its own extensions. An extension is a folder with one or more view files and an optional `style.css`, no manifest; the folder name is its id. The defaults (list, run, docs, activity) ship with the app (Nix: `share/flow-cockpit/extensions`; later the Windows installer's folder); the user's go in `~/.config/flow-cockpit/extensions/`, and one with a default's name replaces it. All are loaded from disk and reloaded live. `disabled = [\"<name>\"]` in `config.toml`, read live, switches one off; the window stays read-only. The Claude Code plugin keeps only the views skill and the capture hooks. Built as Task 8c, after Task 8b."
+        }
+      },
+      "title": "Built-in views are compiled into the app"
+    },
+    {
+      "body": "The Build tab lists only plan.md's tasks, and the core reads task numbers as plain numbers, so tasks added by a\ndecision (5b, 8b, 8c, 8d, 8e) are invisible and the task card points at the wrong task while one of them is built.",
+      "status": {
+        "Decided": {
+          "date": "2026-10-29",
+          "what": "plan.md gets each added task under its lettered number, with a line naming the decision that added it; the core reads ids like `8b` and orders them after 8; the flows' rules say how an added task is numbered. Built as Task 8d, before back and forward (now Task 8e)."
+        }
+      },
+      "title": "Tasks added during a build don't show"
+    },
+    {
+      "body": "The user: Activity is slow or freezes. Every 2 s while a session runs it re-reads the whole transcript (34 MB for this\nbuild's session, about 113 MB with its 88 subagents), sends every turn with every tool input to the window and redraws\nall of it.",
+      "status": {
+        "Decided": {
+          "date": "2026-10-29",
+          "what": "the core reads only what was appended since the last read, outside the index lock; the window gets the newest 20 turns with a \"Show older turns\" button, and a tool call's input is fetched only when its fold opens. Measured on this session's transcript before and after. Built as Task 8f, right after the extensions' fix round, before Tasks 8d and 8e."
+        }
+      },
+      "title": "Activity freezes on a large running session"
+    },
+    {
+      "body": "The user asked for the Mermaid diagrams to be drawn ahead so a page doesn't flash when it first opens. Today a diagram\nshows its source text until Mermaid has drawn it, then jumps to the drawing; only a redraw of a diagram already drawn\nis instant.",
+      "status": {
+        "Decided": {
+          "date": "2026-10-29",
+          "what": "the window draws diagrams ahead, in idle time: on start the task graphs and document diagrams of the shown project's unfinished runs, and on opening a run the rest of that run's documents. A diagram not drawn yet shows a quiet placeholder of the right size instead of its source; the source shows only when drawing fails. Drawings are kept in memory only (nothing written to disk). Built as Task 8g, after Task 8e."
+        }
+      },
+      "title": "Diagrams flash when a page first opens"
     }
   ],
   "flow": "feature",
@@ -95,7 +220,7 @@
       "what": "plan approved"
     }
   ],
-  "now": "The flow run view mockup is approved; Task 5b moves its format reading into the core, then Task 6.",
+  "now": "Building Task 8d, tasks added during a build shown in their place (lettered ids).",
   "phase": "execute",
   "phases": [
     {
@@ -213,6 +338,158 @@
       "raw": "2026-10-28, Task 4: a per-line head cap and `rebuild_project` recomputing roots first join the fix round — both made a session vanish, against \"any Claude session's activity can be found\" — costs a larger fix round; folders that match no root wait for Task 6, which calls `build` when a new folder appears in `~/.claude/projects`.",
       "scope": "Task 4",
       "why": "both made a session vanish, against \"any Claude session's activity can be found\""
+    },
+    {
+      "call": "`ts-rs`, `jiff` and `serde` in the app crate are implied by the brief (`ViewInfo` derives `TS`; `Index` takes a `jiff::Timestamp`)",
+      "cost": null,
+      "date": "2026-10-29",
+      "raw": "2026-10-29, Task 6: `ts-rs`, `jiff` and `serde` in the app crate are implied by the brief (`ViewInfo` derives `TS`; `Index` takes a `jiff::Timestamp`) — costs three dependencies the Files line didn't name.",
+      "scope": "Task 6",
+      "why": "costs three dependencies the Files line didn't name."
+    },
+    {
+      "call": "the `changed` payload derives `TS`, `--print-types` prints only the bindings until Task 7 adds `api.d.ts`, and `AttachConsole` is a direct kernel32 extern rather than `windows-sys`",
+      "cost": "a few lines of unsafe FFI.",
+      "date": "2026-10-29",
+      "raw": "2026-10-29, Task 6: the `changed` payload derives `TS`, `--print-types` prints only the bindings until Task 7 adds `api.d.ts`, and `AttachConsole` is a direct kernel32 extern rather than `windows-sys` — the implementer's calls — costs a few lines of unsafe FFI.",
+      "scope": "Task 6",
+      "why": "the implementer's calls"
+    },
+    {
+      "call": "the Claude projects folder honours `$CLAUDE_CONFIG_DIR` and the config folder `$XDG_CONFIG_HOME`",
+      "cost": "Tasks 10 and 12 and the views skill using the same rule.",
+      "date": "2026-10-29",
+      "raw": "2026-10-29, Task 6: the Claude projects folder honours `$CLAUDE_CONFIG_DIR` and the config folder `$XDG_CONFIG_HOME` — how Claude Code and XDG already work — costs Tasks 10 and 12 and the views skill using the same rule.",
+      "scope": "Task 6",
+      "why": "how Claude Code and XDG already work"
+    },
+    {
+      "call": "the window stays `incognito`",
+      "cost": "view state lasting one run only.",
+      "date": "2026-10-29",
+      "raw": "2026-10-29, Task 6: the window stays `incognito` — views keep no browser storage between runs, in line with the app writing nothing — costs view state lasting one run only.",
+      "scope": "Task 6",
+      "why": "views keep no browser storage between runs, in line with the app writing nothing"
+    },
+    {
+      "call": "the Windows clippy cast, rejecting a dynamic `import()` in a view, and a poll thread that survives a panicking tick join the fix round",
+      "cost": "a larger fix round.",
+      "date": "2026-10-29",
+      "raw": "2026-10-29, Task 6: the Windows clippy cast, rejecting a dynamic `import()` in a view, and a poll thread that survives a panicking tick join the fix round — the first would fail Windows CI, the second is the letter of \"only `import type`\", the third leaves the window stale — costs a larger fix round.",
+      "scope": "Task 6",
+      "why": "the first would fail Windows CI, the second is the letter of \"only `import type`\", the third leaves the window stale"
+    },
+    {
+      "call": "`api.d.ts` defines `Route`, `Step` (after the bindings' `Phase` and `Gate`) and `CardOpts` (a string is always text) as the implementer proposed",
+      "cost": "nothing.",
+      "date": "2026-10-29",
+      "raw": "2026-10-29, Task 7: `api.d.ts` defines `Route`, `Step` (after the bindings' `Phase` and `Gate`) and `CardOpts` (a string is always text) as the implementer proposed — the plan names them without shapes — costs nothing.",
+      "scope": "Task 7",
+      "why": "the plan names them without shapes"
+    },
+    {
+      "call": "a render timeout, the design's fold row for the diff block and a note for an unknown tab join the fix round",
+      "cost": "a larger fix round; Mermaid stays loaded eagerly, since lazy loading would change the plan's `index.html`.",
+      "date": "2026-10-29",
+      "raw": "2026-10-29, Task 7: a render timeout, the design's fold row for the diff block and a note for an unknown tab join the fix round — a never-settling view froze the window silently — costs a larger fix round; Mermaid stays loaded eagerly, since lazy loading would change the plan's `index.html`.",
+      "scope": "Task 7",
+      "why": "a never-settling view froze the window silently"
+    },
+    {
+      "call": "the docs view is a `run-tab` titled \"Docs\", not the `doc` slot",
+      "cost": "the `doc` route having no built-in view.",
+      "date": "2026-10-29",
+      "raw": "2026-10-29, Task 8: the docs view is a `run-tab` titled \"Docs\", not the `doc` slot — the approved design shows Docs as a tab of the run, and the run view hosts the tabs — costs the `doc` route having no built-in view.",
+      "scope": "Task 8",
+      "why": "the approved design shows Docs as a tab of the run, and the run view hosts the tabs"
+    },
+    {
+      "call": "`app/shell/tokens.css` joins Task 8's files",
+      "cost": "one more shared file.",
+      "date": "2026-10-29",
+      "raw": "2026-10-29, Task 8: `app/shell/tokens.css` joins Task 8's files — the house stylesheet lives there since Task 7 and the list and activity rows need styling — costs one more shared file.",
+      "scope": "Task 8",
+      "why": "the house stylesheet lives there since Task 7 and the list and activity rows need styling"
+    },
+    {
+      "call": "the implementer's calls stand (Build/Decisions selection kept per run, run tabs laid out with `display: contents`, the list opens on the first project, Activity reads only the selected session)",
+      "cost": "nothing.",
+      "date": "2026-10-29",
+      "raw": "2026-10-29, Task 8: the implementer's calls stand (Build/Decisions selection kept per run, run tabs laid out with `display: contents`, the list opens on the first project, Activity reads only the selected session) — they keep state across redraws and avoid parsing whole transcripts — costs nothing.",
+      "scope": "Task 8",
+      "why": "they keep state across redraws and avoid parsing whole transcripts"
+    },
+    {
+      "call": "\"Calls the build made\" lists flow.md's rulings only, as the approved design does",
+      "cost": "a ledger ruling not yet copied being missing from the list until it is.",
+      "date": "2026-10-29",
+      "raw": "2026-10-29, Task 8: \"Calls the build made\" lists flow.md's rulings only, as the approved design does — the ledger's rulings are the same calls worded for the log and get copied into flow.md, so merging them double-counted — costs a ledger ruling not yet copied being missing from the list until it is.",
+      "scope": "Task 8",
+      "why": "the ledger's rulings are the same calls worded for the log and get copied into flow.md, so merging them double-counted"
+    },
+    {
+      "call": "the edits to Task 4's fixture home and `core/tests/index.rs` stand",
+      "cost": "Task 4's fixtures carrying view-only cases.",
+      "date": "2026-10-29",
+      "raw": "2026-10-29, Task 8: the edits to Task 4's fixture home and `core/tests/index.rs` stand — `index.rs` was named in the picks-and-fixed decision and the views' fixtures are dumped from that home — costs Task 4's fixtures carrying view-only cases.",
+      "scope": "Task 8",
+      "why": "`index.rs` was named in the picks-and-fixed decision and the views' fixtures are dumped from that home"
+    },
+    {
+      "call": "each root belongs to exactly one project, its git remote's when one resolves and its folder name's otherwise, and projects that still share a name show a short path tail in the list",
+      "cost": "the core index and its tests joining Task 8's fix round.",
+      "date": "2026-10-29",
+      "raw": "2026-10-29, Task 8: each root belongs to exactly one project, its git remote's when one resolves and its folder name's otherwise, and projects that still share a name show a short path tail in the list — the spec folds checkouts \"by git remote, by folder name without one\", and a root listed under two projects broke that — costs the core index and its tests joining Task 8's fix round.",
+      "scope": "Task 8",
+      "why": "the spec folds checkouts \"by git remote, by folder name without one\", and a root listed under two projects broke that"
+    },
+    {
+      "call": "a project keeps a root only when that root's checkout is one of the project's own",
+      "cost": "one cached path walk per root.",
+      "date": "2026-10-29",
+      "raw": "2026-10-29, Task 8: a project keeps a root only when that root's checkout is one of the project's own — roots then follow the rule sessions already follow, so a worktree of one repo inside another's `.claude/worktrees/` lands in one project only — costs one cached path walk per root.",
+      "scope": "Task 8",
+      "why": "roots then follow the rule sessions already follow, so a worktree of one repo inside another's `.claude/worktrees/` lands in one project only"
+    },
+    {
+      "call": "such a worktree belongs to the repo whose folder holds it, its documents too",
+      "cost": "a rare run listed under the wrong project.",
+      "date": "2026-10-29",
+      "raw": "2026-10-29, Task 8: such a worktree belongs to the repo whose folder holds it, its documents too — that is where its sessions already go, and giving it to its own repo would move sessions — costs a rare run listed under the wrong project.",
+      "scope": "Task 8",
+      "why": "that is where its sessions already go, and giving it to its own repo would move sessions"
+    },
+    {
+      "call": "on Linux the app sets `WEBKIT_DISABLE_DMABUF_RENDERER=1` before the window opens, unless it is already set",
+      "cost": "WebKitGTK's faster DMA-BUF path on every Linux machine (setting it to 0 brings it back).",
+      "date": "2026-10-29",
+      "raw": "2026-10-29, Task 9 follow-up: on Linux the app sets `WEBKIT_DISABLE_DMABUF_RENDERER=1` before the window opens, unless it is already set — at the slice checkpoint the window died on the user's NVIDIA card under Wayland (\"Error 71 (Protocol error)\") and that variable fixed it — costs WebKitGTK's faster DMA-BUF path on every Linux machine (setting it to 0 brings it back).",
+      "scope": "Task 9 follow-up",
+      "why": "at the slice checkpoint the window died on the user's NVIDIA card under Wayland (\"Error 71 (Protocol error)\") and that variable fixed it"
+    },
+    {
+      "call": "a cut `questions` stays an array (only question and header kept, each question cut by characters, trailing entries dropped) and the capture line gains `questions_cut: true`",
+      "cost": "one optional field.",
+      "date": "2026-10-29",
+      "raw": "2026-10-29, Task 10: a cut `questions` stays an array (only question and header kept, each question cut by characters, trailing entries dropped) and the capture line gains `questions_cut: true` — the brief left how to cut open, and a cut that left broken JSON would hide the open question from Task 11 — costs one optional field.",
+      "scope": "Task 10",
+      "why": "the brief left how to cut open, and a cut that left broken JSON would hide the open question from Task 11"
+    },
+    {
+      "call": "the plugin's description, its marketplace entry and the root README name the capture hooks",
+      "cost": "three more files in the task.",
+      "date": "2026-10-29",
+      "raw": "2026-10-29, Task 10: the plugin's description, its marketplace entry and the root README name the capture hooks — an opt-in user must know the plugin installs hooks, and descriptions stay true to the code — costs three more files in the task.",
+      "scope": "Task 10",
+      "why": "an opt-in user must know the plugin installs hooks, and descriptions stay true to the code"
+    },
+    {
+      "call": "the Build tab's task graph runs top to bottom, Task 1 at the top and the last task at the bottom, with no scrollbar of its own (the user's ask once the plan grew to 20 tasks; it replaces the approved mockup's left-to-right graph)",
+      "cost": null,
+      "date": "2026-10-29",
+      "raw": "2026-10-29, Task 8d: the Build tab's task graph runs top to bottom, Task 1 at the top and the last task at the bottom, with no scrollbar of its own (the user's ask once the plan grew to 20 tasks; it replaces the approved mockup's left-to-right graph) — costs a taller graph column on long plans.",
+      "scope": "Task 8d",
+      "why": "costs a taller graph column on long plans."
     }
   ],
   "sections": [
@@ -250,7 +527,7 @@
     },
     {
       "heading": "Options",
-      "markdown": "### Surface and shape\n\nPicked: Claude Code stays in the user's terminal, and a separate desktop window (Tauri) draws what the sessions and\ntheir subagents do, from captured events, flow.md, the SDD ledgers and transcripts; watching only, no interacting\nwith Claude.\n\nOffered 2026-10-28, with evidence: E2, E10 back an at-a-glance state view with detail one step away; E4, E5 warn\nagainst always-on detail; E6 says showing more pays off for people working with the agents, not people who only\nwatch. Nothing in the literature compares surfaces.\n\n- Diagrams in the docs only, viewed in existing Markdown renderers (S). Kept as a slice, not the whole answer.\n- Own desktop window, Tauri (L).\n- Terminal viewer in its own pane (L): rejected by the user, diagrams don't work well in a terminal.\n- Desktop cockpit hosting Claude Code in embedded PTYs (L+): replaced; running Claude Code inside the app is the risky\n  part.\n- Terminal cockpit hosting Claude Code (like CCManager): rejected, text-only diagrams and a terminal in a terminal.\n- Agent teams in tmux panes: Linux only (no Windows Terminal split panes); separate question, not picked.\n- **Picked (user's proposal, recommended):** Claude Code stays in the user's terminal; hooks and a mod capture what the\n  session and its subagents do into per-session event files; a separate desktop window (Tauri) follows those files\n  plus flow.md, the SDD ledgers and transcripts, and draws runs, phases, the task graph and review loops, live agent\n  activity, and the docs with Mermaid. **Scope (user, 2026-10-28):** \"lets first just focus on the visulisation and\n  capturing what claude code and the subagents to do just visulize everything that happens with the flows and keep\n  the actually interacting with claude out of it for now\". No answering questions, no starting flows, no typing.\n\n### Language\n\nPicked: Rust core, TypeScript views (user, 2026-10-28).\n\nRust extensions considered: a 15-line serde cdylib built in 6.4 s clean, 0.75 s release / 0.32 s debug incremental on\nthis machine (24 cores), so compile time isn't the objection; drawing in the webview, no stable plugin ABI, a\ntoolchain on every machine and a longer agent loop are.\n\n### Spike\n\nPicked: a throwaway clickable prototype from real data, agreed 2026-10-28.\n\n\"Lets create a prototype for that. So my inial idea was to have a drop down\nto select the projects im working on. And a list of flows that currently run or have run with filter and sort. I can\nsee on which steps they are, are they waiting, what kind of flow was it etc. When I click of them I get the detailed\nview with task list chat out put etc\". Built as a clickable page in the brainstorm companion from real data (a\nscratchpad extraction script), not Tauri; nothing of it is kept without going through the plan.\n\nWhat the spike showed (2026-10-28):\n\n- Reading everything from disk is cheap: 19 flows, 638 sessions (750 MB of transcripts), build logs and subagent\n  files in about 1.4 s, using one `grep` pass to link sessions to flows.\n- A project is more than one folder: sessions ran in `~/dead-claude-skills`, the flows now live in\n  `~/projects/dead-claude-skills`, plus worktrees under `.claude/worktrees/`. The prototype folds them by folder name.\n- Linking a session to a flow works when the session edited or wrote that flow's flow.md; a mere mention links nearly\n  every session to every flow.\n- \"Waiting on you\" from \"the last message ends with a question\" flagged web-mcp, idle 5 days, with 16 of 18 tasks done:\n  a forgotten run, not a live question. Live state needs the capture; disk alone gives history.\n- No plan declares task dependencies, so the graph can only show plan order. No existing spec or plan has a Mermaid\n  block.\n- The brainstorm companion reloads or blanks a full-document page; the prototype is served on its own port instead.\n- User, 2026-10-28: \"the shape feels right but most of it have really hard edges. Its really important that its easy\n  and nice to read\". Readability is a goal of its own, not polish.\n- Restyle (hallmark, app scope, fast mode): Night City's own palette from `plugins/default/themes/night-city.json`\n  instead of saturated ad-hoc colours, IBM Plex Sans 16px body, tone-stepped surfaces instead of 1px borders, rounded\n  rows and panels, prose capped at 72–75ch, tool calls as one quiet line that opens to the diff or command, Mermaid\n  themed dark to match, inline code rendered in log lines. `sloplint --scope app`: clean. The blank pages seen while\n  testing were the headless test browser dropping every tab about 10 s after it opened (an untouched list page too),\n  not the page or Mermaid.\n- User, 2026-10-28: \"table good, but the individual runs are still quit messy and really hard to read or not able to\n  read at all\". Run view rebuilt around reading: the Build tab opens with a two-sentence summary (\"16 of 18 tasks\n  done. Next up: …\"), one line per task with a plain state (\"Done after 2 fix rounds\"), and a task opens to \"What\n  happened\" as numbered sentences, then Security, Decisions (decision, why, if wrong) and Left for later. The plan-order\n  diagram is gone (a straight line says nothing). The Conversation tab groups the transcript into turns, newest first:\n  your prompt, the work folded into one line (\"Changed 6 files, ran 16 commands\"), earlier notes folded, Claude's\n  answer; older turns clamp to six lines. Wrapped build-log lines are now joined by the extractor.\n- User, 2026-10-28: \"task view is shit, i see there are 10 task but what do they do I cant see at a glance. Decisions\n  are really hard to read. COnversations is just a long list of text. Its so hard to read. Docs same issue again and\n  overview not sure about that\". Diagnosis: the source text is written for agents (a plan task is a title plus a dense\n  interface spec, no plain \"what it does\" line; ledger lines and rulings are compressed technical prose; transcripts\n  are long by nature). Restyling can't make that glanceable; it needs a distilling step, written by the flows or by a\n  model in the app.\n- For the real app: rendered Markdown from transcripts and build logs is untrusted (web pages end up in them), so it\n  needs a sanitiser before it reaches the DOM; the prototype doesn't have one.\n\n### Readable documents or model summaries\n\nPicked: better source documents, which the viewer draws as UI by their structure; Haiku summaries not picked.\n\n- User, 2026-10-28, on \"flows write it\" vs \"Haiku summarises\": \"instead of just rendering markdown could we just\n  enhance whats written. I will change the flow.md and shit a bit better etc\". Direction: better source documents\n  (the user reworks them), and a viewer that recognises their structure and draws it as UI instead of rendering\n  Markdown as is. Haiku summaries not picked.\n\n### Which documents get the readable format\n\nPicked: flow.md and the plan; the build log stays as it is for now.\n\n- 2026-10-28, which documents get the readable format: offered flow.md only / flow.md + plan / + build log\n  (recommended flow.md + plan). User: \"2\". The plan's part (one plain line per task, dependencies) goes in through a\n  conductor override of `writing-plans`; the build log stays as it is for now.\n\n### Mod or no mod\n\nPicked: no mod. The capture and transcripts cover agent state, questions and permission prompts; a mod is revisited\nonly if a gap shows (plan review round 1, 2026-10-28).\n\n### Flow run view\n\nPicked: the mockup in `crates/flow-cockpit/design/run-view.html` after three reworks, approved 2026-10-28 (\"its\nfucking awesome!!! lets goo\"): an app window on one grid; Build is a phase track and one-line task rail beside the\nselected task, with folds styled as rows; Decisions and Docs are master and detail; installed fonts; the Night City\npalette unchanged.\n\nMockup round 1 (2026-10-28, `crates/flow-cockpit/design/run-view.html`): the user likes the theme and the colouring,\nand hates the alignment: \"it 100% looks like ai and kinda lazy\", \"also half the screen is empty\" (a centred capped\ncolumn at ~1880 px). Fonts: installed ones, no bundled or downloaded font. Reworking it as an app window that fills\nthe width on one grid, with fewer boxes; not picked yet.\n\nMockup round 2 (2026-10-28): \"definetly a good step up but now its just bam 3 or 4 walls of text. Its overwhelming a\nbit but definetly the right direction\"; the user asked Claude to analyse it. Reworking for one focal point per\nscreen: the selected task on Build, phases as one line, one-line task rows, decisions as expandable lists, no task\nrail on Decisions and Docs.\n\nMockup round 3 (2026-10-28): \"Rest awesome except the decissions tab\". The user moved the chapters to the right on\nDocs, with the documents on the left. Two changes asked: the clickable inline links in Build (\"the build log, 1\nentry\") don't fit the scheme; Decisions should be decisions and deviations on the left with the text in the middle."
+      "markdown": "### Surface and shape\n\nPicked: Claude Code stays in the user's terminal, and a separate desktop window (Tauri) draws what the sessions and\ntheir subagents do, from captured events, flow.md, the SDD ledgers and transcripts; watching only, no interacting\nwith Claude.\n\nOffered 2026-10-28, with evidence: E2, E10 back an at-a-glance state view with detail one step away; E4, E5 warn\nagainst always-on detail; E6 says showing more pays off for people working with the agents, not people who only\nwatch. Nothing in the literature compares surfaces.\n\n- Diagrams in the docs only, viewed in existing Markdown renderers (S). Kept as a slice, not the whole answer.\n- Own desktop window, Tauri (L).\n- Terminal viewer in its own pane (L): rejected by the user, diagrams don't work well in a terminal.\n- Desktop cockpit hosting Claude Code in embedded PTYs (L+): replaced; running Claude Code inside the app is the risky\n  part.\n- Terminal cockpit hosting Claude Code (like CCManager): rejected, text-only diagrams and a terminal in a terminal.\n- Agent teams in tmux panes: Linux only (no Windows Terminal split panes); separate question, not picked.\n- **Picked (user's proposal, recommended):** Claude Code stays in the user's terminal; hooks and a mod capture what the\n  session and its subagents do into per-session event files; a separate desktop window (Tauri) follows those files\n  plus flow.md, the SDD ledgers and transcripts, and draws runs, phases, the task graph and review loops, live agent\n  activity, and the docs with Mermaid. **Scope (user, 2026-10-28):** \"lets first just focus on the visulisation and\n  capturing what claude code and the subagents to do just visulize everything that happens with the flows and keep\n  the actually interacting with claude out of it for now\". No answering questions, no starting flows, no typing.\n\n### Language\n\nPicked: Rust core, TypeScript views (user, 2026-10-28).\n\nRust extensions considered: a 15-line serde cdylib built in 6.4 s clean, 0.75 s release / 0.32 s debug incremental on\nthis machine (24 cores), so compile time isn't the objection; drawing in the webview, no stable plugin ABI, a\ntoolchain on every machine and a longer agent loop are.\n\n### Spike\n\nPicked: a throwaway clickable prototype from real data, agreed 2026-10-28.\n\n\"Lets create a prototype for that. So my inial idea was to have a drop down\nto select the projects im working on. And a list of flows that currently run or have run with filter and sort. I can\nsee on which steps they are, are they waiting, what kind of flow was it etc. When I click of them I get the detailed\nview with task list chat out put etc\". Built as a clickable page in the brainstorm companion from real data (a\nscratchpad extraction script), not Tauri; nothing of it is kept without going through the plan.\n\nWhat the spike showed (2026-10-28):\n\n- Reading everything from disk is cheap: 19 flows, 638 sessions (750 MB of transcripts), build logs and subagent\n  files in about 1.4 s, using one `grep` pass to link sessions to flows.\n- A project is more than one folder: sessions ran in `~/dead-claude-skills`, the flows now live in\n  `~/projects/dead-claude-skills`, plus worktrees under `.claude/worktrees/`. The prototype folds them by folder name.\n- Linking a session to a flow works when the session edited or wrote that flow's flow.md; a mere mention links nearly\n  every session to every flow.\n- \"Waiting on you\" from \"the last message ends with a question\" flagged web-mcp, idle 5 days, with 16 of 18 tasks done:\n  a forgotten run, not a live question. Live state needs the capture; disk alone gives history.\n- No plan declares task dependencies, so the graph can only show plan order. No existing spec or plan has a Mermaid\n  block.\n- The brainstorm companion reloads or blanks a full-document page; the prototype is served on its own port instead.\n- User, 2026-10-28: \"the shape feels right but most of it have really hard edges. Its really important that its easy\n  and nice to read\". Readability is a goal of its own, not polish.\n- Restyle (hallmark, app scope, fast mode): Night City's own palette from `plugins/default/themes/night-city.json`\n  instead of saturated ad-hoc colours, IBM Plex Sans 16px body, tone-stepped surfaces instead of 1px borders, rounded\n  rows and panels, prose capped at 72–75ch, tool calls as one quiet line that opens to the diff or command, Mermaid\n  themed dark to match, inline code rendered in log lines. `sloplint --scope app`: clean. The blank pages seen while\n  testing were the headless test browser dropping every tab about 10 s after it opened (an untouched list page too),\n  not the page or Mermaid.\n- User, 2026-10-28: \"table good, but the individual runs are still quit messy and really hard to read or not able to\n  read at all\". Run view rebuilt around reading: the Build tab opens with a two-sentence summary (\"16 of 18 tasks\n  done. Next up: …\"), one line per task with a plain state (\"Done after 2 fix rounds\"), and a task opens to \"What\n  happened\" as numbered sentences, then Security, Decisions (decision, why, if wrong) and Left for later. The plan-order\n  diagram is gone (a straight line says nothing). The Conversation tab groups the transcript into turns, newest first:\n  your prompt, the work folded into one line (\"Changed 6 files, ran 16 commands\"), earlier notes folded, Claude's\n  answer; older turns clamp to six lines. Wrapped build-log lines are now joined by the extractor.\n- User, 2026-10-28: \"task view is shit, i see there are 10 task but what do they do I cant see at a glance. Decisions\n  are really hard to read. COnversations is just a long list of text. Its so hard to read. Docs same issue again and\n  overview not sure about that\". Diagnosis: the source text is written for agents (a plan task is a title plus a dense\n  interface spec, no plain \"what it does\" line; ledger lines and rulings are compressed technical prose; transcripts\n  are long by nature). Restyling can't make that glanceable; it needs a distilling step, written by the flows or by a\n  model in the app.\n- For the real app: rendered Markdown from transcripts and build logs is untrusted (web pages end up in them), so it\n  needs a sanitiser before it reaches the DOM; the prototype doesn't have one.\n\n### Readable documents or model summaries\n\nPicked: better source documents, which the viewer draws as UI by their structure; Haiku summaries not picked.\n\n- User, 2026-10-28, on \"flows write it\" vs \"Haiku summarises\": \"instead of just rendering markdown could we just\n  enhance whats written. I will change the flow.md and shit a bit better etc\". Direction: better source documents\n  (the user reworks them), and a viewer that recognises their structure and draws it as UI instead of rendering\n  Markdown as is. Haiku summaries not picked.\n\n### Which documents get the readable format\n\nPicked: flow.md and the plan; the build log stays as it is for now.\n\n- 2026-10-28, which documents get the readable format: offered flow.md only / flow.md + plan / + build log\n  (recommended flow.md + plan). User: \"2\". The plan's part (one plain line per task, dependencies) goes in through a\n  conductor override of `writing-plans`; the build log stays as it is for now.\n\n### Mod or no mod\n\nPicked: no mod. The capture and transcripts cover agent state, questions and permission prompts; a mod is revisited\nonly if a gap shows (plan review round 1, 2026-10-28).\n\n### Flow run view\n\nPicked: the mockup in `crates/flow-cockpit/design/run-view.html` after three reworks, approved 2026-10-28 (\"its\nfucking awesome!!! lets goo\"): an app window on one grid; Build is a phase track and one-line task rail beside the\nselected task, with folds styled as rows; Decisions and Docs are master and detail; installed fonts; the Night City\npalette unchanged.\n\nMockup round 1 (2026-10-28, `crates/flow-cockpit/design/run-view.html`): the user likes the theme and the colouring,\nand hates the alignment: \"it 100% looks like ai and kinda lazy\", \"also half the screen is empty\" (a centred capped\ncolumn at ~1880 px). Fonts: installed ones, no bundled or downloaded font. Reworking it as an app window that fills\nthe width on one grid, with fewer boxes; not picked yet.\n\nMockup round 2 (2026-10-28): \"definetly a good step up but now its just bam 3 or 4 walls of text. Its overwhelming a\nbit but definetly the right direction\"; the user asked Claude to analyse it. Reworking for one focal point per\nscreen: the selected task on Build, phases as one line, one-line task rows, decisions as expandable lists, no task\nrail on Decisions and Docs.\n\nMockup round 3 (2026-10-28): \"Rest awesome except the decissions tab\". The user moved the chapters to the right on\nDocs, with the documents on the left. Two changes asked: the clickable inline links in Build (\"the build log, 1\nentry\") don't fit the scheme; Decisions should be decisions and deviations on the left with the text in the middle.\n\n### Slice 2\n\nPicked: go for slice 2 (Tasks 10 to 13), user, 2026-10-29, after using slice 1's window (\"I like what you build\").\nAt the checkpoint the Nix-built window died on the user's NVIDIA card under Wayland (\"Error 71 (Protocol error)\");\n`WEBKIT_DISABLE_DMABUF_RENDERER=1` fixed it, and the app now sets it itself (Rulings, Task 9 follow-up)."
     },
     {
       "heading": "Plan review",
@@ -258,15 +535,15 @@
     },
     {
       "heading": "Tasks",
-      "markdown": "Task 1: base 7bfc93e, untracked at start: none; head 1803f42, files check clean; review approved, 3 minors deferred\nTask 2: base 1803f42, untracked at start: none; head 595cbca, files check clean; review: 1 fix round (4 Important addressed), 7 minors deferred\nTask 3: base 595cbca, untracked at start: none; head 83976f1, files check clean; review: 1 fix round (2 Important addressed), 4 minors deferred\nTask 4: base 83976f1, untracked at start: none; head b1f0975, files check clean (ignored included); review: 1 fix round (1 Critical, 2 Important, 3 decided addressed), 7 minors deferred\nTask 5: base b1f0975, untracked at start: none; head c7c89b8; mockup approved after 3 reworks\nTask 5b: base c7c89b8, untracked at start: none (added by the user's decision 2026-10-29)"
+      "markdown": "Task 1: base 7bfc93e, untracked at start: none; head 1803f42, files check clean; review approved, 3 minors deferred\nTask 2: base 1803f42, untracked at start: none; head 595cbca, files check clean; review: 1 fix round (4 Important addressed), 7 minors deferred\nTask 3: base 595cbca, untracked at start: none; head 83976f1, files check clean; review: 1 fix round (2 Important addressed), 4 minors deferred\nTask 4: base 83976f1, untracked at start: none; head b1f0975, files check clean (ignored included); review: 1 fix round (1 Critical, 2 Important, 3 decided addressed), 7 minors deferred\nTask 5: base b1f0975, untracked at start: none; head c7c89b8; mockup approved after 3 reworks\nTask 5b: base c7c89b8, untracked at start: none (added by the user's decision 2026-10-29); head 5bd5303, files check clean; review approved, 3 minors deferred\nTask 6: base 5bd5303, untracked at start: none; head efa6b6b, files check clean; review: 1 fix round (1 Important, 3 ruled in, addressed), 8 minors deferred\nTask 7: base efa6b6b, untracked at start: none; head 9d41dc2, files check clean; review: 1 fix round (1 Important, 3 ruled in, addressed), 6 minors deferred\nTask 8: base 9d41dc2, untracked at start: none; head 6ecde9a, files check clean; review: 2 fix rounds (3 Important, 2 core project-root bugs, 1 re-review Important addressed), 10 minors deferred\nTask 9: base 6ecde9a, untracked at start: none; head b51defa, files check clean; review: 2 fix rounds (2 Important, 7 minors ruled in, addressed), 3 minors deferred; slice checkpoint passed; follow-up 04231a0 (DMA-BUF renderer off on Linux)\nTask 10: base 04231a0, untracked at start: none; head ab99d63, files check clean; review: 2 fix rounds (2 Important, 1 files deviation ruled in, 10 minors addressed), 1 minor deferred; interactive check of questions and notifications passed (user)\nTask 8b: base ab99d63, untracked at start: none; head 94af2d7, files check clean; review: 1 fix round (1 Important, 5 minors ruled in, addressed)\nTask 8c: base 94af2d7, untracked at start: none; head cedef5f, files check clean; review approved (7 minors fixed in 1 round), 1 minor deferred\nTask 8f: base cedef5f, untracked at start: none; head 850fa13, files check clean; review approved, 7 minors deferred (user: no further Activity changes now); cold open 571-587 -> 235-242 ms, live tick 321-325 -> 2.6-2.7 ms\nTask 8d: base 850fa13, untracked at start: 4 reformatted files the user left (rules.md note), result"
     },
     {
       "heading": "Rulings",
-      "markdown": "- 2026-10-28, setup: Task 5 keeps every existing flow.md section while converting; the controller writes flow.md only\n  between tasks — both write flow.md — costs a manual merge if a line lands mid-task.\n- 2026-10-28, setup: the brief clause and Global Constraints go verbatim into the build workspace's `rules.md`, which\n  every implementer and reviewer prompt names first — one copy of the same text — costs a subagent that skips it.\n- 2026-10-28, setup: Task 9 Step 5 runs as `claude -p --plugin-dir` — no interactive session from the controller —\n  costs not seeing the live reload by eye until the slice checkpoint.\n- 2026-10-28, Task 2: ts-rs 12 writes type-only `.ts` bindings, taken as the \"generated `.d.ts`\" since\n  `--print-types` joins them into one declaration file — costs a rename there if tsc objects.\n- 2026-10-28, Task 2: the copied real fixtures in `core/tests/fixtures/` are excluded from treefmt — a reformatted copy\n  no longer tests the real shape — costs those fixtures staying unformatted.\n- 2026-10-28, Task 3: a user entry opens a turn only when it isn't `isMeta` and its text (a string or an array's text\n  blocks) doesn't start with `<` — the literal rule made real meta entries into prompts and dropped image prompts —\n  costs a fix round.\n- 2026-10-28, Task 4: status precedence is Done, Waiting, Working, Stale, Idle — the spec lists Waiting first and a run\n  waiting on the user stays theirs to act on — costs a wait of 4 days never reading Stale.\n- 2026-10-28, Task 4: `Config::parse`/`load`, `Default` on `LinkCache` and `LinkCache::bytes_read()` are implied by the\n  brief, not deviations — none crosses to the views — costs three public items the plan didn't name.\n- 2026-10-28, Task 4: a per-line head cap and `rebuild_project` recomputing roots first join the fix round — both made\n  a session vanish, against \"any Claude session's activity can be found\" — costs a larger fix round; folders that match\n  no root wait for Task 6, which calls `build` when a new folder appears in `~/.claude/projects`."
+      "markdown": "- 2026-10-28, setup: Task 5 keeps every existing flow.md section while converting; the controller writes flow.md only\n  between tasks — both write flow.md — costs a manual merge if a line lands mid-task.\n- 2026-10-28, setup: the brief clause and Global Constraints go verbatim into the build workspace's `rules.md`, which\n  every implementer and reviewer prompt names first — one copy of the same text — costs a subagent that skips it.\n- 2026-10-28, setup: Task 9 Step 5 runs as `claude -p --plugin-dir` — no interactive session from the controller —\n  costs not seeing the live reload by eye until the slice checkpoint.\n- 2026-10-28, Task 2: ts-rs 12 writes type-only `.ts` bindings, taken as the \"generated `.d.ts`\" since\n  `--print-types` joins them into one declaration file — costs a rename there if tsc objects.\n- 2026-10-28, Task 2: the copied real fixtures in `core/tests/fixtures/` are excluded from treefmt — a reformatted copy\n  no longer tests the real shape — costs those fixtures staying unformatted.\n- 2026-10-28, Task 3: a user entry opens a turn only when it isn't `isMeta` and its text (a string or an array's text\n  blocks) doesn't start with `<` — the literal rule made real meta entries into prompts and dropped image prompts —\n  costs a fix round.\n- 2026-10-28, Task 4: status precedence is Done, Waiting, Working, Stale, Idle — the spec lists Waiting first and a run\n  waiting on the user stays theirs to act on — costs a wait of 4 days never reading Stale.\n- 2026-10-28, Task 4: `Config::parse`/`load`, `Default` on `LinkCache` and `LinkCache::bytes_read()` are implied by the\n  brief, not deviations — none crosses to the views — costs three public items the plan didn't name.\n- 2026-10-28, Task 4: a per-line head cap and `rebuild_project` recomputing roots first join the fix round — both made\n  a session vanish, against \"any Claude session's activity can be found\" — costs a larger fix round; folders that match\n  no root wait for Task 6, which calls `build` when a new folder appears in `~/.claude/projects`.\n- 2026-10-29, Task 6: `ts-rs`, `jiff` and `serde` in the app crate are implied by the brief (`ViewInfo` derives `TS`;\n  `Index` takes a `jiff::Timestamp`) — costs three dependencies the Files line didn't name.\n- 2026-10-29, Task 6: the `changed` payload derives `TS`, `--print-types` prints only the bindings until Task 7 adds\n  `api.d.ts`, and `AttachConsole` is a direct kernel32 extern rather than `windows-sys` — the implementer's calls —\n  costs a few lines of unsafe FFI.\n- 2026-10-29, Task 6: the Claude projects folder honours `$CLAUDE_CONFIG_DIR` and the config folder `$XDG_CONFIG_HOME`\n  — how Claude Code and XDG already work — costs Tasks 10 and 12 and the views skill using the same rule.\n- 2026-10-29, Task 6: the window stays `incognito` — views keep no browser storage between runs, in line with the app\n  writing nothing — costs view state lasting one run only.\n- 2026-10-29, Task 6: the Windows clippy cast, rejecting a dynamic `import()` in a view, and a poll thread that\n  survives a panicking tick join the fix round — the first would fail Windows CI, the second is the letter of \"only\n  `import type`\", the third leaves the window stale — costs a larger fix round.\n- 2026-10-29, Task 7: `api.d.ts` defines `Route`, `Step` (after the bindings' `Phase` and `Gate`) and `CardOpts` (a\n  string is always text) as the implementer proposed — the plan names them without shapes — costs nothing.\n- 2026-10-29, Task 7: a render timeout, the design's fold row for the diff block and a note for an unknown tab join\n  the fix round — a never-settling view froze the window silently — costs a larger fix round; Mermaid stays loaded\n  eagerly, since lazy loading would change the plan's `index.html`.\n- 2026-10-29, Task 8: the docs view is a `run-tab` titled \"Docs\", not the `doc` slot — the approved design shows Docs as\n  a tab of the run, and the run view hosts the tabs — costs the `doc` route having no built-in view.\n- 2026-10-29, Task 8: `app/shell/tokens.css` joins Task 8's files — the house stylesheet lives there since Task 7 and\n  the list and activity rows need styling — costs one more shared file.\n- 2026-10-29, Task 8: the implementer's calls stand (Build/Decisions selection kept per run, run tabs laid out with\n  `display: contents`, the list opens on the first project, Activity reads only the selected session) — they keep\n  state across redraws and avoid parsing whole transcripts — costs nothing.\n- 2026-10-29, Task 8: \"Calls the build made\" lists flow.md's rulings only, as the approved design does — the ledger's\n  rulings are the same calls worded for the log and get copied into flow.md, so merging them double-counted — costs a\n  ledger ruling not yet copied being missing from the list until it is.\n- 2026-10-29, Task 8: the edits to Task 4's fixture home and `core/tests/index.rs` stand — `index.rs` was named in the\n  picks-and-fixed decision and the views' fixtures are dumped from that home — costs Task 4's fixtures carrying\n  view-only cases.\n- 2026-10-29, Task 8: each root belongs to exactly one project, its git remote's when one resolves and its folder\n  name's otherwise, and projects that still share a name show a short path tail in the list — the spec folds checkouts\n  \"by git remote, by folder name without one\", and a root listed under two projects broke that — costs the core index\n  and its tests joining Task 8's fix round.\n- 2026-10-29, Task 8: a project keeps a root only when that root's checkout is one of the project's own — roots then\n  follow the rule sessions already follow, so a worktree of one repo inside another's `.claude/worktrees/` lands in one\n  project only — costs one cached path walk per root.\n- 2026-10-29, Task 8: such a worktree belongs to the repo whose folder holds it, its documents too — that is where its\n  sessions already go, and giving it to its own repo would move sessions — costs a rare run listed under the wrong\n  project.\n- 2026-10-29, Task 9 follow-up: on Linux the app sets `WEBKIT_DISABLE_DMABUF_RENDERER=1` before the window opens,\n  unless it is already set — at the slice checkpoint the window died on the user's NVIDIA card under Wayland (\"Error\n  71 (Protocol error)\") and that variable fixed it — costs WebKitGTK's faster DMA-BUF path on every Linux machine\n  (setting it to 0 brings it back).\n- 2026-10-29, Task 10: a cut `questions` stays an array (only question and header kept, each question cut by\n  characters, trailing entries dropped) and the capture line gains `questions_cut: true` — the brief left how to cut\n  open, and a cut that left broken JSON would hide the open question from Task 11 — costs one optional field.\n- 2026-10-29, Task 10: the plugin's description, its marketplace entry and the root README name the capture hooks —\n  an opt-in user must know the plugin installs hooks, and descriptions stay true to the code — costs three more files\n  in the task.\n- 2026-10-29, Task 8d: the Build tab's task graph runs top to bottom, Task 1 at the top and the last task at the\n  bottom, with no scrollbar of its own (the user's ask once the plan grew to 20 tasks; it replaces the approved\n  mockup's left-to-right graph) — costs a taller graph column on long plans."
     },
     {
       "heading": "Deviations",
-      "markdown": "### Task 3 transcript fixtures are hand-written, not trimmed real ones\n\nThe plan asked for trimmed real transcripts. Copying them into the public repo was blocked, so the implementer reads\nreal transcripts only for their JSON shapes and field names and writes the fixture lines with invented text.\n\nStatus: decided 2026-10-28: hand-written in the real shape\n\n### Subagent text replies have no place in the activity model\n\nThe plan's `Text` carries no agent, so Task 3 dropped every subagent reply, final reports included; only their tool\ncalls showed.\n\nStatus: decided 2026-10-28: `Text` gains `agent: Option<String>`, and subagent replies land in the turn open at their\ntime\n\n### Status never decays without a file change\n\nStatus was derived only when a project's files changed, so a run whose Claude session stopped stayed Working.\n\nStatus: decided 2026-10-28: `Index::refresh(now)` re-derives every status from cached facts without reading the disk;\nTask 6's poll calls it each tick\n\n### The approved mockup reads document format in the view\n\nThe page parses flow.md's Rulings, keeps each conductor's phase list and gate positions, and strips the\n`minor (deferred):` tag itself, against \"the document format is resolved in the core\".\n\nStatus: decided 2026-10-29: a new Task 5b before Task 6 gives the core typed `Ruling`s (flow.md and build log),\n`FlowDoc.phases` from the conductors' phase tables (checked against each SKILL.md), and untagged deferred items; the\nmockup switches to those fields"
+      "markdown": "### Task 3 transcript fixtures are hand-written, not trimmed real ones\n\nThe plan asked for trimmed real transcripts. Copying them into the public repo was blocked, so the implementer reads\nreal transcripts only for their JSON shapes and field names and writes the fixture lines with invented text.\n\nStatus: decided 2026-10-28: hand-written in the real shape\n\n### Subagent text replies have no place in the activity model\n\nThe plan's `Text` carries no agent, so Task 3 dropped every subagent reply, final reports included; only their tool\ncalls showed.\n\nStatus: decided 2026-10-28: `Text` gains `agent: Option<String>`, and subagent replies land in the turn open at their\ntime\n\n### Status never decays without a file change\n\nStatus was derived only when a project's files changed, so a run whose Claude session stopped stayed Working.\n\nStatus: decided 2026-10-28: `Index::refresh(now)` re-derives every status from cached facts without reading the disk;\nTask 6's poll calls it each tick\n\n### The approved mockup reads document format in the view\n\nThe page parses flow.md's Rulings, keeps each conductor's phase list and gate positions, and strips the\n`minor (deferred):` tag itself, against \"the document format is resolved in the core\".\n\nStatus: decided 2026-10-29: a new Task 5b before Task 6 gives the core typed `Ruling`s (flow.md and build log),\n`FlowDoc.phases` from the conductors' phase tables (checked against each SKILL.md), and untagged deferred items; the\nmockup switches to those fields\n\n### Two crates share one bindings folder\n\nThe core's export wiped the whole `bindings/` folder and its check failed on any file it didn't write, so the app's\n`ViewInfo` would break it.\n\nStatus: decided 2026-10-29: each crate owns its files; the core writes and checks only its own, and the app's check\ncovers the whole folder; `core/src/bindings.rs` joins Task 6's files\n\n### The webview writes its own data folder\n\nTauri always creates the webview's data folder (`~/.local/share/dev.deadmade.flow-cockpit/`, `%LOCALAPPDATA%` on\nWindows), incognito or not; it can be moved, not stopped. \"The app writes nothing\" didn't hold.\n\nStatus: decided 2026-10-29: accepted; the rule reads \"our code writes nothing; the webview engine keeps its own small\nfolder\"\n\n### A broken copy of a built-in view can't fall back\n\n`view_source(id)` always returns the global copy when one exists, and the built-ins live only inside the binary, so\nthe window couldn't draw the built-in under a broken copy's error.\n\nStatus: decided 2026-10-29: `view_source(id, builtin: Option<bool>)`; with `true` it returns the built-in; the runtime\nuses it, views don't see it; `commands.rs` and `views.rs` join Task 7's files\n\n### Views don't know their route, and run tabs have no place\n\nThe plan's `ViewContext` had no route, so a view couldn't tell which run or doc it draws; and the approved run view\ndraws the whole window, tab bar included, with no place for `run-tab` views.\n\nStatus: decided 2026-10-29: `ViewContext` gains a read-only `route` and `tabs` (the loaded run-tab views); the run view\nputs them in its tab bar, and a selected tab's view is drawn into the run view's `data-slot=\"run-tab\"` element\n\n### Loose sessions can't be opened\n\nThe spec lists loose sessions \"so any Claude session's activity can be found\", but no route led to a session that\nbelongs to no run.\n\nStatus: decided 2026-10-29: `Route` gains `{ to: 'session', project, id }`, documented in `api.d.ts`; the activity view\ndraws it; `runtime.js`, `api.d.ts` and `runtime.test.mjs` join Task 8's files\n\n### Audit rows lack picks and fixed counts\n\nThe spec's list shows each audit's picks and how many were fixed; `AuditSummary` carried only open, closed or unknown.\n\nStatus: decided 2026-10-29: `AuditSummary` gains `picks: Option<u32>` and `fixed: u32` from the parsed report\n\n### The list mixes projects, filters and runs\n\nAfter using slice 1 the user asked for projects and runs to be apart, and for a switch between flow runs and loose\nsessions. Task 8's list puts projects, status and conductor filters and the sort in one left rail beside the rows.\n\nStatus: decided 2026-10-29: the left rail keeps only Projects; the runs side gets a switch, Flow runs or Loose\nsessions (audits stay under Flow runs), a filter bar (status, conductor, sort, search) and a table with column\nheadings. Built as Task 8b, after Task 10 and before Task 11.\n\n### No way back, and a reload loses the page\n\nThe user asked for back and forward through the pages, and for a reload to keep the page. The runtime keeps the route\nin memory only, so a reload opens the list and there is no history.\n\nStatus: decided 2026-10-29: the route lives in the window's address (its hash), so the mouse's back and forward side\nbuttons move through the pages and a reload (F5 or Ctrl+R) keeps the page; no top-bar buttons or keys. A fresh start\nopens the list, and nothing is written to disk. Built as Task 8e, after the extensions (Task 8c) and lettered task ids (Task 8d).\n\n### Built-in views are compiled into the app\n\nChanging a default view needs a rebuild, a default can only be replaced, not switched off, and the views skill lives\nin a Claude Code plugin although the views belong to the app. The user wants the defaults shipped like extensions that\nanyone can disable, owned by the app so it runs on its own, not by a Claude Code plugin.\n\nStatus: decided 2026-10-29: the app gets its own extensions. An extension is a folder with one or more view files and\nan optional `style.css`, no manifest; the folder name is its id. The defaults (list, run, docs, activity) ship with\nthe app (Nix: `share/flow-cockpit/extensions`; later the Windows installer's folder); the user's go in\n`~/.config/flow-cockpit/extensions/`, and one with a default's name replaces it. All are loaded from disk and reloaded\nlive. `disabled = [\"<name>\"]` in `config.toml`, read live, switches one off; the window stays read-only. The Claude\nCode plugin keeps only the views skill and the capture hooks. Built as Task 8c, after Task 8b.\n\n### Tasks added during a build don't show\n\nThe Build tab lists only plan.md's tasks, and the core reads task numbers as plain numbers, so tasks added by a\ndecision (5b, 8b, 8c, 8d, 8e) are invisible and the task card points at the wrong task while one of them is built.\n\nStatus: decided 2026-10-29: plan.md gets each added task under its lettered number, with a line naming the decision\nthat added it; the core reads ids like `8b` and orders them after 8; the flows' rules say how an added task is\nnumbered. Built as Task 8d, before back and forward (now Task 8e).\n\n### Activity freezes on a large running session\n\nThe user: Activity is slow or freezes. Every 2 s while a session runs it re-reads the whole transcript (34 MB for this\nbuild's session, about 113 MB with its 88 subagents), sends every turn with every tool input to the window and redraws\nall of it.\n\nStatus: decided 2026-10-29: the core reads only what was appended since the last read, outside the index lock; the\nwindow gets the newest 20 turns with a \"Show older turns\" button, and a tool call's input is fetched only when its\nfold opens. Measured on this session's transcript before and after. Built as Task 8f, right after the extensions' fix\nround, before Tasks 8d and 8e.\n\n### Diagrams flash when a page first opens\n\nThe user asked for the Mermaid diagrams to be drawn ahead so a page doesn't flash when it first opens. Today a diagram\nshows its source text until Mermaid has drawn it, then jumps to the drawing; only a redraw of a diagram already drawn\nis instant.\n\nStatus: decided 2026-10-29: the window draws diagrams ahead, in idle time: on start the task graphs and document\ndiagrams of the shown project's unfinished runs, and on opening a run the rest of that run's documents. A diagram not\ndrawn yet shows a quiet placeholder of the right size instead of its source; the source shows only when drawing fails.\nDrawings are kept in memory only (nothing written to disk). Built as Task 8g, after Task 8e."
     },
     {
       "heading": "Follow-ups",

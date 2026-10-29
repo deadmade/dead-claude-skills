@@ -378,7 +378,7 @@ test('run_task_cards_use_does_and_graph_only_when_all_depends_written', async ()
   assert.equal(box.querySelector('.task-h h2 p, .rows .ttl p, .does p, .now .sentence p'), null);
   assert.match(text(box.querySelector('.task-h')), /2\s*The check\s*Being built/);
   assert.match(text(box.querySelector('.task .facts')), /Needs task 1 first\./);
-  assert.ok(box.querySelector('.task .where-graph .graph'), 'every task says what it depends on: a graph');
+  assert.ok(box.querySelector('.build > .where-graph .graph'), 'every task says what it depends on: a graph');
   assert.match(
     text(box.querySelector('.now .summary')),
     /^1 of 2 tasks done\. Reviews sent work back once\. 1 deviation waits for you\.$/,
@@ -786,6 +786,58 @@ test('run_wires_accessibility_like_the_design', async () => {
   resolves(docs.box);
 });
 
+test('run_graph_has_no_scrollbar_and_fits_its_column', () => {
+  // The shell's stylesheet: the graph never scrolls on its own; from a 1200px window on it has its own column, as tall
+  // as the visible content and pinned there, and its drawing only ever shrinks to fit it (never grows past full size).
+  const css = readFileSync(new URL('../../app/shell/tokens.css', import.meta.url), 'utf8').replace(
+    /\/\*[\s\S]*?\*\//g,
+    '',
+  );
+  const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, sel, body]) => ({ sel: sel.trim(), body }));
+  const graphRules = rules.filter((r) => /(^|[\s,])\.graph\b/.test(r.sel));
+  assert.ok(graphRules.length > 0, 'no .graph rules');
+  for (const r of graphRules) assert.doesNotMatch(r.body, /overflow(-x|-y)?\s*:\s*(auto|scroll)/, r.sel);
+  const svg = rules.find((r) => r.sel === '.graph svg')?.body ?? '';
+  assert.match(svg, /max-width:\s*100%/);
+  assert.match(svg, /max-height:\s*100%/);
+  assert.doesNotMatch(svg, /min-(width|height)|(^|[\s;])(width|height):\s*\d/, 'the drawing never grows');
+  const beside =
+    /@media \(min-width: (\d+(?:\.\d+)?)rem\) \{ \.build \{ grid-template-columns: minmax\(0, 1fr\) [^;]+; \}([^@]*)\}/.exec(
+      css,
+    );
+  assert.ok(beside, 'no two-column .build rule');
+  assert.equal(Number(beside[1]) * 16, 1200, 'the graph goes beside the card from 1200px');
+  const column = /\.where-graph \{([^}]*)\}/.exec(beside[2])?.[1] ?? '';
+  assert.match(column, /position:\s*sticky/);
+  assert.match(column, /height:\s*calc\(100vh/);
+});
+
+test('run_graph_has_its_own_column_beside_now_and_card', async () => {
+  const { box } = await draw('run', { to: 'run', project: ALPHA, slug: 'login' });
+  const build = box.querySelector('.content > .build');
+  assert.ok(build, 'no .build layout');
+  const main = build.querySelector(':scope > .build-main');
+  assert.ok(main?.querySelector(':scope > .now') && main.querySelector(':scope > article.task'));
+  const where = build.querySelector(':scope > .where-graph');
+  assert.ok(where, 'the graph is not its own column');
+  assert.equal(box.querySelector('article.task .where-graph'), null, 'the graph left the card');
+  // The legend sits above the graph, its ring sentence on a line of its own.
+  assert.deepEqual(
+    [...where.children].filter((c) => !c.classList.contains('visually-hidden')).map((c) => c.className),
+    ['key', 'graph'],
+  );
+  assert.equal(
+    text(where.querySelector('.key')),
+    'Done, being built, waiting on you, not started; ringed is this task.',
+  );
+  assert.equal(text(where.querySelector('.key .ring')), 'ringed is this task.');
+  // Picking another task redraws both columns in the same shape.
+  press(box, 'The form');
+  assert.ok(box.querySelector('.content > .build > .build-main > article.task'));
+  assert.ok(box.querySelector('.content > .build > .where-graph .graph'));
+  assert.equal(text(box.querySelector('.task .does')), 'Draws the form.');
+});
+
 test('run_graph_nodes_select_their_task', async () => {
   const w = window as any;
   w.mermaid = {
@@ -859,6 +911,8 @@ test('run_draws_a_lettered_task_in_place', async () => {
     assert.match(text(box.querySelector('.task .facts')), /^Needs task 2 first\.$/);
     assert.match(text(box.querySelector('.now .summary')), /^2 of 3 tasks done\./);
     // The graph names it with a valid Mermaid id, linked from the task it depends on and ringed.
+    // Top to bottom: the first task at the top, dependencies flowing down.
+    assert.match(source, /^flowchart TB\n/);
     assert.match(source, /^ {2}T2b\(\("2b"\)\)$/m);
     assert.match(source, /^ {2}T2 --> T2b$/m);
     assert.match(source, /^ {2}style T2b /m);
