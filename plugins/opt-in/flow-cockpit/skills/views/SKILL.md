@@ -12,13 +12,20 @@ ship with the app: `list` (projects, flow runs, audits, loose sessions), `run` (
 data and writes nothing. It reloads the views a few seconds after a file in any extensions folder changes, so the
 user sees your change without a restart.
 
-The app is `${user_config.appPath}`, written `"$app"` below. On Linux it comes from this repository's flake
+The app is the plugin's `appPath` setting, `${user_config.appPath}`, or `flow-cockpit` on PATH when that is not set;
+it is written `"$app"` below. On Linux it comes from this repository's flake
 (`nix run github:deadmade/dead-claude-skills#flow-cockpit`, or its `flow-cockpit` package in a system config). On
 Windows the installer puts it at `%USERPROFILE%\.claude\bin\flow-cockpit\flow-cockpit.exe`, with its default extensions
-beside it. Check that `"$app" --version` runs before you start; if it doesn't, tell the user how to get it and stop.
+beside it. Before you start, check that it runs; if it doesn't, tell the user how to get it and stop:
 
-The commands here are POSIX shell (Git Bash on Windows). Each one starts by setting `app` in single quotes, so a
-Windows path keeps its backslashes; a variable set in one shell call is gone in the next.
+```sh
+app='${user_config.appPath}'
+case $app in '' | *user_config*) app=flow-cockpit ;; esac
+"$app" --version
+```
+
+The commands here are POSIX shell (Git Bash on Windows). Each one starts with those two `app` lines: the single quotes
+keep a Windows path's backslashes, and a variable set in one shell call is gone in the next.
 
 ## Where views live
 
@@ -73,10 +80,13 @@ Run this as one command:
 
 ```sh
 app='${user_config.appPath}'
+case $app in '' | *user_config*) app=flow-cockpit ;; esac
 dir=$("$app" --print-paths | sed -n 's/^user extensions: //p')
-mkdir -p "$dir"
-"$app" --print-types > "$dir/flow-cockpit.d.ts"
+[ -n "$dir" ] && mkdir -p "$dir" && "$app" --print-types > "$dir/flow-cockpit.d.ts"
 ```
+
+If it prints nothing and `$dir` stays empty, `--print-paths` failed: run `"$app" --print-paths` on its own and tell
+the user what it says.
 
 `flow-cockpit.d.ts` declares the module `flow-cockpit`: the view interface (`View`, `ViewContext`, `Route`, `Slot`,
 `Blocks`, `DataApi`) and every data type. A view imports its types from it by that bare name, never by a path:
@@ -98,9 +108,11 @@ like this:
 
   ```sh
   app='${user_config.appPath}'
+  case $app in '' | *user_config*) app=flow-cockpit ;; esac
   dir=$("$app" --print-paths | sed -n 's/^user extensions: //p')
   defaults=$("$app" --print-paths | sed -n 's/^default extensions: //p')
-  mkdir -p "$dir" && cp -r "$defaults/list" "$dir/" && chmod -R u+w "$dir/list"
+  [ -n "$dir" ] && [ -d "$defaults" ] &&
+    mkdir -p "$dir" && cp -r "$defaults/list" "$dir/" && chmod -R u+w "$dir/list"
   ```
 
   The copy keeps the name, so it replaces the default; its imports from `flow-cockpit` work as they are. Deleting the
@@ -209,7 +221,9 @@ export default view;
 
   ```sh
   app='${user_config.appPath}'
-  cd "$("$app" --print-paths | sed -n 's/^user extensions: //p')" &&
+  case $app in '' | *user_config*) app=flow-cockpit ;; esac
+  dir=$("$app" --print-paths | sed -n 's/^user extensions: //p')
+  [ -n "$dir" ] && cd "$dir" &&
     tsc --noEmit --strict --target es2023 --lib es2023,dom,dom.iterable --module esnext --moduleResolution bundler \
       --verbatimModuleSyntax --erasableSyntaxOnly flow-cockpit.d.ts <name>/*.ts
   ```

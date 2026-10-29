@@ -1,5 +1,6 @@
 // The binaries the installer downloads or points plugins at: tui-review, web-mcp, the flow cockpit and agent-browser.
 import { createHash } from 'node:crypto';
+import { posix, win32 } from 'node:path';
 import { BUNDLE } from './plugins.ts';
 import { RELEASES, newer, semver } from './release.ts';
 
@@ -78,6 +79,23 @@ export function binAsset(name: string, platform: string, arch: string, version: 
   const url = `${RELEASES}/v${version}/${file}`;
   const exe = platform === 'win32' ? `${name}.exe` : name;
   return { file, url, sha256: `${url}.sha256`, exe, folder: plugin?.folder === true };
+}
+
+// Where the binary of `pluginName` goes in binDir on `platform`: a folder plugin's in a folder of its own.
+export function binPath(binDir: string, pluginName: string, platform: string) {
+  const { name, folder } = BIN_PLUGINS[pluginName];
+  const p = platform === 'win32' ? win32 : posix;
+  const exe = platform === 'win32' ? `${name}.exe` : name;
+  return folder ? p.join(binDir, name, exe) : p.join(binDir, exe);
+}
+
+// What to do when the binary of `pluginName` couldn't be installed. A folder plugin's failure is most likely its open
+// app holding the folder, and a hand-built one lacks what ships beside it, so it gets a rerun instead of a build.
+export function binAdvice(pluginName: string) {
+  const { name, folder } = BIN_PLUGINS[pluginName];
+  return folder
+    ? `close ${name} if it is open and run the installer again`
+    : `build it with \`cargo build --release\` in crates/${name} and set its path with /plugin configure ${pluginName}`;
 }
 
 // The checksum a `sha256sum` line starts with, lowercased; undefined when the text is not one.

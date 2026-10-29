@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { createServer as createHttp, type Server } from 'node:http';
 import { createServer as createHttps } from 'node:https';
 import { tmpdir } from 'node:os';
@@ -117,6 +117,27 @@ test('downloadBin keeps the old folder when the archive lacks the program', asyn
     assert.ok(existsSync(join(dir, 'extensions', 'gone', 'gone.ts')));
     assert.deepEqual(readdirSync(join(dir, '..')), ['fake']);
   } finally {
+    server.close();
+  }
+});
+
+// The old folder can't move aside (on Windows: the app is open). Here an `.old-<pid>` folder the sweep can't delete
+// blocks the rename; modes don't lock a folder on Windows, so the case runs elsewhere.
+test('downloadBin leaves no staged copy when the old folder cannot move aside', { skip: WIN }, async () => {
+  const { server, url } = await release(archive);
+  const dir = oldFolder();
+  const blocker = join(`${dir}.old-${process.pid}`, 'locked');
+  mkdirSync(blocker, { recursive: true });
+  writeFileSync(join(blocker, 'x'), '');
+  chmodSync(blocker, 0o500);
+  const asset = { file: archive, url, sha256: `${url}.sha256`, exe, folder: true };
+  try {
+    await assert.rejects(downloadBin('fake', asset, join(dir, exe)));
+    assert.equal(readFileSync(join(dir, exe), 'utf8'), 'old binary');
+    const left = readdirSync(join(dir, '..')).filter((f) => f.includes('.tmp-'));
+    assert.deepEqual(left, [], 'no staged copy left');
+  } finally {
+    chmodSync(blocker, 0o700);
     server.close();
   }
 });

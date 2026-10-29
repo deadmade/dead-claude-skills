@@ -13,6 +13,8 @@ import {
   sha256Of,
   sha256Matches,
   binAction,
+  binAdvice,
+  binPath,
 } from './binaries.ts';
 import { unavailable } from './options.ts';
 
@@ -109,6 +111,31 @@ test('flow-cockpit has a pinned linux hint', () => {
 test('the flake has the flow-cockpit package the linux hint runs', () => {
   const flake = readFileSync(new URL('../../flake.nix', import.meta.url), 'utf8');
   assert.match(flake, /^\s+flow-cockpit = pkgs\.rustPlatform\.buildRustPackage/m);
+});
+
+// The installer downloads the name build-flow-cockpit.yml uploads: the same target and the same file name.
+test('build-flow-cockpit.yml packs the zip binAsset downloads', () => {
+  const yml = readFileSync(new URL('../../.github/workflows/build-flow-cockpit.yml', import.meta.url), 'utf8');
+  const target = /^\s+TARGET: (\S+)$/m.exec(yml)?.[1];
+  const name = /^\s+name=(\S+)$/m.exec(yml)?.[1];
+  assert.ok(target && name, 'the workflow sets TARGET and name');
+  assert.match(yml, /"\$RUNNER_TEMP\/dist\/\$name\.zip"/);
+  assert.equal(`${name!.replace('$TARGET', target!)}.zip`, binAsset('flow-cockpit', 'win32', 'x64', '1.2.3')!.file);
+});
+
+test('binPath: the flow cockpit in a folder of its own, the others loose in bin', () => {
+  const win = 'C:\\Users\\u\\.claude\\bin';
+  assert.equal(binPath(win, 'flow-cockpit', 'win32'), 'C:\\Users\\u\\.claude\\bin\\flow-cockpit\\flow-cockpit.exe');
+  assert.equal(binPath(win, 'web-mcp', 'win32'), 'C:\\Users\\u\\.claude\\bin\\web-mcp.exe');
+  assert.equal(binPath('/h/.claude/bin', 'tui-review', 'linux'), '/h/.claude/bin/tui-review');
+});
+
+// A flow cockpit install that fails is most likely its open window holding the folder; building it by hand doesn't
+// bring the default extensions along.
+test('binAdvice: rerun for the flow cockpit, build for the others', () => {
+  assert.match(binAdvice('flow-cockpit'), /close flow-cockpit if it is open and run the installer again/);
+  assert.doesNotMatch(binAdvice('flow-cockpit'), /cargo/);
+  assert.match(binAdvice('web-mcp'), /cargo build --release` in crates\/web-mcp/);
 });
 
 test('tui-review versions match the release the installer fetches', () => {

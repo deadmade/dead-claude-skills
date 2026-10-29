@@ -10,7 +10,8 @@ extensions ship with the app; your own add to them or replace them, and any of t
 nothing from Claude Code for that. This plugin carries the `views` skill, which teaches Claude to write and change
 views: ask for a new screen or tab, or for a change to one, and it appears in the open window without a restart.
 
-It runs on Linux (from the flake) and Windows x64 (from the installer).
+It runs on Linux (from the flake). A Windows x64 build ships through the installer, but it hasn't been tried on a
+Windows machine yet.
 
 The plugin also carries **capture hooks**. They record what transcripts lack: questions Claude asked you, permission
 prompts, agents starting and stopping, turns ending. Each Claude session gets one line-per-event file

@@ -3,10 +3,11 @@ name: Build flow cockpit
 # The flow cockpit window for Windows x64: a zip of flow-cockpit.exe and its four default extensions (extensions/<name>/,
 # which the app finds beside the exe), plus its checksum. release.yml calls this and attaches them to the vX.Y.Z release
 # the installer downloads from (BIN_PLUGINS in installer/core/binaries.ts). Linux runs the app from the flake instead,
-# since it links the system's GTK and WebKit. A PR that changes this file, or a run by hand, builds only.
+# since it links the system's GTK and WebKit. A PR that changes this file or the crate, or a run by hand, builds only,
+# so a broken release build or zip shows before a release depends on it.
 on:
   pull_request:
-    paths: ['.github/workflows/build-flow-cockpit.yml']
+    paths: ['.github/workflows/build-flow-cockpit.yml', 'crates/flow-cockpit/**']
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -44,11 +45,13 @@ jobs:
         run: cargo build --release --locked -p flow-cockpit --target "$TARGET"
 
       # A release build is a GUI program with no console: through a pipe it must still print, as the installer reads it.
+      # The checkout has CRLF line endings on Windows, so each side drops its \r before comparing.
       - name: Smoke test
         run: |
-          out=$("target/$TARGET/release/flow-cockpit.exe" --version | cat)
+          out=$("target/$TARGET/release/flow-cockpit.exe" --version | cat | tr -d '\r')
+          want=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1 | tr -d '\r')
           echo "$out"
-          test "$out" = "flow-cockpit $(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)"
+          test "$out" = "flow-cockpit $want"
 
       # The exe and every extensions/ folder but tests/; the tsconfig.json beside them isn't copied (as in the flake).
       - name: Package

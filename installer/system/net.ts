@@ -68,12 +68,19 @@ export async function downloadBin(name: string, asset: Asset, bin: string) {
     const dest = asset.folder ? dirname(bin) : bin;
     mkdirSync(dirname(dest), { recursive: true });
     const staged = `${dest}.tmp-${process.pid}`;
-    if (asset.folder) cpSync(out, staged, { recursive: true });
-    else cpSync(asset.raw ? file : join(out, asset.exe), staged);
-    chmodSync(asset.folder ? join(staged, asset.exe) : staged, 0o755);
-    // Windows can rename a running exe (agent-browser's daemon, a live web-mcp) but not replace it. A folder can't be
-    // renamed onto another one anywhere, so the old folder always moves aside first.
-    replaceBin(staged, dest, WIN || asset.folder === true);
+    try {
+      if (asset.folder) cpSync(out, staged, { recursive: true });
+      else cpSync(asset.raw ? file : join(out, asset.exe), staged);
+      chmodSync(asset.folder ? join(staged, asset.exe) : staged, 0o755);
+      // Windows can rename a running exe (agent-browser's daemon, a live web-mcp) but not replace it. A folder can't
+      // be renamed onto another one anywhere, so the old folder always moves aside first.
+      replaceBin(staged, dest, WIN || asset.folder === true);
+    } catch (e) {
+      // A half-copied or unplaced copy (on Windows: an open app's folder refused to move). Once the staged copy is in
+      // place nothing throws, so this never deletes an installed one.
+      rmSync(staged, { recursive: true, force: true });
+      throw e;
+    }
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }

@@ -111,7 +111,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   `tests/` at `share/flow-cockpit/extensions/` and checks that tree, and that copies of the defaults type-check against
   `--print-types`. The app finds the defaults at `$FLOW_COCKPIT_EXTENSIONS` (a dev override: point it at `crates/flow-cockpit/extensions` to see edits live), else
   `<exe dir>/../share/flow-cockpit/extensions`, else `<exe dir>/extensions`. It writes nothing, and reads the user's
-  extensions and `config.toml` (`disabled`, `hidden`, `trusted`) from `~/.config/flow-cockpit/`.
+  extensions and `config.toml` (`disabled`, `hidden`, `trusted`) from `~/.config/flow-cockpit/` (`%APPDATA%\flow-cockpit\` on Windows).
 - Notifications (`plugins/default/`, formerly the notify plugin): `hooks.json` entries (Stop, Notification, PreToolUse
   on AskUserQuestion) running one stdlib Node script, `hooks/notify.mjs`, async. Logic and tests in `hooks/lib.mjs`; Linux
   talks D-Bus via `busctl`, Windows runs an inline PowerShell WinRT toast, focus comes from tmux. The installer always
@@ -196,7 +196,7 @@ plus tui-review's budgets, benchmarks and mod tests) for each crate a PR touches
 flow cockpit's crate, plugin, the flake or the npm manifests (core tests and clippy on Linux and Windows, the app's Windows build, the
 views tests and both `tsc -p` checks; on Linux `nix build .#flow-cockpit`; with `CI=true` the core's relative-worktree
 test fails instead of skipping on a git older than 2.48); `crates-build.yml` (both binaries) and
-`build-flow-cockpit.yml` (the Windows app's zip) on PRs touching them and from `release.yml`; `sync.yml` weekly, one job, PR and set of issues per `SOURCES` entry (new upstream
+`build-flow-cockpit.yml` (the Windows app's release build and zip, also on PRs touching its crate) on PRs touching them and from `release.yml`; `sync.yml` weekly, one job, PR and set of issues per `SOURCES` entry (new upstream
 skills, and a "Sync <name> failing" issue it closes on the next green run), and as a dry run (no PR, no issues) on PRs
 touching the sync code.
 
