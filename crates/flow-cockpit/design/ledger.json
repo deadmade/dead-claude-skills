@@ -1,26 +1,110 @@
 {
   "plan": "docs/features/flow-observability/plan.md",
   "rulings": [
-    "Ruling: Task 5 keeps every existing flow.md section (Tasks, Rulings, Deviations, Plan review) while converting to the new format, and the controller writes flow.md only between tasks — the plan has both writers — costs a merge by hand if a line lands mid-task.",
-    "Ruling: the brief clause and Global Constraints are delivered verbatim in `rules.md` in this workspace, which every implementer and reviewer prompt names as its first read, instead of pasting them into each prompt — same text, one copy — costs a subagent that skips the file (reviewers check the clause was applied).",
-    "Ruling: Task 9 Step 5's \"ask Claude to add a view\" runs as `claude -p` with `--plugin-dir` in the worktree — no interactive session from here — costs not seeing the live reload by eye; the user sees it at the slice checkpoint.",
-    "Ruling: ts-rs 12 writes type-only `.ts` bindings, not `.d.ts` — accepted as the \"generated .d.ts\" of Global Constraints, since `--print-types` (Task 6) concatenates them into one declaration file — costs a rename step there if tsc objects.",
-    "Ruling: copied real fixtures under crates/flow-cockpit/core/tests/fixtures/docs/ are excluded from treefmt and the flake `vendored` list (both files already in Task 2's list) — a fixture prettier rewrites no longer tests the real shape (it already unindented the ledger's wrapped line) — costs those fixtures staying unformatted.",
-    "Ruling: a user entry opens a turn only when it is not `isMeta` and its text (a string, or the text blocks of an array) doesn't start with `<` — the brief's rule read literally turns real meta entries into prompts (20 of 54 in this project) and drops image prompts, while the spec groups turns by the user's prompts — costs a fix round on Task 3.",
-    "Ruling: status precedence Done > Waiting > Working > Stale > Idle — the spec lists Waiting first and a run waiting on the user stays theirs to act on — costs a 4-day-old wait never reading Stale.",
-    "Ruling: Config::parse/load (Result<_, String>), Default on LinkCache and LinkCache::bytes_read() are implied by the brief (Config from config.toml; the 2 MB test measures bytes), not deviations — none crosses to the views — costs three public items the plan didn't name.",
-    "Ruling: core/tests/index.rs (not on the Files list) accepted — same as docs.rs and activity.rs in Tasks 2-3 — costs nothing.",
-    "Ruling: the 1 MiB whole-head cap and `rebuild_project` listing dirs from the old roots enter the fix round — both make a session vanish, against spec:29 (\"any Claude session's activity can be found\") — costs a larger fix round. Folders matching no root wait for Task 6 (call `build` when a new folder appears in claude_projects).",
-    "Ruling: design/docs.json (raw docs for the Docs tab) is part of \"its JSON\" in the listed design folder — costs nothing.",
-    "Task 2: finding (from Task 5): parse_ledger glues `Ruling:` and `Note` lines into the task entry above them instead of `rulings` — fix after the Task 5 stop."
+    {
+      "call": "Task 5 keeps every existing flow.md section (Tasks, Rulings, Deviations, Plan review) while converting to the new format, and the controller writes flow.md only between tasks",
+      "cost": "a merge by hand if a line lands mid-task.",
+      "date": null,
+      "raw": "Ruling: Task 5 keeps every existing flow.md section (Tasks, Rulings, Deviations, Plan review) while converting to the new format, and the controller writes flow.md only between tasks — the plan has both writers — costs a merge by hand if a line lands mid-task.",
+      "scope": null,
+      "why": "the plan has both writers"
+    },
+    {
+      "call": "the brief clause and Global Constraints are delivered verbatim in `rules.md` in this workspace, which every implementer and reviewer prompt names as its first read, instead of pasting them into each prompt",
+      "cost": "a subagent that skips the file (reviewers check the clause was applied).",
+      "date": null,
+      "raw": "Ruling: the brief clause and Global Constraints are delivered verbatim in `rules.md` in this workspace, which every implementer and reviewer prompt names as its first read, instead of pasting them into each prompt — same text, one copy — costs a subagent that skips the file (reviewers check the clause was applied).",
+      "scope": null,
+      "why": "same text, one copy"
+    },
+    {
+      "call": "Task 9 Step 5's \"ask Claude to add a view\" runs as `claude -p` with `--plugin-dir` in the worktree",
+      "cost": "not seeing the live reload by eye; the user sees it at the slice checkpoint.",
+      "date": null,
+      "raw": "Ruling: Task 9 Step 5's \"ask Claude to add a view\" runs as `claude -p` with `--plugin-dir` in the worktree — no interactive session from here — costs not seeing the live reload by eye; the user sees it at the slice checkpoint.",
+      "scope": null,
+      "why": "no interactive session from here"
+    },
+    {
+      "call": "ts-rs 12 writes type-only `.ts` bindings, not `.d.ts`",
+      "cost": "a rename step there if tsc objects.",
+      "date": null,
+      "raw": "Ruling: ts-rs 12 writes type-only `.ts` bindings, not `.d.ts` — accepted as the \"generated .d.ts\" of Global Constraints, since `--print-types` (Task 6) concatenates them into one declaration file — costs a rename step there if tsc objects.",
+      "scope": null,
+      "why": "accepted as the \"generated .d.ts\" of Global Constraints, since `--print-types` (Task 6) concatenates them into one declaration file"
+    },
+    {
+      "call": "copied real fixtures under crates/flow-cockpit/core/tests/fixtures/docs/ are excluded from treefmt and the flake `vendored` list (both files already in Task 2's list)",
+      "cost": "those fixtures staying unformatted.",
+      "date": null,
+      "raw": "Ruling: copied real fixtures under crates/flow-cockpit/core/tests/fixtures/docs/ are excluded from treefmt and the flake `vendored` list (both files already in Task 2's list) — a fixture prettier rewrites no longer tests the real shape (it already unindented the ledger's wrapped line) — costs those fixtures staying unformatted.",
+      "scope": null,
+      "why": "a fixture prettier rewrites no longer tests the real shape (it already unindented the ledger's wrapped line)"
+    },
+    {
+      "call": "a user entry opens a turn only when it is not `isMeta` and its text (a string, or the text blocks of an array) doesn't start with `<`",
+      "cost": "a fix round on Task 3.",
+      "date": null,
+      "raw": "Ruling: a user entry opens a turn only when it is not `isMeta` and its text (a string, or the text blocks of an array) doesn't start with `<` — the brief's rule read literally turns real meta entries into prompts (20 of 54 in this project) and drops image prompts, while the spec groups turns by the user's prompts — costs a fix round on Task 3.",
+      "scope": null,
+      "why": "the brief's rule read literally turns real meta entries into prompts (20 of 54 in this project) and drops image prompts, while the spec groups turns by the user's prompts"
+    },
+    {
+      "call": "status precedence Done > Waiting > Working > Stale > Idle",
+      "cost": "a 4-day-old wait never reading Stale.",
+      "date": null,
+      "raw": "Ruling: status precedence Done > Waiting > Working > Stale > Idle — the spec lists Waiting first and a run waiting on the user stays theirs to act on — costs a 4-day-old wait never reading Stale.",
+      "scope": null,
+      "why": "the spec lists Waiting first and a run waiting on the user stays theirs to act on"
+    },
+    {
+      "call": "Config::parse/load (Result<_, String>), Default on LinkCache and LinkCache::bytes_read() are implied by the brief (Config from config.toml; the 2 MB test measures bytes), not deviations",
+      "cost": "three public items the plan didn't name.",
+      "date": null,
+      "raw": "Ruling: Config::parse/load (Result<_, String>), Default on LinkCache and LinkCache::bytes_read() are implied by the brief (Config from config.toml; the 2 MB test measures bytes), not deviations — none crosses to the views — costs three public items the plan didn't name.",
+      "scope": null,
+      "why": "none crosses to the views"
+    },
+    {
+      "call": "core/tests/index.rs (not on the Files list) accepted",
+      "cost": "nothing.",
+      "date": null,
+      "raw": "Ruling: core/tests/index.rs (not on the Files list) accepted — same as docs.rs and activity.rs in Tasks 2-3 — costs nothing.",
+      "scope": null,
+      "why": "same as docs.rs and activity.rs in Tasks 2-3"
+    },
+    {
+      "call": "the 1 MiB whole-head cap and `rebuild_project` listing dirs from the old roots enter the fix round",
+      "cost": "a larger fix round. Folders matching no root wait for Task 6 (call `build` when a new folder appears in claude_projects).",
+      "date": null,
+      "raw": "Ruling: the 1 MiB whole-head cap and `rebuild_project` listing dirs from the old roots enter the fix round — both make a session vanish, against spec:29 (\"any Claude session's activity can be found\") — costs a larger fix round. Folders matching no root wait for Task 6 (call `build` when a new folder appears in claude_projects).",
+      "scope": null,
+      "why": "both make a session vanish, against spec:29 (\"any Claude session's activity can be found\")"
+    },
+    {
+      "call": "design/docs.json (raw docs for the Docs tab) is part of \"its JSON\" in the listed design folder",
+      "cost": null,
+      "date": null,
+      "raw": "Ruling: design/docs.json (raw docs for the Docs tab) is part of \"its JSON\" in the listed design folder — costs nothing.",
+      "scope": null,
+      "why": "costs nothing."
+    },
+    {
+      "call": "` and `Note` lines into the task entry above them instead of `rulings`",
+      "cost": null,
+      "date": null,
+      "raw": "Task 2: finding (from Task 5): parse_ledger glues `Ruling:` and `Note` lines into the task entry above them instead of `rulings` — fix after the Task 5 stop.",
+      "scope": null,
+      "why": "fix after the Task 5 stop."
+    }
   ],
   "tasks": [
     {
       "fix_rounds": 0,
       "later": [
-        "minor (deferred): implement/SKILL.md:52 \"Record both as … gate lines\" reads as two lines; say the execution method is the `, execution: …` extra (same in upgrade/SKILL.md:41)",
-        "minor (deferred): checkTemplates accepts a part anywhere in the file, not only in the template comment",
-        "minor (deferred): several edited prose lines run past the 120-column wrap (flow-rules fifth stop, feature-flow Phase 4, fix-flow and upgrade gate lines)"
+        "implement/SKILL.md:52 \"Record both as … gate lines\" reads as two lines; say the execution method is the `, execution: …` extra (same in upgrade/SKILL.md:41)",
+        "checkTemplates accepts a part anywhere in the file, not only in the template comment",
+        "several edited prose lines run past the 120-column wrap (flow-rules fifth stop, feature-flow Phase 4, fix-flow and upgrade gate lines)"
       ],
       "model": "sonnet",
       "n": 1,
@@ -36,13 +120,13 @@
     {
       "fix_rounds": 1,
       "later": [
-        "minor (deferred): text before the first `## ` dropped from sections (flow.rs:85)",
-        "minor (deferred): frontmatter placeholders (`phase: <…>`, `now: <…>`) read as values",
-        "minor (deferred): a date inside the Reopened reason counts as re-approval (flow.rs:178)",
-        "minor (deferred): list_items drops old deviations titled \"None…\" (flow.rs:292)",
-        "minor (deferred): any ledger entry containing \"security\" lands in `security` (ledger.rs:135) — re-check on the real excerpt",
-        "minor (deferred): old_flow_md_files_load doesn't pin language-skills' approved date or web-mcp's open Gate 1",
-        "minor (deferred): ledger security rule `starts_with(\"security\")` misses \"review: security finding …\" shapes"
+        "text before the first `## ` dropped from sections (flow.rs:85)",
+        "frontmatter placeholders (`phase: <…>`, `now: <…>`) read as values",
+        "a date inside the Reopened reason counts as re-approval (flow.rs:178)",
+        "list_items drops old deviations titled \"None…\" (flow.rs:292)",
+        "any ledger entry containing \"security\" lands in `security` (ledger.rs:135) — re-check on the real excerpt",
+        "old_flow_md_files_load doesn't pin language-skills' approved date or web-mcp's open Gate 1",
+        "ledger security rule `starts_with(\"security\")` misses \"review: security finding …\" shapes"
       ],
       "model": "sonnet",
       "n": 2,
@@ -60,8 +144,8 @@
     {
       "fix_rounds": 1,
       "later": [
-        "minor (deferred): failures map could be a HashSet; tests index turns[0] directly; agent started/ended taken from any entry kind",
-        "minor (deferred): `<` check runs on the joined text of an array prompt (reminder block first hides the prompt); \"[Request interrupted by user]\" entries open turns if they exist"
+        "failures map could be a HashSet; tests index turns[0] directly; agent started/ended taken from any entry kind",
+        "`<` check runs on the joined text of an array prompt (reminder block first hides the prompt); \"[Request interrupted by user]\" entries open turns if they exist"
       ],
       "model": "sonnet",
       "n": 3,
@@ -79,8 +163,8 @@
     {
       "fix_rounds": 1,
       "later": [
-        "minor (deferred): encode/slug near-duplicate; Index::doc re-implements entries::read_text; no negative cache for other projects' sessions in rebuild_project",
-        "minor (deferred): tail scan resumes from a stale offset after truncate-and-regrow; read_head early stop on an empty cwd or a tool_result user entry; skip_line reads a huge newline-less line through once; a failed File::open in scan still caches size/mtime"
+        "encode/slug near-duplicate; Index::doc re-implements entries::read_text; no negative cache for other projects' sessions in rebuild_project",
+        "tail scan resumes from a stale offset after truncate-and-regrow; read_head early stop on an empty cwd or a tool_result user entry; skip_line reads a huge newline-less line through once; a failed File::open in scan still caches size/mtime"
       ],
       "model": "sonnet",
       "n": 4,
@@ -101,9 +185,10 @@
       "model": "opus",
       "n": 5,
       "security": [],
-      "state": "Building",
+      "state": "Done",
       "story": [
-        "dispatched Steps 1-2 only (base b1f0975, implementer opus; no commit — Step 3 stop is the controller's, Step 4 commit after approval)"
+        "dispatched Steps 1-2 only (base b1f0975, implementer opus; no commit — Step 3 stop is the controller's, Step 4 commit after approval)",
+        "complete (c7c89b8)"
       ]
     }
   ]

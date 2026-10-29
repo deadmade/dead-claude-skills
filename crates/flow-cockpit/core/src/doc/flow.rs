@@ -3,6 +3,7 @@
 use serde::Serialize;
 use ts_rs::TS;
 
+use super::phases::{Phase, phases};
 use super::{blocks, dates, field_span, join, normalize, strip_comments, title, without};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, TS)]
@@ -14,6 +15,10 @@ pub struct FlowDoc {
     pub gates: Vec<Gate>,
     pub decisions: Vec<Decision>,
     pub deviations: Vec<Deviation>,
+    /// The calls the build made on its own, one per `## Rulings` list item.
+    pub rulings: Vec<Ruling>,
+    /// The conductor's phases with their state at `phase:`; empty for a conductor or phase not known.
+    pub phases: Vec<Phase>,
     /// Every `## ` section, in order, as raw Markdown (comments removed).
     pub sections: Vec<Section>,
 }
@@ -54,6 +59,19 @@ pub enum DeviationStatus {
     Unknown,
 }
 
+/// A call the build made on its own: `<date>, <scope>: <call> — <why> — costs <cost>` in flow.md, `<call> — <why> —
+/// costs <cost>` in the build log. What does not split keeps `call` as the whole text and the parts `None`; `raw` is
+/// the original text, wrapped lines joined.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct Ruling {
+    pub date: Option<String>,
+    pub scope: Option<String>,
+    pub call: String,
+    pub why: Option<String>,
+    pub cost: Option<String>,
+    pub raw: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 pub struct Section {
     pub heading: String,
@@ -92,12 +110,15 @@ pub fn parse_flow(text: &str) -> FlowDoc {
             doc.decisions.extend(decisions(&block.lines));
         } else if lower.starts_with("deviations") {
             doc.deviations.extend(deviations(&block.lines));
+        } else if lower == "rulings" {
+            doc.rulings.extend(rulings(&block.lines));
         }
         doc.sections.push(Section {
             heading: heading.to_string(),
             markdown: join(&block.lines),
         });
     }
+    doc.phases = phases(doc.flow.as_deref(), doc.phase.as_deref());
     doc
 }
 
@@ -260,6 +281,68 @@ fn status(value: &str) -> DeviationStatus {
             date: None,
             what: rest.trim().to_string(),
         },
+    }
+}
+
+/// The list items of a Rulings section; prose around the list is not a ruling.
+fn rulings(lines: &[&str]) -> Vec<Ruling> {
+    let mut items: Vec<String> = Vec::new();
+    for line in lines {
+        if let Some(text) = item_marker(line) {
+            items.push(text.to_string());
+        } else if line.starts_with([' ', '\t'])
+            && !line.trim().is_empty()
+            && let Some(item) = items.last_mut()
+        {
+            item.push(' ');
+            item.push_str(line.trim());
+        }
+    }
+    items
+        .iter()
+        .filter(|text| !text.is_empty())
+        .map(|text| ruling(text))
+        .collect()
+}
+
+/// Splits one ruling's text (see [`Ruling`]); never fails.
+pub(crate) fn ruling(text: &str) -> Ruling {
+    let raw = text.trim();
+    let head = dates(raw)
+        .first()
+        .filter(|(at, _)| *at == 0)
+        .and_then(|(_, date)| {
+            let (scope, rest) = raw[date.len()..].strip_prefix(',')?.split_once(':')?;
+            let (scope, rest) = (scope.trim(), rest.trim());
+            (!scope.is_empty() && !rest.is_empty())
+                .then(|| ((*date).to_string(), scope.to_string(), rest))
+        });
+    let (date, scope, body) = match head {
+        Some((date, scope, rest)) => (Some(date), Some(scope), rest),
+        None => (None, None, raw),
+    };
+    let mut parts = body.split(" — ").map(str::trim);
+    let call = parts.next().filter(|c| !c.is_empty()).unwrap_or(body);
+    let why = parts.next().filter(|w| !w.is_empty()).map(str::to_string);
+    let rest: Vec<&str> = parts.collect();
+    let cost = (!rest.is_empty())
+        .then(|| rest.join(" — "))
+        .map(|c| {
+            let lower = c.to_ascii_lowercase();
+            if lower.starts_with("costs ") {
+                c["costs ".len()..].trim().to_string()
+            } else {
+                c
+            }
+        })
+        .filter(|c| !c.is_empty());
+    Ruling {
+        date,
+        scope,
+        call: call.to_string(),
+        why,
+        cost,
+        raw: raw.to_string(),
     }
 }
 

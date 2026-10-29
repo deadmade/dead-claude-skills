@@ -5,13 +5,14 @@ use std::collections::BTreeMap;
 use serde::Serialize;
 use ts_rs::TS;
 
+use super::flow::{Ruling, ruling};
 use super::normalize;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, TS)]
 pub struct Ledger {
     pub plan: Option<String>,
     pub tasks: Vec<LedgerTask>,
-    pub rulings: Vec<String>,
+    pub rulings: Vec<Ruling>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -47,8 +48,10 @@ pub fn parse_ledger(text: &str) -> Ledger {
         if ledger.plan.is_none() && entry.starts_with('#') {
             ledger.plan = plan_of(&entry);
         }
-        if entry.contains("Ruling:") {
-            ledger.rulings.push(strip_bullet(&entry).to_string());
+        if let Some((_, call)) = entry.split_once("Ruling:") {
+            let mut r = ruling(call);
+            r.raw = strip_bullet(&entry).to_string();
+            ledger.rulings.push(r);
         }
         if let Some((numbers, rest)) = task_entry(&entry) {
             for n in numbers {
@@ -135,8 +138,8 @@ fn apply(task: &mut LedgerTask, text: &str) {
     if lower.starts_with("security") {
         task.security.push(text.to_string());
     }
-    if lower.starts_with("minor (deferred)") || lower.starts_with("parked") {
-        task.later.push(text.to_string());
+    if let Some(item) = deferred(text) {
+        task.later.push(item.to_string());
         return;
     }
     let state = if lower.starts_with("complete") {
@@ -171,6 +174,24 @@ fn apply(task: &mut LedgerTask, text: &str) {
     };
     task.state = state;
     task.story.push(text.to_string());
+}
+
+/// The item text of a `minor (deferred):`, `minor:` or `parked:` entry, without its tag.
+fn deferred(text: &str) -> Option<&str> {
+    let lower = text.to_ascii_lowercase();
+    ["minor (deferred)", "parked", "minor"]
+        .iter()
+        .find_map(|tag| {
+            // The tag is ASCII, so its length is a char boundary in `text` too.
+            let rest = lower.starts_with(tag).then(|| &text[tag.len()..])?;
+            let rest = rest.trim_start();
+            // "parked the ..." (no colon) is still an item, "minority" is not.
+            match rest.strip_prefix(':') {
+                Some(item) => Some(item.trim()),
+                None if *tag != "minor" && lower.starts_with(tag) => Some(text.trim()),
+                None => None,
+            }
+        })
 }
 
 /// The word after `implementer` in a dispatch line, past a session id: `implementer 01a0-... (opus)` gives `opus`.

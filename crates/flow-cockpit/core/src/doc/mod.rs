@@ -4,11 +4,13 @@
 pub mod audit;
 pub mod flow;
 pub mod ledger;
+pub mod phases;
 pub mod plan;
 
 pub use audit::{AuditDoc, Finding, parse_audit};
-pub use flow::{Decision, Deviation, DeviationStatus, FlowDoc, Gate, Section, parse_flow};
+pub use flow::{Decision, Deviation, DeviationStatus, FlowDoc, Gate, Ruling, Section, parse_flow};
 pub use ledger::{Ledger, LedgerTask, TaskState, parse_ledger};
+pub use phases::{Phase, PhaseState};
 pub use plan::{PlanDoc, PlanTask, parse_plan};
 
 /// Drops a byte-order mark and turns CRLF into LF.

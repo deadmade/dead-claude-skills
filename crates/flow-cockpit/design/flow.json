@@ -66,6 +66,16 @@
         }
       },
       "title": "Status never decays without a file change"
+    },
+    {
+      "body": "The page parses flow.md's Rulings, keeps each conductor's phase list and gate positions, and strips the\n`minor (deferred):` tag itself, against \"the document format is resolved in the core\".",
+      "status": {
+        "Decided": {
+          "date": "2026-10-29",
+          "what": "a new Task 5b before Task 6 gives the core typed `Ruling`s (flow.md and build log), `FlowDoc.phases` from the conductors' phase tables (checked against each SKILL.md), and untagged deferred items; the mockup switches to those fields"
+        }
+      },
+      "title": "The approved mockup reads document format in the view"
     }
   ],
   "flow": "feature",
@@ -85,8 +95,126 @@
       "what": "plan approved"
     }
   ],
-  "now": "The flow run view mockup is approved; the build goes on with Task 6, the app shell.",
+  "now": "The flow run view mockup is approved; Task 5b moves its format reading into the core, then Task 6.",
   "phase": "execute",
+  "phases": [
+    {
+      "gate_after": null,
+      "key": "ground",
+      "name": "Ground",
+      "state": "Done"
+    },
+    {
+      "gate_after": null,
+      "key": "brainstorm",
+      "name": "Brainstorm",
+      "state": "Done"
+    },
+    {
+      "gate_after": 1,
+      "key": "grill",
+      "name": "Grill",
+      "state": "Done"
+    },
+    {
+      "gate_after": null,
+      "key": "plan",
+      "name": "Plan",
+      "state": "Done"
+    },
+    {
+      "gate_after": 2,
+      "key": "evaluate",
+      "name": "Evaluate",
+      "state": "Done"
+    },
+    {
+      "gate_after": null,
+      "key": "execute",
+      "name": "Build",
+      "state": "Now"
+    },
+    {
+      "gate_after": null,
+      "key": "finish",
+      "name": "Verify and finish",
+      "state": "Later"
+    }
+  ],
+  "rulings": [
+    {
+      "call": "Task 5 keeps every existing flow.md section while converting; the controller writes flow.md only between tasks",
+      "cost": "a manual merge if a line lands mid-task.",
+      "date": "2026-10-28",
+      "raw": "2026-10-28, setup: Task 5 keeps every existing flow.md section while converting; the controller writes flow.md only between tasks — both write flow.md — costs a manual merge if a line lands mid-task.",
+      "scope": "setup",
+      "why": "both write flow.md"
+    },
+    {
+      "call": "the brief clause and Global Constraints go verbatim into the build workspace's `rules.md`, which every implementer and reviewer prompt names first",
+      "cost": "a subagent that skips it.",
+      "date": "2026-10-28",
+      "raw": "2026-10-28, setup: the brief clause and Global Constraints go verbatim into the build workspace's `rules.md`, which every implementer and reviewer prompt names first — one copy of the same text — costs a subagent that skips it.",
+      "scope": "setup",
+      "why": "one copy of the same text"
+    },
+    {
+      "call": "Task 9 Step 5 runs as `claude -p --plugin-dir`",
+      "cost": "not seeing the live reload by eye until the slice checkpoint.",
+      "date": "2026-10-28",
+      "raw": "2026-10-28, setup: Task 9 Step 5 runs as `claude -p --plugin-dir` — no interactive session from the controller — costs not seeing the live reload by eye until the slice checkpoint.",
+      "scope": "setup",
+      "why": "no interactive session from the controller"
+    },
+    {
+      "call": "ts-rs 12 writes type-only `.ts` bindings, taken as the \"generated `.d.ts`\" since `--print-types` joins them into one declaration file",
+      "cost": null,
+      "date": "2026-10-28",
+      "raw": "2026-10-28, Task 2: ts-rs 12 writes type-only `.ts` bindings, taken as the \"generated `.d.ts`\" since `--print-types` joins them into one declaration file — costs a rename there if tsc objects.",
+      "scope": "Task 2",
+      "why": "costs a rename there if tsc objects."
+    },
+    {
+      "call": "the copied real fixtures in `core/tests/fixtures/` are excluded from treefmt",
+      "cost": "those fixtures staying unformatted.",
+      "date": "2026-10-28",
+      "raw": "2026-10-28, Task 2: the copied real fixtures in `core/tests/fixtures/` are excluded from treefmt — a reformatted copy no longer tests the real shape — costs those fixtures staying unformatted.",
+      "scope": "Task 2",
+      "why": "a reformatted copy no longer tests the real shape"
+    },
+    {
+      "call": "a user entry opens a turn only when it isn't `isMeta` and its text (a string or an array's text blocks) doesn't start with `<`",
+      "cost": "a fix round.",
+      "date": "2026-10-28",
+      "raw": "2026-10-28, Task 3: a user entry opens a turn only when it isn't `isMeta` and its text (a string or an array's text blocks) doesn't start with `<` — the literal rule made real meta entries into prompts and dropped image prompts — costs a fix round.",
+      "scope": "Task 3",
+      "why": "the literal rule made real meta entries into prompts and dropped image prompts"
+    },
+    {
+      "call": "status precedence is Done, Waiting, Working, Stale, Idle",
+      "cost": "a wait of 4 days never reading Stale.",
+      "date": "2026-10-28",
+      "raw": "2026-10-28, Task 4: status precedence is Done, Waiting, Working, Stale, Idle — the spec lists Waiting first and a run waiting on the user stays theirs to act on — costs a wait of 4 days never reading Stale.",
+      "scope": "Task 4",
+      "why": "the spec lists Waiting first and a run waiting on the user stays theirs to act on"
+    },
+    {
+      "call": "`Config::parse`/`load`, `Default` on `LinkCache` and `LinkCache::bytes_read()` are implied by the brief, not deviations",
+      "cost": "three public items the plan didn't name.",
+      "date": "2026-10-28",
+      "raw": "2026-10-28, Task 4: `Config::parse`/`load`, `Default` on `LinkCache` and `LinkCache::bytes_read()` are implied by the brief, not deviations — none crosses to the views — costs three public items the plan didn't name.",
+      "scope": "Task 4",
+      "why": "none crosses to the views"
+    },
+    {
+      "call": "a per-line head cap and `rebuild_project` recomputing roots first join the fix round",
+      "cost": "a larger fix round; folders that match no root wait for Task 6, which calls `build` when a new folder appears in `~/.claude/projects`.",
+      "date": "2026-10-28",
+      "raw": "2026-10-28, Task 4: a per-line head cap and `rebuild_project` recomputing roots first join the fix round — both made a session vanish, against \"any Claude session's activity can be found\" — costs a larger fix round; folders that match no root wait for Task 6, which calls `build` when a new folder appears in `~/.claude/projects`.",
+      "scope": "Task 4",
+      "why": "both made a session vanish, against \"any Claude session's activity can be found\""
+    }
+  ],
   "sections": [
     {
       "heading": "Request",
@@ -130,7 +258,7 @@
     },
     {
       "heading": "Tasks",
-      "markdown": "Task 1: base 7bfc93e, untracked at start: none; head 1803f42, files check clean; review approved, 3 minors deferred\nTask 2: base 1803f42, untracked at start: none; head 595cbca, files check clean; review: 1 fix round (4 Important addressed), 7 minors deferred\nTask 3: base 595cbca, untracked at start: none; head 83976f1, files check clean; review: 1 fix round (2 Important addressed), 4 minors deferred\nTask 4: base 83976f1, untracked at start: none; head b1f0975, files check clean (ignored included); review: 1 fix round (1 Critical, 2 Important, 3 decided addressed), 7 minors deferred\nTask 5: base b1f0975, untracked at start: none; mockup approved after 3 reworks"
+      "markdown": "Task 1: base 7bfc93e, untracked at start: none; head 1803f42, files check clean; review approved, 3 minors deferred\nTask 2: base 1803f42, untracked at start: none; head 595cbca, files check clean; review: 1 fix round (4 Important addressed), 7 minors deferred\nTask 3: base 595cbca, untracked at start: none; head 83976f1, files check clean; review: 1 fix round (2 Important addressed), 4 minors deferred\nTask 4: base 83976f1, untracked at start: none; head b1f0975, files check clean (ignored included); review: 1 fix round (1 Critical, 2 Important, 3 decided addressed), 7 minors deferred\nTask 5: base b1f0975, untracked at start: none; head c7c89b8; mockup approved after 3 reworks\nTask 5b: base c7c89b8, untracked at start: none (added by the user's decision 2026-10-29)"
     },
     {
       "heading": "Rulings",
@@ -138,7 +266,7 @@
     },
     {
       "heading": "Deviations",
-      "markdown": "### Task 3 transcript fixtures are hand-written, not trimmed real ones\n\nThe plan asked for trimmed real transcripts. Copying them into the public repo was blocked, so the implementer reads\nreal transcripts only for their JSON shapes and field names and writes the fixture lines with invented text.\n\nStatus: decided 2026-10-28: hand-written in the real shape\n\n### Subagent text replies have no place in the activity model\n\nThe plan's `Text` carries no agent, so Task 3 dropped every subagent reply, final reports included; only their tool\ncalls showed.\n\nStatus: decided 2026-10-28: `Text` gains `agent: Option<String>`, and subagent replies land in the turn open at their\ntime\n\n### Status never decays without a file change\n\nStatus was derived only when a project's files changed, so a run whose Claude session stopped stayed Working.\n\nStatus: decided 2026-10-28: `Index::refresh(now)` re-derives every status from cached facts without reading the disk;\nTask 6's poll calls it each tick"
+      "markdown": "### Task 3 transcript fixtures are hand-written, not trimmed real ones\n\nThe plan asked for trimmed real transcripts. Copying them into the public repo was blocked, so the implementer reads\nreal transcripts only for their JSON shapes and field names and writes the fixture lines with invented text.\n\nStatus: decided 2026-10-28: hand-written in the real shape\n\n### Subagent text replies have no place in the activity model\n\nThe plan's `Text` carries no agent, so Task 3 dropped every subagent reply, final reports included; only their tool\ncalls showed.\n\nStatus: decided 2026-10-28: `Text` gains `agent: Option<String>`, and subagent replies land in the turn open at their\ntime\n\n### Status never decays without a file change\n\nStatus was derived only when a project's files changed, so a run whose Claude session stopped stayed Working.\n\nStatus: decided 2026-10-28: `Index::refresh(now)` re-derives every status from cached facts without reading the disk;\nTask 6's poll calls it each tick\n\n### The approved mockup reads document format in the view\n\nThe page parses flow.md's Rulings, keeps each conductor's phase list and gate positions, and strips the\n`minor (deferred):` tag itself, against \"the document format is resolved in the core\".\n\nStatus: decided 2026-10-29: a new Task 5b before Task 6 gives the core typed `Ruling`s (flow.md and build log),\n`FlowDoc.phases` from the conductors' phase tables (checked against each SKILL.md), and untagged deferred items; the\nmockup switches to those fields"
     },
     {
       "heading": "Follow-ups",

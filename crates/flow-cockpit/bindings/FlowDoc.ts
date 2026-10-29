@@ -2,9 +2,19 @@
 import type { Decision } from "./Decision";
 import type { Deviation } from "./Deviation";
 import type { Gate } from "./Gate";
+import type { Phase } from "./Phase";
+import type { Ruling } from "./Ruling";
 import type { Section } from "./Section";
 
 export type FlowDoc = { flow: string | null, phase: string | null, now: string | null, title: string | null, gates: Array<Gate>, decisions: Array<Decision>, deviations: Array<Deviation>, 
+/**
+ * The calls the build made on its own, one per `## Rulings` list item.
+ */
+rulings: Array<Ruling>, 
+/**
+ * The conductor's phases with their state at `phase:`; empty for a conductor or phase not known.
+ */
+phases: Array<Phase>, 
 /**
  * Every `## ` section, in order, as raw Markdown (comments removed).
  */

@@ -2,7 +2,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use flow_cockpit_core::doc::{
-    DeviationStatus, FlowDoc, TaskState, parse_audit, parse_flow, parse_ledger, parse_plan,
+    DeviationStatus, FlowDoc, PhaseState, TaskState, parse_audit, parse_flow, parse_ledger,
+    parse_plan,
 };
 
 fn fixture(name: &str) -> String {
@@ -220,7 +221,12 @@ fn ledger_counts_fix_rounds_and_security() {
     assert_eq!(by_n(4).state, TaskState::Review);
     assert_eq!(by_n(4).fix_rounds, 0);
     assert!(ledger.rulings.len() >= 5);
-    assert!(ledger.rulings.iter().any(|r| r.contains("`GetOpts` gains")));
+    assert!(
+        ledger
+            .rulings
+            .iter()
+            .any(|r| r.raw.contains("`GetOpts` gains"))
+    );
 }
 
 #[test]
@@ -483,7 +489,11 @@ fn rulings_and_notes_between_task_lines_stay_out_of_tasks() {
          Task 2: dispatched (base def5678, implementer opus)\n",
     );
     assert_eq!(ledger.rulings.len(), 1);
-    assert!(ledger.rulings[0].contains("never reaches the server — costs nothing"));
+    assert!(
+        ledger.rulings[0]
+            .raw
+            .contains("never reaches the server — costs nothing")
+    );
     let everywhere: Vec<&String> = ledger
         .tasks
         .iter()
@@ -495,5 +505,145 @@ fn rulings_and_notes_between_task_lines_stay_out_of_tasks() {
             .iter()
             .all(|l| !l.contains("Note for the controller"))
     );
-    assert!(ledger.rulings.iter().all(|r| !r.contains("Note for")));
+    assert!(ledger.rulings.iter().all(|r| !r.raw.contains("Note for")));
+}
+
+#[test]
+fn rulings_split_into_parts() {
+    let doc = parse_flow(
+        "## Rulings\n\nCalls the build made.\n\n\
+         - 2026-10-28, setup: Task 5 keeps every section while converting; the controller writes\n  \
+         flow.md only between tasks — both write flow.md — costs a manual merge if a line lands mid-task.\n\
+         - 2026-10-29, task 2: a plain call — because it is simple\n",
+    );
+    assert_eq!(doc.rulings.len(), 2);
+    let first = &doc.rulings[0];
+    assert_eq!(first.date.as_deref(), Some("2026-10-28"));
+    assert_eq!(first.scope.as_deref(), Some("setup"));
+    assert_eq!(
+        first.call,
+        "Task 5 keeps every section while converting; the controller writes flow.md only between tasks"
+    );
+    assert_eq!(first.why.as_deref(), Some("both write flow.md"));
+    assert_eq!(
+        first.cost.as_deref(),
+        Some("a manual merge if a line lands mid-task.")
+    );
+    assert!(
+        first.raw.starts_with("2026-10-28, setup: Task 5")
+            && first.raw.contains("writes flow.md only")
+    );
+    let second = &doc.rulings[1];
+    assert_eq!(second.why.as_deref(), Some("because it is simple"));
+    assert_eq!(second.cost, None);
+}
+
+#[test]
+fn ledger_rulings_are_typed() {
+    let ledger = parse_ledger(
+        "Task 1: dispatched (base abc1234, implementer sonnet)\n\
+         Ruling: the cache key ignores the fragment — it never reaches\n  \
+         the server — costs nothing if wrong.\n",
+    );
+    assert_eq!(ledger.rulings.len(), 1);
+    let r = &ledger.rulings[0];
+    assert_eq!(r.date, None);
+    assert_eq!(r.scope, None);
+    assert_eq!(r.call, "the cache key ignores the fragment");
+    assert_eq!(r.why.as_deref(), Some("it never reaches the server"));
+    assert_eq!(r.cost.as_deref(), Some("nothing if wrong."));
+}
+
+#[test]
+fn unsplittable_ruling_keeps_raw() {
+    let doc = parse_flow(
+        "## Rulings\n\n- <date>, <scope>: <call> — <why> — costs <cost>\n- just a note, no parts\n- 2026-10-30 no comma shape\n",
+    );
+    assert_eq!(doc.rulings.len(), 3);
+    let note = &doc.rulings[1];
+    assert_eq!(note.call, "just a note, no parts");
+    assert_eq!(
+        (&note.date, &note.scope, &note.why, &note.cost),
+        (&None, &None, &None, &None)
+    );
+    assert_eq!(note.raw, "just a note, no parts");
+    assert_eq!(doc.rulings[2].call, "2026-10-30 no comma shape");
+    assert_eq!(doc.rulings[2].date, None);
+    assert_eq!(parse_flow("## Rulings\n").rulings, []);
+}
+
+fn flow_at(flow: &str, phase: &str) -> FlowDoc {
+    parse_flow(&format!("---\nflow: {flow}\nphase: {phase}\n---\n\n# T\n"))
+}
+
+#[test]
+fn phases_follow_the_conductor() {
+    let doc = flow_at("feature", "execute");
+    let keys: Vec<&str> = doc.phases.iter().map(|p| p.key.as_str()).collect();
+    assert_eq!(
+        keys,
+        [
+            "ground",
+            "brainstorm",
+            "grill",
+            "plan",
+            "evaluate",
+            "execute",
+            "finish"
+        ]
+    );
+    let states: Vec<PhaseState> = doc.phases.iter().map(|p| p.state).collect();
+    assert_eq!(
+        states,
+        [
+            PhaseState::Done,
+            PhaseState::Done,
+            PhaseState::Done,
+            PhaseState::Done,
+            PhaseState::Done,
+            PhaseState::Now,
+            PhaseState::Later
+        ]
+    );
+    let gates: Vec<(&str, Option<u8>)> = doc
+        .phases
+        .iter()
+        .filter(|p| p.gate_after.is_some())
+        .map(|p| (p.key.as_str(), p.gate_after))
+        .collect();
+    assert_eq!(gates, [("grill", Some(1)), ("evaluate", Some(2))]);
+    assert_eq!(doc.phases[5].name, "Build");
+    assert_eq!(doc.phases[6].name, "Verify and finish");
+    assert_eq!(doc.phases[0].name, "Ground");
+    assert!(
+        flow_at("feature", "done")
+            .phases
+            .iter()
+            .all(|p| p.state == PhaseState::Done)
+    );
+    assert_eq!(flow_at("fix", "cause").phases[2].gate_after, Some(1));
+}
+
+#[test]
+fn unknown_conductor_has_no_phases() {
+    assert_eq!(flow_at("mystery", "execute").phases, []);
+    assert_eq!(flow_at("feature", "not-a-phase").phases, []);
+    assert_eq!(parse_flow("# no frontmatter\n").phases, []);
+}
+
+#[test]
+fn deferred_items_lose_their_tag() {
+    let ledger = parse_ledger(
+        "Task 3: minor (deferred): Task 5 must cache PDFs too\n\
+         Task 3: parked: the retry budget\n\
+         Task 3: minor: a typo in the help text\n",
+    );
+    assert_eq!(
+        ledger.tasks[0].later,
+        [
+            "Task 5 must cache PDFs too",
+            "the retry budget",
+            "a typo in the help text"
+        ]
+    );
 }
