@@ -31,8 +31,8 @@ Reads, each named `mcp__plugin_mcp-azure_ado__<tool>`:
 - `wi_query`: work items by assignee (`me` or a name), state, type or title text, or a raw WIQL query.
 - `pipeline_runs`: recent runs, newest first, by pipeline, branch, PR or result.
 - `pipeline_view`: a run's stages and jobs with result and duration, its errors and warnings, and its test results:
-  passed, failed and skipped counts, then up to 20 failed tests, each with its error's first line and the first 5
-  lines of its stack trace.
+  passed, failed and skipped counts over all its test runs (of a retried job, only its latest attempt's), then up to
+  20 failed tests, each with its error's first line and the first 5 lines of its stack trace.
 - `pipeline_log`: a run's cleaned logs: each failed step's error lines with context and its last 50 lines, read from
   at most its last 20,000 lines when the server reports the log's length (else the whole log); `step` picks one,
   `full` pages through a whole log (at most 2000 lines or 40,000 characters per call).

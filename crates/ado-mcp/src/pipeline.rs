@@ -1,7 +1,6 @@
 //! The pipeline tools: the reads `pipeline_runs`, `pipeline_view` and `pipeline_log`, the writes `pipeline_run` and
 //! `pipeline_cancel`; and `repo_list` and `project_list`.
 
-use std::cmp::Reverse;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Write as _;
 
@@ -373,13 +372,50 @@ fn tree<'a>(
     }
 }
 
-/// Of the test runs with one name (a retried job publishes one per attempt), the newest (highest id); by id.
-fn newest_per_name(mut runs: Vec<TestRun>) -> Vec<TestRun> {
-    runs.sort_by_key(|r| Reverse(r.id));
-    let mut seen = HashSet::new();
-    runs.retain(|r| seen.insert(r.name.clone()));
-    runs.reverse();
-    runs
+/// The job a test run came from (stage, phase and job name, by its `pipelineReference`) and that job's attempt
+/// (stage, phase, job); none when the reference names no phase or job.
+fn job_attempt(r: &TestRun) -> Option<(JobKey<'_>, (i32, i32, i32))> {
+    let p = r.pipeline_reference.as_ref()?;
+    let (s, ph, j) = (
+        p.stage_reference.as_ref(),
+        p.phase_reference.as_ref(),
+        p.job_reference.as_ref(),
+    );
+    let key = (
+        s.and_then(|s| s.stage_name.as_deref()),
+        ph.and_then(|p| p.phase_name.as_deref()),
+        j.and_then(|j| j.job_name.as_deref()),
+    );
+    if key.1.is_none() && key.2.is_none() {
+        return None;
+    }
+    let attempt = (
+        s.and_then(|s| s.attempt).unwrap_or(0),
+        ph.and_then(|p| p.attempt).unwrap_or(0),
+        j.and_then(|j| j.attempt).unwrap_or(0),
+    );
+    Some((key, attempt))
+}
+
+type JobKey<'a> = (Option<&'a str>, Option<&'a str>, Option<&'a str>);
+
+/// The test runs that count, by id: a retried job publishes again, so of one job's runs only those of its latest
+/// attempt; every run of that attempt (one per result file, all with one name), and every run that names no job.
+fn latest_attempts(mut runs: Vec<TestRun>) -> Vec<TestRun> {
+    runs.sort_by_key(|r| r.id);
+    let mut latest: HashMap<JobKey, (i32, i32, i32)> = HashMap::new();
+    for (job, attempt) in runs.iter().filter_map(job_attempt) {
+        let top = latest.entry(job).or_insert(attempt);
+        *top = (*top).max(attempt);
+    }
+    let keep: Vec<bool> = runs
+        .iter()
+        .map(|r| job_attempt(r).is_none_or(|(job, attempt)| latest[&job] == attempt))
+        .collect();
+    runs.into_iter()
+        .zip(keep)
+        .filter_map(|(r, k)| k.then_some(r))
+        .collect()
 }
 
 /// `tests: <passed> passed, <failed> failed, <skipped> skipped` over `runs`, then the first 20 failed tests (the
@@ -446,7 +482,7 @@ async fn test_results(ctx: &Ctx, proj: &str, run: u32, rest: &str) -> Vec<String
         })
         .await;
     let runs = match runs {
-        Ok(l) if !l.value.is_empty() => newest_per_name(l.value),
+        Ok(l) if !l.value.is_empty() => latest_attempts(l.value),
         Err(e) if e.status != Some(404) => return unread(e),
         _ => return Vec::new(),
     };
@@ -1343,15 +1379,56 @@ mod tests {
         .unwrap()
     }
 
+    /// A run named `Unit` that job `job` of stage `Build` published at `attempt`, as Runs - List shapes the reference.
+    fn job_run(id: i32, job: &str, attempt: i32) -> TestRun {
+        serde_json::from_value(serde_json::json!({"id": id, "name": "Unit",
+            "pipelineReference": {"pipelineId": 77,
+                "stageReference": {"stageName": "Build", "attempt": attempt},
+                "phaseReference": {"phaseName": job, "attempt": attempt},
+                "jobReference": {"jobName": "__default", "attempt": attempt}}}))
+        .unwrap()
+    }
+
+    fn ids(runs: &[TestRun]) -> Vec<i32> {
+        runs.iter().filter_map(|r| r.id).collect()
+    }
+
+    /// `PublishTestResults` makes one run per result file, all with the same name.
     #[test]
-    fn newest_run_per_name() {
-        let kept = newest_per_name(vec![
-            test_run(5, "Unit", 1, 0, 1),
-            test_run(3, "Lint", 1, 1, 0),
-            test_run(9, "Unit", 1, 1, 0),
+    fn same_job_attempt_all_count() {
+        let kept = latest_attempts(vec![
+            job_run(7, "Test", 1),
+            job_run(5, "Test", 1),
+            job_run(6, "Test", 1),
         ]);
-        let ids: Vec<Option<i32>> = kept.iter().map(|r| r.id).collect();
-        assert_eq!(ids, [Some(3), Some(9)]);
+        assert_eq!(ids(&kept), [5, 6, 7]);
+    }
+
+    #[test]
+    fn retried_job_counts_latest_attempt() {
+        let kept = latest_attempts(vec![
+            job_run(5, "Test", 1),
+            job_run(6, "Test", 1),
+            job_run(8, "Test", 2),
+            job_run(9, "Test", 2),
+        ]);
+        assert_eq!(ids(&kept), [8, 9]);
+    }
+
+    #[test]
+    fn jobs_sharing_a_name_both_count() {
+        let kept = latest_attempts(vec![job_run(5, "Test", 1), job_run(6, "Lint", 1)]);
+        assert_eq!(ids(&kept), [5, 6]);
+    }
+
+    #[test]
+    fn runs_without_reference_all_count() {
+        let kept = latest_attempts(vec![
+            test_run(9, "Unit", 1, 1, 0),
+            test_run(5, "Unit", 1, 0, 1),
+            job_run(3, "Test", 2),
+        ]);
+        assert_eq!(ids(&kept), [3, 5, 9]);
     }
 
     #[test]

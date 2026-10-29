@@ -128,8 +128,15 @@ Pick a run whose tests failed. Call `pipeline_view run=<run>`. After the stages,
 `tests: <n> passed, <n> failed, <n> skipped`, then up to 20 failed tests, each with its error's first line and up to 5
 stack trace lines. Compare the counts with the run's Tests tab in the web UI.
 
+Then pick a run of a pipeline that publishes several result files, or has several test jobs, with failures in more
+than one of them, and call `pipeline_view run=<run>` again. Every test run's failures must show, and the counts must
+match the Tests tab. If you find a run where a test job was rerun (Rerun failed jobs), check that only the rerun's
+results count.
+
 Paste back: the `tests:` line, whether the counts match the web UI (and, if not, the web UI's), how many failed tests
-were listed, and any `couldn't be read` line.
+were listed, and any `couldn't be read` line; for the second run, its `tests:` line, whether failures from each result
+file or job showed, and whether the counts match the web UI; for a rerun job, whether the first attempt's failures
+were left out.
 
 ### pr_files since
 

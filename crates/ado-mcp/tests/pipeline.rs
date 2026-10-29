@@ -213,9 +213,10 @@ fn test_area_404_adds_nothing() {
     assert_eq!(text, view_base());
 }
 
-/// Of the test runs with one name, only the newest counts: no results of the first attempt are read.
+/// A retried job counts at its latest attempt only: no results of the first attempt are read. A same-named run of
+/// another job counts.
 #[test]
-fn retried_run_counts_newest() {
+fn retried_job_counts_latest_attempt() {
     let fx = Fixture::start();
     run_routes(&fx);
     test_routes(&fx);
@@ -234,6 +235,16 @@ fn retried_run_counts_newest() {
         "{text}"
     );
     assert_eq!(sent(&fx, &results(41)).len(), 0);
+    // Run 41 from another job of the same name (one per result file, or the default title): it counts too.
+    runs["value"][0]["pipelineReference"]["phaseReference"]["phaseName"] = json!("Test Linux");
+    fx.route(TEST_RUNS, vec![Resp::json(&runs)]);
+    fx.route(&results(41), vec![fixture("test-results.json")]);
+    let text = ok(&mut mcp, "pipeline_view", json!({"run": 77}));
+    assert!(
+        text.contains("\ntests: 20 passed, 3 failed, 2 skipped\n  ParsesEmptyInput: "),
+        "{text}"
+    );
+    assert_eq!(sent(&fx, &results(41)).len(), 1);
 }
 
 #[test]

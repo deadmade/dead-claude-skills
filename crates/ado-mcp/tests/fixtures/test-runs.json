@@ -4,6 +4,12 @@
       "id": 41,
       "name": "Unit",
       "url": "https://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/test/Runs/41",
+      "pipelineReference": {
+        "pipelineId": 77,
+        "stageReference": { "stageName": "Build", "attempt": 1 },
+        "phaseReference": { "phaseName": "Test", "attempt": 1 },
+        "jobReference": { "jobName": "__default", "attempt": 1 }
+      },
       "build": {
         "id": "77",
         "name": "20260305.1",
@@ -47,6 +53,12 @@
       "id": 42,
       "name": "Unit",
       "url": "https://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/test/Runs/42",
+      "pipelineReference": {
+        "pipelineId": 77,
+        "stageReference": { "stageName": "Build", "attempt": 2 },
+        "phaseReference": { "phaseName": "Test", "attempt": 2 },
+        "jobReference": { "jobName": "__default", "attempt": 2 }
+      },
       "build": {
         "id": "77",
         "name": "20260305.1",
@@ -90,6 +102,12 @@
       "id": 43,
       "name": "Integration",
       "url": "https://dev.example/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/test/Runs/43",
+      "pipelineReference": {
+        "pipelineId": 77,
+        "stageReference": { "stageName": "Build", "attempt": 1 },
+        "phaseReference": { "phaseName": "Integration", "attempt": 1 },
+        "jobReference": { "jobName": "__default", "attempt": 1 }
+      },
       "build": {
         "id": "77",
         "name": "20260305.1",
