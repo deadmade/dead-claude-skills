@@ -31,6 +31,12 @@ use crate::views::{BUILTIN, Views};
 static BINDINGS: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/../bindings");
 
 fn main() -> ExitCode {
+    #[cfg(target_os = "linux")]
+    if should_disable_dmabuf(std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").as_deref()) {
+        // SAFETY: this runs first in `main`, before Tauri or any other thread exists, so nothing reads the
+        // environment while it changes.
+        unsafe { std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1") };
+    }
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args
         .iter()
@@ -47,6 +53,13 @@ fn main() -> ExitCode {
         },
         _ => fail("usage: flow-cockpit [--version | --print-types | --print-view <id>]\n"),
     }
+}
+
+/// `WebKitGTK`'s DMA-BUF renderer kills the window on NVIDIA under Wayland, so it is turned off unless the user set
+/// `WEBKIT_DISABLE_DMABUF_RENDERER` themselves (`0` brings it back).
+#[cfg(target_os = "linux")]
+fn should_disable_dmabuf(current: Option<&std::ffi::OsStr>) -> bool {
+    current.is_none()
 }
 
 /// Opens the window: builds the index from the transcripts' heads, starts the poll and serves the commands.
@@ -179,6 +192,15 @@ fn attach_console() {}
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn dmabuf_is_turned_off_only_when_the_variable_is_unset() {
+        assert!(should_disable_dmabuf(None));
+        for value in ["1", "0", ""] {
+            assert!(!should_disable_dmabuf(Some(value.as_ref())), "{value:?}");
+        }
+    }
 
     #[test]
     fn print_types_holds_every_binding_without_imports() {

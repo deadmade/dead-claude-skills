@@ -26,4 +26,6 @@ Linux only for now; Windows comes with the next slice.
 - Views live in `~/.config/flow-cockpit/views/` (`$XDG_CONFIG_HOME`). A file `<id>.ts` with the id of a built-in
   (`list`, `run`, `docs`, `activity`) replaces it, and deleting it restores the built-in; any other id adds a view.
 - `~/.config/flow-cockpit/config.toml`, edited by hand, can hide projects (`hidden = ["<id or name>"]`).
+- On Linux the app turns WebKitGTK's DMA-BUF renderer off, because it crashes the window on NVIDIA under Wayland;
+  `WEBKIT_DISABLE_DMABUF_RENDERER=0` turns it back on.
 - A view that breaks shows its error in its own place; the rest of the window keeps working.
