@@ -33,6 +33,40 @@
       }
     ]
   },
+  "s-delta": {
+    "agents": [],
+    "live": {
+      "waiting": null
+    },
+    "turns": [
+      {
+        "prompt": {
+          "agent": null,
+          "at": "2026-01-19T08:30:00.000Z",
+          "text": "Look around delta."
+        },
+        "replies": [],
+        "tools": []
+      }
+    ]
+  },
+  "s-gamma": {
+    "agents": [],
+    "live": {
+      "waiting": null
+    },
+    "turns": [
+      {
+        "prompt": {
+          "agent": null,
+          "at": "2026-01-19T08:00:00.000Z",
+          "text": "Look around gamma."
+        },
+        "replies": [],
+        "tools": []
+      }
+    ]
+  },
   "s-link": {
     "agents": [],
     "live": {

@@ -13,5 +13,10 @@
     "Flow": "---\nflow: research\nphase: done\n---\n\n# Spiky: flow\n",
     "Plan": null,
     "Spec": null
+  },
+  "github-com-acme-gamma/dfeat": {
+    "Flow": "---\nflow: fix\nphase: build\nnow: Fixing the delta feature in a worktree that sits inside gamma.\n---\n\n# Dfeat: flow\n",
+    "Plan": null,
+    "Spec": null
   }
 }

@@ -69,15 +69,35 @@ fn checkout_of(cwd: &Path) -> PathBuf {
     cwd.to_path_buf()
 }
 
-/// A worktree's `.git` file holds `gitdir: <main>/.git/worktrees/<name>`.
+/// A worktree's `.git` file holds `gitdir: <main>/.git/worktrees/<name>`, relative to the worktree's folder when git
+/// writes relative paths (`worktree.useRelativePaths`).
 fn main_of_worktree(git_file: &Path) -> Option<PathBuf> {
     let text = fs::read_to_string(git_file).ok()?;
-    let target = Path::new(text.trim().strip_prefix("gitdir:")?.trim());
+    let target = lexical(
+        &git_file
+            .parent()?
+            .join(text.trim().strip_prefix("gitdir:")?.trim()),
+    );
     target
         .ancestors()
         .find(|a| a.file_name().is_some_and(|n| n == ".git"))?
         .parent()
         .map(Path::to_path_buf)
+}
+
+/// `a/b/../c` as `a/c`, without reading the disk: the path may name a folder that is gone.
+fn lexical(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for part in path.components() {
+        match part {
+            Component::ParentDir => {
+                out.pop();
+            }
+            Component::CurDir => {}
+            other => out.push(other),
+        }
+    }
+    out
 }
 
 fn identity_of(checkout: &Path) -> Identity {
@@ -142,9 +162,11 @@ fn slug(s: &str) -> String {
 /// The checkouts and every worktree of them that exists: `.claude/worktrees/*`, `.worktrees/*` and the folders git
 /// recorded in `.git/worktrees/*/gitdir`. Sorted, each once.
 ///
-/// A record counts only while the worktree's own `.git` file is there. A folder left behind by a moved or deleted
-/// worktree has none, so git's stale record doesn't claim it: it stays with the checkout it sits in, so no folder is
-/// a root of two projects.
+/// A record counts only while the worktree's own `.git` file is there (git's own test for a stale record); a relative
+/// record is read from git's admin folder for that worktree. Each folder then stays only where `checkout_of` puts it,
+/// the rule sessions follow, so no folder is a root of two projects: a folder left behind by a moved worktree stays
+/// with the checkout it sits in, and a worktree of another repository inside `.claude/worktrees/` stays with the
+/// checkout whose convention holds it.
 pub(crate) fn roots_of(checkouts: &BTreeSet<PathBuf>) -> Vec<PathBuf> {
     let mut roots = checkouts.clone();
     for checkout in checkouts {
@@ -155,7 +177,7 @@ pub(crate) fn roots_of(checkouts: &BTreeSet<PathBuf>) -> Vec<PathBuf> {
             let Ok(text) = fs::read_to_string(admin.join("gitdir")) else {
                 continue;
             };
-            let git_file = Path::new(text.trim());
+            let git_file = lexical(&admin.join(text.trim()));
             if let Some(worktree) = git_file.parent()
                 && git_file.is_file()
             {
@@ -163,6 +185,7 @@ pub(crate) fn roots_of(checkouts: &BTreeSet<PathBuf>) -> Vec<PathBuf> {
             }
         }
     }
+    roots.retain(|root| checkouts.contains(root) || checkouts.contains(&checkout_of(root)));
     roots.into_iter().collect()
 }
 
@@ -214,5 +237,56 @@ mod tests {
             Path::new("/gone/app")
         );
         assert_eq!(checkout_of(Path::new("/gone/app")), Path::new("/gone/app"));
+    }
+
+    /// git 2.48+ can write a worktree's records as paths relative to the file that holds them.
+    #[test]
+    fn relative_worktree_records_resolve_from_their_own_folder() {
+        let tmp =
+            std::env::temp_dir().join(format!("flow-cockpit-relative-{}", std::process::id()));
+        fs::remove_dir_all(&tmp).ok();
+        let main = tmp.join("main");
+        fs::create_dir_all(&main).unwrap();
+        let git = |dir: &Path, args: &[&str]| {
+            std::process::Command::new("git")
+                .args([
+                    "-c",
+                    "user.name=t",
+                    "-c",
+                    "user.email=t@example.com",
+                    "-c",
+                    "init.defaultBranch=main",
+                ])
+                .args(args)
+                .current_dir(dir)
+                .output()
+        };
+        let made = git(&main, &["init", "-q"])
+            .and_then(|_| git(&main, &["commit", "-q", "--allow-empty", "-m", "start"]))
+            .and_then(|_| {
+                git(
+                    &main,
+                    &["worktree", "add", "-q", "--relative-paths", "../wt"],
+                )
+            });
+        match made {
+            Ok(out) if out.status.success() => {}
+            other => {
+                // Without git 2.48+ there is nothing real to read; the case is then untested here.
+                eprintln!("skipped: git can't make a relative worktree: {other:?}");
+                fs::remove_dir_all(&tmp).ok();
+                return;
+            }
+        }
+        let record = fs::read_to_string(main.join(".git/worktrees/wt/gitdir")).unwrap();
+        assert!(Path::new(record.trim()).is_relative(), "git wrote {record}");
+
+        let wt = tmp.join("wt");
+        assert_eq!(
+            roots_of(&BTreeSet::from([main.clone()])),
+            [main.clone(), wt.clone()]
+        );
+        assert_eq!(checkout_of(&wt), main);
+        fs::remove_dir_all(&tmp).ok();
     }
 }

@@ -20,6 +20,16 @@
     "roots": ["/home/you/work/beta"]
   },
   {
+    "id": "github-com-acme-delta",
+    "name": "delta",
+    "roots": ["/home/you/work/delta"]
+  },
+  {
+    "id": "github-com-acme-gamma",
+    "name": "gamma",
+    "roots": ["/home/you/work/gamma", "/home/you/work/gamma/.claude/worktrees/d"]
+  },
+  {
     "id": "folder-solo",
     "name": "solo",
     "roots": ["/home/you/a/solo", "/home/you/b/solo"]

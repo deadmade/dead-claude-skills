@@ -125,6 +125,25 @@ impl World {
         )
         .unwrap();
 
+        // A live worktree of delta that sits inside gamma's `.claude/worktrees/`.
+        git_dir(
+            &root.join("work/gamma"),
+            "[remote \"origin\"]\n\turl = git@github.com:acme/gamma.git\n",
+        );
+        git_dir(
+            &root.join("work/delta"),
+            "[remote \"origin\"]\n\turl = git@github.com:acme/delta.git\n",
+        );
+        let d_admin = root.join("work/delta/.git/worktrees/d");
+        let d = root.join("work/gamma/.claude/worktrees/d");
+        fs::create_dir_all(&d_admin).unwrap();
+        fs::write(
+            d_admin.join("gitdir"),
+            format!("{}\n", d.join(".git").display()),
+        )
+        .unwrap();
+        fs::write(d.join(".git"), format!("gitdir: {}\n", d_admin.display())).unwrap();
+
         let world = World {
             home: Home {
                 claude_projects: root.join("claude/projects"),
@@ -259,6 +278,20 @@ fn every_root_is_in_one_project() {
     let beta: Vec<_> = projects.iter().filter(|p| p.name == "beta").collect();
     assert_eq!(beta.len(), 2);
     let remote = beta.iter().find(|p| !p.id.starts_with("folder-")).unwrap();
+    // A live worktree of delta inside gamma's `.claude/worktrees/` goes where its sessions go: to gamma, by the
+    // convention, and not to delta as well through delta's record.
+    let named = |name: &str| projects.iter().find(|p| p.name == name).unwrap();
+    assert_eq!(
+        named("gamma").roots,
+        [
+            w.path("work/gamma"),
+            w.path("work/gamma/.claude/worktrees/d")
+        ]
+    );
+    assert_eq!(named("delta").roots, [w.path("work/delta")]);
+    // Its documents load once, with the root: not under delta as well.
+    let index = w.index();
+    assert_eq!(runs(&index, &project(&index, "delta")), []);
     let folder = beta.iter().find(|p| p.id.starts_with("folder-")).unwrap();
     assert_eq!(remote.roots, [w.path("work/beta")]);
     assert_eq!(

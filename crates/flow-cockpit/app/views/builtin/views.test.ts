@@ -454,12 +454,26 @@ test('list_clears_filters_the_new_project_has_no_row_for', async () => {
 test('list_tells_apart_projects_with_one_name', async () => {
   // beta's old checkout folder (no git left) and the moved repository are two projects of one name.
   const { box } = await draw('list', { to: 'list', project: ALPHA });
-  const marks = rowsOf(box, 'Projects').map((r) => [text(r.querySelector('.ttl')), text(r.querySelector('.mark'))]);
-  assert.deepEqual(marks, [
+  const marks = (b: Element) =>
+    rowsOf(b, 'Projects').map((r) => [text(r.querySelector('.ttl')), text(r.querySelector('.mark'))]);
+  assert.deepEqual(marks(box), [
     ['alpha', ''],
-    ['beta', 'in old'],
-    ['beta', 'in work'],
+    ['beta', 'in old/beta'],
+    ['beta', 'in work/beta'],
+    ['delta', ''],
+    ['gamma', ''],
     ['solo', ''],
+  ]);
+
+  // A fork and its upstream cloned side by side: one parent folder, so the mark names the folder too.
+  const projects = [
+    { id: 'github-com-me-app', name: 'app', roots: ['/home/you/src/app'] },
+    { id: 'github-com-upstream-app', name: 'app', roots: ['/home/you/src/app-upstream'] },
+  ];
+  const side = await draw('list', { to: 'list', project: 'github-com-me-app' }, { projects });
+  assert.deepEqual(marks(side.box), [
+    ['app', 'in src/app'],
+    ['app', 'in src/app-upstream'],
   ]);
 });
 
@@ -487,6 +501,14 @@ test('run_wires_accessibility_like_the_design', async () => {
   press(login.box, 'Decisions');
   assert.equal(login.box.querySelector('article.item')?.getAttribute('aria-labelledby'), 'item-h');
   resolves(login.box);
+
+  // Another view's tab: the slot it draws in is the panel the tabs control.
+  const docsTab = await draw('run', { to: 'run', project: ALPHA, slug: 'login', tab: 'docs' });
+  const slot = docsTab.box.querySelector('[data-slot="run-tab"]');
+  assert.equal(slot?.id, 'run-panel');
+  assert.equal(slot?.getAttribute('role'), 'tabpanel');
+  assert.equal(slot?.getAttribute('aria-labelledby'), 'run-tab-docs');
+  resolves(docsTab.box);
 
   const gone = await draw('run', { to: 'run', project: ALPHA, slug: 'nope' });
   assert.equal(gone.box.querySelector('.error')?.getAttribute('role'), 'alert');

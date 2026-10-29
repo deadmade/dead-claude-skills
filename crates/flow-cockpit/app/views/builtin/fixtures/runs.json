@@ -344,5 +344,34 @@
       "slug": "spiky",
       "status": "Done"
     }
+  },
+  "github-com-acme-gamma/dfeat": {
+    "flow": {
+      "decisions": [],
+      "deviations": [],
+      "flow": "fix",
+      "gates": [],
+      "now": "Fixing the delta feature in a worktree that sits inside gamma.",
+      "phase": "build",
+      "phases": [],
+      "rulings": [],
+      "sections": [],
+      "title": "Dfeat: flow"
+    },
+    "ledger": null,
+    "plan": null,
+    "sessions": [],
+    "summary": {
+      "conductor": "fix",
+      "copies": 1,
+      "gates": [],
+      "last_activity": "2026-10-29T08:00:46.866794243Z",
+      "now": "Fixing the delta feature in a worktree that sits inside gamma.",
+      "open_deviations": 0,
+      "phase": "build",
+      "progress": null,
+      "slug": "dfeat",
+      "status": "Idle"
+    }
   }
 }

@@ -543,6 +543,9 @@ function frame(
     const slot = el('div');
     slot.dataset.slot = 'run-tab';
     slot.id = PANEL;
+    slot.setAttribute('role', 'tabpanel');
+    // A tab that isn't loaded has no button to name the panel.
+    if (all.some(([id]) => id === tab)) slot.setAttribute('aria-labelledby', `run-tab-${tab}`);
     win.append(slot);
     return win;
   }

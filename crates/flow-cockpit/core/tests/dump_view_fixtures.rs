@@ -95,6 +95,24 @@ fn world(root: &Path) -> (Home, Config) {
         ),
     )
     .unwrap();
+    // A live worktree of delta that sits inside gamma's `.claude/worktrees/`.
+    git_dir(
+        &root.join("work/gamma"),
+        "[remote \"origin\"]\n\turl = git@github.com:acme/gamma.git\n",
+    );
+    git_dir(
+        &root.join("work/delta"),
+        "[remote \"origin\"]\n\turl = git@github.com:acme/delta.git\n",
+    );
+    let d_admin = root.join("work/delta/.git/worktrees/d");
+    let d = root.join("work/gamma/.claude/worktrees/d");
+    fs::create_dir_all(&d_admin).unwrap();
+    fs::write(
+        d_admin.join("gitdir"),
+        format!("{}\n", d.join(".git").display()),
+    )
+    .unwrap();
+    fs::write(d.join(".git"), format!("gitdir: {}\n", d_admin.display())).unwrap();
     let home = Home {
         claude_projects: root.join("claude/projects"),
         capture_dir: root.join("capture"),

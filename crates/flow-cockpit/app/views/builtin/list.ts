@@ -168,8 +168,9 @@ function looseRow(ctx: ViewContext, project: string, s: SessionSummary): HTMLLIE
 }
 
 /**
- * Projects that share a name, told apart by where their first folder sits: `in projects` for `~/projects/<name>`.
- * The roots come sorted, so a checkout comes before its own worktrees. Deeper folders are added until the places differ.
+ * Projects that share a name, told apart by the end of their first folder's path, its own name included: `in
+ * src/app` and `in src/app-upstream` for a fork beside its upstream. The roots come sorted, so a checkout comes before
+ * its own worktrees. Folders are added from the end until the places differ.
  */
 function placesOf(projects: Project[]): Map<string, string> {
   const places = new Map<string, string>();
@@ -177,17 +178,12 @@ function placesOf(projects: Project[]): Map<string, string> {
   for (const p of projects) byName.set(p.name, [...(byName.get(p.name) ?? []), p]);
   for (const same of byName.values()) {
     if (same.length < 2) continue;
-    const parents = same.map((p) =>
-      (p.roots[0] ?? '')
-        .split(/[\\/]+/)
-        .filter(Boolean)
-        .slice(0, -1),
-    );
-    let depth = 1;
+    const paths = same.map((p) => (p.roots[0] ?? '').split(/[\\/]+/).filter(Boolean));
+    let depth = 2;
     const tail = (parts: string[]) => parts.slice(-depth).join('/');
-    const deepest = Math.max(...parents.map((x) => x.length));
-    while (depth < deepest && new Set(parents.map(tail)).size < same.length) depth++;
-    same.forEach((p, i) => places.set(p.id, parents[i].length ? `in ${tail(parents[i])}` : ''));
+    const deepest = Math.max(...paths.map((x) => x.length));
+    while (depth < deepest && new Set(paths.map(tail)).size < same.length) depth++;
+    same.forEach((p, i) => places.set(p.id, paths[i].length ? `in ${tail(paths[i])}` : ''));
   }
   return places;
 }

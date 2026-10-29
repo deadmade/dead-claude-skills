@@ -146,5 +146,36 @@
       "last_activity": "2026-01-20T11:00:00Z",
       "started": "2026-01-19T09:30:00.000Z"
     }
+  ],
+  "github-com-acme-delta": [
+    {
+      "first_prompt": "Look around delta.",
+      "id": "s-delta",
+      "kind": "Loose",
+      "last_activity": "2026-01-20T11:00:00Z",
+      "started": "2026-01-19T08:30:00.000Z"
+    }
+  ],
+  "github-com-acme-gamma": [
+    {
+      "conductor": "fix",
+      "copies": 1,
+      "gates": [],
+      "kind": "FlowRun",
+      "last_activity": "2026-10-29T08:00:46.866794243Z",
+      "now": "Fixing the delta feature in a worktree that sits inside gamma.",
+      "open_deviations": 0,
+      "phase": "build",
+      "progress": null,
+      "slug": "dfeat",
+      "status": "Idle"
+    },
+    {
+      "first_prompt": "Look around gamma.",
+      "id": "s-gamma",
+      "kind": "Loose",
+      "last_activity": "2026-01-20T11:00:00Z",
+      "started": "2026-01-19T08:00:00.000Z"
+    }
   ]
 }
