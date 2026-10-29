@@ -6,6 +6,6 @@ import type { ViewSource } from "./ViewSource";
  */
 export type ViewInfo = { id: string, source: ViewSource, 
 /**
- * A file in a views folder stands in for the built-in of the same id.
+ * One of the user's views stands in for a default view of the same id.
  */
 replaced: boolean, };

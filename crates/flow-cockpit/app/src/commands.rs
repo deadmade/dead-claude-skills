@@ -1,4 +1,4 @@
-//! The window's read-only commands. Each reads the shared index or the views folders and changes nothing; the
+//! The window's read-only commands. Each reads the shared index or the extensions folders and changes nothing; the
 //! poll thread is the only writer of the index.
 //!
 //! The commands run off the main thread (`async`), so reading a large transcript for `session` never stalls the
@@ -14,7 +14,7 @@ use flow_cockpit_core::activity::Activity;
 use flow_cockpit_core::index::{DocName, Entry, FlowRun, Index, Project};
 use tauri::State;
 
-use crate::views::{ViewInfo, Views};
+use crate::views::{Extensions, ViewInfo, Views};
 
 /// What the commands and the poll share.
 pub struct Shared {
@@ -95,9 +95,15 @@ pub fn views(data: Data<'_>) -> Vec<ViewInfo> {
     data.views.list()
 }
 
-/// The view's code, types stripped; the error names the line. `builtin: true` reads the built-in even when a views
-/// folder replaces it: the runtime draws it below a broken replacement.
+/// The view's code, types stripped; the error names the line. `builtin: true` reads the default extensions' view
+/// even when one of the user's replaces it: the runtime draws it below a broken replacement.
 #[tauri::command(async)]
 pub fn view_source(data: Data<'_>, id: &str, builtin: Option<bool>) -> Result<String, String> {
     data.views.source(id, builtin.unwrap_or(false))
+}
+
+/// The loaded extensions' styles, the ones switched off, and where the defaults were looked for when missing.
+#[tauri::command(async)]
+pub fn extensions(data: Data<'_>) -> Extensions {
+    data.views.extensions()
 }

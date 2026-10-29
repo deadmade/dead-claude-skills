@@ -48,13 +48,15 @@ const says = (text) => `const p = document.createElement('p'); p.textContent = $
 /**
  * A stand-in for the app: `views` maps an id to `{ source, builtin, from }`, where `source` is what `view_source`
  * answers (a string, or `{ error }`), `builtin` what it answers with `builtin: true`, and `from` the ViewSource.
+ * `extensions` is what the `extensions` command answers.
  */
-function fakeApp(views) {
+function fakeApp(views, extensions = { styles: [], disabled: [], looked: [] }) {
   const listeners = new Map();
   const calls = [];
   const answer = (value) => (value && typeof value === 'object' ? Promise.reject(value.error) : Promise.resolve(value));
   const app = {
     views,
+    extensions,
     calls,
     invoke(cmd, args = {}) {
       calls.push([cmd, args]);
@@ -67,6 +69,7 @@ function fakeApp(views) {
           })),
         );
       }
+      if (cmd === 'extensions') return Promise.resolve(app.extensions);
       if (cmd === 'view_source') {
         const v = app.views[args.id];
         if (!v) return Promise.reject(`no view ${args.id}`);
@@ -521,6 +524,52 @@ test('a_route_without_views_says_so', async () => {
   const app = fakeApp({});
   const { root } = await started(app, { to: 'list' });
   assert.match(root.querySelector('.empty')?.textContent ?? '', /No view draws this screen/);
+});
+
+const extensionStyles = () => [...document.head.querySelectorAll('style')];
+
+test('extension_style_is_added_once_and_removed_when_switched_off', async () => {
+  const app = fakeApp(
+    { list: { source: view('list', 'list', says('list')) } },
+    { styles: [{ extension: 'list', css: 'section[data-view="list"] { color: red; }' }], disabled: [], looked: [] },
+  );
+  const { runtime } = await started(app, { to: 'list' });
+  assert.deepEqual(
+    extensionStyles().map((s) => [s.dataset.extension, s.textContent]),
+    [['list', 'section[data-view="list"] { color: red; }']],
+  );
+  // A reload swaps it, never adds a second.
+  app.extensions = { ...app.extensions, styles: [{ extension: 'list', css: 'p { color: blue; }' }] };
+  await app.emit('views-changed', {});
+  await runtime.idle();
+  assert.deepEqual(
+    extensionStyles().map((s) => s.textContent),
+    ['p { color: blue; }'],
+  );
+  // Switched off in config.toml: its style goes with its views.
+  app.extensions = { styles: [], disabled: ['list'], looked: [] };
+  delete app.views.list;
+  await app.emit('views-changed', {});
+  await runtime.idle();
+  assert.deepEqual(extensionStyles(), []);
+});
+
+test('a_switched_off_list_or_run_says_so', async () => {
+  const app = fakeApp({}, { styles: [], disabled: ['list', 'run'], looked: [] });
+  const { root, runtime } = await started(app, { to: 'list' });
+  assert.equal(root.querySelector('.empty')?.textContent, 'The list extension is switched off in config.toml.');
+  runtime.navigate(RUN);
+  await runtime.idle();
+  assert.equal(root.querySelector('.empty')?.textContent, 'The run extension is switched off in config.toml.');
+});
+
+test('missing_default_extensions_name_where_the_window_looked', async () => {
+  const app = fakeApp({}, { styles: [], disabled: [], looked: ['/opt/a', '/opt/b'] });
+  const { root } = await started(app, { to: 'list' });
+  assert.match(
+    root.querySelector('.empty')?.textContent ?? '',
+    /The default extensions weren't found\. Looked in \/opt\/a, \/opt\/b\./,
+  );
 });
 
 test('card_string_body_is_text', () => {

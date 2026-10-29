@@ -15,12 +15,14 @@ pub struct Home {
     pub capture_dir: PathBuf,
 }
 
-/// `config.toml`: the repositories whose own views load, and the projects to leave out (by id or name).
+/// `config.toml`: the repositories whose own views load, the projects to leave out (by id or name), and the
+/// extensions switched off (by folder name).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 #[serde(default)]
 pub struct Config {
     pub trusted: Vec<PathBuf>,
     pub hidden: Vec<String>,
+    pub disabled: Vec<String>,
 }
 
 impl Config {
@@ -60,6 +62,13 @@ mod tests {
         let c = Config::parse("trusted = ['/a/b']\nhidden = ['x']\n").unwrap();
         assert_eq!(c.trusted, [PathBuf::from("/a/b")]);
         assert!(c.hides("id", "X"));
+    }
+
+    #[test]
+    fn reads_disabled_extensions() {
+        let c = Config::parse("disabled = ['activity', 'mine']\n").unwrap();
+        assert_eq!(c.disabled, ["activity", "mine"]);
+        assert_eq!(Config::parse("").unwrap().disabled, Vec::<String>::new());
     }
 
     #[test]

@@ -2,17 +2,20 @@
 // tasks in the rail, the selected task as the one focal point. Decisions: deviations, decisions and the build's own
 // calls as master and detail. The run's other tabs (Docs, Activity) are views of their own, drawn by the runtime into
 // this view's `data-slot="run-tab"` element across the window's lower row.
-import type { View, ViewContext } from '../../shell/api';
-import type { Decision } from '../../../bindings/Decision';
-import type { Deviation } from '../../../bindings/Deviation';
-import type { FlowDoc } from '../../../bindings/FlowDoc';
-import type { FlowRun } from '../../../bindings/FlowRun';
-import type { Gate } from '../../../bindings/Gate';
-import type { LedgerTask } from '../../../bindings/LedgerTask';
-import type { PlanTask } from '../../../bindings/PlanTask';
-import type { Ruling } from '../../../bindings/Ruling';
-import type { Status } from '../../../bindings/Status';
-import type { TaskState } from '../../../bindings/TaskState';
+import type {
+  View,
+  ViewContext,
+  Decision,
+  Deviation,
+  FlowDoc,
+  FlowRun,
+  Gate,
+  LedgerTask,
+  PlanTask,
+  Ruling,
+  Status,
+  TaskState,
+} from 'flow-cockpit';
 
 type Pair = { p: PlanTask; t: LedgerTask | undefined };
 type Item =

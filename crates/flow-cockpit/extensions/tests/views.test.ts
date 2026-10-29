@@ -1,7 +1,7 @@
-// The built-in views in jsdom, against the data the core gives for the fixture home (fixtures/*.json, written by
+// The default extensions' views in jsdom, against the data the core gives for the fixture home (fixtures/*.json, written by
 // `cargo test -p flow-cockpit-core --test dump_view_fixtures -- --ignored`). Runs in flow-cockpit.yml after `npm ci`,
 // not in `npm test`:
-//   node --test crates/flow-cockpit/app/views/builtin/views.test.ts
+//   node --test crates/flow-cockpit/extensions/tests/views.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -13,11 +13,11 @@ g.window = dom.window;
 g.document = dom.window.document;
 // No Mermaid in jsdom: a diagram stays as its source with the reason, as in the window when Mermaid can't load.
 
-const { markdown } = await import('../../shell/blocks/markdown.js');
-const { mermaid } = await import('../../shell/blocks/mermaid.js');
-const { diff } = await import('../../shell/blocks/diff.js');
-const { stepper } = await import('../../shell/blocks/stepper.js');
-const { card } = await import('../../shell/blocks/card.js');
+const { markdown } = await import('../../app/shell/blocks/markdown.js');
+const { mermaid } = await import('../../app/shell/blocks/mermaid.js');
+const { diff } = await import('../../app/shell/blocks/diff.js');
+const { stepper } = await import('../../app/shell/blocks/stepper.js');
+const { card } = await import('../../app/shell/blocks/card.js');
 const blocks = Object.freeze({ markdown, mermaid, diff, stepper, card });
 
 const fixture = (name: string) => JSON.parse(readFileSync(new URL(`fixtures/${name}.json`, import.meta.url), 'utf8'));
@@ -37,7 +37,7 @@ const TABS = [
 
 let fresh = 0;
 /** Each test gets its own copy of the view module, so what one test picked doesn't carry into the next. */
-const load = async (name: string) => (await import(`./${name}.ts?t=${++fresh}`)).default;
+const load = async (name: string) => (await import(`../${name}/${name}.ts?t=${++fresh}`)).default;
 
 /** A ViewContext over the fixtures; `data` overrides parts of them, `api` replaces calls. */
 function context(route: any, data: Partial<typeof DATA> = {}, api: Record<string, any> = {}) {
@@ -88,7 +88,7 @@ const clone = (x: any) => JSON.parse(JSON.stringify(x));
 
 test('views_import_types_only', () => {
   for (const name of ['list', 'run', 'docs', 'activity']) {
-    const source = readFileSync(new URL(`${name}.ts`, import.meta.url), 'utf8');
+    const source = readFileSync(new URL(`../${name}/${name}.ts`, import.meta.url), 'utf8');
     const values = source.split('\n').filter((l) => /^\s*import\b/.test(l) && !/^\s*import\s+type\b/.test(l));
     assert.deepEqual(values, [], `${name}.ts has a value import`);
     assert.doesNotMatch(source, /\binnerHTML\b|\bouterHTML\b|insertAdjacentHTML/, `${name}.ts writes HTML`);
@@ -537,7 +537,7 @@ test('activity_reads_only_the_selected_session', async () => {
 });
 
 test('activity_folds_stay_on_their_turn_across_a_redraw', async () => {
-  const { createRuntime } = await import('../../shell/runtime.js');
+  const { createRuntime } = await import('../../app/shell/runtime.js');
   const sessions = clone(DATA.sessions);
   const handlers = new Map<string, (event: any) => void>();
   const invoke = async (cmd: string, args: any = {}) => {
@@ -552,7 +552,7 @@ test('activity_folds_stay_on_their_turn_across_a_redraw', async () => {
     root,
     invoke,
     listen: async (name: string, handler: any) => handlers.set(name, handler),
-    importModule: () => import(`./activity.ts?t=${++fresh}`),
+    importModule: () => import(`../activity/activity.ts?t=${++fresh}`),
   });
   await runtime.start({ to: 'session', project: ALPHA, id: 's-link' });
   const fold = (prompt: string) =>
@@ -685,7 +685,7 @@ test('run_graph_nodes_select_their_task', async () => {
 });
 
 test('list_switch_and_filters_survive_a_redraw', async () => {
-  const { createRuntime } = await import('../../shell/runtime.js');
+  const { createRuntime } = await import('../../app/shell/runtime.js');
   const entries = clone(DATA.entries);
   const handlers = new Map<string, (event: any) => void>();
   const invoke = async (cmd: string, args: any = {}) => {
@@ -701,7 +701,7 @@ test('list_switch_and_filters_survive_a_redraw', async () => {
     root,
     invoke,
     listen: async (name: string, handler: any) => handlers.set(name, handler),
-    importModule: () => import(`./list.ts?t=${++fresh}`),
+    importModule: () => import(`../list/list.ts?t=${++fresh}`),
   });
   await runtime.start({ to: 'list', project: ALPHA });
   const redraw = async () => {
@@ -735,7 +735,7 @@ test('list_switch_and_filters_survive_a_redraw', async () => {
 
 /** The list in the real runtime over a copy of the fixtures, which a test changes before `redraw`. */
 async function listRuntime(project: string) {
-  const { createRuntime } = await import('../../shell/runtime.js');
+  const { createRuntime } = await import('../../app/shell/runtime.js');
   const entries = clone(DATA.entries);
   const handlers = new Map<string, (event: any) => void>();
   const invoke = async (cmd: string, args: any = {}) => {
@@ -751,7 +751,7 @@ async function listRuntime(project: string) {
     root,
     invoke,
     listen: async (name: string, handler: any) => handlers.set(name, handler),
-    importModule: () => import(`./list.ts?t=${++fresh}`),
+    importModule: () => import(`../list/list.ts?t=${++fresh}`),
   });
   await runtime.start({ to: 'list', project });
   const redraw = async () => {

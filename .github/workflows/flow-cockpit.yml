@@ -66,11 +66,12 @@ jobs:
       - name: Views tests and type checks
         run: |
           npm ci
-          node --test 'crates/flow-cockpit/app/shell/*.test.mjs' 'crates/flow-cockpit/app/views/builtin/*.test.ts'
+          node --test 'crates/flow-cockpit/app/shell/*.test.mjs' 'crates/flow-cockpit/extensions/tests/*.test.ts'
           npx tsc -p crates/flow-cockpit/app/shell
-          npx tsc -p crates/flow-cockpit/app/views
+          npx tsc -p crates/flow-cockpit/extensions
 
-  # The package Linux users run (nix run .#flow-cockpit); its build runs the app's tests.
+  # The package Linux users run (nix run .#flow-cockpit); its build runs the app's tests and checks the default extensions
+  # it installs.
   nix:
     runs-on: ubuntu-latest
     steps:
@@ -82,3 +83,4 @@ jobs:
         run: |
           nix build .#flow-cockpit -L
           ./result/bin/flow-cockpit --version
+          ./result/bin/flow-cockpit --print-paths

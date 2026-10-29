@@ -9,8 +9,9 @@
     "strict": true,
     "verbatimModuleSyntax": true,
     "erasableSyntaxOnly": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "paths": { "flow-cockpit": ["../app/shell/api.d.ts"] }
   },
-  "include": ["builtin/*.ts", "../shell/api.d.ts", "../../bindings/*.ts"],
-  "exclude": ["builtin/*.test.ts"]
+  "include": ["*/*.ts"],
+  "exclude": ["tests"]
 }

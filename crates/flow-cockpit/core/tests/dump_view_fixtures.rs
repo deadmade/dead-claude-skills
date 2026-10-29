@@ -1,5 +1,5 @@
-//! Writes the data the built-in views get, from an index over the fixture home (`fixtures/home/`, set up the way
-//! `tests/index.rs` does), to `app/views/builtin/fixtures/*.json` for the views' tests. Run with
+//! Writes the data the default extensions' views get, from an index over the fixture home (`fixtures/home/`, set up the way
+//! `tests/index.rs` does), to `extensions/tests/fixtures/*.json` for the views' tests. Run with
 //! `cargo test -p flow-cockpit-core --test dump_view_fixtures -- --ignored`.
 
 use std::collections::BTreeMap;
@@ -162,7 +162,7 @@ fn dump_view_fixtures() {
     index.scan_links(&mut LinkCache::default());
     let shown = root.to_string_lossy().replace('\\', "\\\\");
 
-    let out = Path::new(env!("CARGO_MANIFEST_DIR")).join("../app/views/builtin/fixtures");
+    let out = Path::new(env!("CARGO_MANIFEST_DIR")).join("../extensions/tests/fixtures");
     fs::create_dir_all(&out).unwrap();
 
     let projects = index.projects();

@@ -93,16 +93,22 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   `.md` file as its own `Markdown` (only a plugin-drawn `Markdown` with `onLinkPress` receives plain link clicks, and
   only in the fullscreen terminal) and shows the clicked file in a pane, refreshed by a 1 s stat while open.
 - The flow cockpit (`docs/features/flow-observability/`): a Tauri window over flow runs, audits and Claude sessions, in
-  `crates/flow-cockpit/`, plus the `plugins/opt-in/flow-cockpit/` plugin, which carries the `views` skill (Claude writes
-  views into the user's views folder). The plugin is hidden on Windows (`unavailable` in `core/options.ts`) until the app
-  ships there. The workspace: `core/` parses flow.md, plan.md, audit reports, build logs and transcripts into a typed
-  model and indexes projects, runs and sessions; `app/` is the window (read-only commands, a 2 s poll, view loading,
-  `--print-types`, `--print-view <id>`). `app/shell/` holds the view runtime, the building blocks and `tokens.css`
-  (JavaScript with JSDoc, checked by `tsc --checkJs` against `api.d.ts`); `app/views/builtin/` the four built-in views,
-  embedded by name (`BUILTIN` in `app/src/views.rs`: a new one is added there); `bindings/` the generated `.d.ts` of
-  every type the views see (one `#[ignore]`d `export_bindings` test per crate writes them; `bindings_are_current`
-  fails when they are stale). Linux gets the app from the flake's `flow-cockpit` package, since it links the system's
-  GTK and WebKit; it writes nothing, and reads its views and `config.toml` from `~/.config/flow-cockpit/`.
+  `crates/flow-cockpit/`, plus the `plugins/opt-in/flow-cockpit/` plugin, which carries only the `views` skill (Claude
+  writes extensions into the user's extensions folder) and the capture hooks. The plugin is hidden on Windows
+  (`unavailable` in `core/options.ts`) until the app ships there. The workspace: `core/` parses flow.md, plan.md, audit
+  reports, build logs and transcripts into a typed model and indexes projects, runs and sessions; `app/` is the window
+  (read-only commands, a 2 s poll that also rereads `config.toml`, extension loading, `--print-types`,
+  `--print-paths`). `app/shell/` holds the view runtime, the building blocks and `tokens.css` (JavaScript with JSDoc,
+  checked by `tsc --checkJs` against `api.d.ts`, which views import as the bare module `flow-cockpit`);
+  `extensions/<name>/` the four default extensions (a folder of view `.ts` files and an optional `style.css`, loaded
+  from disk, not compiled in), with their jsdom tests and fixtures in `extensions/tests/` and their `tsconfig.json`
+  beside them; `bindings/` the generated `.d.ts` of every type the views see (one `#[ignore]`d `export_bindings` test
+  per crate writes them; `bindings_are_current` fails when they are stale). Linux gets the app from the flake's
+  `flow-cockpit` package, since it links the system's GTK and WebKit; it installs every `extensions/` folder but
+  `tests/` at `share/flow-cockpit/extensions/` and checks that tree. The app finds the defaults at
+  `$FLOW_COCKPIT_EXTENSIONS` (a dev override: point it at `crates/flow-cockpit/extensions` to see edits live), else
+  `<exe dir>/../share/flow-cockpit/extensions`, else `<exe dir>/extensions`. It writes nothing, and reads the user's
+  extensions and `config.toml` (`disabled`, `hidden`, `trusted`) from `~/.config/flow-cockpit/`.
 - Notifications (`plugins/default/`, formerly the notify plugin): `hooks.json` entries (Stop, Notification, PreToolUse
   on AskUserQuestion) running one stdlib Node script, `hooks/notify.mjs`, async. Logic and tests in `hooks/lib.mjs`; Linux
   talks D-Bus via `busctl`, Windows runs an inline PowerShell WinRT toast, focus comes from tmux. The installer always
@@ -162,8 +168,8 @@ plugins of ours that the manifest no longer lists.
 - flow-cockpit: `cargo test` and `cargo clippy --workspace --all-targets -- -D warnings` in `crates/flow-cockpit` (the
   app needs the dev shell's GTK and WebKit); `nix build .#flow-cockpit` builds the package and runs the app's tests
   except the three timing ones its `checkFlags` skip. The views tests (jsdom, after `npm ci`):
-  `node --test 'crates/flow-cockpit/app/shell/*.test.mjs' 'crates/flow-cockpit/app/views/builtin/*.test.ts'`, then
-  `npx tsc -p crates/flow-cockpit/app/shell` and `npx tsc -p crates/flow-cockpit/app/views`. They run only there and in
+  `node --test 'crates/flow-cockpit/app/shell/*.test.mjs' 'crates/flow-cockpit/extensions/tests/*.test.ts'`, then
+  `npx tsc -p crates/flow-cockpit/app/shell` and `npx tsc -p crates/flow-cockpit/extensions`. They run only there and in
   `flow-cockpit.yml`, never in `npm test` or the pre-commit hook.
 - tui-review mod tests need a generated fixture first, from `crates/tui-review`:
   `cargo run --release -- gen --out <dir> && node ../../plugins/shared/tui-review/tests/make-fixture.mjs <dir>`, then `claude plugin test .` in

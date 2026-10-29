@@ -1,10 +1,11 @@
 //! The poll: every 2 s it stats the folders the cockpit reads and tells the window what changed. It stats, and reads
-//! nothing else itself: the Claude projects folder (each transcript and subagent transcript), the capture folder, each
-//! project's `docs/` and `.superpowers/sdd/` trees, and the global views folder. A folder that doesn't exist yet is
-//! checked again on every tick, so one made later is seen.
+//! nothing else itself but `config.toml` when that changed: the Claude projects folder (each transcript and subagent
+//! transcript), the capture folder, each project's `docs/` and `.superpowers/sdd/` trees, both extensions folders and
+//! `config.toml`. A folder that doesn't exist yet is checked again on every tick, so one made later is seen.
 //!
 //! The poll is the index's only writer. Each tick it rebuilds the projects whose files changed, rescans links when a
-//! transcript changed (the cache reads only what grew), and refreshes every status against the clock.
+//! transcript changed (the cache reads only what grew), and refreshes every status against the clock. A changed
+//! `config.toml` switches extensions on and off, and rebuilds the index when the projects it hides or trusts changed.
 
 use std::collections::{BTreeSet, HashMap};
 use std::ffi::{OsStr, OsString};
@@ -40,7 +41,10 @@ type Sig = (u64, Option<SystemTime>);
 
 pub struct Poller {
     home: Home,
+    config_path: PathBuf,
+    /// The settings last read; a `config.toml` that doesn't parse leaves them as they were.
     config: Config,
+    config_sig: Option<Sig>,
     cache: LinkCache,
     /// Whether the link scan has run. It waits for the window's first `entries` answer, so the first paint never
     /// waits for transcripts to be read.
@@ -62,16 +66,18 @@ pub struct Poller {
 
 impl Poller {
     /// Takes the current state of every watched folder as the baseline: the first tick reports only what changed
-    /// since.
+    /// since. `config` is what `config_path` held when the index was built.
     #[must_use]
-    pub fn new(home: Home, config: Config, shared: &Shared) -> Poller {
+    pub fn new(home: Home, config_path: PathBuf, config: Config, shared: &Shared) -> Poller {
         let transcripts = list_transcripts(&home.claude_projects);
         let (projects, entries) = snapshot(&shared.read());
         Poller {
             folders: folders_with_transcripts(&home.claude_projects, &transcripts),
             captures: list_files(&home.capture_dir),
             trees: trees_of(&projects),
-            views: fingerprint(shared.views.global()),
+            views: views_fingerprint(shared),
+            config_sig: sig(&config_path),
+            config_path,
             transcripts,
             projects,
             entries,
@@ -86,8 +92,9 @@ impl Poller {
     /// once.
     pub fn tick(&mut self, shared: &Shared, now: Timestamp) -> Vec<Event> {
         let mut events = Vec::new();
-        let views = fingerprint(shared.views.global());
-        if views != self.views {
+        let (switched, reconfigured) = self.reread_config(shared);
+        let views = views_fingerprint(shared);
+        if views != self.views || switched {
             self.views = views;
             events.push(Event::ViewsChanged);
         }
@@ -108,7 +115,7 @@ impl Poller {
         let new_folder = !pending.is_empty();
         let first_scan = !self.scanned && shared.painted();
         let mut touched = BTreeSet::new();
-        if new_folder || first_scan {
+        if new_folder || first_scan || reconfigured {
             // Built and scanned outside the lock: the first scan may read gigabytes, and the window keeps answering
             // from the old index meanwhile. A rebuilt index keeps the same cache.
             let mut fresh = Index::build(&self.home, &self.config, now);
@@ -144,7 +151,7 @@ impl Poller {
         self.captures = captures;
 
         let (projects, entries) = snapshot(&shared.read());
-        if new_folder || projects != self.projects {
+        if new_folder || reconfigured || projects != self.projects {
             events.push(Event::Changed(Changed { project: None }));
             self.trees = trees_of(&projects);
         } else {
@@ -160,6 +167,32 @@ impl Poller {
         self.projects = projects;
         self.entries = entries;
         events
+    }
+
+    /// Reads `config.toml` again when it changed, and hands the views its `disabled`. Returns whether `disabled`
+    /// changed, and whether `hidden` or `trusted` did (the index is then built again). A file that doesn't parse
+    /// changes nothing; a removed one is the defaults.
+    fn reread_config(&mut self, shared: &Shared) -> (bool, bool) {
+        let now = sig(&self.config_path);
+        if now == self.config_sig {
+            return (false, false);
+        }
+        self.config_sig = now;
+        let config = match Config::load(&self.config_path) {
+            Ok(config) => config,
+            Err(e) => {
+                eprintln!("flow-cockpit: {e}; keeping the settings it had");
+                return (false, false);
+            }
+        };
+        let switched = config.disabled != self.config.disabled;
+        if switched {
+            shared.views.set_disabled(config.disabled.clone());
+        }
+        let reconfigured =
+            config.hidden != self.config.hidden || config.trusted != self.config.trusted;
+        self.config = config;
+        (switched, reconfigured)
     }
 
     /// The projects whose transcripts, capture files or documents changed since the last tick.
@@ -311,6 +344,14 @@ fn entries(dir: &Path) -> impl Iterator<Item = (PathBuf, fs::FileType)> {
         .filter_map(|e| Some((e.path(), e.file_type().ok()?)))
 }
 
+/// Both extensions folders' fingerprints together.
+fn views_fingerprint(shared: &Shared) -> u64 {
+    shared
+        .views
+        .folders()
+        .fold(0_u64, |acc, dir| acc.wrapping_add(fingerprint(dir)))
+}
+
 fn trees_of(projects: &[Project]) -> HashMap<String, u64> {
     projects
         .iter()
@@ -372,12 +413,17 @@ mod tests {
     use flow_cockpit_core::index::{Entry, Index};
 
     use super::*;
-    use crate::views::{BUILTIN, Views};
+    use crate::paths::Defaults;
+    use crate::views::Views;
 
     struct World {
         root: PathBuf,
         home: Home,
-        views: PathBuf,
+        /// The default extensions folder.
+        defaults: PathBuf,
+        /// The user's extensions folder.
+        user: PathBuf,
+        config: PathBuf,
     }
 
     impl Drop for World {
@@ -401,7 +447,7 @@ mod tests {
     }
 
     impl World {
-        /// An empty home: no Claude projects folder, capture folder or views folder yet.
+        /// An empty home: no Claude projects folder, capture folder, extensions folders or config yet.
         fn empty(tag: &str) -> World {
             let root = std::env::temp_dir()
                 .join(format!("flow-cockpit-poll-{}-{tag}", std::process::id()));
@@ -412,7 +458,9 @@ mod tests {
                     claude_projects: root.join("claude/projects"),
                     capture_dir: root.join("capture"),
                 },
-                views: root.join("config/views"),
+                defaults: root.join("share/extensions"),
+                user: root.join("config/extensions"),
+                config: root.join("config/config.toml"),
                 root,
             }
         }
@@ -482,11 +530,20 @@ mod tests {
 
         fn shared(&self) -> Shared {
             let index = Index::build(&self.home, &Config::default(), Timestamp::now());
-            Shared::new(index, Views::new(&BUILTIN, self.views.clone()))
+            let defaults = Defaults {
+                found: Some(self.defaults.clone()),
+                looked: vec![self.defaults.clone()],
+            };
+            Shared::new(index, Views::new(defaults, self.user.clone(), Vec::new()))
         }
 
         fn poller(&self, shared: &Shared) -> Poller {
-            Poller::new(self.home.clone(), Config::default(), shared)
+            Poller::new(
+                self.home.clone(),
+                self.config.clone(),
+                Config::default(),
+                shared,
+            )
         }
     }
 
@@ -561,13 +618,20 @@ mod tests {
         let mut poller = w.poller(&shared);
         assert_eq!(poller.tick(&shared, Timestamp::now()), []);
 
-        // The views folder appears with a view in it.
-        fs::create_dir_all(&w.views).unwrap();
-        fs::write(w.views.join("mine.ts"), "export default {};\n").unwrap();
-        assert_eq!(
-            poller.tick(&shared, Timestamp::now()),
-            [Event::ViewsChanged]
-        );
+        // Each extensions folder appears with an extension in it, and then a file in it changes.
+        for folder in [&w.defaults, &w.user] {
+            fs::create_dir_all(folder.join("mine")).unwrap();
+            fs::write(folder.join("mine/mine.ts"), "export default {};\n").unwrap();
+            assert_eq!(
+                poller.tick(&shared, Timestamp::now()),
+                [Event::ViewsChanged]
+            );
+            fs::write(folder.join("mine/style.css"), "section {}\n").unwrap();
+            assert_eq!(
+                poller.tick(&shared, Timestamp::now()),
+                [Event::ViewsChanged]
+            );
+        }
 
         // Claude Code's projects folder appears with alpha's first session: a new folder means a full build.
         w.session("work/alpha", "s1", "Hi.");
@@ -728,6 +792,49 @@ mod tests {
             poller.tick(&shared, Timestamp::now()),
             [changed(Some(&alpha))]
         );
+    }
+
+    #[test]
+    fn config_change_rereads_disabled_and_hidden() {
+        let w = World::alpha("config");
+        fs::create_dir_all(w.defaults.join("activity")).unwrap();
+        fs::write(
+            w.defaults.join("activity/activity.ts"),
+            "export default {};\n",
+        )
+        .unwrap();
+        let shared = w.shared();
+        let mut poller = w.poller(&shared);
+        assert_eq!(poller.tick(&shared, Timestamp::now()), []);
+        assert_eq!(shared.views.list().len(), 1);
+
+        // `disabled` switches the extension off: the views reload, the data stays.
+        fs::create_dir_all(w.config.parent().unwrap()).unwrap();
+        fs::write(&w.config, "disabled = ['activity']\n").unwrap();
+        assert_eq!(
+            poller.tick(&shared, Timestamp::now()),
+            [Event::ViewsChanged]
+        );
+        assert_eq!(shared.views.list(), []);
+
+        // `hidden` takes the project out of the list.
+        fs::write(&w.config, "disabled = ['activity']\nhidden = ['alpha']\n").unwrap();
+        assert_eq!(poller.tick(&shared, Timestamp::now()), [changed(None)]);
+        assert_eq!(shared.read().projects(), []);
+
+        // A file that doesn't parse keeps the settings it had.
+        fs::write(&w.config, "disabled = [\n").unwrap();
+        assert_eq!(poller.tick(&shared, Timestamp::now()), []);
+        assert_eq!(shared.views.list(), []);
+
+        // Both back: the project and the extension return.
+        fs::remove_file(&w.config).unwrap();
+        assert_eq!(
+            poller.tick(&shared, Timestamp::now()),
+            [Event::ViewsChanged, changed(None)]
+        );
+        assert_eq!(shared.views.list().len(), 1);
+        assert_eq!(shared.read().projects().len(), 1);
     }
 
     #[test]

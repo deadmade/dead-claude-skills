@@ -126,6 +126,26 @@
         # These time the poll against file changes and the clock; they run in a local `cargo test`, not in the sandboxed
         # build.
         checkFlags = map (t: "--skip=${t}") ["poll_emits_once_per_change" "poll_sees_folders_created_later" "first_paint_before_link_scan"];
+        # The default extensions, which the app finds at <exe dir>/../share/flow-cockpit/extensions. `tests/` holds the
+        # views' tests and fixtures, not an extension; the tsconfig.json beside the folders isn't copied either.
+        postInstall = ''
+          dest=$out/share/flow-cockpit/extensions
+          mkdir -p "$dest"
+          for dir in extensions/*/; do
+            name=$(basename "$dir")
+            [ "$name" = tests ] || cp -r "$dir" "$dest/$name"
+          done
+        '';
+        # The installed tree holds the four defaults and no tests, fixtures or configs, and the app finds it.
+        doInstallCheck = true;
+        installCheckPhase = ''
+          runHook preInstallCheck
+          dest=$out/share/flow-cockpit/extensions
+          test "$(ls "$dest" | tr '\n' ' ')" = "activity docs list run "
+          test -z "$(find "$dest" -name '*.test.ts' -o -name fixtures -o -name '*.json')"
+          $out/bin/flow-cockpit --print-paths | grep -Fx "default extensions: $dest"
+          runHook postInstallCheck
+        '';
         meta = {
           inherit (cockpitApp) description;
           mainProgram = "flow-cockpit";

@@ -1,7 +1,8 @@
 // The view runtime. It loads every view the app lists as code (`view_source` → a `text/javascript` Blob → `import()`,
-// the Blob URL revoked right after), draws the views of the current route, each in its own section, and loads them
-// again on `views-changed`. A view that fails to load or to draw shows its error card in its own section, with the
-// built-in of that id drawn below it when a views folder replaced one; the other views never see it.
+// the Blob URL revoked right after), adds each loaded extension's `style.css` as one `<style>`, draws the views of the
+// current route, each in its own section, and loads them again on `views-changed`. A view that fails to load or to
+// draw shows its error card in its own section, with the default of that id drawn below it when one of the user's
+// extensions replaced it; the other views never see it.
 import { card } from './blocks/card.js';
 import { diff } from './blocks/diff.js';
 import { markdown } from './blocks/markdown.js';
@@ -14,6 +15,7 @@ import { stepper } from './blocks/stepper.js';
  * @typedef {import('./api').DataApi} DataApi
  * @typedef {import('./api').ViewContext} ViewContext
  * @typedef {import('../../bindings/ViewInfo').ViewInfo} ViewInfo
+ * @typedef {import('../../bindings/Extensions').Extensions} Extensions
  * @typedef {import('../../bindings/DocName').DocName} DocName
  * @typedef {(cmd: string, args?: Record<string, unknown>) => Promise<any>} Invoke
  * @typedef {(event: string, handler: (event: { payload: any }) => void) => Promise<unknown>} Listen
@@ -189,6 +191,8 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
   let entries = [];
   /** @type {unknown} */
   let listError = null;
+  /** @type {Extensions} */
+  let extensions = { styles: [], disabled: [], looked: [] };
   /** The route last drawn, as JSON. */
   let drawnAt = '';
   /** @type {Promise<void>} */
@@ -222,10 +226,23 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
       (error) => ({ view: null, error }),
     );
 
+  /** Each extension's `style.css` as one `<style>`; the ones from the last load go. */
+  function applyStyles() {
+    for (const old of document.head.querySelectorAll('style[data-extension]')) old.remove();
+    for (const { extension, css } of extensions.styles) {
+      const style = document.createElement('style');
+      style.dataset.extension = extension;
+      style.textContent = css;
+      document.head.append(style);
+    }
+  }
+
   async function loadAll() {
     try {
-      /** @type {ViewInfo[]} */
-      const infos = await invoke('views');
+      /** @type {[ViewInfo[], Extensions | null]} */
+      const [infos, ext] = await Promise.all([invoke('views'), invoke('extensions')]);
+      extensions = ext ?? { styles: [], disabled: [], looked: [] };
+      applyStyles();
       entries = await Promise.all(
         infos.map(async (info) => {
           const own = await loaded(info.id, false);
@@ -251,7 +268,7 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
   const errorCard = (id, err, replaced) =>
     card({
       title: `The ${id} view couldn't be drawn.`,
-      meta: replaced ? 'Its copy in the views folder failed, so the built-in one is drawn below.' : undefined,
+      meta: replaced ? 'Your copy failed, so the default one is drawn below.' : undefined,
       body: reason(err),
       error: true,
     });
@@ -299,7 +316,7 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
       box.append(await render(builtin, ctx));
     } catch (err) {
       box.append(
-        card({ title: `The built-in ${entry.info.id} view couldn't be drawn either.`, body: reason(err), error: true }),
+        card({ title: `The default ${entry.info.id} view couldn't be drawn either.`, body: reason(err), error: true }),
       );
     }
     return box;
@@ -330,13 +347,21 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
       return;
     }
     if (!sections.length) {
+      // `list` and `run` are both a slot and the default extension that fills it.
+      const lines = extensions.disabled.includes(at.to)
+        ? [`The ${at.to} extension is switched off in config.toml.`]
+        : ['No view draws this screen.', `Add an extension with a view for the "${at.to}" slot.`];
+      if (extensions.looked.length)
+        lines.push(`The default extensions weren't found. Looked in ${extensions.looked.join(', ')}.`);
       const empty = document.createElement('div');
       empty.className = 'empty';
-      const first = document.createElement('p');
-      first.textContent = 'No view draws this screen.';
-      const second = document.createElement('p');
-      second.textContent = `Add a view with slot "${at.to}" to the views folder.`;
-      empty.append(first, second);
+      empty.append(
+        ...lines.map((text) => {
+          const line = document.createElement('p');
+          line.textContent = text;
+          return line;
+        }),
+      );
       root.replaceChildren(empty);
       return;
     }

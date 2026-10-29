@@ -1,5 +1,6 @@
-//! The flow cockpit: a window over the user's flow runs, audits and Claude sessions, drawn by replaceable views.
-//! It reads and never writes: the core's index, the views folders, and the user's hand-edited `config.toml`.
+//! The flow cockpit: a window over the user's flow runs, audits and Claude sessions, drawn by views that come in
+//! extensions. It reads and never writes: the core's index, the extensions folders, and the user's hand-edited
+//! `config.toml`.
 
 // A release build on Windows opens no console window; `--version` and friends attach to the parent's console.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -13,6 +14,9 @@ mod strip;
 mod views;
 
 use std::io::Write;
+use std::path::Path;
+#[cfg(test)]
+use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
 use std::thread;
@@ -23,9 +27,9 @@ use jiff::Timestamp;
 use tauri::Emitter;
 
 use crate::commands::Shared;
-use crate::paths::Platform;
+use crate::paths::{Defaults, Platform};
 use crate::poll::{Event, Poller};
-use crate::views::{BUILTIN, Views};
+use crate::views::Views;
 
 /// The generated TypeScript types, embedded for `--print-types`.
 static BINDINGS: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/../bindings");
@@ -47,11 +51,12 @@ fn main() -> ExitCode {
         [] => run(),
         ["--version"] => print(&format!("flow-cockpit {}\n", env!("CARGO_PKG_VERSION"))),
         ["--print-types"] => print(&types()),
-        ["--print-view", id] => match views::print_view(&BUILTIN, id) {
-            Some(source) => print(source),
-            None => fail(&format!("flow-cockpit: no built-in view {id}\n")),
-        },
-        _ => fail("usage: flow-cockpit [--version | --print-types | --print-view <id>]\n"),
+        ["--print-paths"] => {
+            let env = |key: &str| std::env::var(key).ok();
+            let config_dir = paths::config_dir(env, Platform::current());
+            print(&paths_text(&default_extensions(env), &config_dir))
+        }
+        _ => fail("usage: flow-cockpit [--version | --print-types | --print-paths]\n"),
     }
 }
 
@@ -71,15 +76,18 @@ fn run() -> ExitCode {
         capture_dir: paths::capture_dir(env, platform),
     };
     let config_dir = paths::config_dir(env, platform);
-    let config = Config::load(&config_dir.join("config.toml")).unwrap_or_else(|e| {
+    let config_path = config_dir.join("config.toml");
+    let config = Config::load(&config_path).unwrap_or_else(|e| {
         eprintln!("flow-cockpit: {e}; using the defaults");
         Config::default()
     });
     let index = Index::build(&home, &config, Timestamp::now());
-    let shared = Arc::new(Shared::new(
-        index,
-        Views::new(&BUILTIN, config_dir.join("views")),
-    ));
+    let views = Views::new(
+        default_extensions(env),
+        config_dir.join("extensions"),
+        config.disabled.clone(),
+    );
+    let shared = Arc::new(Shared::new(index, views));
     let poll_shared = Arc::clone(&shared);
     let result = tauri::Builder::default()
         .manage(shared)
@@ -91,10 +99,11 @@ fn run() -> ExitCode {
             commands::session,
             commands::views,
             commands::view_source,
+            commands::extensions,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
-            let mut poller = Poller::new(home, config, &poll_shared);
+            let mut poller = Poller::new(home, config_path, config, &poll_shared);
             thread::spawn(move || {
                 poll::run(&poll_shared, &mut poller, |event| {
                     let sent = match event {
@@ -115,10 +124,36 @@ fn run() -> ExitCode {
     }
 }
 
+/// The default extensions folder for the running program.
+fn default_extensions(env: impl Fn(&str) -> Option<String>) -> Defaults {
+    let exe = std::env::current_exe().ok();
+    paths::default_extensions(env, exe.as_deref())
+}
+
+/// `--print-paths`: the folders the window reads its extensions and settings from, one per line with a label.
+fn paths_text(defaults: &Defaults, config_dir: &Path) -> String {
+    let found = if let Some(dir) = &defaults.found {
+        dir.display().to_string()
+    } else {
+        let looked: Vec<String> = defaults
+            .looked
+            .iter()
+            .map(|p| p.display().to_string())
+            .collect();
+        format!("none found (looked in {})", looked.join(", "))
+    };
+    format!(
+        "default extensions: {found}\nuser extensions: {}\nconfig: {}\n",
+        config_dir.join("extensions").display(),
+        config_dir.join("config.toml").display()
+    )
+}
+
 /// The view interface, embedded for `--print-types`.
 static API: &str = include_str!("../shell/api.d.ts");
 
-/// The view interface and the bindings as one declaration file: each type once, without the imports between them.
+/// The view interface and the bindings as one declaration file, declaring the module `flow-cockpit` that views import
+/// their types from: each type once, without the imports and re-exports between them.
 fn types() -> String {
     let mut files: Vec<_> = BINDINGS
         .files()
@@ -127,18 +162,24 @@ fn types() -> String {
     files.sort_by_key(|f| f.path());
     let files = files.iter().map(|f| f.contents_utf8().unwrap_or_default());
     let mut out = String::from(
-        "// The flow cockpit's view interface and data types, from `flow-cockpit --print-types`. Generated: do not edit.\n",
+        "// The flow cockpit's view interface and data types, from `flow-cockpit --print-types`. Generated: do not edit.\n\
+         // A view imports them with `import type { View } from 'flow-cockpit';`.\n\
+         declare module 'flow-cockpit' {\n",
     );
     for text in std::iter::once(API).chain(files) {
         let text = text.replace("\r\n", "\n");
         for line in text.lines() {
-            if line.starts_with("import type ") || line.starts_with("// This file was generated") {
+            if line.starts_with("import type ")
+                || line.starts_with("export type * from ")
+                || line.starts_with("// This file was generated")
+            {
                 continue;
             }
             out.push_str(line);
             out.push('\n');
         }
     }
+    out.push_str("}\n");
     out
 }
 
@@ -216,6 +257,62 @@ mod tests {
         ] {
             assert!(out.contains(name), "{name} missing");
         }
-        assert!(!out.contains("import "));
+        assert!(!out.lines().any(|l| l.trim_start().starts_with("import ")));
+    }
+
+    /// A view imports its types from the bare `flow-cockpit`: the printed file declares that module, with every type
+    /// inside it and no re-export line left.
+    #[test]
+    fn print_types_declares_the_flow_cockpit_module() {
+        let out = types();
+        let body = out
+            .split_once("declare module 'flow-cockpit' {\n")
+            .expect("no module declaration")
+            .1;
+        assert!(body.contains("export type Entry") && body.contains("export interface View "));
+        assert!(body.trim_end().ends_with('}'));
+        assert!(
+            !out.lines()
+                .any(|l| l.starts_with("export type * from") || l.starts_with("import ")),
+            "an import or re-export is left"
+        );
+    }
+
+    /// In the repository `flow-cockpit` resolves to `api.d.ts`, so it re-exports every binding.
+    #[test]
+    fn api_re_exports_every_binding() {
+        for file in BINDINGS.files() {
+            let name = file.path().file_stem().unwrap().to_str().unwrap();
+            let line = format!("export type * from '../../bindings/{name}';");
+            assert!(API.contains(&line), "api.d.ts lacks {line}");
+        }
+    }
+
+    #[test]
+    fn print_paths_names_each_folder() {
+        let found = Defaults {
+            found: Some(PathBuf::from("/nix/store/x/share/flow-cockpit/extensions")),
+            looked: vec![PathBuf::from(
+                "/nix/store/x/bin/../share/flow-cockpit/extensions",
+            )],
+        };
+        let config = PathBuf::from("/h/.config/flow-cockpit");
+        assert_eq!(
+            paths_text(&found, &config),
+            format!(
+                "default extensions: {}\nuser extensions: {}\nconfig: {}\n",
+                Path::new("/nix/store/x/share/flow-cockpit/extensions").display(),
+                config.join("extensions").display(),
+                config.join("config.toml").display(),
+            )
+        );
+        let missing = Defaults {
+            found: None,
+            looked: vec![PathBuf::from("/a"), PathBuf::from("/b")],
+        };
+        assert!(
+            paths_text(&missing, &config)
+                .starts_with("default extensions: none found (looked in /a, /b)\n")
+        );
     }
 }

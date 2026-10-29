@@ -2,14 +2,17 @@
 // projects. The content switches between two tabs: Flow runs (a table of runs, then a table of audits) and Loose
 // sessions (the Claude sessions of the last 7 days that belong to no run), each under a filter bar that shows only the
 // controls its rows have fields for. A row names its state only when it is the exception; a finished run is quiet.
-import type { View, ViewContext } from '../../shell/api';
-import type { AuditSummary } from '../../../bindings/AuditSummary';
-import type { Entry } from '../../../bindings/Entry';
-import type { FlowRunSummary } from '../../../bindings/FlowRunSummary';
-import type { Gate } from '../../../bindings/Gate';
-import type { Project } from '../../../bindings/Project';
-import type { SessionSummary } from '../../../bindings/SessionSummary';
-import type { Status } from '../../../bindings/Status';
+import type {
+  View,
+  ViewContext,
+  AuditSummary,
+  Entry,
+  FlowRunSummary,
+  Gate,
+  Project,
+  SessionSummary,
+  Status,
+} from 'flow-cockpit';
 
 type Sort = 'activity' | 'needs' | 'furthest' | 'name';
 type Tab = 'runs' | 'loose';

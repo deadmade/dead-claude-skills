@@ -4,10 +4,7 @@
 // section as Markdown. spec.md and plan.md are Markdown, Mermaid blocks drawn.
 //
 // A run-tab view: the run view draws the frame and this view's rail and content fill the window's lower row.
-import type { View, ViewContext } from '../../shell/api';
-import type { DocName } from '../../../bindings/DocName';
-import type { FlowDoc } from '../../../bindings/FlowDoc';
-import type { Gate } from '../../../bindings/Gate';
+import type { View, ViewContext, DocName, FlowDoc, Gate } from 'flow-cockpit';
 
 const DOCS: [DocName, string][] = [
   ['Spec', 'spec.md'],

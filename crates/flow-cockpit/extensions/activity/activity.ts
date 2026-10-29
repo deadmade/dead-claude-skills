@@ -2,12 +2,7 @@
 // calls (edits as diffs, commands, other input) one fold away. It serves two slots:
 // - `run-tab`, a run's Activity tab: the run's sessions in the rail, the selected one's turns beside it;
 // - `session`, one session's own screen, such as a loose session opened from the list.
-import type { View, ViewContext } from '../../shell/api';
-import type { Activity } from '../../../bindings/Activity';
-import type { AgentInfo } from '../../../bindings/AgentInfo';
-import type { Text } from '../../../bindings/Text';
-import type { ToolCall } from '../../../bindings/ToolCall';
-import type { Turn } from '../../../bindings/Turn';
+import type { View, ViewContext, Activity, AgentInfo, Text, ToolCall, Turn } from 'flow-cockpit';
 
 /** The session picked in each run, kept while the window is open. */
 const picked = new Map<string, string>();

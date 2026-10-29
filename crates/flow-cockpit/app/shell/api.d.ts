@@ -1,5 +1,7 @@
-// The view interface. A view file `export default`s a `View`; it takes only types from here (type-only imports) and gets
-// everything else through `ctx`. `flow-cockpit --print-types` prints this file and the data types as one declaration file.
+// The view interface. A view file `export default`s a `View`; it takes only types, from the module `flow-cockpit`
+// (`import type { View } from 'flow-cockpit'`), and gets everything else through `ctx`. In this repository that module
+// is this file (a `paths` entry in the extensions' tsconfig.json); `flow-cockpit --print-types` prints it and the data
+// types as one declaration file of that module.
 import type { Activity } from '../../bindings/Activity';
 import type { DocName } from '../../bindings/DocName';
 import type { Entry } from '../../bindings/Entry';
@@ -7,6 +9,44 @@ import type { FlowRun } from '../../bindings/FlowRun';
 import type { PhaseState } from '../../bindings/PhaseState';
 import type { Project } from '../../bindings/Project';
 import type { ViewInfo } from '../../bindings/ViewInfo';
+
+// Every data type, so a view takes them all from `flow-cockpit` too.
+export type * from '../../bindings/Activity';
+export type * from '../../bindings/AgentInfo';
+export type * from '../../bindings/AuditDoc';
+export type * from '../../bindings/AuditSummary';
+export type * from '../../bindings/Changed';
+export type * from '../../bindings/Decision';
+export type * from '../../bindings/Deviation';
+export type * from '../../bindings/DeviationStatus';
+export type * from '../../bindings/DocName';
+export type * from '../../bindings/Entry';
+export type * from '../../bindings/Extensions';
+export type * from '../../bindings/Finding';
+export type * from '../../bindings/FlowDoc';
+export type * from '../../bindings/FlowRun';
+export type * from '../../bindings/FlowRunSummary';
+export type * from '../../bindings/Gate';
+export type * from '../../bindings/Ledger';
+export type * from '../../bindings/LedgerTask';
+export type * from '../../bindings/Live';
+export type * from '../../bindings/Phase';
+export type * from '../../bindings/PhaseState';
+export type * from '../../bindings/PlanDoc';
+export type * from '../../bindings/PlanTask';
+export type * from '../../bindings/Project';
+export type * from '../../bindings/Ruling';
+export type * from '../../bindings/Section';
+export type * from '../../bindings/SessionSummary';
+export type * from '../../bindings/Status';
+export type * from '../../bindings/Style';
+export type * from '../../bindings/TaskState';
+export type * from '../../bindings/Text';
+export type * from '../../bindings/ToolCall';
+export type * from '../../bindings/ToolDetail';
+export type * from '../../bindings/Turn';
+export type * from '../../bindings/ViewInfo';
+export type * from '../../bindings/ViewSource';
 
 /**
  * Where the window is. `list` draws the `list` views, `run` the `run` views, `doc` the `doc` views, `session` the
