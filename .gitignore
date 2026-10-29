@@ -11,3 +11,4 @@ plugins/**/.claude-plugin/types/
 node_modules/
 .superpowers/
 installer/**/*.js
+crates/flow-cockpit/app/gen/

@@ -1,0 +1,194 @@
+//! The flow cockpit: a window over the user's flow runs, audits and Claude sessions, drawn by replaceable views.
+//! It reads and never writes: the core's index, the views folders, and the user's hand-edited `config.toml`.
+
+// A release build on Windows opens no console window; `--version` and friends attach to the parent's console.
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+#[cfg(test)]
+mod bindings;
+mod commands;
+mod paths;
+mod poll;
+mod strip;
+mod views;
+
+use std::io::Write;
+use std::process::ExitCode;
+use std::sync::Arc;
+use std::thread;
+
+use flow_cockpit_core::index::{Config, Home, Index};
+use include_dir::{Dir, include_dir};
+use jiff::Timestamp;
+use tauri::Emitter;
+
+use crate::commands::Shared;
+use crate::paths::Platform;
+use crate::poll::{Event, Poller};
+use crate::views::{BUILTIN, Views};
+
+/// The generated TypeScript types, embedded for `--print-types`.
+static BINDINGS: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/../bindings");
+
+fn main() -> ExitCode {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    match args
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>()
+        .as_slice()
+    {
+        [] => run(),
+        ["--version"] => print(&format!("flow-cockpit {}\n", env!("CARGO_PKG_VERSION"))),
+        ["--print-types"] => print(&types()),
+        ["--print-view", id] => match views::print_view(&BUILTIN, id) {
+            Some(source) => print(source),
+            None => fail(&format!("flow-cockpit: no built-in view {id}\n")),
+        },
+        _ => fail("usage: flow-cockpit [--version | --print-types | --print-view <id>]\n"),
+    }
+}
+
+/// Opens the window: builds the index from the transcripts' heads, starts the poll and serves the commands.
+fn run() -> ExitCode {
+    let platform = Platform::current();
+    let env = |key: &str| std::env::var(key).ok();
+    let home = Home {
+        claude_projects: paths::claude_projects(env, platform),
+        capture_dir: paths::capture_dir(env, platform),
+    };
+    let config_dir = paths::config_dir(env, platform);
+    let config = Config::load(&config_dir.join("config.toml")).unwrap_or_else(|e| {
+        eprintln!("flow-cockpit: {e}; using the defaults");
+        Config::default()
+    });
+    let index = Index::build(&home, &config, Timestamp::now());
+    let shared = Arc::new(Shared::new(
+        index,
+        Views::new(&BUILTIN, config_dir.join("views")),
+    ));
+    let poll_shared = Arc::clone(&shared);
+    let result = tauri::Builder::default()
+        .manage(shared)
+        .invoke_handler(tauri::generate_handler![
+            commands::projects,
+            commands::entries,
+            commands::flow_run,
+            commands::doc,
+            commands::session,
+            commands::views,
+            commands::view_source,
+        ])
+        .setup(move |app| {
+            let handle = app.handle().clone();
+            let mut poller = Poller::new(home, config, &poll_shared);
+            thread::spawn(move || {
+                poll::run(&poll_shared, &mut poller, |event| {
+                    let sent = match event {
+                        Event::Changed(changed) => handle.emit("changed", changed),
+                        Event::ViewsChanged => handle.emit("views-changed", ()),
+                    };
+                    if let Err(e) = sent {
+                        eprintln!("flow-cockpit: {e}");
+                    }
+                });
+            });
+            Ok(())
+        })
+        .run(tauri::generate_context!());
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => fail(&format!("flow-cockpit: {e}\n")),
+    }
+}
+
+/// The bindings as one declaration file: each type once, without the imports between them.
+fn types() -> String {
+    let mut files: Vec<_> = BINDINGS
+        .files()
+        .filter(|f| f.path().extension().is_some_and(|e| e == "ts"))
+        .collect();
+    files.sort_by_key(|f| f.path());
+    let mut out = String::from(
+        "// The flow cockpit's data types, from `flow-cockpit --print-types`. Generated: do not edit.\n",
+    );
+    for file in files {
+        let text = file
+            .contents_utf8()
+            .unwrap_or_default()
+            .replace("\r\n", "\n");
+        for line in text.lines() {
+            if line.starts_with("import type ") || line.starts_with("// This file was generated") {
+                continue;
+            }
+            out.push_str(line);
+            out.push('\n');
+        }
+    }
+    out
+}
+
+fn print(text: &str) -> ExitCode {
+    attach_console();
+    let mut out = std::io::stdout().lock();
+    match out.write_all(text.as_bytes()).and_then(|()| out.flush()) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(_) => ExitCode::FAILURE,
+    }
+}
+
+fn fail(text: &str) -> ExitCode {
+    attach_console();
+    // Nothing more to do when stderr is gone too.
+    let _ = std::io::stderr().write_all(text.as_bytes());
+    ExitCode::from(2)
+}
+
+/// A Windows GUI program starts without a console. When its standard handles were inherited (a pipe, a file), they
+/// are used as they are; only when stdout is missing does it attach to the parent's console, so `flow-cockpit
+/// --version` typed in a terminal prints there.
+#[cfg(windows)]
+fn attach_console() {
+    use std::ffi::c_void;
+
+    const STD_OUTPUT_HANDLE: u32 = -11_i32 as u32;
+    const ATTACH_PARENT_PROCESS: u32 = u32::MAX;
+    const INVALID_HANDLE_VALUE: isize = -1;
+
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn GetStdHandle(std_handle: u32) -> *mut c_void;
+        fn AttachConsole(process_id: u32) -> i32;
+    }
+
+    // SAFETY: both functions take plain integers and touch no memory of ours; GetStdHandle only returns a handle,
+    // which is compared and never used here. AttachConsole failing (no parent console) leaves things as they were.
+    unsafe {
+        let handle = GetStdHandle(STD_OUTPUT_HANDLE);
+        if handle.is_null() || handle as isize == INVALID_HANDLE_VALUE {
+            AttachConsole(ATTACH_PARENT_PROCESS);
+        }
+    }
+}
+
+#[cfg(not(windows))]
+fn attach_console() {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn print_types_holds_every_binding_without_imports() {
+        let out = types();
+        for name in [
+            "export type Entry",
+            "export type FlowDoc",
+            "export type ViewInfo",
+            "export type Changed",
+        ] {
+            assert!(out.contains(name), "{name} missing");
+        }
+        assert!(!out.contains("import "));
+    }
+}

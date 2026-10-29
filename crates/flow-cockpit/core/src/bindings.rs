@@ -1,6 +1,7 @@
 //! The TypeScript types for the views, generated from the Rust types (no `#[ts(export)]`).
 //! `export_bindings` (ignored) writes them to `crates/flow-cockpit/bindings/`; `bindings_are_current`
-//! fails when the committed files differ from what the types now produce.
+//! fails when the committed files differ from what the types now produce. The folder also holds the app's types, so
+//! both look only at the core's own files; the app crate's `bindings_are_current` checks the whole folder.
 
 use std::fs;
 use std::io;
@@ -47,7 +48,6 @@ fn read_dir(dir: &Path) -> io::Result<Vec<(String, String)>> {
 #[ignore = "writes crates/flow-cockpit/bindings/; run: cargo test -p flow-cockpit-core export_bindings -- --ignored"]
 fn export_bindings() {
     let dir = committed_dir();
-    fs::remove_dir_all(&dir).ok();
     fs::create_dir_all(&dir).unwrap();
     export_all_to(&dir).unwrap();
 }
@@ -60,7 +60,9 @@ fn bindings_are_current() {
     export_all_to(&temp).unwrap();
     let generated = read_dir(&temp).unwrap();
     fs::remove_dir_all(&temp).ok();
-    let committed = read_dir(&committed_dir()).expect("bindings/ is missing: run export_bindings");
+    let mut committed =
+        read_dir(&committed_dir()).expect("bindings/ is missing: run export_bindings");
+    committed.retain(|(name, _)| generated.iter().any(|(g, _)| g == name));
     assert_eq!(
         committed, generated,
         "bindings/ is stale: cargo test -p flow-cockpit-core export_bindings -- --ignored"

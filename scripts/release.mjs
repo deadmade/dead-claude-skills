@@ -53,6 +53,7 @@ const bumps = [
     ['crates/tui-review', 'tui-review'],
     ['crates/web-mcp', 'web-mcp'],
     ['crates/flow-cockpit', 'flow-cockpit-core'],
+    ['crates/flow-cockpit', 'flow-cockpit'],
   ].flatMap(([dir, name]) => [
     [`${dir}/Cargo.toml`, /^(version = )"[^"]*"/m],
     [`${dir}/Cargo.lock`, new RegExp(`^(name = "${name}"\\r?\\nversion = )"[^"]*"`, 'm')],
