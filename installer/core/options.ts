@@ -66,8 +66,8 @@ export const CATEGORIES: Page[] = [
   {
     id: 'tools',
     title: 'Tools',
-    blurb: 'Plugins that bring their own binary or pane.',
-    keys: ['graphify', 'tui-review', 'web-mcp', 'web-builtins-off', 'md-pane'],
+    blurb: 'Plugins that bring their own binary, pane or window.',
+    keys: ['graphify', 'tui-review', 'web-mcp', 'web-builtins-off', 'md-pane', 'flow-cockpit'],
   },
   {
     id: 'system',
@@ -113,6 +113,7 @@ export const HINTS: Record<string, string> = {
 export function unavailable(key: string, platform: string, arch: string, version: string): string | undefined {
   const name = nameOf(key);
   if (platform === 'win32' && name === 'nix-lsp') return 'nixd is not available on Windows';
+  if (platform === 'win32' && name === 'flow-cockpit') return 'the flow cockpit app is not on Windows yet';
   if (name === 'web-builtins-off') return unavailable(`web-mcp@${MARKETPLACE}`, platform, arch, version);
   const bin = BIN_PLUGINS[name];
   if (bin && !binAsset(bin.name, platform, arch, version)) return `no ${bin.name} build for ${platform}-${arch}`;

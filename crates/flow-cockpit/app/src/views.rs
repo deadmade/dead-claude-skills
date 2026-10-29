@@ -5,14 +5,25 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use include_dir::{Dir, File, include_dir};
+use include_dir::{Dir, DirEntry, File};
 use serde::Serialize;
 use ts_rs::TS;
 
 use crate::strip::strip;
 
-/// The built-in views, embedded at build time.
-pub static BUILTIN: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/views/builtin");
+/// Embeds the named files of `views/builtin/` as one folder.
+macro_rules! builtin {
+    ($($name:literal),* $(,)?) => {
+        Dir::new("", &[$(DirEntry::File(File::new(
+            $name,
+            include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/views/builtin/", $name)),
+        ))),*])
+    };
+}
+
+/// The built-in views, embedded at build time: the view files only, not the tests and fixtures beside them. A new
+/// built-in is added here (`builtin_embeds_only_the_view_files` fails until it is).
+pub static BUILTIN: Dir<'static> = builtin!["activity.ts", "docs.ts", "list.ts", "run.ts"];
 
 /// Where a view's code comes from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
@@ -142,8 +153,6 @@ fn view_id(name: &str) -> Option<&str> {
 
 #[cfg(test)]
 mod tests {
-    use include_dir::DirEntry;
-
     use super::*;
 
     const LIST: &str = "const view = { id: 'list' };\nexport default view;\n";
@@ -245,6 +254,27 @@ mod tests {
                 info("run", ViewSource::Builtin, false),
             ]
         );
+    }
+
+    /// Only the view files ship: the tests and their fixtures next to them stay out of the binary.
+    #[test]
+    fn builtin_embeds_only_the_view_files() {
+        let mut on_disk: Vec<String> =
+            fs::read_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/views/builtin"))
+                .unwrap()
+                .flatten()
+                .filter(|e| e.file_type().is_ok_and(|t| t.is_file()))
+                .filter_map(|e| e.file_name().into_string().ok())
+                .filter(|name| view_id(name).is_some())
+                .collect();
+        on_disk.sort();
+        let embedded: Vec<&str> = BUILTIN
+            .entries()
+            .iter()
+            .map(|e| e.path().to_str().unwrap())
+            .collect();
+        assert_eq!(embedded, on_disk);
+        assert!(print_view(&BUILTIN, "run").is_some_and(|s| s.contains("slot")));
     }
 
     #[test]

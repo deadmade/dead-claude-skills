@@ -85,6 +85,8 @@
       pkgs = nixpkgs.legacyPackages.${system};
       manifest = (pkgs.lib.importTOML ./crates/tui-review/Cargo.toml).package;
       webMcp = (pkgs.lib.importTOML ./crates/web-mcp/Cargo.toml).package;
+      cockpit = (pkgs.lib.importTOML ./crates/flow-cockpit/Cargo.toml).workspace.package;
+      cockpitApp = (pkgs.lib.importTOML ./crates/flow-cockpit/app/Cargo.toml).package;
     in {
       tui-review = pkgs.rustPlatform.buildRustPackage {
         pname = manifest.name;
@@ -111,6 +113,24 @@
           mainProgram = "web-mcp";
         };
       };
+      # The flow cockpit window (Tauri, crates/flow-cockpit/app): `nix run .#flow-cockpit`, or the package in a system
+      # config. It links the system's GTK and WebKit, so Linux gets it from here, not as a release download.
+      flow-cockpit = pkgs.rustPlatform.buildRustPackage {
+        pname = cockpitApp.name;
+        inherit (cockpit) version;
+        src = ./crates/flow-cockpit;
+        cargoLock.lockFile = ./crates/flow-cockpit/Cargo.lock;
+        buildAndTestSubdir = "app";
+        nativeBuildInputs = with pkgs; [pkg-config wrapGAppsHook3];
+        buildInputs = with pkgs; [webkitgtk_4_1 gtk3 libsoup_3 librsvg dbus];
+        # These time the poll against file changes and the clock; they run in a local `cargo test`, not in the sandboxed
+        # build.
+        checkFlags = map (t: "--skip=${t}") ["poll_emits_once_per_change" "poll_sees_folders_created_later" "first_paint_before_link_scan"];
+        meta = {
+          inherit (cockpitApp) description;
+          mainProgram = "flow-cockpit";
+        };
+      };
     });
 
     devShells = forAllSystems (system: let
@@ -120,8 +140,9 @@
       default = pkgs.mkShell {
         inherit (pre-commit) shellHook;
         buildInputs = pre-commit.enabledPackages;
-        # What scripts/sync-*.mjs and the workflows use besides stdenv, and the Rust toolchain for tui-review's binary.
-        packages = with pkgs; [git gh nodejs_26 cargo rustc clippy rustfmt rust-analyzer];
+        # What scripts/sync-*.mjs and the workflows use besides stdenv, the Rust toolchain for the crates, and the
+        # libraries the flow cockpit window builds against.
+        packages = with pkgs; [git gh nodejs_26 cargo rustc clippy rustfmt rust-analyzer pkg-config webkitgtk_4_1 gtk3 libsoup_3 librsvg dbus];
         RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
       };
     });

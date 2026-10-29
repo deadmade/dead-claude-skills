@@ -71,3 +71,8 @@ test('options hidden per platform', () => {
   }
   assert.equal(unavailable(`tui-review@${M}`, 'linux', 'x64', '1.0.0'), undefined);
 });
+
+test('flow-cockpit is unavailable on win32 for now', () => {
+  assert.equal(typeof unavailable(`flow-cockpit@${M}`, 'win32', 'x64', '1.0.0'), 'string');
+  assert.equal(unavailable(`flow-cockpit@${M}`, 'linux', 'x64', '1.0.0'), undefined);
+});

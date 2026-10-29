@@ -97,6 +97,12 @@
       "description": "Click a .md path in Claude's reply to read it, rendered, in a pane beside the chat (fullscreen terminal). Opt-in.",
       "source": "./plugins/opt-in/md-pane",
       "category": "productivity"
+    },
+    {
+      "name": "flow-cockpit",
+      "description": "Teaches Claude to write and change the flow cockpit's views: the TypeScript views of the window that shows your flow runs, audits and Claude sessions (Linux, app from the flake). Opt-in.",
+      "source": "./plugins/opt-in/flow-cockpit",
+      "category": "development"
     }
   ]
 }

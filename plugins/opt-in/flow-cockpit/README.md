@@ -1,0 +1,29 @@
+# flow-cockpit
+
+The flow cockpit is a desktop window that shows what your flow runs are doing: every project's flow runs, audits and
+loose Claude sessions in a list, and for one run its phases, gates, tasks, decisions, documents and the sessions that
+worked on it. It reads the flow files, plans, build logs and Claude Code's transcripts, writes nothing, and redraws
+within a few seconds when they change.
+
+Each screen is a **view**, a TypeScript file you can replace or add to. This plugin carries the `views` skill, which
+teaches Claude to write and change them: ask for a new screen or tab, or for a change to one, and it appears in the
+open window without a restart.
+
+Linux only for now; Windows comes with the next slice.
+
+## Install
+
+1. The app, from this repository's flake (it links the system's GTK and WebKit, so it is not a plain download):
+   `nix run github:deadmade/dead-claude-skills#flow-cockpit`, or `packages.x86_64-linux.flow-cockpit` from the flake
+   in your system config. From a checkout: `nix build .#flow-cockpit`.
+2. The plugin: pick it in the installer (see the [main README](../../../README.md)), on its Tools page. The installer
+   hides it on Windows until the app is built there.
+
+## Use
+
+- `flow-cockpit` opens the window. `flow-cockpit --version`, `--print-types` (the view interface and data types as one
+  `.d.ts`) and `--print-view <id>` (a built-in view's source) print and exit.
+- Views live in `~/.config/flow-cockpit/views/` (`$XDG_CONFIG_HOME`). A file `<id>.ts` with the id of a built-in
+  (`list`, `run`, `docs`, `activity`) replaces it, and deleting it restores the built-in; any other id adds a view.
+- `~/.config/flow-cockpit/config.toml`, edited by hand, can hide projects (`hidden = ["<id or name>"]`).
+- A view that breaks shows its error in its own place; the rest of the window keeps working.

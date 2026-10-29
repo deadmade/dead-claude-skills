@@ -272,7 +272,12 @@ mod tests {
         match made {
             Ok(out) if out.status.success() => {}
             other => {
-                // Without git 2.48+ there is nothing real to read; the case is then untested here.
+                // Without git 2.48+ there is nothing real to read; the case is then untested here, but never silently
+                // in CI, whose runners must have a git that can.
+                assert!(
+                    std::env::var("CI").as_deref() != Ok("true"),
+                    "CI's git can't make a relative worktree: {other:?}"
+                );
                 eprintln!("skipped: git can't make a relative worktree: {other:?}");
                 fs::remove_dir_all(&tmp).ok();
                 return;

@@ -34,6 +34,7 @@ test('opt-ins from the real manifests', () => {
       ...[
         'atlassian',
         'csharp-skills',
+        'flow-cockpit',
         'flows',
         'graphify',
         'hallmark',
