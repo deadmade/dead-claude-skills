@@ -27,6 +27,40 @@ pub struct Changed {
     pub project: Option<String>,
 }
 
+/// `config.toml`: where it is, the settings last read from it, and its signature when they were read.
+pub struct ConfigFile {
+    path: PathBuf,
+    /// A file that doesn't parse leaves these as they were (the defaults, at start).
+    pub config: Config,
+    sig: ConfigSig,
+}
+
+/// The signature of `config.toml` itself, a symlink's own included, and of the file it points to. home-manager links
+/// it into the Nix store, where every file's mtime is 1: a switch to a file of the same length shows only in the new
+/// link's own mtime.
+type ConfigSig = (Option<Sig>, Option<Sig>);
+
+fn config_sig(path: &Path) -> ConfigSig {
+    let own = fs::symlink_metadata(path)
+        .ok()
+        .map(|meta| (meta.len(), meta.modified().ok()));
+    (own, sig(path))
+}
+
+impl ConfigFile {
+    /// Reads `path`; a file that doesn't parse is reported on stderr and gives the defaults. The signature is taken
+    /// first, so a save while the window starts is read again on the poll's first tick.
+    #[must_use]
+    pub fn load(path: PathBuf) -> ConfigFile {
+        let sig = config_sig(&path);
+        let config = Config::load(&path).unwrap_or_else(|e| {
+            eprintln!("flow-cockpit: {e}; using the defaults");
+            Config::default()
+        });
+        ConfigFile { path, config, sig }
+    }
+}
+
 /// What a tick tells the window.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
@@ -41,10 +75,7 @@ type Sig = (u64, Option<SystemTime>);
 
 pub struct Poller {
     home: Home,
-    config_path: PathBuf,
-    /// The settings last read; a `config.toml` that doesn't parse leaves them as they were.
-    config: Config,
-    config_sig: Option<Sig>,
+    settings: ConfigFile,
     cache: LinkCache,
     /// Whether the link scan has run. It waits for the window's first `entries` answer, so the first paint never
     /// waits for transcripts to be read.
@@ -66,9 +97,9 @@ pub struct Poller {
 
 impl Poller {
     /// Takes the current state of every watched folder as the baseline: the first tick reports only what changed
-    /// since. `config` is what `config_path` held when the index was built.
+    /// since; `config.toml` from when `settings` read it, which is what the index was built with.
     #[must_use]
-    pub fn new(home: Home, config_path: PathBuf, config: Config, shared: &Shared) -> Poller {
+    pub fn new(home: Home, settings: ConfigFile, shared: &Shared) -> Poller {
         let transcripts = list_transcripts(&home.claude_projects);
         let (projects, entries) = snapshot(&shared.read());
         Poller {
@@ -76,13 +107,11 @@ impl Poller {
             captures: list_files(&home.capture_dir),
             trees: trees_of(&projects),
             views: views_fingerprint(shared),
-            config_sig: sig(&config_path),
-            config_path,
+            settings,
             transcripts,
             projects,
             entries,
             home,
-            config,
             cache: LinkCache::default(),
             scanned: false,
         }
@@ -118,7 +147,7 @@ impl Poller {
         if new_folder || first_scan || reconfigured {
             // Built and scanned outside the lock: the first scan may read gigabytes, and the window keeps answering
             // from the old index meanwhile. A rebuilt index keeps the same cache.
-            let mut fresh = Index::build(&self.home, &self.config, now);
+            let mut fresh = Index::build(&self.home, &self.settings.config, now);
             if self.scanned || first_scan {
                 fresh.scan_links(&mut self.cache);
                 self.scanned = true;
@@ -173,25 +202,26 @@ impl Poller {
     /// changed, and whether `hidden` or `trusted` did (the index is then built again). A file that doesn't parse
     /// changes nothing; a removed one is the defaults.
     fn reread_config(&mut self, shared: &Shared) -> (bool, bool) {
-        let now = sig(&self.config_path);
-        if now == self.config_sig {
+        let file = &mut self.settings;
+        let now = config_sig(&file.path);
+        if now == file.sig {
             return (false, false);
         }
-        self.config_sig = now;
-        let config = match Config::load(&self.config_path) {
+        file.sig = now;
+        let config = match Config::load(&file.path) {
             Ok(config) => config,
             Err(e) => {
                 eprintln!("flow-cockpit: {e}; keeping the settings it had");
                 return (false, false);
             }
         };
-        let switched = config.disabled != self.config.disabled;
+        let switched = config.disabled != file.config.disabled;
         if switched {
             shared.views.set_disabled(config.disabled.clone());
         }
         let reconfigured =
-            config.hidden != self.config.hidden || config.trusted != self.config.trusted;
-        self.config = config;
+            config.hidden != file.config.hidden || config.trusted != file.config.trusted;
+        file.config = config;
         (switched, reconfigured)
     }
 
@@ -529,19 +559,25 @@ mod tests {
         }
 
         fn shared(&self) -> Shared {
-            let index = Index::build(&self.home, &Config::default(), Timestamp::now());
+            self.shared_with(&Config::default())
+        }
+
+        fn shared_with(&self, config: &Config) -> Shared {
+            let index = Index::build(&self.home, config, Timestamp::now());
             let defaults = Defaults {
                 found: Some(self.defaults.clone()),
                 looked: vec![self.defaults.clone()],
             };
-            Shared::new(index, Views::new(defaults, self.user.clone(), Vec::new()))
+            Shared::new(
+                index,
+                Views::new(defaults, self.user.clone(), config.disabled.clone()),
+            )
         }
 
         fn poller(&self, shared: &Shared) -> Poller {
             Poller::new(
                 self.home.clone(),
-                self.config.clone(),
-                Config::default(),
+                ConfigFile::load(self.config.clone()),
                 shared,
             )
         }
@@ -617,21 +653,6 @@ mod tests {
         let shared = w.shared();
         let mut poller = w.poller(&shared);
         assert_eq!(poller.tick(&shared, Timestamp::now()), []);
-
-        // Each extensions folder appears with an extension in it, and then a file in it changes.
-        for folder in [&w.defaults, &w.user] {
-            fs::create_dir_all(folder.join("mine")).unwrap();
-            fs::write(folder.join("mine/mine.ts"), "export default {};\n").unwrap();
-            assert_eq!(
-                poller.tick(&shared, Timestamp::now()),
-                [Event::ViewsChanged]
-            );
-            fs::write(folder.join("mine/style.css"), "section {}\n").unwrap();
-            assert_eq!(
-                poller.tick(&shared, Timestamp::now()),
-                [Event::ViewsChanged]
-            );
-        }
 
         // Claude Code's projects folder appears with alpha's first session: a new folder means a full build.
         w.session("work/alpha", "s1", "Hi.");
@@ -792,6 +813,111 @@ mod tests {
             poller.tick(&shared, Timestamp::now()),
             [changed(Some(&alpha))]
         );
+    }
+
+    /// Not a timing test (each step adds or removes a file), so the Nix build runs it.
+    #[test]
+    fn extension_folder_changes_emit_views_changed() {
+        let w = World::empty("extensions");
+        let shared = w.shared();
+        let mut poller = w.poller(&shared);
+        assert_eq!(poller.tick(&shared, Timestamp::now()), []);
+        // Each extensions folder appears with an extension in it, gains a file, and loses it again.
+        for folder in [&w.defaults, &w.user] {
+            fs::create_dir_all(folder.join("mine")).unwrap();
+            fs::write(folder.join("mine/mine.ts"), "export default {};\n").unwrap();
+            assert_eq!(
+                poller.tick(&shared, Timestamp::now()),
+                [Event::ViewsChanged]
+            );
+            fs::write(folder.join("mine/style.css"), "section {}\n").unwrap();
+            assert_eq!(
+                poller.tick(&shared, Timestamp::now()),
+                [Event::ViewsChanged]
+            );
+            fs::remove_file(folder.join("mine/style.css")).unwrap();
+            assert_eq!(
+                poller.tick(&shared, Timestamp::now()),
+                [Event::ViewsChanged]
+            );
+            assert_eq!(poller.tick(&shared, Timestamp::now()), []);
+        }
+    }
+
+    /// The defaults `docs` and `list`, one view each.
+    fn two_defaults(w: &World) {
+        for name in ["docs", "list"] {
+            fs::create_dir_all(w.defaults.join(name)).unwrap();
+            fs::write(
+                w.defaults.join(name).join(format!("{name}.ts")),
+                "export default {};\n",
+            )
+            .unwrap();
+        }
+    }
+
+    fn view_ids(shared: &Shared) -> Vec<String> {
+        shared.views.list().into_iter().map(|v| v.id).collect()
+    }
+
+    /// The window reads `config.toml` once at start and builds the index, which can take seconds; a save in between
+    /// still applies on the first tick.
+    #[test]
+    fn config_saved_during_startup_applies_on_the_first_tick() {
+        let w = World::empty("startup");
+        two_defaults(&w);
+        fs::create_dir_all(w.config.parent().unwrap()).unwrap();
+        fs::write(&w.config, "disabled = []\n").unwrap();
+        let settings = ConfigFile::load(w.config.clone());
+        // Saved while the index builds.
+        fs::write(&w.config, "disabled = ['docs']\n").unwrap();
+        let shared = w.shared_with(&settings.config);
+        let mut poller = Poller::new(w.home.clone(), settings, &shared);
+        assert_eq!(
+            poller.tick(&shared, Timestamp::now()),
+            [Event::ViewsChanged]
+        );
+        assert_eq!(view_ids(&shared), ["list"]);
+    }
+
+    /// home-manager links `config.toml` into the Nix store, where every file's mtime is 1: a switch to a same-length
+    /// file is seen by the new link's own mtime.
+    #[cfg(unix)]
+    #[test]
+    fn config_symlink_switch_is_seen_at_the_same_length() {
+        let w = World::empty("symlink");
+        two_defaults(&w);
+        let store = w.root.join("store");
+        fs::create_dir_all(&store).unwrap();
+        fs::create_dir_all(w.config.parent().unwrap()).unwrap();
+        let epoch = SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1);
+        for (file, text) in [
+            ("a.toml", "disabled = ['docs']\n"),
+            ("b.toml", "disabled = ['list']\n"),
+        ] {
+            fs::write(store.join(file), text).unwrap();
+            fs::File::options()
+                .write(true)
+                .open(store.join(file))
+                .unwrap()
+                .set_modified(epoch)
+                .unwrap();
+        }
+        std::os::unix::fs::symlink(store.join("a.toml"), &w.config).unwrap();
+        let settings = ConfigFile::load(w.config.clone());
+        let shared = w.shared_with(&settings.config);
+        let mut poller = Poller::new(w.home.clone(), settings, &shared);
+        assert_eq!(poller.tick(&shared, Timestamp::now()), []);
+        assert_eq!(view_ids(&shared), ["list"]);
+
+        // A switch: a new link to a same-length file with the same mtime.
+        fs::remove_file(&w.config).unwrap();
+        std::os::unix::fs::symlink(store.join("b.toml"), &w.config).unwrap();
+        assert_eq!(
+            poller.tick(&shared, Timestamp::now()),
+            [Event::ViewsChanged]
+        );
+        assert_eq!(view_ids(&shared), ["docs"]);
     }
 
     #[test]

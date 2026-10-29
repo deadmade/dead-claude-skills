@@ -32,7 +32,7 @@ pub fn capture_dir(env: impl Fn(&str) -> Option<String>, platform: Platform) -> 
     base.join("flow-cockpit").join("capture")
 }
 
-/// The global views folder and `config.toml` live here: `$XDG_CONFIG_HOME/flow-cockpit` (default
+/// The user's extensions folder and `config.toml` live here: `$XDG_CONFIG_HOME/flow-cockpit` (default
 /// `~/.config/flow-cockpit`) on Linux, `%APPDATA%\flow-cockpit` (default `%USERPROFILE%\AppData\Roaming`) on Windows.
 pub fn config_dir(env: impl Fn(&str) -> Option<String>, platform: Platform) -> PathBuf {
     let base = match platform {

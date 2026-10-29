@@ -24,6 +24,8 @@ you start; if it doesn't, tell the user how to get it and stop.
 - **An extension** is a folder `<name>/` holding one or more view files and an optional `style.css`. The folder name
   is the extension's name. A file `<id>.ts` in it is the view `<id>`. A name with a second dot (`flow-cockpit.d.ts`,
   `x.test.ts`) is not a view, and neither is a file that isn't `.ts`. A folder without a view is not an extension.
+- **Links are ignored**, with no error: a symlinked extension folder, view file or `style.css` doesn't load. Put real
+  folders and files there, copies rather than links.
 - **The default extensions** ship with the app (in the Nix package, `share/flow-cockpit/extensions/`). Never write
   there: an update replaces them.
 - **The user's extensions folder** is `$XDG_CONFIG_HOME/flow-cockpit/extensions/`. When `XDG_CONFIG_HOME` is unset or

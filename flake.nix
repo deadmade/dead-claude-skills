@@ -136,14 +136,22 @@
             [ "$name" = tests ] || cp -r "$dir" "$dest/$name"
           done
         '';
-        # The installed tree holds the four defaults and no tests, fixtures or configs, and the app finds it.
+        # The installed tree holds the four defaults and no tests, fixtures or configs, and the app finds it. Copied
+        # out as a user would, the defaults type-check against `--print-types` as they are (the skill's tsc line).
         doInstallCheck = true;
+        nativeInstallCheckInputs = [pkgs.typescript];
         installCheckPhase = ''
           runHook preInstallCheck
           dest=$out/share/flow-cockpit/extensions
           test "$(ls "$dest" | tr '\n' ' ')" = "activity docs list run "
           test -z "$(find "$dest" -name '*.test.ts' -o -name fixtures -o -name '*.json')"
           $out/bin/flow-cockpit --print-paths | grep -Fx "default extensions: $dest"
+          copy=$(mktemp -d)
+          cp -r "$dest"/. "$copy"
+          chmod -R u+w "$copy"
+          $out/bin/flow-cockpit --print-types > "$copy/flow-cockpit.d.ts"
+          (cd "$copy" && tsc --noEmit --strict --target es2023 --lib es2023,dom,dom.iterable --module esnext \
+            --moduleResolution bundler --verbatimModuleSyntax --erasableSyntaxOnly flow-cockpit.d.ts ./*/*.ts)
           runHook postInstallCheck
         '';
         meta = {

@@ -21,14 +21,14 @@ use std::process::ExitCode;
 use std::sync::Arc;
 use std::thread;
 
-use flow_cockpit_core::index::{Config, Home, Index};
+use flow_cockpit_core::index::{Home, Index};
 use include_dir::{Dir, include_dir};
 use jiff::Timestamp;
 use tauri::Emitter;
 
 use crate::commands::Shared;
 use crate::paths::{Defaults, Platform};
-use crate::poll::{Event, Poller};
+use crate::poll::{ConfigFile, Event, Poller};
 use crate::views::Views;
 
 /// The generated TypeScript types, embedded for `--print-types`.
@@ -76,16 +76,12 @@ fn run() -> ExitCode {
         capture_dir: paths::capture_dir(env, platform),
     };
     let config_dir = paths::config_dir(env, platform);
-    let config_path = config_dir.join("config.toml");
-    let config = Config::load(&config_path).unwrap_or_else(|e| {
-        eprintln!("flow-cockpit: {e}; using the defaults");
-        Config::default()
-    });
-    let index = Index::build(&home, &config, Timestamp::now());
+    let settings = ConfigFile::load(config_dir.join("config.toml"));
+    let index = Index::build(&home, &settings.config, Timestamp::now());
     let views = Views::new(
         default_extensions(env),
         config_dir.join("extensions"),
-        config.disabled.clone(),
+        settings.config.disabled.clone(),
     );
     let shared = Arc::new(Shared::new(index, views));
     let poll_shared = Arc::clone(&shared);
@@ -103,7 +99,7 @@ fn run() -> ExitCode {
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
-            let mut poller = Poller::new(home, config_path, config, &poll_shared);
+            let mut poller = Poller::new(home, settings, &poll_shared);
             thread::spawn(move || {
                 poll::run(&poll_shared, &mut poller, |event| {
                     let sent = match event {

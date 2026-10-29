@@ -38,7 +38,8 @@ characters) and its header (cut to 64), the options are dropped and trailing que
   `list`, `run`, `docs` and `activity`, are installed with the app (`share/flow-cockpit/extensions/` in the Nix
   package). Yours live in `~/.config/flow-cockpit/extensions/` (`$XDG_CONFIG_HOME`): a new name adds views, a
   default's name replaces that whole default, and deleting it brings the default back. To change a default, copy its
-  folder there. The old `~/.config/flow-cockpit/views/` folder is no longer read.
+  folder there. Links are ignored: put real folders and files there. The old `~/.config/flow-cockpit/views/` folder
+  is no longer read.
 - `~/.config/flow-cockpit/config.toml`, edited by hand, can switch extensions off (`disabled = ["<name>"]`) and hide
   projects (`hidden = ["<id or name>"]`). The open window picks a change up within a few seconds.
 - `FLOW_COCKPIT_EXTENSIONS=<folder>` loads the defaults from another folder, such as a checkout's

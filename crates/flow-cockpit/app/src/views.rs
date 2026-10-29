@@ -475,13 +475,14 @@ mod tests {
                 .list()
                 .contains(&info("extra", ViewSource::Global, false))
         );
-        let err = views.source("extra", false).unwrap_err();
-        assert!(
-            err.contains('a') && err.contains('b') && err.contains("extra"),
-            "{err}"
+        assert_eq!(
+            views.source("extra", false).unwrap_err(),
+            "the extensions a and b both have a view extra"
         );
-        let err = views.source("list", false).unwrap_err();
-        assert!(err.contains("list") && err.contains("other"), "{err}");
+        assert_eq!(
+            views.source("list", false).unwrap_err(),
+            "the extensions list and other both have a view list"
+        );
         // Across the two folders it is no clash: the user's wins.
         fs::remove_dir_all(t.0.join("user/b")).unwrap();
         assert!(views.source("extra", false).is_ok());

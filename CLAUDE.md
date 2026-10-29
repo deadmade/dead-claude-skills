@@ -105,8 +105,8 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   beside them; `bindings/` the generated `.d.ts` of every type the views see (one `#[ignore]`d `export_bindings` test
   per crate writes them; `bindings_are_current` fails when they are stale). Linux gets the app from the flake's
   `flow-cockpit` package, since it links the system's GTK and WebKit; it installs every `extensions/` folder but
-  `tests/` at `share/flow-cockpit/extensions/` and checks that tree. The app finds the defaults at
-  `$FLOW_COCKPIT_EXTENSIONS` (a dev override: point it at `crates/flow-cockpit/extensions` to see edits live), else
+  `tests/` at `share/flow-cockpit/extensions/` and checks that tree, and that copies of the defaults type-check against
+  `--print-types`. The app finds the defaults at `$FLOW_COCKPIT_EXTENSIONS` (a dev override: point it at `crates/flow-cockpit/extensions` to see edits live), else
   `<exe dir>/../share/flow-cockpit/extensions`, else `<exe dir>/extensions`. It writes nothing, and reads the user's
   extensions and `config.toml` (`disabled`, `hidden`, `trusted`) from `~/.config/flow-cockpit/`.
 - Notifications (`plugins/default/`, formerly the notify plugin): `hooks.json` entries (Stop, Notification, PreToolUse
