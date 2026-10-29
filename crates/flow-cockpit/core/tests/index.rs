@@ -262,7 +262,8 @@ fn finds_audits_with_picks_state() {
             _ => None,
         })
         .collect();
-    assert_eq!(audits.len(), 1);
+    // Newest first.
+    assert_eq!(audits.len(), 2);
     let a = &audits[0];
     assert_eq!(a.file, "2026-01-05-test-audit-installer.md");
     assert_eq!(
@@ -277,6 +278,13 @@ fn finds_audits_with_picks_state() {
         .collect();
     assert_eq!(severities, [("high", 1), ("med", 1), ("low", 1)]);
     assert_eq!(a.open, Some(true));
+    assert_eq!((a.picks, a.fixed), (Some(2), 1));
+
+    // Without a `Picks:` line the state is unknown and nothing counts as picked.
+    let b = &audits[1];
+    assert_eq!(b.file, "2026-01-03-doc-audit-readme.md");
+    assert_eq!(b.conductor, "doc-audit");
+    assert_eq!((b.open, b.picks, b.fixed), (None, None, 0));
 }
 
 #[test]

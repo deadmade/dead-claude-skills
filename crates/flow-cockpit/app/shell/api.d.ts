@@ -9,14 +9,19 @@ import type { Project } from '../../bindings/Project';
 import type { ViewInfo } from '../../bindings/ViewInfo';
 
 /**
- * Where the window is. `list` draws the `list` views, `run` the `run` views, `doc` the `doc` views. A `run` route whose
- * `tab` names a `run-tab` view draws the run views too, and that view inside the run view's `data-slot="run-tab"`
- * element.
+ * Where the window is. `list` draws the `list` views, `run` the `run` views, `doc` the `doc` views, `session` the
+ * `session` views. A `run` route whose `tab` names a `run-tab` view draws the run views too, and that view inside the
+ * run view's `data-slot="run-tab"` element. `session` is one Claude session by its id, such as a loose session that
+ * belongs to no flow run.
  */
 export type Route =
   | { to: 'list'; project?: string }
   | { to: 'run'; project: string; slug: string; tab?: string }
-  | { to: 'doc'; project: string; slug: string; name: DocName };
+  | { to: 'doc'; project: string; slug: string; name: DocName }
+  | { to: 'session'; project: string; id: string };
+
+/** Where a view draws: one of these, or a list of them for a view that serves several (see `View.slot`). */
+export type Slot = 'list' | 'run' | 'run-tab' | 'doc' | 'session';
 
 /** The core's read-only data. Each call asks the app afresh; nothing is cached. */
 export interface DataApi {
@@ -71,6 +76,10 @@ export interface ViewContext {
 export interface View {
   id: string;
   title: string;
-  slot: 'list' | 'run' | 'run-tab' | 'doc';
+  /**
+   * Where it draws. A list serves each of its slots with the same render, which tells them apart by `ctx.route`: the
+   * built-in activity view is `['run-tab', 'session']`, a run's Activity tab and a session's own screen.
+   */
+  slot: Slot | readonly Slot[];
   render(ctx: ViewContext): Node | Promise<Node>;
 }

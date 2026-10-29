@@ -4,4 +4,12 @@ export type AuditSummary = { file: string, date: string, conductor: string, scop
 /**
  * `None` when the report has no `Picks:` line.
  */
-open: boolean | null, };
+open: boolean | null, 
+/**
+ * How many findings the user picked; `None` when the report has no `Picks:` line.
+ */
+picks: number | null, 
+/**
+ * How many findings have a `Fixed` line.
+ */
+fixed: number, };

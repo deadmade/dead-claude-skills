@@ -1,0 +1,156 @@
+{
+  "s-link": {
+    "agents": [],
+    "live": {
+      "waiting": null
+    },
+    "turns": [
+      {
+        "prompt": {
+          "agent": null,
+          "at": "2026-01-19T10:00:00.000Z",
+          "text": "Build the login form."
+        },
+        "replies": [
+          {
+            "agent": null,
+            "at": "2026-01-19T10:00:05.000Z",
+            "text": "Writing the flow file."
+          }
+        ],
+        "tools": [
+          {
+            "agent": null,
+            "at": "2026-01-19T10:00:05.000Z",
+            "detail": {
+              "file": "/home/you/work/alpha/docs/features/login/flow.md",
+              "kind": "Edit",
+              "new": "b",
+              "old": "a"
+            },
+            "failed": false,
+            "id": "t1",
+            "summary": "/home/you/work/alpha/docs/features/login/flow.md",
+            "tool": "Edit"
+          }
+        ]
+      },
+      {
+        "prompt": {
+          "agent": null,
+          "at": "2026-01-19T10:05:00.000Z",
+          "text": "Now run the tests."
+        },
+        "replies": [
+          {
+            "agent": null,
+            "at": "2026-01-19T10:05:10.000Z",
+            "text": "All **12** tests pass."
+          }
+        ],
+        "tools": [
+          {
+            "agent": null,
+            "at": "2026-01-19T10:05:02.000Z",
+            "detail": {
+              "command": "npm test",
+              "description": "Run the tests",
+              "kind": "Command"
+            },
+            "failed": false,
+            "id": "t3",
+            "summary": "Run the tests",
+            "tool": "Bash"
+          }
+        ]
+      }
+    ]
+  },
+  "s-mention": {
+    "agents": [],
+    "live": {
+      "waiting": null
+    },
+    "turns": [
+      {
+        "prompt": {
+          "agent": null,
+          "at": "2026-01-19T11:00:00.000Z",
+          "text": "Read docs/features/login/flow.md and summarise it."
+        },
+        "replies": [
+          {
+            "agent": null,
+            "at": "2026-01-19T11:00:05.000Z",
+            "text": "I read docs/features/login/flow.md."
+          }
+        ],
+        "tools": [
+          {
+            "agent": null,
+            "at": "2026-01-19T11:00:05.000Z",
+            "detail": {
+              "json": "{\"file_path\":\"/home/you/work/alpha/docs/features/login/flow.md\"}",
+              "kind": "Other"
+            },
+            "failed": false,
+            "id": "t2",
+            "summary": "/home/you/work/alpha/docs/features/login/flow.md",
+            "tool": "Read"
+          }
+        ]
+      }
+    ]
+  },
+  "s-solo-a": {
+    "agents": [],
+    "live": {
+      "waiting": null
+    },
+    "turns": [
+      {
+        "prompt": {
+          "agent": null,
+          "at": "2026-01-19T13:00:00.000Z",
+          "text": "Solo A."
+        },
+        "replies": [],
+        "tools": []
+      }
+    ]
+  },
+  "s-solo-b": {
+    "agents": [],
+    "live": {
+      "waiting": null
+    },
+    "turns": [
+      {
+        "prompt": {
+          "agent": null,
+          "at": "2026-01-19T14:00:00.000Z",
+          "text": "Solo B."
+        },
+        "replies": [],
+        "tools": []
+      }
+    ]
+  },
+  "s-wt": {
+    "agents": [],
+    "live": {
+      "waiting": null
+    },
+    "turns": [
+      {
+        "prompt": {
+          "agent": null,
+          "at": "2026-01-19T12:00:00.000Z",
+          "text": "A quick question."
+        },
+        "replies": [],
+        "tools": []
+      }
+    ]
+  }
+}

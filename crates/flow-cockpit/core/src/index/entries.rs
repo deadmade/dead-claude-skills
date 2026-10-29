@@ -55,6 +55,10 @@ pub struct AuditSummary {
     pub findings_by_severity: Vec<(String, u32)>,
     /// `None` when the report has no `Picks:` line.
     pub open: Option<bool>,
+    /// How many findings the user picked; `None` when the report has no `Picks:` line.
+    pub picks: Option<u32>,
+    /// How many findings have a `Fixed` line.
+    pub fixed: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -323,6 +327,10 @@ fn audit_summary(file: String, text: &str) -> AuditSummary {
             || rest.split(['-', '.']).next().unwrap_or("").to_string(),
             |c| (*c).to_string(),
         );
+    let count = |n: usize| u32::try_from(n).unwrap_or(u32::MAX);
+    let mut fixed = doc.fixed.clone();
+    fixed.sort_unstable();
+    fixed.dedup();
     let mut by_severity: Vec<(String, u32)> = Vec::new();
     for finding in &doc.findings {
         match by_severity.iter_mut().find(|(s, _)| *s == finding.severity) {
@@ -337,6 +345,8 @@ fn audit_summary(file: String, text: &str) -> AuditSummary {
         scope: doc.scope,
         findings_by_severity: by_severity,
         open: doc.open,
+        picks: doc.picks.as_ref().map(|p| count(p.len())),
+        fixed: count(fixed.len()),
     }
 }
 

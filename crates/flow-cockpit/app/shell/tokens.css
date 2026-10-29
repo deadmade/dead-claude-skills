@@ -284,3 +284,62 @@ details.unfold > .unfold-body { padding: var(--space-3) 0 var(--space-2); }
 .diff .add { color: var(--color-done); background: color-mix(in oklab, var(--color-done) 12%, transparent); }
 .diff details.unfold > summary { font-family: var(--font-body); }
 .diff details.unfold > .unfold-body { padding: 0; }
+
+/* ---------- the built-in views beyond the design: the run-tab slot, the list, activity ----------
+ * The same vocabulary: one grid, a rail and content, one-line rows, folds as quiet rows, state words for exceptions. */
+.st-Stale { background: color-mix(in oklab, var(--color-warn) 14%, transparent); color: var(--color-warn); }
+/* A run-tab view draws its own rail and content on the run view's grid, across the lower row. */
+.window > [data-slot="run-tab"], .window > [data-slot="run-tab"] > section.view { display: contents; }
+.window > [data-slot="run-tab"] > p.quiet, .window > [data-slot="run-tab"] > section.view > .card.error { grid-column: 1 / -1; margin: var(--space-4) var(--gutter); }
+/* The app's name leads back to the list. */
+.brand button.app { border: 0; background: none; padding: var(--space-1) var(--space-2); margin-left: calc(-1 * var(--space-2)); border-radius: var(--radius-row); transition: background-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out); }
+.brand button.app:hover { color: var(--color-ink); background: var(--color-paper-2); }
+.brand button.app:active { background: var(--color-paper-3); }
+/* A pressed filter or sort reads like the selected row. */
+.row[aria-pressed="true"] { background: var(--color-paper-3); color: var(--color-ink); }
+
+/* The list: the search on the content's edge, rows sharing one set of columns per group. */
+.search { width: min(24rem, 100%); min-height: 36px; padding: 0 var(--space-3); border: 1px solid var(--color-rule); border-radius: var(--radius-row); background: var(--color-paper-2); color: var(--color-ink); font: inherit; font-size: var(--text-sm); transition: border-color var(--dur-micro) var(--ease-out), background-color var(--dur-micro) var(--ease-out); }
+.search::placeholder { color: var(--color-muted); }
+.search:hover { border-color: var(--color-paper-4); }
+.search:focus { background: var(--color-paper-3); }
+.content > .group + .group { margin-top: var(--space-6); }
+.entries.runs .row { grid-template-columns: minmax(7rem, 1fr) 5.5rem minmax(0, 2fr) 2.5rem 4rem 8rem 4rem; }
+.entries.audits .row { grid-template-columns: minmax(7rem, 1fr) 5.5rem minmax(0, 2fr) 9rem 8rem 8rem; }
+.entries.loose .row { grid-template-columns: minmax(0, 1fr) 5.5rem 4rem; }
+.entries .row > span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.entries .row > [class^="col-"] { color: var(--color-muted); }
+.entries .row .col-when { justify-self: end; }
+.gate-ticks { display: flex; align-items: center; gap: var(--space-1); height: 12px; align-self: center; }
+
+/* Activity: one turn after another, newest first; the main session's reply is the one block at full contrast. */
+.live-wait { max-width: var(--measure); font-size: var(--text-lg); line-height: 1.4; color: var(--color-accent); padding-bottom: var(--space-5); margin-bottom: var(--space-6); border-bottom: 1px solid var(--color-rule); }
+.turns { list-style: none; padding: 0; }
+.turn { display: grid; grid-template-columns: minmax(0, var(--measure)); gap: var(--space-2) var(--space-7); align-items: start; }
+@media (min-width: 110rem) { .turn { grid-template-columns: minmax(0, 64ch) minmax(0, 1fr); } }
+.turn + .turn { margin-top: var(--space-6); padding-top: var(--space-6); border-top: 1px solid var(--color-rule); }
+.turn-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-3); align-items: baseline; }
+.turn-h { font-size: var(--text-md); font-weight: 500; line-height: 1.5; color: var(--color-ink-2); white-space: pre-line; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
+.turn-head .count { font-size: var(--text-xs); color: var(--color-muted); white-space: nowrap; }
+.turn-reply { margin-top: var(--space-3); }
+.turn-reply .md { color: var(--color-ink); }
+.turn-main > .quiet { margin-top: var(--space-2); font-size: var(--text-sm); }
+.turn-side > details.unfold + details.unfold { margin-top: var(--space-2); }
+.tool-list { list-style: none; padding: 0; }
+.tool-call > summary > span:first-child { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tool-name { color: var(--color-ink); font-weight: 600; }
+.tool-call.failed > summary .count { color: var(--color-error); }
+.reply + .reply { margin-top: var(--space-4); }
+.reply-by { font-size: var(--text-xs); color: var(--color-muted); margin-bottom: var(--space-1); }
+
+/* Docs: Options as decision cards. */
+.decisions .card .item-lead { margin-top: 0; }
+.decisions .card-body .md { margin-top: var(--space-2); }
+
+@media (max-width: 64rem) {
+  .search { width: 100%; }
+  .entries.runs .row { grid-template-columns: minmax(0, 1fr) 2.5rem 4rem auto 4rem; }
+  .entries.audits .row { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .entries.loose .row { grid-template-columns: minmax(0, 1fr) 4rem; }
+  .entries .row > .col-kind, .entries .row > .col-now, .entries .row > .col-findings { display: none; }
+}

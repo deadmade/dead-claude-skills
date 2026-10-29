@@ -1,0 +1,348 @@
+{
+  "github-com-acme-alpha/login": {
+    "flow": {
+      "decisions": [
+        {
+          "body": "Offered 2026-01-10: its own page, or a panel over the start page.",
+          "picked": "its own page, so a link can point at it.",
+          "title": "Where the form lives"
+        },
+        {
+          "body": "Offered 2026-01-11: a checkbox, or nothing for now.",
+          "picked": null,
+          "title": "Remember me"
+        }
+      ],
+      "deviations": [
+        {
+          "body": "",
+          "status": "Open",
+          "title": "The form needs a second field"
+        },
+        {
+          "body": "",
+          "status": {
+            "Decided": {
+              "date": "2026-01-12",
+              "what": "argon2"
+            }
+          },
+          "title": "Pick a hash"
+        }
+      ],
+      "flow": "feature",
+      "gates": [
+        {
+          "approved": "2026-01-10",
+          "n": 1,
+          "raw": "- Gate 1, spec approved: 2026-01-10",
+          "reopened": false,
+          "what": "spec approved"
+        },
+        {
+          "approved": "2026-01-11",
+          "n": 2,
+          "raw": "- Gate 2, plan approved: 2026-01-11",
+          "reopened": false,
+          "what": "plan approved"
+        }
+      ],
+      "now": "Building task 2 of 2.",
+      "phase": "build",
+      "phases": [],
+      "rulings": [
+        {
+          "call": "the form keeps the browser's own validation",
+          "cost": "a plainer error text.",
+          "date": "2026-01-12",
+          "raw": "2026-01-12, Task 1: the form keeps the browser's own validation — fewer moving parts — costs a plainer error text.",
+          "scope": "Task 1",
+          "why": "fewer moving parts"
+        }
+      ],
+      "sections": [
+        {
+          "heading": "Request",
+          "markdown": "Let people sign in with a name and a password, and keep the form short."
+        },
+        {
+          "heading": "Gates",
+          "markdown": "- Gate 1, spec approved: 2026-01-10\n- Gate 2, plan approved: 2026-01-11"
+        },
+        {
+          "heading": "Options",
+          "markdown": "### Where the form lives\n\nOffered 2026-01-10: its own page, or a panel over the start page.\n\n- **Picked:** its own page, so a link can point at it.\n\n### Remember me\n\nOffered 2026-01-11: a checkbox, or nothing for now."
+        },
+        {
+          "heading": "Rulings",
+          "markdown": "- 2026-01-12, Task 1: the form keeps the browser's own validation — fewer moving parts — costs a plainer error text."
+        },
+        {
+          "heading": "Deviations",
+          "markdown": "### The form needs a second field\n\nStatus: open\n\n### Pick a hash\n\nStatus: decided 2026-01-12: argon2"
+        }
+      ],
+      "title": "Login: flow"
+    },
+    "ledger": {
+      "plan": "docs/features/login/plan.md",
+      "rulings": [],
+      "tasks": [
+        {
+          "fix_rounds": 1,
+          "later": ["the label wraps on a narrow window"],
+          "model": "sonnet",
+          "n": 1,
+          "security": [],
+          "state": "Done",
+          "story": [
+            "dispatched (base 0a1b2c3, implementer sonnet)",
+            "fix round 1/5 (1 addressed, 0 open; commits 0a1b2c3..abc1234)",
+            "complete abc1234"
+          ]
+        },
+        {
+          "fix_rounds": 0,
+          "later": [],
+          "model": "opus",
+          "n": 2,
+          "security": [],
+          "state": "Building",
+          "story": ["dispatched (base abc1234, implementer opus)"]
+        }
+      ]
+    },
+    "plan": {
+      "tasks": [
+        {
+          "depends_on": [],
+          "does": "Draws the form.",
+          "markdown": "**Does:** Draws the form.\n**Depends on:** none",
+          "n": 1,
+          "title": "The form"
+        },
+        {
+          "depends_on": [1],
+          "does": "Checks the password.",
+          "markdown": "**Does:** Checks the password.\n**Depends on:** Task 1",
+          "n": 2,
+          "title": "The check"
+        }
+      ],
+      "title": "Login Implementation Plan"
+    },
+    "sessions": ["s-link"],
+    "summary": {
+      "conductor": "feature",
+      "copies": 2,
+      "gates": [
+        {
+          "approved": "2026-01-10",
+          "n": 1,
+          "raw": "- Gate 1, spec approved: 2026-01-10",
+          "reopened": false,
+          "what": "spec approved"
+        },
+        {
+          "approved": "2026-01-11",
+          "n": 2,
+          "raw": "- Gate 2, plan approved: 2026-01-11",
+          "reopened": false,
+          "what": "plan approved"
+        }
+      ],
+      "last_activity": "2026-01-20T11:00:00Z",
+      "now": "Building task 2 of 2.",
+      "open_deviations": 1,
+      "phase": "build",
+      "progress": [1, 2],
+      "slug": "login",
+      "status": "Idle"
+    }
+  },
+  "github-com-acme-alpha/signup": {
+    "flow": {
+      "decisions": [],
+      "deviations": [],
+      "flow": "feature",
+      "gates": [
+        {
+          "approved": null,
+          "n": 1,
+          "raw": "- Gate 1, spec approved:",
+          "reopened": false,
+          "what": "spec approved"
+        },
+        {
+          "approved": null,
+          "n": 2,
+          "raw": "- Gate 2, plan approved:",
+          "reopened": false,
+          "what": "plan approved"
+        }
+      ],
+      "now": "Waiting for you to approve the spec (Gate 1).",
+      "phase": "grill",
+      "phases": [
+        {
+          "gate_after": null,
+          "key": "ground",
+          "name": "Ground",
+          "state": "Done"
+        },
+        {
+          "gate_after": null,
+          "key": "brainstorm",
+          "name": "Brainstorm",
+          "state": "Done"
+        },
+        {
+          "gate_after": 1,
+          "key": "grill",
+          "name": "Grill",
+          "state": "Now"
+        },
+        {
+          "gate_after": null,
+          "key": "plan",
+          "name": "Plan",
+          "state": "Later"
+        },
+        {
+          "gate_after": 2,
+          "key": "evaluate",
+          "name": "Evaluate",
+          "state": "Later"
+        },
+        {
+          "gate_after": null,
+          "key": "execute",
+          "name": "Build",
+          "state": "Later"
+        },
+        {
+          "gate_after": null,
+          "key": "finish",
+          "name": "Verify and finish",
+          "state": "Later"
+        }
+      ],
+      "rulings": [],
+      "sections": [
+        {
+          "heading": "Gates",
+          "markdown": "- Gate 1, spec approved:\n- Gate 2, plan approved:"
+        }
+      ],
+      "title": "Signup: flow"
+    },
+    "ledger": null,
+    "plan": null,
+    "sessions": [],
+    "summary": {
+      "conductor": "feature",
+      "copies": 1,
+      "gates": [
+        {
+          "approved": null,
+          "n": 1,
+          "raw": "- Gate 1, spec approved:",
+          "reopened": false,
+          "what": "spec approved"
+        },
+        {
+          "approved": null,
+          "n": 2,
+          "raw": "- Gate 2, plan approved:",
+          "reopened": false,
+          "what": "plan approved"
+        }
+      ],
+      "last_activity": "2026-01-20T11:30:00Z",
+      "now": "Waiting for you to approve the spec (Gate 1).",
+      "open_deviations": 0,
+      "phase": "grill",
+      "progress": null,
+      "slug": "signup",
+      "status": "Waiting"
+    }
+  },
+  "github-com-acme-alpha/spiky": {
+    "flow": {
+      "decisions": [],
+      "deviations": [],
+      "flow": "research",
+      "gates": [],
+      "now": null,
+      "phase": "done",
+      "phases": [
+        {
+          "gate_after": null,
+          "key": "ground",
+          "name": "Ground",
+          "state": "Done"
+        },
+        {
+          "gate_after": null,
+          "key": "brainstorm",
+          "name": "Brainstorm",
+          "state": "Done"
+        },
+        {
+          "gate_after": 1,
+          "key": "grill",
+          "name": "Grill",
+          "state": "Done"
+        },
+        {
+          "gate_after": null,
+          "key": "plan",
+          "name": "Plan",
+          "state": "Done"
+        },
+        {
+          "gate_after": 2,
+          "key": "evaluate",
+          "name": "Evaluate",
+          "state": "Done"
+        },
+        {
+          "gate_after": null,
+          "key": "execute",
+          "name": "Build",
+          "state": "Done"
+        },
+        {
+          "gate_after": null,
+          "key": "validate",
+          "name": "Validate",
+          "state": "Done"
+        },
+        {
+          "gate_after": null,
+          "key": "finish",
+          "name": "Verify and finish",
+          "state": "Done"
+        }
+      ],
+      "rulings": [],
+      "sections": [],
+      "title": "Spiky: flow"
+    },
+    "ledger": null,
+    "plan": null,
+    "sessions": [],
+    "summary": {
+      "conductor": "research",
+      "copies": 1,
+      "gates": [],
+      "last_activity": "2026-01-15T12:00:00Z",
+      "now": null,
+      "open_deviations": 0,
+      "phase": "done",
+      "progress": null,
+      "slug": "spiky",
+      "status": "Done"
+    }
+  }
+}

@@ -1,0 +1,17 @@
+[
+  {
+    "id": "github-com-acme-alpha",
+    "name": "alpha",
+    "roots": [
+      "/home/you/work/alpha",
+      "/home/you/work/alpha/.claude/worktrees/x",
+      "/home/you/work/alpha/.worktrees/y",
+      "/home/you/work/alpha-2"
+    ]
+  },
+  {
+    "id": "folder-solo",
+    "name": "solo",
+    "roots": ["/home/you/a/solo", "/home/you/b/solo"]
+  }
+]

@@ -480,6 +480,37 @@ test('a_tab_that_isnt_loaded_says_so_in_the_slot', async () => {
   assert.match(slot.textContent, /The nope tab isn't loaded/);
 });
 
+test('session_route_draws_the_session_view_not_the_run_view', async () => {
+  const app = fakeApp({
+    run: { source: view('run', 'run', RUN_FRAME) },
+    activity: {
+      source: viewOf(
+        'activity',
+        ['run-tab', 'session'],
+        `(ctx) => {
+        const p = document.createElement('p');
+        p.textContent = ctx.route.to + ':' + ctx.route.id;
+        return p;
+      }`,
+      ),
+    },
+  });
+  const { root } = await started(app, { to: 'session', project: 'p1', id: 's-1' });
+  assert.equal(section(root, 'run'), null, 'the run view is not drawn');
+  assert.equal(section(root, 'activity')?.textContent, 'session:s-1');
+
+  // The same view still serves as the run's Activity tab.
+  const { root: runRoot } = await started(app, { ...RUN, tab: 'activity' });
+  const slot = section(runRoot, 'run').querySelector('[data-slot="run-tab"]');
+  assert.equal(section(slot, 'activity')?.textContent, 'run:undefined');
+});
+
+test('a_slot_list_with_an_unknown_slot_is_a_load_error', async () => {
+  const app = fakeApp({ odd: { source: viewOf('odd', ['run-tab', 'nope'], '() => document.createElement("p")') } });
+  const { root } = await started(app, { to: 'list' });
+  assert.match(section(root, 'odd')?.textContent ?? '', /"nope" isn't one of/);
+});
+
 test('a_route_without_views_says_so', async () => {
   const app = fakeApp({});
   const { root } = await started(app, { to: 'list' });

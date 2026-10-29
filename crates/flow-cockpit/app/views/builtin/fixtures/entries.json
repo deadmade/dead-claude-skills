@@ -1,0 +1,132 @@
+{
+  "folder-solo": [
+    {
+      "first_prompt": "Solo A.",
+      "id": "s-solo-a",
+      "kind": "Loose",
+      "last_activity": "2026-01-20T11:00:00Z",
+      "started": "2026-01-19T13:00:00.000Z"
+    },
+    {
+      "first_prompt": "Solo B.",
+      "id": "s-solo-b",
+      "kind": "Loose",
+      "last_activity": "2026-01-20T11:00:00Z",
+      "started": "2026-01-19T14:00:00.000Z"
+    }
+  ],
+  "github-com-acme-alpha": [
+    {
+      "conductor": "feature",
+      "copies": 1,
+      "gates": [
+        {
+          "approved": null,
+          "n": 1,
+          "raw": "- Gate 1, spec approved:",
+          "reopened": false,
+          "what": "spec approved"
+        },
+        {
+          "approved": null,
+          "n": 2,
+          "raw": "- Gate 2, plan approved:",
+          "reopened": false,
+          "what": "plan approved"
+        }
+      ],
+      "kind": "FlowRun",
+      "last_activity": "2026-01-20T11:30:00Z",
+      "now": "Waiting for you to approve the spec (Gate 1).",
+      "open_deviations": 0,
+      "phase": "grill",
+      "progress": null,
+      "slug": "signup",
+      "status": "Waiting"
+    },
+    {
+      "conductor": "feature",
+      "copies": 2,
+      "gates": [
+        {
+          "approved": "2026-01-10",
+          "n": 1,
+          "raw": "- Gate 1, spec approved: 2026-01-10",
+          "reopened": false,
+          "what": "spec approved"
+        },
+        {
+          "approved": "2026-01-11",
+          "n": 2,
+          "raw": "- Gate 2, plan approved: 2026-01-11",
+          "reopened": false,
+          "what": "plan approved"
+        }
+      ],
+      "kind": "FlowRun",
+      "last_activity": "2026-01-20T11:00:00Z",
+      "now": "Building task 2 of 2.",
+      "open_deviations": 1,
+      "phase": "build",
+      "progress": [1, 2],
+      "slug": "login",
+      "status": "Idle"
+    },
+    {
+      "conductor": "research",
+      "copies": 1,
+      "gates": [],
+      "kind": "FlowRun",
+      "last_activity": "2026-01-15T12:00:00Z",
+      "now": null,
+      "open_deviations": 0,
+      "phase": "done",
+      "progress": null,
+      "slug": "spiky",
+      "status": "Done"
+    },
+    {
+      "conductor": "test-audit",
+      "date": "2026-01-05",
+      "file": "2026-01-05-test-audit-installer.md",
+      "findings_by_severity": [
+        ["high", 1],
+        ["med", 1],
+        ["low", 1]
+      ],
+      "fixed": 1,
+      "kind": "Audit",
+      "open": true,
+      "picks": 2,
+      "scope": "branch: feat-x ← main, 12 files"
+    },
+    {
+      "conductor": "doc-audit",
+      "date": "2026-01-03",
+      "file": "2026-01-03-doc-audit-readme.md",
+      "findings_by_severity": [
+        ["med", 1],
+        ["low", 1]
+      ],
+      "fixed": 0,
+      "kind": "Audit",
+      "open": null,
+      "picks": null,
+      "scope": "README.md and the install section"
+    },
+    {
+      "first_prompt": "Read docs/features/login/flow.md and summarise it.",
+      "id": "s-mention",
+      "kind": "Loose",
+      "last_activity": "2026-01-20T11:00:00Z",
+      "started": "2026-01-19T11:00:00.000Z"
+    },
+    {
+      "first_prompt": "A quick question.",
+      "id": "s-wt",
+      "kind": "Loose",
+      "last_activity": "2026-01-20T11:00:00Z",
+      "started": "2026-01-19T12:00:00.000Z"
+    }
+  ]
+}

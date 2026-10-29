@@ -1,0 +1,17 @@
+{
+  "github-com-acme-alpha/login": {
+    "Flow": "---\nflow: feature\nphase: build\nnow: Building task 2 of 2.\n---\n\n# Login: flow\n\n## Request\n\nLet people sign in with a name and a password, and keep the form short.\n\n## Gates\n\n- Gate 1, spec approved: 2026-01-10\n- Gate 2, plan approved: 2026-01-11\n\n## Options\n\n### Where the form lives\n\nOffered 2026-01-10: its own page, or a panel over the start page.\n\n- **Picked:** its own page, so a link can point at it.\n\n### Remember me\n\nOffered 2026-01-11: a checkbox, or nothing for now.\n\n## Rulings\n\n- 2026-01-12, Task 1: the form keeps the browser's own validation — fewer moving parts — costs a plainer error text.\n\n## Deviations\n\n### The form needs a second field\n\nStatus: open\n\n### Pick a hash\n\nStatus: decided 2026-01-12: argon2\n",
+    "Plan": "# Login Implementation Plan\n\n### Task 1: The form\n\n**Does:** Draws the form.\n**Depends on:** none\n\n### Task 2: The check\n\n**Does:** Checks the password.\n**Depends on:** Task 1\n",
+    "Spec": null
+  },
+  "github-com-acme-alpha/signup": {
+    "Flow": "---\nflow: feature\nphase: grill\nnow: Waiting for you to approve the spec (Gate 1).\n---\n\n# Signup: flow\n\n## Gates\n\n- Gate 1, spec approved:\n- Gate 2, plan approved:\n",
+    "Plan": null,
+    "Spec": null
+  },
+  "github-com-acme-alpha/spiky": {
+    "Flow": "---\nflow: research\nphase: done\n---\n\n# Spiky: flow\n",
+    "Plan": null,
+    "Spec": null
+  }
+}

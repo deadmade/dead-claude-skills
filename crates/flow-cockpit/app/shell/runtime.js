@@ -21,7 +21,7 @@ import { stepper } from './blocks/stepper.js';
  * @typedef {Loaded & { info: ViewInfo, fallback: Loaded | null }} Entry
  */
 
-const SLOTS = ['list', 'run', 'run-tab', 'doc'];
+const SLOTS = ['list', 'run', 'run-tab', 'doc', 'session'];
 const blocks = Object.freeze({ markdown, mermaid, diff, stepper, card });
 
 /** @param {unknown} err */
@@ -207,7 +207,11 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     }
     const view = module?.default;
     if (!view || typeof view.render !== 'function') throw new Error('it has no default export with a render function');
-    if (!SLOTS.includes(view.slot)) throw new Error(`its slot "${view.slot}" isn't one of ${SLOTS.join(', ')}`);
+    /** @type {unknown[]} */
+    const slots = Array.isArray(view.slot) ? view.slot : [view.slot];
+    if (!slots.length) throw new Error('its slot list is empty');
+    const odd = slots.findIndex((s) => typeof s !== 'string' || !SLOTS.includes(s));
+    if (odd >= 0) throw new Error(`its slot "${slots[odd]}" isn't one of ${SLOTS.join(', ')}`);
     return view;
   }
 
@@ -237,8 +241,11 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     }
   }
 
-  /** @param {Entry} entry */
-  const slotOf = (entry) => entry.view?.slot ?? entry.fallback?.view?.slot ?? null;
+  /** The slots a view serves; empty while it never loaded. @param {Entry} entry @returns {readonly string[]} */
+  const slotsOf = (entry) => {
+    const slot = entry.view?.slot ?? entry.fallback?.view?.slot;
+    return slot === undefined ? [] : typeof slot === 'string' ? [slot] : slot;
+  };
 
   /** @param {string} id @param {unknown} err @param {boolean} replaced */
   const errorCard = (id, err, replaced) =>
@@ -302,7 +309,7 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     const at = Object.freeze({ ...route });
     const tabs = Object.freeze(
       entries
-        .filter((e) => slotOf(e) === 'run-tab')
+        .filter((e) => slotsOf(e).includes('run-tab'))
         .map((e) => {
           const view = /** @type {View} */ (e.view ?? e.fallback?.view);
           return Object.freeze({ id: e.info.id, title: view.title || e.info.id });
@@ -311,9 +318,9 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     /** @type {ViewContext} */
     const ctx = Object.freeze({ data, blocks, navigate, route: at, tabs });
     // A view that never loaded has no known slot: its error shows on every route.
-    const shown = entries.filter((e) => slotOf(e) === at.to || slotOf(e) === null);
+    const shown = entries.filter((e) => slotsOf(e).includes(at.to) || !slotsOf(e).length);
     const wanted = at.to === 'run' ? at.tab : undefined;
-    const tab = wanted ? entries.find((e) => e.info.id === wanted && slotOf(e) === 'run-tab') : undefined;
+    const tab = wanted ? entries.find((e) => e.info.id === wanted && slotsOf(e).includes('run-tab')) : undefined;
     const [sections, tabSection] = await Promise.all([
       Promise.all(shown.map((e) => section(e, ctx))),
       tab ? section(tab, ctx) : wanted ? missingTab(wanted) : null,
