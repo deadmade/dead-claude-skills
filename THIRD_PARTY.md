@@ -142,6 +142,19 @@ synced upstream commit is in `UPSTREAM`.
 - **Consent-O-Matic**: MIT, https://github.com/cavi-au/Consent-O-Matic. web-mcp downloads the pinned v1.1.5 zip on the
   first search (sha256-checked) and loads it into its search browsers; not vendored.
 
+## flow-cockpit
+
+`crates/flow-cockpit/app/shell/vendor/` holds three libraries the views' building blocks use, copied unchanged from
+their npm tarballs (each tarball checked against the registry's `dist.integrity`), each with its license next to it:
+
+- **marked** 18.1.2: MIT, https://github.com/markedjs/marked (`lib/marked.esm.js`, and `lib/marked.d.ts` as
+  `marked.esm.d.ts`; `LICENSE-marked`). Tarball `sha512-DfOnvLAQ6WYeWxWO1u4RyFOeqyHup6dks5PPqnoFiooU7ipRvidO/2j8plhAHIiZg574E9ZlzSjUiPMLAzFkgg==`.
+- **DOMPurify** 3.4.17: Apache-2.0 or MPL-2.0, https://github.com/cure53/DOMPurify (`dist/purify.es.mjs`,
+  `dist/purify.es.d.mts`; `LICENSE-dompurify`, `LICENSE-dompurify-MPL`). Tarball
+  `sha512-B/pSlYVHQ58kqISD/yDjuJ1yfzI34m1gF4lAod2bwSRhiN4K5Cl3H8Af7hqB2PmTL911tdEudnnXn5FnhRoz0w==`.
+- **mermaid** 12.2.0: MIT, https://github.com/mermaid-js/mermaid (`dist/mermaid.min.js`; `LICENSE-mermaid`). Tarball
+  `sha512-w7nr/SFrLO7BaVTs3dQTvYSV6nYSBj0Yy9DjBhsIJtAcHqRzXSq4Pg32ujHZ/AdWsAMNEvvhbm5dt9E2tOiHzw==`.
+
 ## Night City (dead-skills)
 
 The palette of `plugins/default/themes/night-city.json` is derived from the Cyberpunk Neon theme

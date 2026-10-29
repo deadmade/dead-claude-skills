@@ -95,8 +95,9 @@ pub fn views(data: Data<'_>) -> Vec<ViewInfo> {
     data.views.list()
 }
 
-/// The view's code, types stripped; the error names the line.
+/// The view's code, types stripped; the error names the line. `builtin: true` reads the built-in even when a views
+/// folder replaces it: the runtime draws it below a broken replacement.
 #[tauri::command(async)]
-pub fn view_source(data: Data<'_>, id: &str) -> Result<String, String> {
-    data.views.source(id)
+pub fn view_source(data: Data<'_>, id: &str, builtin: Option<bool>) -> Result<String, String> {
+    data.views.source(id, builtin.unwrap_or(false))
 }

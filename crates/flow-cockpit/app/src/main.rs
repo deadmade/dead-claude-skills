@@ -102,21 +102,22 @@ fn run() -> ExitCode {
     }
 }
 
-/// The bindings as one declaration file: each type once, without the imports between them.
+/// The view interface, embedded for `--print-types`.
+static API: &str = include_str!("../shell/api.d.ts");
+
+/// The view interface and the bindings as one declaration file: each type once, without the imports between them.
 fn types() -> String {
     let mut files: Vec<_> = BINDINGS
         .files()
         .filter(|f| f.path().extension().is_some_and(|e| e == "ts"))
         .collect();
     files.sort_by_key(|f| f.path());
+    let files = files.iter().map(|f| f.contents_utf8().unwrap_or_default());
     let mut out = String::from(
-        "// The flow cockpit's data types, from `flow-cockpit --print-types`. Generated: do not edit.\n",
+        "// The flow cockpit's view interface and data types, from `flow-cockpit --print-types`. Generated: do not edit.\n",
     );
-    for file in files {
-        let text = file
-            .contents_utf8()
-            .unwrap_or_default()
-            .replace("\r\n", "\n");
+    for text in std::iter::once(API).chain(files) {
+        let text = text.replace("\r\n", "\n");
         for line in text.lines() {
             if line.starts_with("import type ") || line.starts_with("// This file was generated") {
                 continue;
@@ -187,6 +188,9 @@ mod tests {
             "export type FlowDoc",
             "export type ViewInfo",
             "export type Changed",
+            "export interface View ",
+            "export interface ViewContext",
+            "export interface Blocks",
         ] {
             assert!(out.contains(name), "{name} missing");
         }

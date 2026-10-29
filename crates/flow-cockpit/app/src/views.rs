@@ -76,16 +76,25 @@ impl Views {
         views.into_values().collect()
     }
 
-    /// The view's code with its types stripped.
+    /// The view's code with its types stripped. `builtin` skips the views folders and reads the built-in, which the
+    /// window draws below a broken replacement.
     ///
     /// # Errors
-    /// No view has that id, its file can't be read, or it doesn't strip (the message names the line).
-    pub fn source(&self, id: &str) -> Result<String, String> {
+    /// No view has that id (no built-in, with `builtin`), its file can't be read, or it doesn't strip (the message
+    /// names the line).
+    pub fn source(&self, id: &str, builtin: bool) -> Result<String, String> {
         // Only ids the listing found: an id is never joined onto a path.
-        let typescript = if let Some(path) = self.global_files().remove(id) {
+        let global = if builtin {
+            None
+        } else {
+            self.global_files().remove(id)
+        };
+        let typescript = if let Some(path) = global {
             fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?
         } else if let Some(text) = print_view(self.builtin, id) {
             text.to_string()
+        } else if builtin {
+            return Err(format!("no built-in view {id}"));
         } else {
             return Err(format!("no view {id}"));
         };
@@ -192,19 +201,35 @@ mod tests {
                 info("run", ViewSource::Global, true),
             ]
         );
-        assert!(views.source("run").unwrap().contains("mine"));
-        assert!(views.source("list").unwrap().contains("list"));
+        assert!(views.source("run", false).unwrap().contains("mine"));
+        assert!(views.source("list", false).unwrap().contains("list"));
         fs::remove_file(t.0.join("run.ts")).unwrap();
-        let run = views.source("run").unwrap();
+        let run = views.source("run", false).unwrap();
         assert!(run.contains("run") && !run.contains(": number"), "{run}");
+    }
+
+    #[test]
+    fn builtin_source_ignores_global() {
+        let t = temp("builtin");
+        fs::write(t.0.join("run.ts"), "export default { id: 'mine' };\n").unwrap();
+        fs::write(t.0.join("extra.ts"), "export default {};\n").unwrap();
+        let views = Views::new(&TEST_BUILTIN, t.0.clone());
+        assert!(views.source("run", false).unwrap().contains("mine"));
+        let run = views.source("run", true).unwrap();
+        assert!(
+            run.contains("id: \"run\"") && !run.contains("mine"),
+            "{run}"
+        );
+        // No built-in behind a view of its own: an error, so the window shows only the error card.
+        assert!(views.source("extra", true).is_err());
     }
 
     #[test]
     fn unknown_or_path_like_id_is_an_error() {
         let t = temp("unknown");
         let views = Views::new(&TEST_BUILTIN, t.0.clone());
-        assert!(views.source("nope").is_err());
-        assert!(views.source("../list").is_err());
+        assert!(views.source("nope", false).is_err());
+        assert!(views.source("../list", false).is_err());
     }
 
     #[test]
