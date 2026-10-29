@@ -4,7 +4,8 @@
 // project: a repository the user trusts adds its own on its project's pages only, so moving to another project loads
 // that project's set (a view from the same place as before is kept, with its module state). A repository view's module
 // can't be unloaded, so when one that was imported stops being allowed (trust taken away, its folder gone, switched
-// off), the window reloads; the address keeps the page. A view that fails to load
+// off) or its id comes with other code (another trusted checkout's, an edit), the window reloads; the address keeps the
+// page. A view that fails to load
 // or to draw shows its error card in its own section, with the default of that id drawn below it when another
 // extension replaced it; the other views never see it.
 import { card } from './blocks/card.js';
@@ -297,9 +298,10 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
   /** A `views-changed` reload is under way: what was imported is checked against what is still allowed. */
   let reloading = false;
   /**
-   * Per project, the ids of the repository views imported for its pages. A module can't be unloaded, so its timers
-   * and listeners outlive its page: once one isn't allowed any more, the window reloads.
-   * @type {Map<string, Set<string>>}
+   * Per project, the repository views imported for its pages, by id, with the code each was imported from. A module
+   * can't be unloaded, so its timers and listeners outlive its page: once one isn't allowed any more, or its id is
+   * served with other code (another trusted checkout's, or an edit), the window reloads.
+   * @type {Map<string, Map<string, string>>}
    */
   const imported = new Map();
 
@@ -330,6 +332,10 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
   async function load(id, builtin, project) {
     /** @type {string} */
     const source = await invoke('view_source', { id, ...(builtin ? { builtin: true } : {}), ...scope(project) });
+    if (project) {
+      if (!imported.has(project)) imported.set(project, new Map());
+      imported.get(project)?.set(id, source);
+    }
     const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
     let module;
     try {
@@ -388,12 +394,7 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
               e.info.replaced === info.replaced,
           );
           if (same) return same;
-          const repo = info.source === 'Repo';
-          if (repo) {
-            if (!imported.has(project)) imported.set(project, new Set());
-            imported.get(project)?.add(info.id);
-          }
-          const own = await loaded(info.id, false, repo ? project : '');
+          const own = await loaded(info.id, false, info.source === 'Repo' ? project : '');
           // A broken replacement's slot comes from the built-in behind it.
           const fallback = own.view || !info.replaced ? null : await loaded(info.id, true, '');
           return { info, ...own, fallback };
@@ -408,18 +409,27 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     }
   }
 
+  /** `imported` as it is now, to compare a reload's against. */
+  const importedNow = () => new Map([...imported].map(([p, ids]) => [p, new Map(ids)]));
+
   /**
-   * Whether every repository view imported so far is still allowed on its project's pages (trusted, its folder there,
-   * not switched off). `infos` is the listing just read for `project`.
-   * @param {string} project @param {ViewInfo[]} infos
+   * Whether every repository view imported before this reload (`was`) is still allowed on its project's pages
+   * (trusted, its folder there, not switched off) and still served with the code it was imported from. `infos` is the
+   * listing just read for `project`, whose repository views the reload has just imported again.
+   * @param {Map<string, Map<string, string>>} was @param {string} project @param {ViewInfo[]} infos
    */
-  async function stillAllowed(project, infos) {
-    for (const [p, ids] of imported) {
+  async function stillAllowed(was, project, infos) {
+    for (const [p, ids] of was) {
       /** @type {ViewInfo[] | null} */
       const listed = p === project ? infos : await invoke('views', scope(p)).catch(() => null);
       if (!listed) continue;
       const repo = new Set(listed.filter((i) => i.source === 'Repo').map((i) => i.id));
-      if ([...ids].some((id) => !repo.has(id))) return false;
+      for (const [id, source] of ids) {
+        if (!repo.has(id)) return false;
+        const now =
+          p === project ? imported.get(p)?.get(id) : await invoke('view_source', { id, project: p }).catch(() => null);
+        if (now !== source) return false;
+      }
     }
     return true;
   }
@@ -495,11 +505,14 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     projectsNow = null; // Each draw reads the projects afresh, once.
     const project = await projectOf(at);
     if (project !== loadedFor) {
-      const infos = await loadAll(project, loadedFor !== null);
-      const checking = reloading;
+      const was = reloading ? importedNow() : null;
       reloading = false;
+      // What this load imports for the project is recorded afresh, so a view that no longer loads counts as changed.
+      if (was) imported.delete(project);
+      const infos = await loadAll(project, loadedFor !== null);
+      if (was && !infos) imported.set(project, was.get(project) ?? new Map());
       // The address keeps the page across the reload.
-      if (checking && infos && !(await stillAllowed(project, infos))) return window.location.reload();
+      if (was && infos && !(await stillAllowed(was, project, infos))) return window.location.reload();
     }
     const tabs = Object.freeze(
       entries

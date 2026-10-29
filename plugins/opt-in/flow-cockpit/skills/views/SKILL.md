@@ -44,8 +44,8 @@ you start; if it doesn't, tell the user how to get it and stop.
     default, replaces it whole, and a view id it shares with them wins.
   - They load from the trusted checkout, or from a worktree git links to it, never from another clone. The main
     checkout's folder wins; a worktree's loads only when the main checkout has none.
-  - Once one of its views has loaded, taking trust away, removing it or switching it off reloads the window on the
-    same page, since its code can't be unloaded otherwise.
+  - Once one of its views has loaded, editing it, taking trust away, removing it or switching it off reloads the
+    window on the same page, since its code can't be unloaded otherwise.
 - The old `flow-cockpit/views/` folder is no longer read. Move a view from there into an extension folder of its own.
 - **`config.toml`** sits next to the user's extensions folder. It holds the user's own settings, edited by hand:
   - `disabled = ["<extension name>", ...]` switches extensions off, defaults, the user's own or a repository's. When
@@ -54,7 +54,8 @@ you start; if it doesn't, tell the user how to get it and stop.
   - `trusted = ["/path/to/repo", ...]` names the repositories whose own extensions load. Write the absolute path of
     a checkout or of one of its worktrees; a relative path or `~` trusts nothing. A path trusts that checkout and the
     worktrees git links to it both ways, nothing else: another clone of the same repository, a folder of the same
-    name or one in `.claude/worktrees/` that git doesn't list needs its own entry. A repository's extensions are code
+    name or one in `.claude/worktrees/` that git doesn't list needs its own entry. A submodule, a worktree of a
+    submodule or a `--separate-git-dir` checkout loads nothing, even when named. A repository's extensions are code
     that runs in the window, with everything a view can see: every project's runs, documents and sessions. Add a
     repository only when the user asks for that one, and say so before you do.
   - A change takes effect within a few seconds, without a restart. A file that doesn't parse is ignored, and the
@@ -157,7 +158,8 @@ export default view;
 - State that should survive a redraw, such as a picked row or a filter, can live in a module-level variable, as in
   the defaults. But every view file is imported afresh whenever any file in an extensions folder changes, or
   `disabled` or `trusted` in `config.toml` does. Moving to another project imports a repository's views afresh too,
-  and the views they replaced. That resets module state and runs top-level code again.
+  and the views they replaced. That resets module state and runs top-level code again. A change to a repository view
+  that has loaded reloads the whole window, which resets every view's state.
 
 ## Rules
 

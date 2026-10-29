@@ -31,11 +31,21 @@ impl Trusted {
     }
 }
 
-/// The folders a repository's extensions may load from for a project with these roots: the main checkouts that a
-/// trusted root is or leads to, sorted, then their linked worktrees, sorted. Reads only the trusted roots' own `.git`
-/// and those main checkouts' `.git/worktrees/` records; another root of the project is never touched.
+/// The folders a repository's extensions may load from for a project with these roots: [`mains`], then their
+/// [`worktrees`]. Reads only the trusted roots' own `.git` and those main checkouts' `.git/worktrees/` records; another
+/// root of the project is never touched.
+#[cfg(test)]
 #[must_use]
 pub fn repositories(roots: &[PathBuf], trusted: &Trusted) -> Vec<PathBuf> {
+    let mains = mains(roots, trusted);
+    let worktrees = worktrees(&mains);
+    mains.into_iter().chain(worktrees).collect()
+}
+
+/// The main checkouts that a trusted root of a project with these roots is or leads to, sorted. Reads only the trusted
+/// roots' own `.git`, and for a worktree its main checkout's record of it.
+#[must_use]
+pub fn mains(roots: &[PathBuf], trusted: &Trusted) -> Vec<PathBuf> {
     let mut mains: Vec<PathBuf> = roots
         .iter()
         .filter(|root| trusted.names(root) && is_real_dir(root))
@@ -43,10 +53,16 @@ pub fn repositories(roots: &[PathBuf], trusted: &Trusted) -> Vec<PathBuf> {
         .collect();
     mains.sort();
     mains.dedup();
+    mains
+}
+
+/// The worktrees git links both ways to these main checkouts, sorted: a walk of each one's `.git/worktrees/` records.
+#[must_use]
+pub fn worktrees(mains: &[PathBuf]) -> Vec<PathBuf> {
     let mut worktrees: Vec<PathBuf> = mains.iter().flat_map(|m| worktrees_of(m)).collect();
     worktrees.sort();
     worktrees.dedup();
-    mains.into_iter().chain(worktrees).collect()
+    worktrees
 }
 
 /// The repository a trusted folder belongs to: itself when its `.git` is a folder or when it has none (a plain folder
@@ -70,12 +86,20 @@ fn main_of(root: &Path) -> Option<PathBuf> {
         return None;
     }
     let main = dot_git.parent()?.to_path_buf();
-    (is_real_dir(&main) && is_real_dir(dot_git) && links_back(&admin, root)).then_some(main)
+    let real = is_real_dir(&main) && is_real_dir(dot_git) && is_real_dir(worktrees);
+    (real && links_back(&admin, root)).then_some(main)
 }
 
-/// The worktrees git recorded for `main` that link back to it, each a real folder (not a link).
+/// The worktrees git recorded for `main` that link back to it, each a real folder (not a link), as is the folder of
+/// records.
 fn worktrees_of(main: &Path) -> Vec<PathBuf> {
-    let Ok(read) = fs::read_dir(main.join(".git").join("worktrees")) else {
+    #[cfg(test)]
+    tests::WALKS.with(|n| n.set(n.get() + 1));
+    let records = main.join(".git").join("worktrees");
+    if !is_real_dir(&records) {
+        return Vec::new();
+    }
+    let Ok(read) = fs::read_dir(records) else {
         return Vec::new();
     };
     read.flatten()
@@ -140,8 +164,15 @@ fn lexical(path: &Path) -> PathBuf {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
+    use std::cell::Cell;
+
     use super::*;
+
+    thread_local! {
+        /// How many times this test's thread walked a checkout's worktree records.
+        pub(crate) static WALKS: Cell<usize> = const { Cell::new(0) };
+    }
 
     struct Temp(PathBuf);
 
@@ -306,6 +337,28 @@ mod tests {
         // Trusting the link itself trusts nothing either.
         assert_eq!(
             repositories(&roots, &trusted(&[&slot])),
+            Vec::<PathBuf>::new()
+        );
+    }
+
+    /// A linked `.git/worktrees` in a trusted checkout is no record folder: its records list nothing, and a worktree
+    /// naming an admin folder inside it leads to no main checkout.
+    #[cfg(unix)]
+    #[test]
+    fn a_linked_worktrees_record_folder_is_ignored() {
+        let t = temp("linked-records");
+        let app = t.0.join("app");
+        let records = t.0.join("records");
+        fs::rename(app.join(".git/worktrees"), &records).unwrap();
+        std::os::unix::fs::symlink(&records, app.join(".git/worktrees")).unwrap();
+        let wt = t.0.join("app/.claude/worktrees/wt");
+        let roots = [app.clone(), wt.clone()];
+        assert_eq!(
+            repositories(&roots, &trusted(&[&app])),
+            std::slice::from_ref(&app)
+        );
+        assert_eq!(
+            repositories(&roots, &trusted(&[&wt])),
             Vec::<PathBuf>::new()
         );
     }

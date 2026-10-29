@@ -16,7 +16,7 @@ use ts_rs::TS;
 
 use crate::paths::Defaults;
 use crate::strip::strip;
-use crate::trust::{Trusted, is_real_dir, repositories};
+use crate::trust::{Trusted, is_real_dir, mains, worktrees};
 
 /// Where a view's code comes from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
@@ -134,21 +134,17 @@ impl Views {
     }
 
     /// The extensions folder of a project with these roots (its checkouts and worktrees) from the repository a
-    /// `trusted` entry names ([`repositories`]): its main checkout's `.flow-cockpit/extensions/` when that exists, else
+    /// `trusted` entry names ([`mains`], [`worktrees`]): its main checkout's `.flow-cockpit/extensions/` when that exists, else
     /// the first of its worktrees'. No other root's folder is looked at. A linked `.flow-cockpit` or `extensions` is
     /// no folder, as everywhere else.
     #[must_use]
     pub fn repo(&self, roots: &[PathBuf]) -> Option<PathBuf> {
-        let folders = repositories(
+        let mains = mains(
             roots,
             &self.trusted.read().unwrap_or_else(PoisonError::into_inner),
         );
-        folders
-            .iter()
-            .map(|root| root.join(".flow-cockpit"))
-            .filter(|dir| is_real_dir(dir))
-            .map(|dir| dir.join("extensions"))
-            .find(|dir| is_real_dir(dir))
+        // The usual case, a folder in the main checkout, reads no worktree record.
+        extensions_in(&mains).or_else(|| extensions_in(&worktrees(&mains)))
     }
 
     /// Every view id once, from the extension that wins, sorted by id. `repo` is a trusted repository's extensions
@@ -249,6 +245,16 @@ impl Views {
         let mut layers = self.layers(None);
         views_of(&layers.swap_remove(0).1)
     }
+}
+
+/// The first of these checkouts' `.flow-cockpit/extensions/`, each part a real folder.
+fn extensions_in(roots: &[PathBuf]) -> Option<PathBuf> {
+    roots
+        .iter()
+        .map(|root| root.join(".flow-cockpit"))
+        .filter(|dir| is_real_dir(dir))
+        .map(|dir| dir.join("extensions"))
+        .find(|dir| is_real_dir(dir))
 }
 
 /// Each view id, from the highest folder that has it; `replaced` when a default view of that id is behind it.
@@ -694,6 +700,31 @@ mod tests {
         assert_eq!(
             views.repo(&roots),
             Some(other.join(".flow-cockpit/extensions"))
+        );
+    }
+
+    /// The main checkout's folder is looked for first: when it has one, no worktree record is read.
+    #[test]
+    fn repo_reads_worktree_records_only_when_the_main_checkout_has_no_folder() {
+        let t = temp("repo-walks");
+        let main = t.0.join("app");
+        fs::create_dir_all(main.join(".git")).unwrap();
+        let views = t.views(&[]);
+        views.set_trusted(std::slice::from_ref(&main));
+        let walks = || crate::trust::tests::WALKS.with(std::cell::Cell::get);
+        let before = walks();
+        assert_eq!(views.repo(std::slice::from_ref(&main)), None);
+        assert_eq!(
+            walks(),
+            before + 1,
+            "no folder in the main checkout: its records are read"
+        );
+        t.write("app/.flow-cockpit/extensions/x/x.ts", "");
+        assert!(views.repo(std::slice::from_ref(&main)).is_some());
+        assert_eq!(
+            walks(),
+            before + 1,
+            "the main checkout's folder: no record read"
         );
     }
 

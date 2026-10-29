@@ -1175,15 +1175,47 @@ test('repo_views_show_only_on_their_projects_pages', async () => {
 });
 
 test('views_changed_reloads_the_shown_projects_views', async () => {
-  const app = fakeApp({ run: { source: view('run', 'run', RUN_FRAME) } });
-  app.repos = { p1: { notes: { from: 'Repo', source: view('notes', 'run-tab', says('old'), 'Notes') } } };
-  const { root, runtime } = await started(app, { ...RUN, tab: 'notes' });
-  const notes = () => section(section(root, 'run'), 'notes')?.textContent;
-  assert.equal(notes(), 'old');
-  app.repos.p1.notes.source = view('notes', 'run-tab', says('new'), 'Notes');
+  // A user's run tab, edited, on a project whose repository adds an unchanged one: the views load again in place.
+  const app = fakeApp({
+    run: { source: view('run', 'run', RUN_FRAME) },
+    mine: { from: 'Global', source: view('mine', 'run-tab', says('old'), 'Mine') },
+  });
+  app.repos = { p1: { notes: { from: 'Repo', source: view('notes', 'run-tab', says('notes'), 'Notes') } } };
+  const { root, runtime } = await started(app, { ...RUN, tab: 'mine' });
+  const mine = () => section(section(root, 'run'), 'mine')?.textContent;
+  assert.equal(mine(), 'old');
+  app.views.mine.source = view('mine', 'run-tab', says('new'), 'Mine');
   await app.emit('views-changed', {});
   await runtime.idle();
-  assert.equal(notes(), 'new');
+  assert.equal(mine(), 'new');
+});
+
+test('a_repository_view_served_from_other_code_reloads_the_window', async () => {
+  await inWindow('http://localhost/', async (win, reloads) => {
+    // Two trusted clones of p1 both have `notes`; the first wins. Taking it out of `trusted` leaves `notes` listed as
+    // a repository's, now with the other clone's code: the first one's module is still in the window.
+    const app = fakeApp({ run: { source: view('run', 'run', RUN_FRAME) } });
+    app.repos = { p1: { notes: { from: 'Repo', source: view('notes', 'run-tab', says('first clone'), 'Notes') } } };
+    const { runtime } = await started(app, { ...RUN, tab: 'notes' });
+    await app.emit('views-changed', {});
+    await runtime.idle();
+    assert.equal(reloads.count, 0, 'the same code: no reload');
+    app.repos.p1.notes.source = view('notes', 'run-tab', says('second clone'), 'Notes');
+    await app.emit('views-changed', {});
+    await runtime.idle();
+    assert.equal(reloads.count, 1);
+    // The same while another project's page is shown.
+    const again = fakeApp({ run: { source: view('run', 'run', RUN_FRAME) } });
+    again.repos = { p1: { notes: { from: 'Repo', source: view('notes', 'run-tab', says('first'), 'Notes') } } };
+    const other = await started(again, { ...RUN, tab: 'notes' });
+    other.runtime.navigate({ ...RUN, project: 'p2' });
+    await other.runtime.idle();
+    again.repos.p1.notes.source = view('notes', 'run-tab', says('second'), 'Notes');
+    await again.emit('views-changed', {});
+    await other.runtime.idle();
+    assert.equal(reloads.count, 2);
+    assert.deepEqual(reloads.errors, []);
+  });
 });
 
 test('a_repository_view_reads_its_code_with_its_project_and_no_other_does', async () => {
