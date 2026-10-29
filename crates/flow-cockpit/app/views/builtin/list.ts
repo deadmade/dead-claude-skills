@@ -92,13 +92,13 @@ function gateWords(gates: Gate[]): string {
   return `${capital(joined(open))} ${open.length === 1 ? 'is' : 'are'} open`;
 }
 
-/** One mark at most: the state when it is the exception. */
-function runMark(r: FlowRunSummary): HTMLElement | string {
+/** One mark at most: the state when it is the exception; none for a run that is as expected. */
+function runMark(r: FlowRunSummary): HTMLElement | null {
   if (r.status === 'Waiting') return el('span', 'mark Waiting', 'Needs you');
   if (r.status === 'Working') return el('span', 'mark Building', 'Working');
   if (r.open_deviations) return el('span', 'mark Waiting', plural(r.open_deviations, 'deviation') + ' open');
   if (r.status === 'Stale') return el('span', 'mark fix', 'Stale');
-  return el('span', 'mark');
+  return null;
 }
 
 /** How far a run is: done runs first, then by tasks done, then runs without a build log. */
@@ -147,9 +147,14 @@ function table(kind: string, caption: string, cols: [string, string][], rows: HT
   return t;
 }
 
-/** A row that opens something: the whole row takes the click, and its name is the one real button. */
-function opener(className: string, name: string, cells: HTMLTableCellElement[], open: () => void) {
-  const tr = el('tr', `opens ${className}`.trim(), td('name', button('', name)), ...cells);
+/**
+ * A row that opens something: the whole row takes the click, and its name is the one real button. `keep` names the
+ * button for the runtime, so focus stays on this row when a redraw sorts others in above it.
+ */
+function opener(className: string, name: string, keep: string, cells: HTMLTableCellElement[], open: () => void) {
+  const b = button('', name);
+  b.dataset.keep = keep;
+  const tr = el('tr', `opens ${className}`.trim(), td('name', b), ...cells);
   tr.addEventListener('click', open);
   return tr;
 }
@@ -177,20 +182,23 @@ const LOOSE_COLS: [string, string][] = [
   ['when', 'Last activity'],
 ];
 
-function runRow(ctx: ViewContext, project: string, r: FlowRunSummary) {
+/** A run's row; the State cell only when the table has that column. */
+function runRow(ctx: ViewContext, project: string, r: FlowRunSummary, withMark: boolean) {
   const ticks = el('span', 'gate-ticks', ...r.gates.map((g) => el('span', g.approved ? 'tick passed' : 'tick')));
   ticks.title = gateWords(r.gates);
   ticks.setAttribute('aria-label', `${gateWords(r.gates)}.`);
   const where = r.now ?? (r.phase === 'done' ? 'Done.' : `In ${r.phase}.`);
+  const mark = runMark(r);
   const row = opener(
     r.status === 'Done' ? 'done' : '',
     words(r.slug),
+    `run-${r.slug}`,
     [
       td('kind', words(r.conductor)),
       td('now', where),
       td('gates', ticks),
       td('tasks', r.progress ? `${r.progress[0]} of ${r.progress[1]}` : ''),
-      td('mark', runMark(r)),
+      ...(withMark ? [td('mark', ...(mark ? [mark] : []))] : []),
       td('when', when(r.last_activity)),
     ],
     () => ctx.navigate({ to: 'run', project, slug: r.slug }),
@@ -225,8 +233,12 @@ function auditRow(a: AuditSummary) {
 
 function looseRow(ctx: ViewContext, project: string, s: SessionSummary) {
   const prompt = s.first_prompt?.trim() || `Session ${s.id.slice(0, 8)}`;
-  const row = opener('', prompt, [td('started', when(s.started)), td('when', when(s.last_activity))], () =>
-    ctx.navigate({ to: 'session', project, id: s.id }),
+  const row = opener(
+    '',
+    prompt,
+    `session-${s.id}`,
+    [td('started', when(s.started)), td('when', when(s.last_activity))],
+    () => ctx.navigate({ to: 'session', project, id: s.id }),
   );
   row.title = prompt;
   return row;
@@ -262,8 +274,8 @@ function picker(id: string, label: string, choices: [string, string][], value: s
   return el('div', 'field', Object.assign(el('label', '', label), { htmlFor: id }), select);
 }
 
-function empty(first: string, second: string): HTMLElement {
-  return el('div', 'empty', el('p', '', first), el('p', '', second));
+function empty(first: string, second = ''): HTMLElement {
+  return el('div', 'empty', el('p', '', first), ...(second ? [el('p', '', second)] : []));
 }
 
 function frame(ctx: ViewContext, projects: Project[], project: Project | undefined, entries: Entry[]): HTMLElement {
@@ -297,10 +309,11 @@ function frame(ctx: ViewContext, projects: Project[], project: Project | undefin
   // A project opens on its flow runs, or on its loose sessions when it has nothing else.
   if (!state.tabs.has(id)) state.tabs.set(id, runs.length || audits.length || !loose.length ? 'runs' : 'loose');
 
-  // The rail: the projects, nothing else.
+  // The rail: the projects, nothing else. A same-named project's place sits under its name.
   const places = placesOf(projects);
   const projectRows = projects.map((p) => {
-    const b = button('row plain', el('span', 'ttl', p.name), el('span', 'mark', places.get(p.id) ?? ''));
+    const place = places.get(p.id);
+    const b = button('row plain', el('span', 'ttl', p.name), ...(place ? [el('span', 'mark', place)] : []));
     b.setAttribute('aria-current', String(p.id === id));
     b.title = p.roots.join('\n');
     b.addEventListener('click', () => {
@@ -308,7 +321,12 @@ function frame(ctx: ViewContext, projects: Project[], project: Project | undefin
     });
     return el('li', '', b);
   });
-  const projectsGroup = el('section', 'group', el('h2', 'group-h', 'Projects'), el('ol', 'rows', ...projectRows));
+  const projectsGroup = el(
+    'section',
+    'group projects',
+    el('h2', 'group-h', 'Projects'),
+    el('ol', 'rows', ...projectRows),
+  );
   projectsGroup.setAttribute('aria-label', 'Projects');
   left.append(projectsGroup);
 
@@ -372,18 +390,18 @@ function frame(ctx: ViewContext, projects: Project[], project: Project | undefin
     filters.replaceChildren();
     const has = tab === 'runs' ? runs.length + audits.length > 0 : loose.length > 0;
     if (has && tab === 'runs') {
-      // Only the values this project has, with their counts; Sort has no Any.
-      if (runs.length)
+      // Only the values this project has, with their counts; Sort has no Any. A value picked earlier stays (count 0)
+      // when live data drops it, so the select still shows what filters the table.
+      if (runs.length || state.status)
         filters.append(
           picker(
             'list-status',
             'Status',
             [
               ['', 'Any'],
-              ...STATUSES.filter(([s]) => runs.some((r) => r.status === s)).map(([s, label]): [string, string] => [
-                s,
-                `${label} (${runs.filter((r) => r.status === s).length})`,
-              ]),
+              ...STATUSES.filter(([s]) => s === state.status || runs.some((r) => r.status === s)).map(
+                ([s, label]): [string, string] => [s, `${label} (${runs.filter((r) => r.status === s).length})`],
+              ),
             ],
             state.status,
             (v) => {
@@ -393,7 +411,9 @@ function frame(ctx: ViewContext, projects: Project[], project: Project | undefin
           ),
         );
       const both = [...runs, ...audits];
-      const conductors = [...new Set(both.map((x) => x.conductor))].sort();
+      const conductors = [
+        ...new Set([...both.map((x) => x.conductor), ...(state.conductor ? [state.conductor] : [])]),
+      ].sort();
       filters.append(
         picker(
           'list-conductor',
@@ -427,11 +447,14 @@ function frame(ctx: ViewContext, projects: Project[], project: Project | undefin
     paint();
   }
 
-  function clearButton(label: string) {
+  /** Clears the search, and with `filters` the Status and Conductor picks too. */
+  function clearButton(label: string, filters: boolean) {
     const clear = button('row plain', el('span', 'ttl', label));
     clear.addEventListener('click', () => {
-      state.status = '';
-      state.conductor = '';
+      if (filters) {
+        state.status = '';
+        state.conductor = '';
+      }
       state.query = '';
       search.value = '';
       show(state.tabs.get(id) ?? 'runs');
@@ -456,7 +479,7 @@ function frame(ctx: ViewContext, projects: Project[], project: Project | undefin
       else if (loose.length)
         body.replaceChildren(
           empty('No loose session matches this search.', 'Try fewer words.'),
-          clearButton('Clear the search'),
+          clearButton('Clear the search', false),
         );
       else
         body.replaceChildren(
@@ -487,21 +510,24 @@ function frame(ctx: ViewContext, projects: Project[], project: Project | undefin
           .filter((a) => matches([a.conductor, words(a.conductor), a.scope, a.file]));
 
     const parts: HTMLElement[] = [];
+    // The State column only when a shown run has a mark, so a quiet list gives its room to Now or phase.
+    const withMark = shownRuns.some((r) => runMark(r));
     if (shownRuns.length)
       parts.push(
         table(
           'runs',
           'Flow runs',
-          RUN_COLS,
-          shownRuns.map((r) => runRow(ctx, id, r)),
+          RUN_COLS.filter(([key]) => withMark || key !== 'mark'),
+          shownRuns.map((r) => runRow(ctx, id, r, withMark)),
           'State',
         ),
       );
     else if (runs.length)
       parts.push(
         empty('No flow run matches these filters.', 'Try fewer words or filters.'),
-        clearButton('Clear the search and filters'),
+        clearButton('Clear the search and filters', true),
       );
+    else parts.push(empty('No flow run in this project yet.'));
     if (shownAudits.length) {
       const open = shownAudits.filter((a) => a.open).length;
       const section = el(
@@ -517,11 +543,10 @@ function frame(ctx: ViewContext, projects: Project[], project: Project | undefin
       );
       section.setAttribute('aria-label', 'Audits');
       parts.push(section);
-    }
-    if (!parts.length)
+    } else if (!runs.length)
       parts.push(
         empty('No audit matches these filters.', 'Try fewer words or filters.'),
-        clearButton('Clear the search and filters'),
+        clearButton('Clear the search and filters', true),
       );
     body.replaceChildren(...parts);
   }

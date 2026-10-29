@@ -601,6 +601,9 @@ test('list_tells_apart_projects_with_one_name', async () => {
     ['gamma', ''],
     ['solo', ''],
   ]);
+  // The mark is there only for a project that needs one, in the list's own rail section (it sits under the name).
+  assert.ok(group(box, 'Projects')?.classList.contains('projects'));
+  assert.equal(rowsOf(box, 'Projects')[0].querySelector('.mark'), null);
 
   // A fork and its upstream cloned side by side: one parent folder, so the mark names the folder too.
   const projects = [
@@ -728,4 +731,94 @@ test('list_switch_and_filters_survive_a_redraw', async () => {
   assert.equal(document.activeElement?.id, 'list-search');
   assert.equal((root.querySelector('#list-search') as HTMLInputElement).value, 'quick');
   assert.deepEqual(cells(root, 'loose'), ['A quick question.']);
+});
+
+/** The list in the real runtime over a copy of the fixtures, which a test changes before `redraw`. */
+async function listRuntime(project: string) {
+  const { createRuntime } = await import('../../shell/runtime.js');
+  const entries = clone(DATA.entries);
+  const handlers = new Map<string, (event: any) => void>();
+  const invoke = async (cmd: string, args: any = {}) => {
+    if (cmd === 'views') return [{ id: 'list', source: 'Builtin', replaced: false }];
+    if (cmd === 'view_source') return '';
+    if (cmd === 'projects') return DATA.projects;
+    if (cmd === 'entries') return entries[args.project] ?? [];
+    return null;
+  };
+  const root = document.createElement('main');
+  document.body.replaceChildren(root);
+  const runtime = createRuntime({
+    root,
+    invoke,
+    listen: async (name: string, handler: any) => handlers.set(name, handler),
+    importModule: () => import(`./list.ts?t=${++fresh}`),
+  });
+  await runtime.start({ to: 'list', project });
+  const redraw = async () => {
+    handlers.get('changed')!({ payload: { project } });
+    await runtime.idle();
+  };
+  return { root, entries, redraw };
+}
+
+test('list_keeps_a_picked_status_its_runs_left', async () => {
+  const { root, entries, redraw } = await listRuntime(ALPHA);
+  pick(root, 'list-status', 'Waiting');
+  pick(root, 'list-conductor', 'research');
+  // The user answers signup, and spiky's conductor is renamed: no row has either value any more.
+  const signup = entries[ALPHA].find((e: any) => e.slug === 'signup');
+  signup.status = 'Working';
+  entries[ALPHA].find((e: any) => e.slug === 'spiky').conductor = 'study';
+  await redraw();
+  const status = root.querySelector('#list-status') as HTMLSelectElement;
+  const conductor = root.querySelector('#list-conductor') as HTMLSelectElement;
+  assert.equal(status.value, 'Waiting');
+  assert.equal(text(status.selectedOptions[0]), 'Waiting on you (0)');
+  assert.equal(conductor.value, 'research');
+  assert.equal(text(conductor.selectedOptions[0]), 'Research (0)');
+  assert.match(text(root.querySelector('#list-panel')), /No flow run matches these filters\./);
+});
+
+test('list_row_keeps_focus_across_a_resort', async () => {
+  const { root, entries, redraw } = await listRuntime(ALPHA);
+  const signup = () => trs(root, 'runs').find((tr) => text(tr.querySelector('.name')) === 'Signup')!;
+  (signup().querySelector('button') as HTMLElement).focus();
+  // A newer run sorts in above it.
+  entries[ALPHA].unshift({ ...clone(entries[ALPHA][0]), slug: 'avatar', last_activity: '2026-01-20T12:00:00Z' });
+  await redraw();
+  assert.deepEqual(cells(root, 'runs'), ['Avatar', 'Login', 'Signup', 'Spiky']);
+  assert.equal(document.activeElement, signup().querySelector('button'));
+});
+
+test('list_clear_the_search_leaves_the_run_filters', async () => {
+  const { box } = await draw('list', { to: 'list', project: ALPHA });
+  pick(box, 'list-conductor', 'research');
+  tabOf(box, 'Loose sessions').click();
+  typeIn(box, 'nothing like this');
+  press(box, 'Clear the search');
+  assert.equal(cells(box, 'loose').length, 2);
+  tabOf(box, 'Flow runs').click();
+  assert.equal((box.querySelector('#list-conductor') as HTMLSelectElement).value, 'research');
+  assert.deepEqual(cells(box, 'runs'), ['Spiky']);
+});
+
+test('list_with_only_audits_says_it_has_no_flow_run', async () => {
+  const entries = clone(DATA.entries);
+  entries[ALPHA] = entries[ALPHA].filter((e: any) => e.kind === 'Audit');
+  const { box } = await draw('list', { to: 'list', project: ALPHA }, { entries });
+  assert.equal(tabOf(box, 'Flow runs').getAttribute('aria-selected'), 'true');
+  assert.equal(text(tabOf(box, 'Flow runs').querySelector('.count')), '0');
+  assert.equal(table(box, 'runs'), null);
+  assert.match(text(box.querySelector('#list-panel')), /No flow run in this project yet\./);
+  assert.equal(trs(box, 'audits').length, 2);
+  assert.equal(box.querySelector('#list-status'), null);
+  assert.ok(box.querySelector('#list-conductor'));
+});
+
+test('list_state_column_only_when_a_row_has_a_mark', async () => {
+  const { box } = await draw('list', { to: 'list', project: ALPHA });
+  assert.ok(heads(box, 'runs').includes('State'));
+  pick(box, 'list-status', 'Done');
+  assert.deepEqual(heads(box, 'runs'), ['Name', 'Conductor', 'Now or phase', 'Gates', 'Tasks', 'Last activity']);
+  assert.equal(trs(box, 'runs')[0].children.length, 6);
 });

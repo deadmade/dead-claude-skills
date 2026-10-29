@@ -297,6 +297,10 @@ details.unfold > .unfold-body { padding: var(--space-3) 0 var(--space-2); }
 .brand button.app:active { background: var(--color-paper-3); }
 /* The list: the projects in the rail; over the content a switch between flow runs and loose sessions, then a filter
  * bar (labelled native selects and the search) and tables whose rows open their run or session. */
+/* The rail's projects: a same-named project's place on its own line under the name, both kept to one line. */
+.projects .row.plain { grid-template-columns: minmax(0, 1fr); }
+.projects .row .mark { overflow: hidden; text-overflow: ellipsis; line-height: 1.4; }
+.projects .row[aria-current="true"] .ttl { white-space: nowrap; }
 .list-tabs .count { margin-left: var(--space-2); font-size: var(--text-xs); color: var(--color-muted); }
 .list-tabs .tab[aria-selected="true"] .count { color: var(--color-ink-2); }
 .filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-5); margin-bottom: var(--space-5); }
@@ -330,7 +334,7 @@ details.unfold > .unfold-body { padding: var(--space-3) 0 var(--space-2); }
 .list-table .col-kind { width: 6.5rem; }
 .list-table .col-gates { width: 4rem; }
 .list-table .col-tasks { width: 5rem; }
-.list-table .col-mark { width: 8.5rem; }
+.list-table .col-mark { width: 8rem; }
 .list-table .col-when, .list-table .col-started { width: 6.5rem; }
 .list-table .col-findings { width: 11rem; }
 .list-table .col-picks { width: 9rem; }
