@@ -142,6 +142,41 @@ fn tools_and_marks() {
     }
 }
 
+/// The argument texts the model reads to pick a value: what counts from 1, and what goes with `path` or without.
+#[test]
+fn argument_descriptions() {
+    let fx = Fixture::start();
+    let tools = ado(&fx, &[]).request("tools/list", json!({}))["tools"].take();
+    let arg = |tool: &str, name: &str| {
+        let t = tools
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|t| t["name"] == tool)
+            .unwrap();
+        t["inputSchema"]["properties"][name]["description"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    assert_eq!(
+        arg("repo_file", "start"),
+        "The 1-based line number to start at. Default 1."
+    );
+    assert_eq!(
+        arg("pr_files", "since"),
+        "Only the changes since this 1-based iteration number (`pr_view` shows the latest)."
+    );
+    assert_eq!(
+        arg("wiki", "full"),
+        "With path only: the whole page; by default it is cut at 4000 characters."
+    );
+    assert_eq!(
+        arg("wiki", "limit"),
+        "Without path only: how many pages to list. Default 100."
+    );
+}
+
 #[test]
 fn errors_are_tool_errors_without_pat() {
     let fx = Fixture::start();

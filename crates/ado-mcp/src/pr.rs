@@ -85,7 +85,7 @@ pub(crate) struct PrFilesArgs {
     pub at: Where,
     /// Pull request id. Default: the active PR of the branch.
     pub id: Option<u32>,
-    /// Only the changes since this iteration (`pr_view` shows the latest).
+    /// Only the changes since this 1-based iteration number (`pr_view` shows the latest).
     pub since: Option<u32>,
 }
 

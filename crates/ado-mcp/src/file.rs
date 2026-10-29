@@ -22,7 +22,7 @@ pub(crate) struct RepoFileArgs {
     pub path: String,
     /// The branch to read. Default: the repo's default branch.
     pub branch: Option<String>,
-    /// The first line to show. Default 1.
+    /// The 1-based line number to start at. Default 1.
     pub start: Option<u32>,
 }
 

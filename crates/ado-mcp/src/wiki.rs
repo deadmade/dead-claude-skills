@@ -18,9 +18,9 @@ pub(crate) struct WikiArgs {
     pub wiki: Option<String>,
     /// The page path, as search prints it: /Runbooks/Deploy. Without it, the wiki's pages are listed.
     pub path: Option<String>,
-    /// The whole page; by default it is cut at 4000 characters.
+    /// With path only: the whole page; by default it is cut at 4000 characters.
     pub full: Option<bool>,
-    /// How many pages to list. Default 100.
+    /// Without path only: how many pages to list. Default 100.
     pub limit: Option<u16>,
 }
 
