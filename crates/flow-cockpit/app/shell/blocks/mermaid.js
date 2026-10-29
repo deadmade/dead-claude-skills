@@ -11,6 +11,10 @@
 
 let ready = false;
 let next = 0;
+// The SVG of each source drawn lately, so a redraw shows a diagram at once instead of flashing back to its source.
+/** @type {Map<string, string>} */
+const drawn = new Map();
+const KEEP = 64;
 
 /** @param {string} name */
 const token = (name) => window.getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -46,6 +50,12 @@ function setUp(lib) {
 export function mermaid(source) {
   const box = document.createElement('div');
   box.className = 'diagram';
+  const svg = drawn.get(source);
+  if (svg !== undefined) {
+    // Mermaid's own SVG, as in `draw`.
+    box.innerHTML = svg;
+    return box;
+  }
   const code = document.createElement('pre');
   code.textContent = source;
   box.append(code);
@@ -63,6 +73,9 @@ async function draw(box, source) {
     // Mermaid's own SVG: under strict security it runs DOMPurify over the whole SVG before returning it, and the
     // window's CSP blocks inline handlers besides.
     box.innerHTML = svg;
+    drawn.delete(source);
+    drawn.set(source, svg);
+    if (drawn.size > KEEP) drawn.delete(/** @type {string} */ (drawn.keys().next().value));
   } catch (err) {
     const note = document.createElement('p');
     note.className = 'quiet';

@@ -75,8 +75,14 @@ function row(line) {
 function fold(run) {
   const details = document.createElement('details');
   details.className = 'unfold';
+  // The design's fold row: a label, and the count on the row's far edge.
   const summary = document.createElement('summary');
-  summary.textContent = `${run.length} unchanged lines`;
+  const label = document.createElement('span');
+  label.textContent = 'Unchanged';
+  const count = document.createElement('span');
+  count.className = 'count';
+  count.textContent = `${run.length} lines`;
+  summary.append(label, count);
   const body = document.createElement('div');
   body.className = 'unfold-body';
   body.append(...run.map(row));

@@ -93,15 +93,43 @@ function freshRoot() {
   return root;
 }
 
-async function started(app, route) {
+async function started(app, route, options = {}) {
   const root = freshRoot();
-  const runtime = createRuntime({ root, invoke: app.invoke, listen: app.listen, importModule: importBlob });
+  const runtime = createRuntime({ root, invoke: app.invoke, listen: app.listen, importModule: importBlob, ...options });
   await runtime.start(route);
   return { root, runtime };
 }
 
 const section = (root, id) => root.querySelector(`section[data-view="${id}"]`);
 const RUN = { to: 'run', project: 'p1', slug: 'flow-cockpit' };
+
+/** A view module whose render is `render`, written here as a function: it may use only `ctx` and globals. */
+const viewOf = (id, slot, render) =>
+  `export default { id: ${JSON.stringify(id)}, title: ${JSON.stringify(id)}, slot: ${JSON.stringify(slot)}, render: ${render} };`;
+
+/** A list view with the state a redraw must keep: scrolled panes, a fold, a stepper, a search box, a diagram. */
+function stateful(ctx) {
+  globalThis.statefulDraws = (globalThis.statefulDraws ?? 0) + 1;
+  const box = document.createElement('div');
+  const left = document.createElement('div');
+  left.className = 'left';
+  const content = document.createElement('div');
+  content.className = 'content';
+  const fold = document.createElement('details');
+  const summary = document.createElement('summary');
+  summary.textContent = 'More';
+  fold.append(summary);
+  content.append(fold);
+  const search = document.createElement('input');
+  search.dataset.keep = 'search';
+  search.addEventListener('input', () => {
+    globalThis.searched = search.value;
+  });
+  left.append(search, ctx.blocks.stepper([{ label: 'Build', state: 'Now' }]));
+  content.append(ctx.blocks.markdown('```mermaid\ngraph TD; X-->Y\n```'));
+  box.append(left, content);
+  return box;
+}
 
 test('markdown_strips_script_and_handlers', () => {
   const node = markdown(
@@ -260,6 +288,67 @@ test('changed_redraws_the_route_of_that_project', async () => {
   assert.equal(globalThis.runDraws, draws + 1);
 });
 
+test('changed_redraw_keeps_scroll_folds_and_focus', async () => {
+  const app = fakeApp({ list: { source: viewOf('list', 'list', stateful) } });
+  const { root, runtime } = await started(app, { to: 'list' });
+  await settle();
+  const old = section(root, 'list');
+  assert.ok(old.querySelector('.diagram svg'), 'the diagram drew before the redraw');
+  old.querySelector('.left').scrollTop = 30;
+  old.querySelector('.content').scrollTop = 50;
+  old.querySelector('.content').scrollLeft = 7;
+  old.querySelector('details').open = true;
+  old.querySelector('button.track').click();
+  const search = old.querySelector('input');
+  search.focus();
+  search.value = 'abc';
+  search.setSelectionRange(1, 2);
+  globalThis.searched = undefined;
+
+  await app.emit('changed', { project: 'p1' });
+  await runtime.idle();
+  const now = section(root, 'list');
+  assert.notEqual(now, old, 'the view drew again');
+  assert.equal(now.querySelector('.left').scrollTop, 30);
+  assert.equal(now.querySelector('.content').scrollTop, 50);
+  assert.equal(now.querySelector('.content').scrollLeft, 7);
+  assert.ok(now.querySelector('details').open);
+  assert.equal(now.querySelector('button.track').getAttribute('aria-expanded'), 'true');
+  assert.ok(!now.querySelector('.phase-list').hidden, 'the stepper list stays open');
+  const input = now.querySelector('input');
+  assert.equal(document.activeElement, input);
+  assert.equal(input.value, 'abc');
+  assert.deepEqual([input.selectionStart, input.selectionEnd], [1, 2]);
+  assert.equal(globalThis.searched, 'abc', 'the view hears the restored text');
+  // The diagram doesn't flash back to its source.
+  assert.ok(now.querySelector('.diagram svg'));
+  assert.equal(now.querySelector('.diagram pre'), null);
+
+  // A new route starts fresh.
+  runtime.navigate({ to: 'list', project: 'other' });
+  await runtime.idle();
+  assert.ok(!section(root, 'list').querySelector('details').open);
+});
+
+test('queued_changed_draws_collapse_into_one', async () => {
+  const app = fakeApp({ list: { source: viewOf('list', 'list', stateful) } });
+  const { runtime } = await started(app, { to: 'list' });
+  const before = globalThis.statefulDraws;
+  for (let i = 0; i < 5; i++) app.emit('changed', { project: null });
+  await runtime.idle();
+  assert.equal(globalThis.statefulDraws, before + 1);
+});
+
+test('a_render_that_never_settles_becomes_its_error_card', async () => {
+  const app = fakeApp({
+    stuck: { source: view('stuck', 'list', 'return new Promise(() => {});') },
+    fine: { source: view('fine', 'list', says('fine view')) },
+  });
+  const { root } = await started(app, { to: 'list' }, { renderTimeout: 30 });
+  assert.match(section(root, 'stuck').querySelector('.card.error')?.textContent ?? '', /didn't finish/);
+  assert.equal(section(root, 'fine').textContent, 'fine view');
+});
+
 test('blob_urls_are_revoked', async (t) => {
   const created = [];
   const revoked = [];
@@ -384,6 +473,13 @@ test('run_tab_view_is_appended_without_a_slot', async () => {
   );
 });
 
+test('a_tab_that_isnt_loaded_says_so_in_the_slot', async () => {
+  const app = fakeApp({ run: { source: view('run', 'run', RUN_FRAME) } });
+  const { root } = await started(app, { ...RUN, tab: 'nope' });
+  const slot = section(root, 'run').querySelector('[data-slot="run-tab"]');
+  assert.match(slot.textContent, /The nope tab isn't loaded/);
+});
+
 test('a_route_without_views_says_so', async () => {
   const app = fakeApp({});
   const { root } = await started(app, { to: 'list' });
@@ -411,7 +507,9 @@ test('diff_marks_lines_and_folds_unchanged_runs', () => {
   assert.deepEqual(text('.ln.add'), ['+ line two', '+ line fifteen', '+ line 20']);
   const fold = node.querySelector('details.unfold');
   assert.ok(fold, 'the unchanged run between the changes folds');
-  assert.match(fold.querySelector('summary').textContent, /6 unchanged lines/);
+  // The design's fold row: a label and a count.
+  assert.equal(fold.querySelector('summary > span:first-child').textContent, 'Unchanged');
+  assert.equal(fold.querySelector('summary > .count').textContent, '6 lines');
   assert.match(diff('same', 'same').textContent, /No change/);
   assert.equal(diff('<b>x</b>', '<i>y</i>').querySelector('b, i'), null);
 });
