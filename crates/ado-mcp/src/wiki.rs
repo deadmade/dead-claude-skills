@@ -7,7 +7,7 @@ use serde::Deserialize;
 
 use crate::api::ApiError;
 use crate::ctx::{Ctx, given, seg};
-use crate::out::{DESC_MAX, args, clip, cut, more};
+use crate::out::{DESC_MAX, args, clip, cut, doubled, more};
 
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "schemars")]
@@ -152,7 +152,7 @@ pub(crate) async fn wiki(ctx: &Ctx, a: &WikiArgs) -> Result<String, ApiError> {
     }
     let (mut lines, has_more) = cut(lines, limit);
     if has_more {
-        lines.push(more(&format!("wiki{scope} limit={}", limit * 2)));
+        lines.push(more(&format!("wiki{scope} limit={}", doubled(limit))));
     }
     Ok(lines.join("\n"))
 }

@@ -13,7 +13,7 @@ use serde_json::{Value, json};
 
 use crate::api::ApiError;
 use crate::ctx::{Ctx, given, seg};
-use crate::out::{args, cut, html_to_text, more};
+use crate::out::{args, cut, doubled, html_to_text, more};
 use crate::remote::decode_path;
 
 const NOT_INSTALLED: &str = "Search isn't installed or is turned off on this collection";
@@ -84,7 +84,8 @@ fn info(code: i32) -> Option<&'static str> {
     })
 }
 
-/// The same search for `limit * 2` hits. `text` is quoted and escaped, so a phrase (`path:"a b"`) repeats exactly.
+/// The same search for twice `limit` hits (`doubled`). `text` is quoted and escaped, so a phrase (`path:"a b"`)
+/// repeats exactly.
 fn more_call(a: &SearchArgs, limit: usize) -> String {
     let text = serde_json::to_string(&a.text).unwrap_or_default();
     let scope = args(&[
@@ -94,7 +95,7 @@ fn more_call(a: &SearchArgs, limit: usize) -> String {
     format!(
         "search kind={} text={text}{scope} limit={}",
         a.kind.name(),
-        limit * 2
+        doubled(limit)
     )
 }
 
@@ -416,6 +417,22 @@ mod tests {
         assert_eq!(p("/docs.md", "/docs"), "/docs");
         assert_eq!(p("/Runbooks/Deploy.md", "/"), "/Runbooks/Deploy");
         assert_eq!(p("/Runbooks/Deploy.md", ""), "/Runbooks/Deploy");
+    }
+
+    #[test]
+    fn more_call_limit_fits_a_u16() {
+        let a = SearchArgs {
+            kind: Kind::Wi,
+            text: "x".into(),
+            project: None,
+            repo: None,
+            limit: Some(40_000),
+        };
+        assert_eq!(more_call(&a, 20), "search kind=wi text=\"x\" limit=40");
+        assert_eq!(
+            more_call(&a, 40_000),
+            "search kind=wi text=\"x\" limit=65535"
+        );
     }
 
     #[test]

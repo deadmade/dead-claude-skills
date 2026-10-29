@@ -60,6 +60,11 @@ pub fn more(call: &str) -> String {
     format!("… more: {call}")
 }
 
+/// The limit a more line offers for a `u16` limit: twice `limit`, at most `u16::MAX` so the next call can take it.
+pub fn doubled(limit: usize) -> usize {
+    limit.saturating_mul(2).min(usize::from(u16::MAX))
+}
+
 /// Azure DevOps rich text as plain text: line breaks and list items kept, other tags dropped.
 pub fn html_to_text(html: &str) -> String {
     const ENTITIES: [(&str, char); 6] = [
@@ -315,6 +320,14 @@ mod tests {
     #[test]
     fn more_names_the_call() {
         assert_eq!(more("wi_query limit=40"), "… more: wi_query limit=40");
+    }
+
+    #[test]
+    fn doubled_fits_a_u16() {
+        assert_eq!(doubled(20), 40);
+        assert_eq!(doubled(32_767), 65_534);
+        assert_eq!(doubled(40_000), 65_535);
+        assert_eq!(doubled(65_535), 65_535);
     }
 
     #[test]
