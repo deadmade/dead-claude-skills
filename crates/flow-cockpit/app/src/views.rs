@@ -16,6 +16,7 @@ use ts_rs::TS;
 
 use crate::paths::Defaults;
 use crate::strip::strip;
+use crate::trust::{Trusted, is_real_dir, repositories};
 
 /// Where a view's code comes from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
@@ -62,7 +63,7 @@ pub struct Views {
     /// `config.toml`'s `disabled`, which the poll keeps current.
     disabled: RwLock<Vec<String>>,
     /// `config.toml`'s `trusted`, which the poll keeps current.
-    trusted: RwLock<Vec<PathBuf>>,
+    trusted: RwLock<Trusted>,
 }
 
 /// One extension folder: its view files by id and its style.
@@ -91,13 +92,13 @@ impl Views {
         defaults: Defaults,
         user: PathBuf,
         disabled: Vec<String>,
-        trusted: Vec<PathBuf>,
+        trusted: &[PathBuf],
     ) -> Views {
         Views {
             defaults,
             user,
             disabled: RwLock::new(disabled),
-            trusted: RwLock::new(trusted),
+            trusted: RwLock::new(Trusted::new(trusted)),
         }
     }
 
@@ -120,7 +121,8 @@ impl Views {
     }
 
     /// `config.toml`'s `trusted`, read again.
-    pub fn set_trusted(&self, trusted: Vec<PathBuf>) {
+    pub fn set_trusted(&self, trusted: &[PathBuf]) {
+        let trusted = Trusted::new(trusted);
         *self.trusted.write().unwrap_or_else(PoisonError::into_inner) = trusted;
     }
 
@@ -131,26 +133,18 @@ impl Views {
             .clone()
     }
 
-    /// The extensions folder of a project with these roots (its checkouts and worktrees), when `trusted` names one of
-    /// them: the first main checkout's `.flow-cockpit/extensions/` that exists, else the first worktree's. Nothing in
-    /// an untrusted project's folders is read. A linked `.flow-cockpit` or `extensions` is no folder, as everywhere
-    /// else.
+    /// The extensions folder of a project with these roots (its checkouts and worktrees) from the repository a
+    /// `trusted` entry names ([`repositories`]): its main checkout's `.flow-cockpit/extensions/` when that exists, else
+    /// the first of its worktrees'. No other root's folder is looked at. A linked `.flow-cockpit` or `extensions` is
+    /// no folder, as everywhere else.
     #[must_use]
     pub fn repo(&self, roots: &[PathBuf]) -> Option<PathBuf> {
-        let trusted = self.trusted.read().unwrap_or_else(PoisonError::into_inner);
-        if !roots
+        let folders = repositories(
+            roots,
+            &self.trusted.read().unwrap_or_else(PoisonError::into_inner),
+        );
+        folders
             .iter()
-            .any(|root| trusted.iter().any(|t| same_folder(t, root)))
-        {
-            return None;
-        }
-        drop(trusted);
-        // A checkout's `.git` is a folder; a worktree's, a file.
-        let (main, worktrees): (Vec<&PathBuf>, Vec<&PathBuf>) = roots
-            .iter()
-            .partition(|root| is_real_dir(&root.join(".git")));
-        main.into_iter()
-            .chain(worktrees)
             .map(|root| root.join(".flow-cockpit"))
             .filter(|dir| is_real_dir(dir))
             .map(|dir| dir.join("extensions"))
@@ -295,20 +289,6 @@ fn shown(layers: &Layers) -> impl Iterator<Item = (ViewSource, Vec<&Extension>)>
     })
 }
 
-/// The same folder: equal paths, or paths that resolve to the same folder.
-fn same_folder(a: &Path, b: &Path) -> bool {
-    a == b
-        || matches!(
-            (fs::canonicalize(a), fs::canonicalize(b)),
-            (Ok(x), Ok(y)) if x == y
-        )
-}
-
-/// A folder, not a link to one.
-fn is_real_dir(path: &Path) -> bool {
-    fs::symlink_metadata(path).is_ok_and(|m| m.is_dir())
-}
-
 /// The views of extensions from one folder by id; an id two of them have is an error naming both.
 fn views_of<'a>(extensions: impl IntoIterator<Item = &'a Extension>) -> BTreeMap<String, Found> {
     let mut out: BTreeMap<String, (String, Found)> = BTreeMap::new();
@@ -424,7 +404,7 @@ mod tests {
                 },
                 self.0.join("user"),
                 disabled.iter().map(ToString::to_string).collect(),
-                Vec::new(),
+                &[],
             )
         }
     }
@@ -670,8 +650,9 @@ mod tests {
         );
     }
 
-    /// A project is trusted by any of its checkouts' or worktrees' paths; its extensions come from the main checkout
-    /// when several carry them, and from a worktree when only that one does.
+    /// A checkout and the worktrees git links to it trust each other; the main checkout's folder wins, and a
+    /// worktree's loads when only it has one. Another checkout of the project, here a same-named folder sorting first,
+    /// never loads.
     #[test]
     fn repo_folder_follows_trust_and_prefers_the_main_checkout() {
         let t = temp("repo-folder");
@@ -683,24 +664,37 @@ mod tests {
             "gitdir: ../../../.git/worktrees/wt\n",
         );
         t.write(
+            "app/.git/worktrees/wt/gitdir",
+            "../../../.claude/worktrees/wt/.git\n",
+        );
+        t.write(
             "app/.claude/worktrees/wt/.flow-cockpit/extensions/x/x.ts",
             "",
         );
-        let roots = [main.clone(), tree.clone()];
+        let other = t.0.join("Downloads/app");
+        fs::create_dir_all(other.join(".git")).unwrap();
+        t.write("Downloads/app/.flow-cockpit/extensions/x/x.ts", "");
+        let roots = [other.clone(), main.clone(), tree.clone()];
         let views = t.views(&[]);
         assert_eq!(views.repo(&roots), None, "untrusted");
-        views.set_trusted(vec![main.clone()]);
+        views.set_trusted(std::slice::from_ref(&main));
         let wt_dir = tree.join(".flow-cockpit/extensions");
         assert_eq!(views.repo(&roots), Some(wt_dir.clone()));
         t.write("app/.flow-cockpit/extensions/x/x.ts", "");
         let main_dir = main.join(".flow-cockpit/extensions");
         assert_eq!(views.repo(&roots), Some(main_dir.clone()));
-        // Trusting the worktree trusts the project: the same folder.
-        views.set_trusted(vec![tree.join("")]);
+        // Trusting the worktree trusts its checkout: the same folder.
+        views.set_trusted(&[tree.join("")]);
         assert_eq!(views.repo(&roots), Some(main_dir));
-        // Another project's path trusts nothing here.
-        views.set_trusted(vec![t.0.join("other")]);
+        // Another path trusts nothing here.
+        views.set_trusted(&[t.0.join("other")]);
         assert_eq!(views.repo(&roots), None);
+        // The same-named folder loads only when it is the one trusted.
+        views.set_trusted(std::slice::from_ref(&other));
+        assert_eq!(
+            views.repo(&roots),
+            Some(other.join(".flow-cockpit/extensions"))
+        );
     }
 
     /// A linked `.flow-cockpit` or `extensions` folder is no folder, as a linked extension is none.
@@ -713,7 +707,7 @@ mod tests {
         t.write("elsewhere/extensions/x/x.ts", "");
         std::os::unix::fs::symlink(t.0.join("elsewhere"), main.join(".flow-cockpit")).unwrap();
         let views = t.views(&[]);
-        views.set_trusted(vec![main.clone()]);
+        views.set_trusted(std::slice::from_ref(&main));
         assert_eq!(views.repo(std::slice::from_ref(&main)), None);
         fs::remove_file(main.join(".flow-cockpit")).unwrap();
         fs::create_dir_all(main.join(".flow-cockpit")).unwrap();
@@ -737,7 +731,7 @@ mod tests {
             },
             PathBuf::from("/nonexistent/flow-cockpit/extensions"),
             Vec::new(),
-            Vec::new(),
+            &[],
         );
         assert_eq!(views.list(None), []);
         assert_eq!(
@@ -760,7 +754,7 @@ mod tests {
             },
             PathBuf::from("/nonexistent/flow-cockpit/extensions"),
             Vec::new(),
-            Vec::new(),
+            &[],
         );
         let ids: Vec<String> = views.list(None).into_iter().map(|v| v.id).collect();
         assert_eq!(ids, ["activity", "docs", "list", "run"]);

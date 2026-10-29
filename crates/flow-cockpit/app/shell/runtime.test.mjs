@@ -84,7 +84,8 @@ const says = (text) => `const p = document.createElement('p'); p.textContent = $
  * A stand-in for the app: `views` maps an id to `{ source, builtin, from }`, where `source` is what `view_source`
  * answers (a string, or `{ error }`), `builtin` what it answers with `builtin: true`, and `from` the ViewSource.
  * `extensions` is what the `extensions` command answers. `repos` maps a project id to views of the same shape that a
- * trusted repository adds on that project's pages (asked for with `project`), over `views`.
+ * trusted repository adds on that project's pages (asked for with `project`), over `views`; `repoStyles` the styles
+ * it adds there.
  */
 function fakeApp(views, extensions = { styles: [], disabled: [], looked: [] }) {
   const listeners = new Map();
@@ -95,6 +96,8 @@ function fakeApp(views, extensions = { styles: [], disabled: [], looked: [] }) {
     extensions,
     calls,
     repos: {},
+    /** A project id to the styles its repository adds on its pages. */
+    repoStyles: {},
     /** The views on the pages of the project a call names. */
     viewsFor: (project) => ({ ...app.views, ...(app.repos[project] ?? {}) }),
     /** The data commands' answers, by command: a function of the call's arguments. Unlisted ones answer null. */
@@ -110,7 +113,10 @@ function fakeApp(views, extensions = { styles: [], disabled: [], looked: [] }) {
           })),
         );
       }
-      if (cmd === 'extensions') return Promise.resolve(app.extensions);
+      if (cmd === 'extensions') {
+        const own = app.repoStyles[args.project] ?? [];
+        return Promise.resolve({ ...app.extensions, styles: [...app.extensions.styles, ...own] });
+      }
       if (app.answers[cmd]) return Promise.resolve(app.answers[cmd](args));
       if (cmd === 'view_source') {
         const v = app.viewsFor(args.project)[args.id];
@@ -1178,11 +1184,86 @@ test('views_changed_reloads_the_shown_projects_views', async () => {
   await app.emit('views-changed', {});
   await runtime.idle();
   assert.equal(notes(), 'new');
-  // Trust taken away: the tab goes.
-  app.repos = {};
-  await app.emit('views-changed', {});
+});
+
+test('a_repository_view_reads_its_code_with_its_project_and_no_other_does', async () => {
+  // Between the listing and the read, p1's repository gains its own `x`: the read for the listed Global `x` must not
+  // return it, or the Global label would carry p1's code onto p2's page.
+  const app = fakeApp({ x: { from: 'Global', source: view('x', 'run', says('global x')) } });
+  app.repos = { p1: { notes: { from: 'Repo', source: view('notes', 'run-tab', says('p1 notes'), 'Notes') } } };
+  const sourceOf = (args) => {
+    if (args.id === 'notes') return args.project === 'p1' ? app.repos.p1.notes.source : Promise.reject('no notes');
+    return args.project === 'p1' ? view('x', 'run', says('p1 x')) : app.views.x.source;
+  };
+  app.answers.view_source = sourceOf;
+  const { root, runtime } = await started(app, RUN);
+  assert.equal(section(root, 'x')?.textContent, 'global x');
+  runtime.navigate({ ...RUN, project: 'p2' });
   await runtime.idle();
-  assert.equal(notes(), undefined);
+  assert.equal(section(root, 'x')?.textContent, 'global x');
+  const reads = app.calls.filter(([cmd]) => cmd === 'view_source').map(([, args]) => [args.id, args.project]);
+  assert.deepEqual(reads, [
+    ['x', undefined],
+    ['notes', 'p1'],
+  ]);
+});
+
+test('an_imported_repository_view_no_longer_allowed_reloads_the_window', async () => {
+  await inWindow('http://localhost/', async (win, reloads) => {
+    const app = fakeApp({ run: { source: view('run', 'run', RUN_FRAME) } });
+    app.repos = { p1: { notes: { from: 'Repo', source: view('notes', 'run-tab', says('p1 notes'), 'Notes') } } };
+    const { runtime } = await started(app, { ...RUN, tab: 'notes' });
+    // Another project's page, then a change that leaves p1's notes allowed: no reload.
+    runtime.navigate({ ...RUN, project: 'p2' });
+    await runtime.idle();
+    await app.emit('views-changed', {});
+    await runtime.idle();
+    assert.equal(reloads.count, 0);
+    // p1's trust taken away while p2 is shown: p1's notes module is still in the window, so it reloads, on p2's page.
+    app.repos = {};
+    await app.emit('views-changed', {});
+    await runtime.idle();
+    assert.equal(reloads.count, 1);
+    assert.equal(win.location.hash, '#/run/p2/flow-cockpit');
+    assert.deepEqual(reloads.errors, []);
+  });
+});
+
+test('the_list_asks_for_the_projects_once_per_draw', async () => {
+  const lists = viewOf('list', 'list', async (ctx) => {
+    const p = document.createElement('p');
+    p.textContent = (await ctx.data.projects()).map((x) => x.id).join(',');
+    return p;
+  });
+  const app = fakeApp({ list: { source: lists } });
+  app.answers.projects = () => [{ id: 'p1', name: 'one', roots: [] }];
+  const { root, runtime } = await started(app, { to: 'list' });
+  await runtime.idle();
+  await settle();
+  await settle();
+  assert.equal(section(root, 'list')?.textContent, 'p1');
+  assert.equal(app.calls.filter(([cmd]) => cmd === 'projects').length, 1);
+  // A redraw asks again, once.
+  await app.emit('changed', { project: null });
+  await runtime.idle();
+  await settle();
+  await settle();
+  assert.equal(app.calls.filter(([cmd]) => cmd === 'projects').length, 2);
+});
+
+test('a_repository_style_leaves_on_another_projects_page', async () => {
+  const app = fakeApp({ run: { source: view('run', 'run', RUN_FRAME) } });
+  app.repos = { p1: { notes: { from: 'Repo', source: view('notes', 'run-tab', says('p1 notes'), 'Notes') } } };
+  app.repoStyles = { p1: [{ extension: 'team', css: 'section[data-view="notes"] { color: red; }' }] };
+  const { runtime } = await started(app, RUN);
+  const styles = () => [...document.head.querySelectorAll('style[data-extension]')].map((s) => s.dataset.extension);
+  assert.deepEqual(styles(), ['team']);
+  runtime.navigate({ ...RUN, project: 'p2' });
+  await runtime.idle();
+  assert.deepEqual(styles(), []);
+  runtime.navigate(RUN);
+  await runtime.idle();
+  assert.deepEqual(styles(), ['team']);
 });
 
 test('session_route_draws_the_session_view_not_the_run_view', async () => {

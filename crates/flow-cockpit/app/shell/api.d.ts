@@ -78,8 +78,9 @@ export interface SessionPage {
   limit?: number;
 }
 
-/** The core's read-only data. Each call asks the app afresh; nothing is cached. */
+/** The core's read-only data. Each call asks the app afresh; nothing is cached, but for `projects`. */
 export interface DataApi {
+  /** The projects as of this draw: asked once per draw, so every view and the window agree on them. */
   projects(): Promise<Project[]>;
   entries(project: string): Promise<Entry[]>;
   flowRun(project: string, slug: string): Promise<FlowRun | null>;

@@ -254,7 +254,7 @@ mod tests {
             },
             root.join("extensions"),
             Vec::new(),
-            Vec::new(),
+            &[],
         );
         Home1(root, Shared::new(index, views))
     }

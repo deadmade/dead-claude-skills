@@ -11,6 +11,7 @@ mod commands;
 mod paths;
 mod poll;
 mod strip;
+mod trust;
 mod views;
 
 use std::io::Write;
@@ -82,7 +83,7 @@ fn run() -> ExitCode {
         default_extensions(env),
         config_dir.join("extensions"),
         settings.config.disabled.clone(),
-        settings.config.trusted.clone(),
+        &settings.config.trusted,
     );
     let shared = Arc::new(Shared::new(index, views));
     let poll_shared = Arc::clone(&shared);

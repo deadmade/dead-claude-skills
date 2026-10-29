@@ -231,7 +231,7 @@ impl Poller {
         }
         let trust = config.trusted != file.config.trusted;
         if trust {
-            shared.views.set_trusted(config.trusted.clone());
+            shared.views.set_trusted(&config.trusted);
         }
         let reconfigured = config.hidden != file.config.hidden;
         file.config = config;
@@ -612,7 +612,7 @@ mod tests {
                     defaults,
                     self.user.clone(),
                     config.disabled.clone(),
-                    config.trusted.clone(),
+                    &config.trusted,
                 ),
             )
         }
@@ -1078,22 +1078,128 @@ mod tests {
         assert_eq!(shared.read().projects().len(), 1);
     }
 
-    /// alpha with a worktree and a repository extension `team` (a run tab, `notes`) in its main checkout, and beta.
+    /// alpha with a worktree git links both ways and a repository extension `team` (a run tab, `notes`) in its main
+    /// checkout, and beta.
     fn alpha_with_extension(tag: &str) -> World {
         let w = World::alpha(tag);
         let tree = w.path("work/alpha/.claude/worktrees/wt");
         fs::create_dir_all(&tree).unwrap();
         fs::write(tree.join(".git"), "gitdir: ../../../.git/worktrees/wt\n").unwrap();
-        w.repo("work/beta");
-        w.session("work/beta", "s-beta", "Hi.");
-        let team = w.path("work/alpha/.flow-cockpit/extensions/team");
-        fs::create_dir_all(&team).unwrap();
+        let admin = w.path("work/alpha/.git/worktrees/wt");
+        fs::create_dir_all(&admin).unwrap();
         fs::write(
-            team.join("notes.ts"),
-            "export default { id: 'notes', slot: 'run-tab' };\n",
+            admin.join("gitdir"),
+            format!("{}\n", tree.join(".git").display()),
         )
         .unwrap();
+        w.repo("work/beta");
+        w.session("work/beta", "s-beta", "Hi.");
+        w.extension("work/alpha", "alpha");
         w
+    }
+
+    impl World {
+        /// The repository extension `team` with the run tab `notes`, its code naming `from`.
+        fn extension(&self, repo: &str, from: &str) {
+            let team = self.path(repo).join(".flow-cockpit/extensions/team");
+            fs::create_dir_all(&team).unwrap();
+            fs::write(
+                team.join("notes.ts"),
+                format!("export default {{ id: 'notes', slot: 'run-tab', from: '{from}' }};\n"),
+            )
+            .unwrap();
+        }
+
+        /// A checkout whose `origin` is `url`.
+        fn repo_with_origin(&self, rel: &str, url: &str) {
+            self.repo(rel);
+            fs::write(
+                self.path(rel).join(".git/config"),
+                format!("[remote \"origin\"]\n\turl = {url}\n"),
+            )
+            .unwrap();
+        }
+
+        /// A poll over this home, with `config.toml` trusting `path`.
+        fn trusting(&self, path: &str) -> (Shared, Poller) {
+            write_config(
+                self,
+                &format!("trusted = ['{}']\n", self.path(path).display()),
+            );
+            let settings = ConfigFile::load(self.config.clone());
+            let shared = self.shared_with(&settings.config);
+            let poller = Poller::new(self.home.clone(), settings, &shared);
+            (shared, poller)
+        }
+    }
+
+    /// Where the code of the `notes` view on `project`'s pages comes from; none when no repository's loads.
+    fn notes_from(shared: &Shared, project: &str) -> Option<String> {
+        let repo = shared.repo(Some(project))?;
+        let source = shared.views.source("notes", false, Some(&repo)).ok()?;
+        let from = source.split("from: \"").nth(1)?.split('"').next()?;
+        Some(from.to_string())
+    }
+
+    /// Two remote-less checkouts named `app` are one project; trusting one never loads the other's extensions, even
+    /// when it sorts first, and the other's folder isn't watched.
+    #[test]
+    fn same_folder_name_without_a_remote_never_loads() {
+        let w = World::empty("same-name");
+        w.repo("work/app");
+        w.session("work/app", "s-1", "Hi.");
+        w.repo("Downloads/app");
+        w.session("Downloads/app", "s-2", "Hi.");
+        w.extension("Downloads/app", "downloads");
+        let (shared, mut poller) = w.trusting("work/app");
+        let app = project_id(&shared, "app");
+        assert_eq!(shared.read().projects().len(), 1, "one project");
+        assert_eq!(notes_from(&shared, &app), None);
+        assert_eq!(poller.tick(&shared, Timestamp::now()), []);
+        w.extension("work/app", "work");
+        assert_eq!(
+            poller.tick(&shared, Timestamp::now()),
+            [Event::ViewsChanged]
+        );
+        assert_eq!(notes_from(&shared, &app).as_deref(), Some("work"));
+        fs::write(
+            w.path("Downloads/app/.flow-cockpit/extensions/team/style.css"),
+            "section {}\n",
+        )
+        .unwrap();
+        assert_eq!(poller.tick(&shared, Timestamp::now()), []);
+    }
+
+    /// A folder whose `.git/config` copies the trusted repository's `origin` joins its project, and never loads.
+    #[test]
+    fn a_copied_origin_never_loads() {
+        let w = World::empty("origin");
+        w.repo_with_origin("work/app", "git@example.com:me/app.git");
+        w.repo_with_origin("tmp/zip/thing", "https://example.com/me/app");
+        w.session("work/app", "s-1", "Hi.");
+        w.session("tmp/zip/thing", "s-2", "Hi.");
+        w.extension("tmp/zip/thing", "zip");
+        let (shared, _poller) = w.trusting("work/app");
+        let app = project_id(&shared, "app");
+        assert_eq!(shared.read().projects().len(), 1, "one project");
+        assert_eq!(notes_from(&shared, &app), None);
+    }
+
+    /// A separate clone in a trusted checkout's `.claude/worktrees/` is a root of its project but no worktree of it:
+    /// its extensions never load.
+    #[test]
+    fn a_clone_in_the_worktrees_folder_never_loads() {
+        let w = World::alpha("stray");
+        w.repo_with_origin(
+            "work/alpha/.claude/worktrees/pr",
+            "https://example.com/stranger/thing",
+        );
+        w.extension("work/alpha/.claude/worktrees/pr", "stranger");
+        let (shared, _poller) = w.trusting("work/alpha");
+        let alpha = project_id(&shared, "alpha");
+        let pr = w.path("work/alpha/.claude/worktrees/pr");
+        assert!(shared.read().projects()[0].roots.contains(&pr));
+        assert_eq!(notes_from(&shared, &alpha), None);
     }
 
     fn write_config(w: &World, text: &str) {

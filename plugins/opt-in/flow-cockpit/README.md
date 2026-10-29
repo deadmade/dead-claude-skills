@@ -45,8 +45,9 @@ The window shows a run as waiting on you while one of its sessions has a questio
 - `~/.config/flow-cockpit/config.toml`, edited by hand, can switch extensions off (`disabled = ["<name>"]`) and hide
   projects (`hidden = ["<id or name>"]`). The open window picks a change up within a few seconds.
 - A repository can carry its own extensions in `.flow-cockpit/extensions/`. They are code that runs in the window, so
-  they load only once you trust the repository in `config.toml` (`trusted = ["<path of any of its checkouts>"]`), and
-  only on that project's pages, above your own.
+  they load only once you trust the repository in `config.toml` (`trusted = ["<absolute path of a checkout>"]`), and
+  only on that project's pages, above your own. A path trusts that checkout and the worktrees git links to it, not
+  other clones of the repository; the main checkout's folder wins over a worktree's.
 - `FLOW_COCKPIT_EXTENSIONS=<folder>` loads the defaults from another folder, such as a checkout's
   `crates/flow-cockpit/extensions`, so edits to them show without a rebuild.
 - On Linux the app turns WebKitGTK's DMA-BUF renderer off, because it crashes the window on NVIDIA under Wayland;

@@ -2,7 +2,9 @@
 // the Blob URL revoked right after), adds each loaded extension's `style.css` as one `<style>`, draws the views of the
 // current route, each in its own section, and loads them again on `views-changed`. The views are those of the route's
 // project: a repository the user trusts adds its own on its project's pages only, so moving to another project loads
-// that project's set (a view from the same place as before is kept, with its module state). A view that fails to load
+// that project's set (a view from the same place as before is kept, with its module state). A repository view's module
+// can't be unloaded, so when one that was imported stops being allowed (trust taken away, its folder gone, switched
+// off), the window reloads; the address keeps the page. A view that fails to load
 // or to draw shows its error card in its own section, with the default of that id drawn below it when another
 // extension replaced it; the other views never see it.
 import { card } from './blocks/card.js';
@@ -244,9 +246,12 @@ function missingTab(id) {
  *   `renderTimeout`: how long a view's render may take, in ms, before it shows as broken.
  */
 export function createRuntime({ root, invoke, listen, importModule = (url) => import(url), renderTimeout = 5000 }) {
+  /** The projects as of the current draw: one `projects` call per draw, for the runtime and the views alike. */
+  /** @type {Promise<import('../../bindings/Project').Project[]> | null} */
+  let projectsNow = null;
   /** @type {DataApi} */
   const data = Object.freeze({
-    projects: () => invoke('projects'),
+    projects: () => (projectsNow ??= invoke('projects')),
     entries: (/** @type {string} */ project) => invoke('entries', { project }),
     flowRun: (/** @type {string} */ project, /** @type {string} */ slug) => invoke('flow_run', { project, slug }),
     doc: (/** @type {string} */ project, /** @type {string} */ slug, /** @type {DocName} */ name) =>
@@ -289,6 +294,14 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
   /** The project whose views are loaded (`''` for none); null before the first load and after `views-changed`. */
   /** @type {string | null} */
   let loadedFor = null;
+  /** A `views-changed` reload is under way: what was imported is checked against what is still allowed. */
+  let reloading = false;
+  /**
+   * Per project, the ids of the repository views imported for its pages. A module can't be unloaded, so its timers
+   * and listeners outlive its page: once one isn't allowed any more, the window reloads.
+   * @type {Map<string, Set<string>>}
+   */
+  const imported = new Map();
 
   /** The commands' `project` argument: none for no project. @param {string} project */
   const scope = (project) => (project ? { project } : {});
@@ -302,14 +315,18 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     if ('project' in at && at.project) return at.project;
     try {
       /** @type {import('../../bindings/Project').Project[] | null} */
-      const projects = await invoke('projects');
+      const projects = await data.projects();
       return projects?.[0]?.id ?? '';
     } catch {
       return '';
     }
   }
 
-  /** @param {string} id @param {boolean} builtin @param {string} project @returns {Promise<View>} */
+  /**
+   * `project` only for a view listed as a repository's: any other is read without it, so a repository view that turns
+   * up between the listing and this read can't come back under another view's label.
+   * @param {string} id @param {boolean} builtin @param {string} project @returns {Promise<View>}
+   */
   async function load(id, builtin, project) {
     /** @type {string} */
     const source = await invoke('view_source', { id, ...(builtin ? { builtin: true } : {}), ...scope(project) });
@@ -351,7 +368,7 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
   /**
    * Loads the views of `project`'s pages. With `keep`, a view the last load got from the same place is kept as it is,
    * module state and all; a repository's view never is, since another project's repository may have one of that id.
-   * @param {string} project @param {boolean} keep
+   * @param {string} project @param {boolean} keep @returns {Promise<ViewInfo[] | null>} the listing; null on an error
    */
   async function loadAll(project, keep) {
     loadedFor = project;
@@ -371,17 +388,40 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
               e.info.replaced === info.replaced,
           );
           if (same) return same;
-          const own = await loaded(info.id, false, project);
+          const repo = info.source === 'Repo';
+          if (repo) {
+            if (!imported.has(project)) imported.set(project, new Set());
+            imported.get(project)?.add(info.id);
+          }
+          const own = await loaded(info.id, false, repo ? project : '');
           // A broken replacement's slot comes from the built-in behind it.
-          const fallback = own.view || !info.replaced ? null : await loaded(info.id, true, project);
+          const fallback = own.view || !info.replaced ? null : await loaded(info.id, true, '');
           return { info, ...own, fallback };
         }),
       );
       listError = null;
+      return infos;
     } catch (err) {
       entries = [];
       listError = err;
+      return null;
     }
+  }
+
+  /**
+   * Whether every repository view imported so far is still allowed on its project's pages (trusted, its folder there,
+   * not switched off). `infos` is the listing just read for `project`.
+   * @param {string} project @param {ViewInfo[]} infos
+   */
+  async function stillAllowed(project, infos) {
+    for (const [p, ids] of imported) {
+      /** @type {ViewInfo[] | null} */
+      const listed = p === project ? infos : await invoke('views', scope(p)).catch(() => null);
+      if (!listed) continue;
+      const repo = new Set(listed.filter((i) => i.source === 'Repo').map((i) => i.id));
+      if ([...ids].some((id) => !repo.has(id))) return false;
+    }
+    return true;
   }
 
   /** The slots a view serves; empty while it never loaded. @param {Entry} entry @returns {readonly string[]} */
@@ -435,7 +475,7 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     }
     box.append(errorCard(entry.info.id, error, entry.info.replaced));
     if (!entry.info.replaced) return box;
-    entry.fallback ??= await loaded(entry.info.id, true, loadedFor ?? '');
+    entry.fallback ??= await loaded(entry.info.id, true, '');
     const builtin = entry.fallback.view;
     try {
       if (!builtin) throw entry.fallback.error;
@@ -452,8 +492,15 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     const at = Object.freeze({ ...route });
     const traversed = traversing;
     traversing = false;
+    projectsNow = null; // Each draw reads the projects afresh, once.
     const project = await projectOf(at);
-    if (project !== loadedFor) await loadAll(project, loadedFor !== null);
+    if (project !== loadedFor) {
+      const infos = await loadAll(project, loadedFor !== null);
+      const checking = reloading;
+      reloading = false;
+      // The address keeps the page across the reload.
+      if (checking && infos && !(await stillAllowed(project, infos))) return window.location.reload();
+    }
     const tabs = Object.freeze(
       entries
         .filter((e) => slotsOf(e).includes('run-tab'))
@@ -626,6 +673,7 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     return queue(() => {
       reloadWaiting = false;
       loadedFor = null; // The files changed: every view loads afresh.
+      reloading = true;
       return draw();
     });
   }
