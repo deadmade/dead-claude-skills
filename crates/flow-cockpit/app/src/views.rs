@@ -268,11 +268,12 @@ mod tests {
                 .filter(|name| view_id(name).is_some())
                 .collect();
         on_disk.sort();
-        let embedded: Vec<&str> = BUILTIN
+        let mut embedded: Vec<&str> = BUILTIN
             .entries()
             .iter()
             .map(|e| e.path().to_str().unwrap())
             .collect();
+        embedded.sort_unstable();
         assert_eq!(embedded, on_disk);
         assert!(print_view(&BUILTIN, "run").is_some_and(|s| s.contains("slot")));
     }

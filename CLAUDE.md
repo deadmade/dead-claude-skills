@@ -184,7 +184,7 @@ plugins of ours that the manifest no longer lists.
 
 CI: `test.yml` (npm test, the installer typecheck and the dead-skills and md-pane mod tests, Linux and Windows; the skill scan, Linux) on every PR and push to main; `crates.yml` (clippy and tests,
 plus tui-review's budgets, benchmarks and mod tests) for each crate a PR touches; `flow-cockpit.yml` on PRs touching the
-flow cockpit's crate, plugin or the flake (core tests and clippy on Linux and Windows, the app's Windows build, the
+flow cockpit's crate, plugin, the flake or the npm manifests (core tests and clippy on Linux and Windows, the app's Windows build, the
 views tests and both `tsc -p` checks; on Linux `nix build .#flow-cockpit`; with `CI=true` the core's relative-worktree
 test fails instead of skipping on a git older than 2.48); `crates-build.yml` (both binaries) on PRs
 touching it and from `release.yml`; `sync.yml` weekly, one job, PR and set of issues per `SOURCES` entry (new upstream

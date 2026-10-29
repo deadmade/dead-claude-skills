@@ -10,6 +10,8 @@ on:
       - 'plugins/opt-in/flow-cockpit/**'
       - 'flake.nix'
       - 'flake.lock'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/flow-cockpit.yml'
   workflow_dispatch:
 
