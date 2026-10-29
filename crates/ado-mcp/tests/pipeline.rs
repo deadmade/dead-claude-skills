@@ -194,6 +194,33 @@ fn tests_summary_and_failures() {
     );
 }
 
+/// A run that isn't there: the timeline's 404 is the whole answer, though the test runs answered.
+#[test]
+fn view_missing_run() {
+    let fx = Fixture::start();
+    let timeline = "/tfs/Coll/b5d2a1e7-6c40-4f8b-8a3d-2e9c7f10a455/_apis/build/builds/99/timeline/";
+    fx.route(timeline, vec![Resp::new(404, "text/plain", "gone")]);
+    test_routes(&fx);
+    let (err, text) = env(&fx).call("pipeline_view", json!({"run": 99}));
+    assert!(err, "{text}");
+    assert_eq!(text, "not found: run #99");
+}
+
+/// A project that isn't there is named as given, and nothing of the run is asked for.
+#[test]
+fn view_unknown_project() {
+    let fx = Fixture::start();
+    let gone = json!({"message": "TF200016: The following project does not exist: 0f3c2b1a-9d8e-4f7a-b6c5-d4e3f2a1b0c9"});
+    fx.route(
+        "/tfs/Coll/_apis/projects/Nope",
+        vec![Resp::new(404, "application/json", gone.to_string())],
+    );
+    let (err, text) = env(&fx).call("pipeline_view", json!({"run": 77, "project": "Nope"}));
+    assert!(err, "{text}");
+    assert_eq!(text, "not found: project Nope");
+    assert!(sent(&fx, TIMELINE).is_empty() && sent(&fx, TEST_RUNS).is_empty());
+}
+
 #[test]
 fn no_test_runs_adds_nothing() {
     let fx = Fixture::start();
