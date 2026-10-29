@@ -16,6 +16,7 @@ use flow_cockpit_core::activity::{
     Activity, CaptureCache, PAGE, SessionLive, ToolDetail, TranscriptCache,
 };
 use flow_cockpit_core::index::{DocName, Entry, FlowRun, Index, Project};
+use jiff::Timestamp;
 use tauri::State;
 
 use crate::views::{Extensions, ViewInfo, Views};
@@ -61,7 +62,10 @@ impl Shared {
         let mut page = self
             .transcripts()
             .page(&path, before, limit.unwrap_or(PAGE));
-        page.live = self.live(id).map(|s| s.live).unwrap_or_default();
+        page.live = self
+            .live(id)
+            .map(|s| s.live_at(Timestamp::now()))
+            .unwrap_or_default();
         Some(page)
     }
 
@@ -181,7 +185,6 @@ mod tests {
     use std::time::{Duration, Instant};
 
     use flow_cockpit_core::index::{Config, Home};
-    use jiff::Timestamp;
 
     use super::*;
     use crate::paths::Defaults;

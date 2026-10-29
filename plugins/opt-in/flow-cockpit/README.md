@@ -21,7 +21,7 @@ write nothing outside that folder. A permission prompt records which tool asked,
 characters) and its header (cut to 64), the options are dropped and trailing questions are dropped until it fits, and a notification message is cut at 1,024 characters; such a line carries
 `questions_cut` or `message_cut`.
 
-The window shows a run as waiting on you while one of its sessions has a question or permission prompt open. Allowing a prompt writes nothing it can see, so the run keeps saying it waits on you until the allowed tool finishes.
+The window shows a run as waiting on you while one of its sessions has a question or permission prompt open, unless that session has written nothing for a day (the window then says the question or prompt was left open). Allowing a prompt writes nothing it can see, so the run keeps saying it waits on you until the allowed tool finishes.
 
 ## Install
 

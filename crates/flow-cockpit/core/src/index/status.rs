@@ -1,6 +1,8 @@
 //! Where a flow run stands: the spec's Status rules, as one pure function over facts and `now`.
 
 use jiff::Timestamp;
+
+use crate::activity::gone_quiet;
 use serde::Serialize;
 use ts_rs::TS;
 
@@ -8,9 +10,6 @@ use ts_rs::TS;
 const WORKING_SECS: i64 = 2 * 60;
 /// A run with nothing happening for this long is stale.
 const STALE_SECS: i64 = 3 * 24 * 3600;
-/// A capture wait whose session wrote nothing for this long no longer counts: the Claude process that asked is gone
-/// (an interrupted question, a closed terminal), and nothing captured will ever end its wait.
-const WAIT_SECS: i64 = 24 * 3600;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
 pub enum Status {
@@ -42,7 +41,7 @@ pub(crate) fn status(f: &Facts, now: Timestamp) -> Status {
         .is_some_and(|p| p.trim().eq_ignore_ascii_case("done"))
     {
         Status::Done
-    } else if f.asked.is_some_and(|t| age(t) <= WAIT_SECS)
+    } else if f.asked.is_some_and(|t| !gone_quiet(Some(t), now))
         || f.now_line
             .is_some_and(|n| n.trim_start().starts_with("Waiting for you"))
     {

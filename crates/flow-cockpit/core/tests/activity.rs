@@ -3,8 +3,8 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use flow_cockpit_core::activity::{
-    Activity, CaptureCache, CaptureEvent, PAGE, ToolCall, ToolDetail, TranscriptCache, Waiting,
-    live, read_capture,
+    Activity, CaptureCache, CaptureEvent, PAGE, SessionLive, ToolCall, ToolDetail, TranscriptCache,
+    Waiting, live, read_capture,
 };
 use jiff::Timestamp;
 
@@ -642,6 +642,63 @@ fn a_late_line_older_than_what_followed_opens_nothing() {
         ],
     );
     assert_eq!(waiting(&other), permission("Edit"));
+    // Nor does a late line close a newer wait: the question's answer lands after the prompt that followed it.
+    let prompt_first = with(
+        &t,
+        "open-question.jsonl",
+        &[
+            line(9, "PermissionRequest", r#","permission_tool":"Bash""#),
+            line(8, "PostToolUse", r#","tool_use_id":"toolu_q1""#),
+        ],
+    );
+    assert_eq!(waiting(&prompt_first), permission("Bash"));
+    let prompted_late = with(
+        &t,
+        "permission.jsonl",
+        &[
+            line(9, "PermissionRequest", r#","permission_tool":"Edit""#),
+            line(7, "UserPromptSubmit", ""),
+        ],
+    );
+    assert_eq!(waiting(&prompted_late), permission("Edit"));
+}
+
+#[test]
+fn nothing_waiting_has_no_last_write() {
+    // `written` is read only for a wait that is shown: nothing else needs it.
+    let t = Temp::new("capture-no-wait");
+    let transcript = t.0.join("s-q.jsonl");
+    fs::write(&transcript, "").unwrap();
+    let file = t.0.join("capture.jsonl");
+    fs::copy(capture_fixture("answered-question.jsonl"), &file).unwrap();
+    assert_eq!(
+        CaptureCache::default().live(&file, &transcript),
+        SessionLive::default()
+    );
+}
+
+#[test]
+fn a_wait_quiet_for_a_day_was_left_open() {
+    let t = Temp::new("capture-left-open");
+    let file = t.0.join("capture.jsonl");
+    fs::copy(capture_fixture("open-question.jsonl"), &file).unwrap();
+    set_mtime(&file, 6);
+    let session = CaptureCache::default().live(&file, &t.0.join("s-q.jsonl"));
+    let later = |hours: i64| {
+        at(6)
+            .checked_add(jiff::SignedDuration::from_hours(hours))
+            .unwrap()
+    };
+    let fresh = session.live_at(later(23));
+    assert_eq!(fresh.waiting, question(COLOUR, false));
+    assert_eq!(fresh.since.as_deref(), Some("2026-03-02T09:00:05Z"));
+    assert!(!fresh.left_open);
+    let old = session.live_at(later(25));
+    assert_eq!(old.waiting, question(COLOUR, false));
+    assert!(
+        old.left_open,
+        "no file of the session was written for 25 hours"
+    );
 }
 
 #[test]

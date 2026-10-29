@@ -183,15 +183,26 @@ function turns(ctx: ViewContext, id: string, page: Activity | null, kept: Map<nu
   if (!page) return empty("This session isn't there any more.", 'Its transcript was moved or deleted.');
   const box = el('div', 'activity');
   const wait = page.live.waiting;
-  if (wait)
+  // A cut drops every question's options (the capture hook keeps only question and header).
+  const question = wait?.kind === 'Question' ? `${wait.text}${wait.cut ? ' (options left out)' : ''}` : '';
+  // A session quiet for a day left its wait behind: the Claude process that asked is gone.
+  const on = when(page.live.since);
+  if (wait && page.live.left_open)
+    box.append(
+      el(
+        'p',
+        'left-open quiet',
+        wait.kind === 'Question'
+          ? `A question was left open on ${on}: ${question}`
+          : `A permission prompt for ${wait.tool} was left open on ${on}.`,
+      ),
+    );
+  else if (wait)
     box.append(
       el(
         'p',
         'live-wait',
-        wait.kind === 'Question'
-          ? // A cut drops every question's options (the capture hook keeps only question and header).
-            `Waiting on you: ${wait.text}${wait.cut ? ' (options left out)' : ''}`
-          : `Waiting on you to allow ${wait.tool}.`,
+        wait.kind === 'Question' ? `Waiting on you: ${question}` : `Waiting on you to allow ${wait.tool}.`,
       ),
     );
   if (!page.total) {

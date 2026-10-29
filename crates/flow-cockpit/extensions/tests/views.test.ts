@@ -556,9 +556,9 @@ test('activity_groups_turns_newest_first', async () => {
 });
 
 test('activity_says_what_the_session_waits_for', async () => {
-  const waiting = (w: any) => {
+  const waiting = (w: any, leftOpen = false) => {
     const sessions = clone(DATA.sessions);
-    sessions['s-mention'].live = { waiting: w };
+    sessions['s-mention'].live = { waiting: w, since: '2026-03-02T09:00:05Z', left_open: leftOpen };
     return { sessions };
   };
   const route = { to: 'session', project: ALPHA, id: 's-mention' };
@@ -571,6 +571,23 @@ test('activity_says_what_the_session_waits_for', async () => {
   assert.equal(text(allow.box.querySelector('.live-wait')), 'Waiting on you to allow Bash.');
   const none = await draw('activity', route);
   assert.equal(none.box.querySelector('.live-wait'), null);
+  // A session quiet for a day left its wait behind: it says so, with the wait's date, and no longer that it waits.
+  const leftQuestion = await draw(
+    'activity',
+    route,
+    waiting({ kind: 'Question', text: 'Tabs or spaces?', cut: false }, true),
+  );
+  assert.equal(leftQuestion.box.querySelector('.live-wait'), null);
+  assert.match(
+    text(leftQuestion.box.querySelector('.left-open')),
+    /^A question was left open on 2 Mar, \d\d:\d\d: Tabs or spaces\?$/,
+  );
+  const leftPrompt = await draw('activity', route, waiting({ kind: 'Permission', tool: 'Bash' }, true));
+  assert.match(
+    text(leftPrompt.box.querySelector('.left-open')),
+    /^A permission prompt for Bash was left open on 2 Mar, \d\d:\d\d\.$/,
+  );
+  assert.equal(allow.box.querySelector('.left-open'), null);
 });
 
 /** A promise per call, settled by the test. */

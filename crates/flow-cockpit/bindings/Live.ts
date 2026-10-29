@@ -4,4 +4,13 @@ import type { Waiting } from "./Waiting";
 /**
  * What the session waits for, from the capture file; `None` when it waits for nothing or has no capture.
  */
-export type Live = { waiting: Waiting | null, };
+export type Live = { waiting: Waiting | null, 
+/**
+ * When the wait began.
+ */
+since: string | null, 
+/**
+ * The session wrote nothing for 24 hours since: the Claude process that asked is gone, and the wait was left
+ * open rather than waiting on anyone.
+ */
+left_open: boolean, };

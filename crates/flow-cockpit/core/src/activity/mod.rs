@@ -17,6 +17,7 @@ use serde::Serialize;
 use serde_json::Value;
 use ts_rs::TS;
 
+pub(crate) use capture::gone_quiet;
 pub use capture::{CaptureCache, CaptureEvent, SessionLive, live, read_capture};
 pub use transcript::TranscriptCache;
 
@@ -101,6 +102,11 @@ pub enum Waiting {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, TS)]
 pub struct Live {
     pub waiting: Option<Waiting>,
+    /// When the wait began.
+    pub since: Option<String>,
+    /// The session wrote nothing for 24 hours since: the Claude process that asked is gone, and the wait was left
+    /// open rather than waiting on anyone.
+    pub left_open: bool,
 }
 
 /// A page of a session's turns, oldest first: the turns whose indexes are `start` up to `start + turns.len()`, out of

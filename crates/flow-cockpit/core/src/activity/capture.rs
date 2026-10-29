@@ -14,6 +14,7 @@
 //! Lines are read like transcripts: a line that does not parse, or of another format version, is skipped, and a last
 //! line without its newline yet waits for the next read.
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Seek, SeekFrom};
@@ -149,13 +150,15 @@ impl Open {
             e.event.as_str(),
             "SessionStart" | "SessionEnd" | "UserPromptSubmit"
         ) {
-            self.waits.clear();
+            // A late line ends only the waits it is newer than.
+            self.waits.retain(|w| w.at > e.at);
             self.cleared = self.cleared.max(Some(e.at));
             return;
         }
         let question = |w: &Wait| matches!(w.waiting, Waiting::Question { .. });
-        // Any other event is the agent it came from moving on from its permission prompt.
-        self.waits.retain(|w| question(w) || w.agent != e.agent);
+        // Any other event is the agent it came from moving on from its permission prompts raised before it.
+        self.waits
+            .retain(|w| question(w) || w.agent != e.agent || w.at > e.at);
         if matches!(e.event.as_str(), "PostToolUse" | "PostToolUseFailure") {
             self.waits
                 .retain(|w| !question(w) || w.tool_use_id != e.tool_use_id);
@@ -211,18 +214,45 @@ pub fn live(events: &[CaptureEvent], written: impl Fn(Option<&str>) -> Option<Ti
     for e in events {
         open.add(e);
     }
-    Live {
-        waiting: open.shown(written).map(|w| w.waiting.clone()),
-    }
+    open.shown(written).map(Wait::live).unwrap_or_default()
+}
+
+/// A wait whose session wrote nothing for this long was left behind by a Claude process that is gone (an interrupted
+/// question, a closed terminal): nothing captured will ever end it.
+const QUIET: SignedDuration = SignedDuration::from_hours(24);
+
+/// Whether a session that last wrote anything at `written` has been quiet for longer than [`QUIET`] at `now`.
+pub(crate) fn gone_quiet(written: Option<Timestamp>, now: Timestamp) -> bool {
+    written.is_none_or(|t| now.duration_since(t) > QUIET)
 }
 
 /// What a session waits for, and when it last wrote anything: its capture file, its transcript, or the transcript of
-/// the subagent its wait belongs to. A wait whose session went quiet long ago was left behind by a process that is
-/// gone; the run's status stops counting it (see the index's status rules).
+/// the subagent its wait belongs to (`None` when nothing waits).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SessionLive {
     pub live: Live,
     pub written: Option<Timestamp>,
+}
+
+impl SessionLive {
+    /// The wait as it stands at `now`: marked `left_open` once the session has been quiet for 24 hours.
+    #[must_use]
+    pub fn live_at(&self, now: Timestamp) -> Live {
+        Live {
+            left_open: self.live.waiting.is_some() && gone_quiet(self.written, now),
+            ..self.live.clone()
+        }
+    }
+}
+
+impl Wait {
+    fn live(&self) -> Live {
+        Live {
+            waiting: Some(self.waiting.clone()),
+            since: Some(self.at.to_string()),
+            left_open: false,
+        }
+    }
 }
 
 /// The capture files read so far, by path: each one's waits, and how far it was read.
@@ -265,20 +295,27 @@ impl CaptureCache {
             file.offset = read_from(capture, file.offset, |e| open.add(&e));
             (file.size, file.mtime, file.id) = (size, mtime, id);
         }
-        let stat = |agent: Option<&str>| match agent {
-            Some(a) => written(&agent_path(transcript, a)),
-            None => written(transcript),
+        // Each transcript is stat'd at most once, and only while a wait needs it.
+        let seen = RefCell::new(HashMap::new());
+        let stat = |agent: Option<&str>| {
+            *seen
+                .borrow_mut()
+                .entry(agent.map(str::to_string))
+                .or_insert_with(|| match agent {
+                    Some(a) => written(&agent_path(transcript, a)),
+                    None => written(transcript),
+                })
         };
-        let shown = file.open.shown(stat);
+        let Some(shown) = file.open.shown(stat) else {
+            return SessionLive::default();
+        };
         let last = [
             mtime.and_then(|t| Timestamp::try_from(t).ok()),
             stat(None),
-            shown.and_then(|w| stat(Some(w.agent.as_deref()?))),
+            shown.agent.as_deref().and_then(|a| stat(Some(a))),
         ];
         SessionLive {
-            live: Live {
-                waiting: shown.map(|w| w.waiting.clone()),
-            },
+            live: shown.live(),
             written: last.into_iter().flatten().max(),
         }
     }
