@@ -80,6 +80,21 @@ fn world(root: &Path) -> (Home, Config) {
     for plain in ["a/solo", "b/solo", "work/secret"] {
         git_dir(&root.join(plain), "[core]\n\tbare = false\n");
     }
+    // beta moved from old/beta (no `.git` left) to work/beta; git's stale record of the old worktree stays.
+    git_dir(
+        &root.join("work/beta"),
+        "[remote \"origin\"]\n\turl = git@github.com:acme/beta.git\n",
+    );
+    let stale = root.join("work/beta/.git/worktrees/old");
+    fs::create_dir_all(&stale).unwrap();
+    fs::write(
+        stale.join("gitdir"),
+        format!(
+            "{}\n",
+            root.join("old/beta/.claude/worktrees/old/.git").display()
+        ),
+    )
+    .unwrap();
     let home = Home {
         claude_projects: root.join("claude/projects"),
         capture_dir: root.join("capture"),

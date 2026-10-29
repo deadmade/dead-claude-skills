@@ -1,4 +1,38 @@
 {
+  "s-beta": {
+    "agents": [],
+    "live": {
+      "waiting": null
+    },
+    "turns": [
+      {
+        "prompt": {
+          "agent": null,
+          "at": "2026-01-19T09:30:00.000Z",
+          "text": "Start on beta."
+        },
+        "replies": [],
+        "tools": []
+      }
+    ]
+  },
+  "s-beta-old": {
+    "agents": [],
+    "live": {
+      "waiting": null
+    },
+    "turns": [
+      {
+        "prompt": {
+          "agent": null,
+          "at": "2026-01-19T09:00:00.000Z",
+          "text": "Tidy the old notes."
+        },
+        "replies": [],
+        "tools": []
+      }
+    ]
+  },
   "s-link": {
     "agents": [],
     "live": {

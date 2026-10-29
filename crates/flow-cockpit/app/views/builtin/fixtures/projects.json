@@ -10,6 +10,16 @@
     ]
   },
   {
+    "id": "folder-beta",
+    "name": "beta",
+    "roots": ["/home/you/old/beta", "/home/you/old/beta/.claude/worktrees/old"]
+  },
+  {
+    "id": "github-com-acme-beta",
+    "name": "beta",
+    "roots": ["/home/you/work/beta"]
+  },
+  {
     "id": "folder-solo",
     "name": "solo",
     "roots": ["/home/you/a/solo", "/home/you/b/solo"]

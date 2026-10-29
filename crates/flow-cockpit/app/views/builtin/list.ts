@@ -167,6 +167,31 @@ function looseRow(ctx: ViewContext, project: string, s: SessionSummary): HTMLLIE
   return el('li', '', row);
 }
 
+/**
+ * Projects that share a name, told apart by where their first folder sits: `in projects` for `~/projects/<name>`.
+ * The roots come sorted, so a checkout comes before its own worktrees. Deeper folders are added until the places differ.
+ */
+function placesOf(projects: Project[]): Map<string, string> {
+  const places = new Map<string, string>();
+  const byName = new Map<string, Project[]>();
+  for (const p of projects) byName.set(p.name, [...(byName.get(p.name) ?? []), p]);
+  for (const same of byName.values()) {
+    if (same.length < 2) continue;
+    const parents = same.map((p) =>
+      (p.roots[0] ?? '')
+        .split(/[\\/]+/)
+        .filter(Boolean)
+        .slice(0, -1),
+    );
+    let depth = 1;
+    const tail = (parts: string[]) => parts.slice(-depth).join('/');
+    const deepest = Math.max(...parents.map((x) => x.length));
+    while (depth < deepest && new Set(parents.map(tail)).size < same.length) depth++;
+    same.forEach((p, i) => places.set(p.id, parents[i].length ? `in ${tail(parents[i])}` : ''));
+  }
+  return places;
+}
+
 function group(title: string, aside: string, className: string, rows: HTMLLIElement[]): HTMLElement {
   const g = el(
     'section',
@@ -242,8 +267,9 @@ function frame(ctx: ViewContext, projects: Project[], project: Project | undefin
   );
 
   // The rail: projects, then the filters (a press toggles one; none pressed shows all), then the sort.
+  const places = placesOf(projects);
   const projectRows = projects.map((p) => {
-    const b = button('row plain', el('span', 'ttl', p.name));
+    const b = button('row plain', el('span', 'ttl', p.name), el('span', 'mark', places.get(p.id) ?? ''));
     b.setAttribute('aria-current', String(p.id === project.id));
     b.title = p.roots.join('\n');
     b.addEventListener('click', () => {

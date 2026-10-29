@@ -141,6 +141,10 @@ fn slug(s: &str) -> String {
 
 /// The checkouts and every worktree of them that exists: `.claude/worktrees/*`, `.worktrees/*` and the folders git
 /// recorded in `.git/worktrees/*/gitdir`. Sorted, each once.
+///
+/// A record counts only while the worktree's own `.git` file is there. A folder left behind by a moved or deleted
+/// worktree has none, so git's stale record doesn't claim it: it stays with the checkout it sits in, so no folder is
+/// a root of two projects.
 pub(crate) fn roots_of(checkouts: &BTreeSet<PathBuf>) -> Vec<PathBuf> {
     let mut roots = checkouts.clone();
     for checkout in checkouts {
@@ -151,8 +155,9 @@ pub(crate) fn roots_of(checkouts: &BTreeSet<PathBuf>) -> Vec<PathBuf> {
             let Ok(text) = fs::read_to_string(admin.join("gitdir")) else {
                 continue;
             };
-            if let Some(worktree) = Path::new(text.trim()).parent()
-                && worktree.is_dir()
+            let git_file = Path::new(text.trim());
+            if let Some(worktree) = git_file.parent()
+                && git_file.is_file()
             {
                 roots.insert(worktree.to_path_buf());
             }

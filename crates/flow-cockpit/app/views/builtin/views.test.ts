@@ -451,6 +451,18 @@ test('list_clears_filters_the_new_project_has_no_row_for', async () => {
   assert.deepEqual(names(solo.box, 'Loose sessions'), ['Solo A.', 'Solo B.']);
 });
 
+test('list_tells_apart_projects_with_one_name', async () => {
+  // beta's old checkout folder (no git left) and the moved repository are two projects of one name.
+  const { box } = await draw('list', { to: 'list', project: ALPHA });
+  const marks = rowsOf(box, 'Projects').map((r) => [text(r.querySelector('.ttl')), text(r.querySelector('.mark'))]);
+  assert.deepEqual(marks, [
+    ['alpha', ''],
+    ['beta', 'in old'],
+    ['beta', 'in work'],
+    ['solo', ''],
+  ]);
+});
+
 test('run_wires_accessibility_like_the_design', async () => {
   const resolves = (box: Element) => {
     for (const el of box.querySelectorAll('[aria-labelledby], [aria-controls]')) {

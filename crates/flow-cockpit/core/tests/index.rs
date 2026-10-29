@@ -3,6 +3,7 @@
 //! `.git/worktrees/*/gitdir` and the 50 MB transcript are written here. `now` is fixed and the files' mtimes are set
 //! from it, so no test reads the clock.
 
+use std::collections::BTreeMap;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -104,6 +105,23 @@ impl World {
         fs::write(
             admin.join("gitdir"),
             format!("{}\n", z.join(".git").display()),
+        )
+        .unwrap();
+        fs::write(z.join(".git"), format!("gitdir: {}\n", admin.display())).unwrap();
+        // beta moved from old/beta to work/beta: git still records the old worktree, whose folder was left behind
+        // without its `.git` file, under the old checkout that has no `.git` at all.
+        git_dir(
+            &root.join("work/beta"),
+            "[remote \"origin\"]\n\turl = git@github.com:acme/beta.git\n",
+        );
+        let stale = root.join("work/beta/.git/worktrees/old");
+        fs::create_dir_all(&stale).unwrap();
+        fs::write(
+            stale.join("gitdir"),
+            format!(
+                "{}\n",
+                root.join("old/beta/.claude/worktrees/old/.git").display()
+            ),
         )
         .unwrap();
 
@@ -222,6 +240,31 @@ fn finds_worktrees_without_sessions() {
     ] {
         assert!(alpha.roots.contains(&w.path(worktree)), "{worktree}");
     }
+}
+
+#[test]
+fn every_root_is_in_one_project() {
+    let w = World::new("one-owner");
+    let projects = w.index().projects();
+    let mut owners: BTreeMap<PathBuf, Vec<String>> = BTreeMap::new();
+    for p in &projects {
+        for root in &p.roots {
+            owners.entry(root.clone()).or_default().push(p.id.clone());
+        }
+    }
+    let shared: Vec<_> = owners.iter().filter(|(_, ids)| ids.len() > 1).collect();
+    assert!(shared.is_empty(), "roots in several projects: {shared:?}");
+
+    // The leftover worktree stays with the remote-less folder it sits in; git's stale record doesn't claim it.
+    let beta: Vec<_> = projects.iter().filter(|p| p.name == "beta").collect();
+    assert_eq!(beta.len(), 2);
+    let remote = beta.iter().find(|p| !p.id.starts_with("folder-")).unwrap();
+    let folder = beta.iter().find(|p| p.id.starts_with("folder-")).unwrap();
+    assert_eq!(remote.roots, [w.path("work/beta")]);
+    assert_eq!(
+        folder.roots,
+        [w.path("old/beta"), w.path("old/beta/.claude/worktrees/old")]
+    );
 }
 
 #[test]
