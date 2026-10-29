@@ -202,12 +202,15 @@ fn wiki_hit(r: &WikiResult) -> String {
     out
 }
 
-/// A failed search: a 404 says Search is missing, or names the project too (a stale cached project id, or no
-/// Search: the 404 can't tell which).
-fn missing(mut e: ApiError, named: Option<&str>) -> ApiError {
-    if let Some(p) = named {
+/// A failed search: a 404 says Search is missing, or names the project or, in a clone, the repo too (a stale cached
+/// id, or no Search: the 404 can't tell which).
+fn missing(mut e: ApiError, named: Option<&str>, repo: Option<&str>) -> ApiError {
+    let what = named
+        .map(|p| format!("project {p}"))
+        .or_else(|| repo.map(|r| format!("repo {r}")));
+    if let Some(what) = what {
         return e.with_what(&format!(
-            "project {p}, or Search isn't installed on this collection"
+            "{what}, or Search isn't installed on this collection"
         ));
     }
     if e.status == Some(404) {
@@ -246,7 +249,7 @@ fn listed<T>(
 }
 
 /// # Errors
-/// When the scope or the server fails; a 404 says Search is missing, or names the project.
+/// When the scope or the server fails; a 404 says Search is missing, or names the project or repo.
 pub(crate) async fn search(ctx: &Ctx, a: &SearchArgs) -> Result<String, ApiError> {
     let limit = usize::from(a.limit.unwrap_or(20).max(1));
     let (named, repo) = (given(a.project.as_deref()), given(a.repo.as_deref()));
@@ -291,7 +294,7 @@ pub(crate) async fn search(ctx: &Ctx, a: &SearchArgs) -> Result<String, ApiError
                         .into_future()
                 })
                 .await
-                .map_err(|e| missing(e, named))?;
+                .map_err(|e| missing(e, named, repo))?;
             let info_code = found.entity_search_response.info_code;
             listed(a, limit, info_code, found.count, found.results, wi_hit)
         }
@@ -308,7 +311,7 @@ pub(crate) async fn search(ctx: &Ctx, a: &SearchArgs) -> Result<String, ApiError
                         .into_future()
                 })
                 .await
-                .map_err(|e| missing(e, named))?;
+                .map_err(|e| missing(e, named, repo))?;
             let empty = found.results.is_empty();
             let info_code = found.entity_search_response.info_code;
             let mut lines = listed(a, limit, info_code, found.count, found.results, code_hit);
@@ -331,7 +334,7 @@ pub(crate) async fn search(ctx: &Ctx, a: &SearchArgs) -> Result<String, ApiError
                         .into_future()
                 })
                 .await
-                .map_err(|e| missing(e, named))?;
+                .map_err(|e| missing(e, named, repo))?;
             let info_code = found.entity_search_response.info_code;
             listed(a, limit, info_code, found.count, found.results, wiki_hit)
         }

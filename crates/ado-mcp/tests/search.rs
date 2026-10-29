@@ -234,6 +234,24 @@ fn project_404() {
     }
 }
 
+/// In a clone with `repo` and no `project`, the repo is looked up in the clone's project: a 404 may be a stale cached
+/// id as much as a missing Search.
+#[test]
+fn clone_repo_404() {
+    let fx = Fixture::start();
+    fx.route(
+        &format!("/tfs/Coll/{PROJ}/_apis/git/repositories/R"),
+        vec![fixture("repo.json")],
+    );
+    fx.route(PROJ_CODE, vec![Resp::new(404, "text/plain", "not found")]);
+    let (err, text) = env(&fx).call("search", json!({"kind": "code", "text": "x", "repo": "R"}));
+    assert!(err, "{text}");
+    assert_eq!(
+        text,
+        "not found: repo R, or Search isn't installed on this collection"
+    );
+}
+
 /// rmcp answers bad arguments with a tool error, not a JSON-RPC one; nothing is sent.
 #[test]
 fn kind_required() {
