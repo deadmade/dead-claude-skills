@@ -67,12 +67,11 @@ pub fn doubled(limit: usize) -> usize {
 
 /// Azure DevOps rich text as plain text: line breaks and list items kept, other tags dropped.
 pub fn html_to_text(html: &str) -> String {
-    const ENTITIES: [(&str, char); 6] = [
+    const ENTITIES: [(&str, char); 5] = [
         ("&amp;", '&'),
         ("&lt;", '<'),
         ("&gt;", '>'),
         ("&quot;", '"'),
-        ("&#39;", '\''),
         ("&nbsp;", ' '),
     ];
     let mut out = String::with_capacity(html.len());
@@ -116,6 +115,11 @@ pub fn html_to_text(html: &str) -> String {
             i += name.len();
             continue;
         }
+        if let Some((ch, len)) = numeric_entity(rest) {
+            out.push(ch);
+            i += len;
+            continue;
+        }
         let ch = rest.chars().next().unwrap_or_default();
         out.push(ch);
         i += ch.len_utf8();
@@ -127,6 +131,27 @@ pub fn html_to_text(html: &str) -> String {
         }
     }
     lines.join("\n").trim().to_string()
+}
+
+/// The character and length of a numeric entity at the start of `s` (`&#128522;`, `&#x1F60A;`; the server writes
+/// emoji this way). `None` when it isn't one or names no character, so it stays text.
+fn numeric_entity(s: &str) -> Option<(char, usize)> {
+    let body = s.strip_prefix("&#")?;
+    let (digits, radix, skip) = match body.strip_prefix(['x', 'X']) {
+        Some(hex) => (hex, 16, 3),
+        None => (body, 10, 2),
+    };
+    // Seven hex or decimal digits cover every code point; a longer run isn't scanned.
+    let end = digits
+        .bytes()
+        .take(8)
+        .position(|b| !b.is_ascii_alphanumeric())?;
+    if digits.as_bytes()[end] != b';' {
+        return None;
+    }
+    let code = u32::from_str_radix(&digits[..end], radix).ok()?;
+    let ch = char::from_u32(code).filter(|&c| c != '\0')?;
+    Some((ch, skip + end + 1))
 }
 
 /// The index of the `>` that ends the tag opening at `from`, skipping any inside quotes. `None` when it never closes.
@@ -307,6 +332,29 @@ mod tests {
     #[test]
     fn html_to_text_decodes_once() {
         assert_eq!(html_to_text("&amp;nbsp; &amp;lt;"), "&nbsp; &lt;");
+        assert_eq!(html_to_text("&amp;#39;"), "&#39;");
+    }
+
+    #[test]
+    fn html_to_text_numeric_entities() {
+        assert_eq!(
+            html_to_text("gerne &#128522; &#x1F60A; &#X41;&#233;"),
+            "gerne 😊 😊 Aé"
+        );
+        // Not a character, unterminated or too long: left as text.
+        for s in [
+            "&#;",
+            "&#x;",
+            "&#55296;",
+            "&#1114112;",
+            "&#0;",
+            "&#65",
+            "&#65 x",
+            "&#12a;",
+            "&#000000065;",
+        ] {
+            assert_eq!(html_to_text(s), s);
+        }
     }
 
     #[test]
