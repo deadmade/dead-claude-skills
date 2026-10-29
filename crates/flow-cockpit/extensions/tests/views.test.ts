@@ -814,6 +814,68 @@ test('run_graph_nodes_select_their_task', async () => {
   }
 });
 
+test('run_draws_a_lettered_task_in_place', async () => {
+  // A task added during the build, as the core gives it: after the task it follows, being built.
+  const runs = clone(DATA.runs);
+  const login = runs[`${ALPHA}/login`];
+  login.plan.tasks.push({
+    id: '2b',
+    title: 'The lockout',
+    does: 'Locks the form after five tries.',
+    depends_on: ['2'],
+    markdown: '',
+  });
+  login.ledger.tasks.find((t: any) => t.id === '2').state = 'Done';
+  login.ledger.tasks.push({
+    id: '2b',
+    state: 'Building',
+    fix_rounds: 0,
+    security: [],
+    later: [],
+    story: ['dispatched (base def4567, implementer opus)'],
+    model: 'opus',
+  });
+  const w = window as any;
+  let source = '';
+  w.mermaid = {
+    initialize() {},
+    render: async (id: string, src: string) => {
+      source = src;
+      return {
+        svg: `<svg id="${id}"><g class="node" id="flowchart-T1-0"></g><g class="node" id="flowchart-T2b-2"></g></svg>`,
+      };
+    },
+  };
+  try {
+    const { box } = await draw('run', { to: 'run', project: ALPHA, slug: 'login' }, { runs });
+    await tick();
+    // The rail lists it in its place, and the card follows the task being built.
+    assert.deepEqual(
+      rowsOf(box, 'Tasks').map((r) => r.getAttribute('data-task')),
+      ['1', '2', '2b'],
+    );
+    assert.equal(box.querySelector('.row[aria-current="true"]')?.getAttribute('data-task'), '2b');
+    assert.match(text(box.querySelector('.task-h')), /2b\s*The lockout\s*Being built/);
+    assert.match(text(box.querySelector('.task .facts')), /^Needs task 2 first\.$/);
+    assert.match(text(box.querySelector('.now .summary')), /^2 of 3 tasks done\./);
+    // The graph names it with a valid Mermaid id, linked from the task it depends on and ringed.
+    assert.match(source, /^ {2}T2b\(\("2b"\)\)$/m);
+    assert.match(source, /^ {2}T2 --> T2b$/m);
+    assert.match(source, /^ {2}style T2b /m);
+    const node = box.querySelector('#flowchart-T2b-2') as Element;
+    assert.equal(node.getAttribute('aria-label'), 'Task 2b, The lockout: being built');
+
+    press(box, 'The form');
+    assert.match(text(box.querySelector('.task .facts')), /Task 2 waits for it\./);
+    await tick();
+    box.querySelector('#flowchart-T2b-2')?.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    assert.equal(text(box.querySelector('.task .does')), 'Locks the form after five tries.');
+    assert.equal(box.querySelector('.row[aria-current="true"]')?.getAttribute('data-task'), '2b');
+  } finally {
+    delete w.mermaid;
+  }
+});
+
 test('list_switch_and_filters_survive_a_redraw', async () => {
   const { createRuntime } = await import('../../app/shell/runtime.js');
   const entries = clone(DATA.entries);

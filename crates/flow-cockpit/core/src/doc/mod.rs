@@ -98,6 +98,47 @@ pub(crate) fn numbers(s: &str) -> Vec<u32> {
         .collect()
 }
 
+/// A task id: a number, then at most one lowercase letter for a task added during a build (`8`, `8b`). Ordered by
+/// number, then the plain task before its lettered ones, letters in order: `8 < 8b < 8c < 9`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct TaskId {
+    n: u32,
+    letter: Option<char>,
+}
+
+impl TaskId {
+    /// The id `s` starts with, and the rest of `s`. `None` unless the id ends where a letter or digit can't follow:
+    /// `8bc`, `8B` and `b8` are no ids.
+    pub fn parse_prefix(s: &str) -> Option<(TaskId, &str)> {
+        let digits = s.len() - s.trim_start_matches(|c: char| c.is_ascii_digit()).len();
+        let n = s[..digits].parse().ok()?;
+        let letter = s[digits..].chars().next().filter(char::is_ascii_lowercase);
+        let rest = &s[digits + usize::from(letter.is_some())..];
+        if rest.starts_with(|c: char| c.is_alphanumeric()) {
+            return None;
+        }
+        Some((TaskId { n, letter }, rest))
+    }
+
+    /// `s` as a whole id.
+    pub fn parse(s: &str) -> Option<TaskId> {
+        Self::parse_prefix(s)
+            .filter(|(_, rest)| rest.is_empty())
+            .map(|(id, _)| id)
+    }
+
+    pub fn plain(n: u32) -> TaskId {
+        TaskId { n, letter: None }
+    }
+}
+
+impl std::fmt::Display for TaskId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.n)?;
+        self.letter.map_or(Ok(()), |l| write!(f, "{l}"))
+    }
+}
+
 /// `YYYY-MM-DD` dates in `s` with their byte offsets.
 pub(crate) fn dates(s: &str) -> Vec<(usize, &str)> {
     let b = s.as_bytes();

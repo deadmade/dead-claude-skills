@@ -163,15 +163,16 @@ fn plan_reads_does_and_depends() {
     let tasks: Vec<_> = doc
         .tasks
         .iter()
-        .map(|t| (t.n, t.title.as_str(), t.depends_on.clone()))
+        .map(|t| (t.id.as_str(), t.title.as_str(), t.depends_on.clone()))
         .collect();
+    let ids = |xs: &[&str]| Some(xs.iter().map(|x| (*x).to_string()).collect::<Vec<_>>());
     assert_eq!(
         tasks,
         [
-            (1, "The theme store", Some(vec![])),
-            (2, "The settings switch", Some(vec![1])),
-            (3, "Docs", Some(vec![1, 2])),
-            (4, "Old-style task", None),
+            ("1", "The theme store", ids(&[])),
+            ("2", "The settings switch", ids(&["1"])),
+            ("3", "Docs", ids(&["1", "2"])),
+            ("4", "Old-style task", None),
         ]
     );
     assert_eq!(
@@ -191,7 +192,7 @@ fn ledger_joins_wrapped_lines() {
         Some("docs/features/web-mcp/plan.md")
     );
     // Task 3's entry is wrapped under an indent; the sentence runs across the wrap.
-    let three = ledger.tasks.iter().find(|t| t.n == 3).unwrap();
+    let three = ledger.tasks.iter().find(|t| t.id == "3").unwrap();
     assert_eq!(three.later.len(), 1);
     assert!(three.later[0].contains("Task 5 must cache PDFs too (spec Goal 3"));
 }
@@ -199,8 +200,8 @@ fn ledger_joins_wrapped_lines() {
 #[test]
 fn ledger_counts_fix_rounds_and_security() {
     let ledger = parse_ledger(&fixture("web-mcp.ledger.md"));
-    let by_n = |n: u32| ledger.tasks.iter().find(|t| t.n == n).unwrap();
-    let five = by_n(5);
+    let by_id = |id: &str| ledger.tasks.iter().find(|t| t.id == id).unwrap();
+    let five = by_id("5");
     // `fix round 1/5` and `fix round 2/5` count; `fix round 1 implemented <sha>` does not.
     assert_eq!(five.fix_rounds, 2);
     assert!(
@@ -218,8 +219,8 @@ fn ledger_counts_fix_rounds_and_security() {
     assert_eq!(five.state, TaskState::Done);
     assert_eq!(five.model.as_deref(), Some("opus"));
     assert_eq!(five.later.len(), 6);
-    assert_eq!(by_n(4).state, TaskState::Review);
-    assert_eq!(by_n(4).fix_rounds, 0);
+    assert_eq!(by_id("4").state, TaskState::Review);
+    assert_eq!(by_id("4").fix_rounds, 0);
     assert!(ledger.rulings.len() >= 5);
     assert!(
         ledger
@@ -473,6 +474,89 @@ fn no_input_panics() {
             parse_plan(text),
             parse_audit(text),
             parse_ledger(text),
+        );
+    }
+}
+
+#[test]
+fn plan_reads_lettered_tasks_in_order() {
+    let doc = parse_plan(
+        "# P\n\n## Tasks\n\n### Task 9: Nine\n\n### Task 8c: Eight c\n\n### Task 8: Eight\n\n\
+         ### Task 8b: Eight b\n\n**Depends on:** Task 8, Task 5b\n\n### Task 10: Ten\n",
+    );
+    let ids: Vec<&str> = doc.tasks.iter().map(|t| t.id.as_str()).collect();
+    // By number, the plain task before its lettered ones, letters in order.
+    assert_eq!(ids, ["8", "8b", "8c", "9", "10"]);
+    let eight_b = &doc.tasks[1];
+    assert_eq!(eight_b.title, "Eight b");
+    assert_eq!(
+        eight_b.depends_on,
+        Some(vec!["8".to_string(), "5b".to_string()])
+    );
+}
+
+#[test]
+fn odd_task_headings_stay_unread() {
+    let doc = parse_plan(
+        "## Tasks\n\n### Task 8bc: Two letters\n\n### Task 8B: Upper case\n\n### Task b8: Letter first\n\n\
+         ### Task 3 transcript fixtures\n",
+    );
+    let read: Vec<(&str, &str)> = doc
+        .tasks
+        .iter()
+        .map(|t| (t.id.as_str(), t.title.as_str()))
+        .collect();
+    assert_eq!(read, [("3", "transcript fixtures")]);
+}
+
+#[test]
+fn ledger_reads_lettered_tasks() {
+    let ledger = parse_ledger(
+        "Task 9: dispatched (base a, implementer sonnet)\n\
+         Task 8b: dispatched (base b, implementer opus)\n\
+         Task 8b: fix round 1/5 (1 Important addressed)\n\
+         Task 8: complete (c)\n\
+         Tasks 3-5: complete (d)\n\
+         Task 8c: dispatched (base e, implementer opus)\n\
+         Task 9 follow-up: dispatched (base f, implementer sonnet)\n\
+         Task 8bc: complete\n",
+    );
+    let ids: Vec<&str> = ledger.tasks.iter().map(|t| t.id.as_str()).collect();
+    assert_eq!(ids, ["3", "4", "5", "8", "8b", "8c", "9"]);
+    let eight_b = &ledger.tasks[4];
+    assert_eq!(eight_b.state, TaskState::Review);
+    assert_eq!(eight_b.fix_rounds, 1);
+    assert_eq!(eight_b.model.as_deref(), Some("opus"));
+    assert_eq!(ledger.tasks[5].state, TaskState::Building);
+    assert_eq!(ledger.tasks[3].state, TaskState::Done);
+}
+
+#[test]
+fn this_repos_plan_has_its_added_tasks() {
+    let text = fs::read_to_string(repo_root().join("docs/features/flow-observability/plan.md"))
+        .expect("this run's plan");
+    let doc = parse_plan(&text);
+    let ids: Vec<&str> = doc.tasks.iter().map(|t| t.id.as_str()).collect();
+    assert_eq!(
+        ids,
+        [
+            "1", "2", "3", "4", "5", "5b", "6", "7", "8", "8b", "8c", "8d", "8e", "8f", "8g", "9",
+            "10", "11", "12", "13"
+        ]
+    );
+    let eight_d = doc.tasks.iter().find(|t| t.id == "8d").unwrap();
+    assert_eq!(eight_d.depends_on, Some(vec!["8f".to_string()]));
+    // Every added task says which decision added it.
+    for t in doc
+        .tasks
+        .iter()
+        .filter(|t| t.id.ends_with(char::is_alphabetic))
+    {
+        assert!(
+            t.markdown
+                .contains("**Added:** 2026-10-29, by the user's decision"),
+            "Task {} has no Added line",
+            t.id
         );
     }
 }

@@ -285,6 +285,51 @@ format, and stops until they approve it; the approved page is what the real view
       `Picked: …`). Changes they ask for go into this file before Task 8 starts.
 - [ ] **Step 4:** Commit: `Add the approved flow run view design.`
 
+### Task 5b: Typed rulings, phases and deferred items in the core
+
+**Does:** Moves the three bits of document format the approved mockup still reads itself into the core, so the views
+get typed data only (Global Constraint 1): the Rulings list, each conductor's phases with their gates, and the
+`minor (deferred):` tag.
+**Depends on:** Task 2, Task 5
+**Added:** 2026-10-29, by the user's decision "The approved mockup reads document format in the view".
+
+**Files:**
+
+- Modify: `core/src/doc/flow.rs`, `core/src/doc/ledger.rs`, `core/src/doc/mod.rs`, `core/tests/docs.rs`,
+  `core/src/bindings.rs`, `crates/flow-cockpit/bindings/`
+- Create: `core/src/doc/phases.rs` (the conductors' phase lists)
+- Modify: `crates/flow-cockpit/design/run-view.html` and the design JSON (re-dumped with
+  `cargo test -p flow-cockpit-core --test dump_this_run -- --ignored`): the page reads the new fields and its own
+  `PHASES` table, `untag()` and Rulings parsing are removed; nothing else on the page changes (it is approved).
+
+**Interfaces (all `#[derive(Serialize, TS)]`, no `#[ts(export)]`):**
+
+- `Ruling { date: Option<String>, scope: Option<String>, call: String, why: Option<String>, cost: Option<String>, raw: String }`.
+  Shapes, read from real files: flow.md's `## Rulings` bullets `- <date>, <scope>: <call> — <why> — costs <cost>`
+  (wrapped with a two-space indent), and the build log's `Ruling: <call> — <why> — costs <cost>`. Anything that
+  doesn't split keeps `call` = the whole text and the parts `None`; `raw` is always the joined original.
+- `FlowDoc` gains `rulings: Vec<Ruling>` and `phases: Vec<Phase>`.
+- `Ledger.rulings` becomes `Vec<Ruling>` (same parser).
+- `Phase { key: String, name: String, state: PhaseState, gate_after: Option<u8> }`;
+  `PhaseState = Done | Now | Later`. Built in `parse_flow` from the `flow:` and `phase:` frontmatter and the
+  conductor's phase list in `phases.rs`; `gate_after` is the gate number that follows that phase, taken from the
+  conductor's list; an unknown conductor or phase gives an empty list (never a panic, never a guess).
+- `LedgerTask.later` holds the item text without its `minor (deferred):` (or `minor:`) tag.
+- Phase lists: one per conductor that writes a flow.md (`flow:` values in the templates and the SKILL.md files under
+  `plugins/flows/skills/`): its phases in order, the `phase:` key each one writes, its display name, and where its
+  gates sit, taken from each conductor's SKILL.md phase table and flow-rules. A test reads each conductor's SKILL.md
+  phase table and fails when `phases.rs` no longer matches it.
+
+- [ ] **Step 1: Write the failing tests:** `rulings_split_into_parts` (flow.md shape, wrapped); `ledger_rulings_are_typed`;
+      `unsplittable_ruling_keeps_raw`; `phases_follow_the_conductor` (feature flow at `phase: execute` → earlier
+      phases Done, Build Now, later Later; gates after Grill and Evaluate); `unknown_conductor_has_no_phases`;
+      `phase_lists_match_skill_tables`; `deferred_items_lose_their_tag`. `parses_every_flow_md_in_repo` stays green.
+- [ ] **Step 2:** Run; expect FAIL.
+- [ ] **Step 3: Implement**; regenerate bindings; re-dump the design JSON; switch the page to the new fields.
+- [ ] **Step 4:** `cargo test -p flow-cockpit-core`, clippy `--all-targets -D warnings`, `npm test`; open the page
+      headless and compare Build, Decisions and Docs against the approved screenshots: no visible change.
+- [ ] **Step 5:** Commit: `Give the core typed rulings, conductor phases and deferred items.`
+
 ### Task 6: The Tauri app shell
 
 **Does:** Opens the window and gives views read-only access to the core's data and to their own code, refreshed when
@@ -402,6 +447,320 @@ from the approved design.
 - [ ] **Step 4:** Tests PASS; `npx tsc -p crates/flow-cockpit/app/views` PASS; `sloplint --scope app` clean;
       `cargo run -p flow-cockpit` shows this repository's runs.
 - [ ] **Step 5:** Commit: `Add the built-in list, flow run, docs and activity views.`
+
+### Task 8b: The list view reworked to the user's layout
+
+**Does:** Separates projects from runs in the built-in `list` view: the left rail holds only Projects; the runs side
+gets a switch between Flow runs and Loose sessions, a filter bar, and a table with column headings.
+**Depends on:** Task 8, Task 10
+**Added:** 2026-10-29, by the user's decision "The list mixes projects, filters and runs".
+
+**Files:**
+
+- Modify: `crates/flow-cockpit/app/views/builtin/list.ts`, `crates/flow-cockpit/app/views/builtin/views.test.ts`,
+  `crates/flow-cockpit/app/shell/tokens.css` (append or adjust the list's own rules only; the run, docs and activity
+  views must look exactly as before), the list fixtures under `app/views/builtin/fixtures/` only if a case is missing
+  (re-dump with `dump_view_fixtures`, invented text only).
+- `plugins/opt-in/flow-cockpit/skills/views/SKILL.md` only if it describes the list's layout.
+
+**Shape:**
+
+```
+┌ Flow cockpit  dead-claude-skills ───────────────────────────────┐
+│ Projects       │ [Flow runs 19]  Loose sessions 17                │
+│                │                                                  │
+│ Desktop        │ Status [Any ▾] Conductor [Any ▾] Sort [Latest ▾] │
+│ dead-claude-   │ Search …                                         │
+│  skills  ←     │                                                  │
+│ gitluxe        │ Name        Conductor  Now / phase  Gates Tasks Last │
+│ nix-config…    │ ──────────────────────────────────────────────── │
+│ …              │ Flow observ… Feature    Building T…  ‖    7/13  08:49 │
+│                │ Web mcp      Research   In execute.  ‖          28 Oct│
+└────────────────┴──────────────────────────────────────────────────┘
+```
+
+- **Rail:** the "Projects" heading and the project rows, as now (selected row, same-name marks). Nothing else.
+- **Switch:** two tabs above the content, "Flow runs" and "Loose sessions", each with its count, styled like the run
+  view's tab bar (reuse its classes) and wired as a tablist (`role="tab"`, `aria-selected`, `aria-controls`). The
+  pick lives in module state per project, like the other filters, and survives redraws. Left/right keys move between
+  the two tabs.
+- **Filter bar** (one row under the switch): Status, Conductor and Sort as native `<select>`s with an "Any" first
+  option (Sort has no "Any"; latest activity is the default), and the search field (keep `id="list-search"`). Each
+  control has a visible label and a stable `id`/`data-keep` so focus and value survive redraws. Only the controls that
+  apply to the shown tab: Loose sessions shows only the search (and a sort if it has more than one order). Options
+  list only values present in the selected project, with counts, as the rail rows did; an option the new project lacks
+  is cleared (Task 8's M4 rule).
+- **Table:** a real `<table>` with `<thead>` headings (`<th scope="col">`). Flow runs: Name, Conductor, Now or phase,
+  Gates, Tasks, Last activity, plus the exception mark where Task 8 shows it. Audits (under Flow runs): their own
+  table under the runs, with a heading and their columns (name/scope, picks and fixed or "State unknown", last
+  activity); not clickable, as now. Loose sessions: first prompt (one line, cut with an ellipsis), started, last
+  activity. A row opens its run or session as now: the whole row is clickable, and the name cell holds the real
+  `<button>` so keyboard and screen readers get one control per row. Unfinished runs still stand out as in Task 8.
+- **Empty states:** a short sentence when a tab has no rows or the filters hide every row ("No flow run matches these
+  filters.").
+- Everything else Task 8 does stays: typed fields only (no format parsing), text nodes or `ctx.blocks.markdown` for
+  data text, no `innerHTML`, no timers or global listeners, `import type` only.
+
+- [ ] **Step 1: Write the failing tests** in `views.test.ts`: the rail holds only projects; the switch shows both tabs
+      with counts and switches the table; the filter bar's selects filter and sort (keep the existing filter and sort
+      tests' intent, moved to the selects); the tables have column headings; audits sit under Flow runs; loose
+      sessions only on their tab; the switch and filters survive a redraw (run the real runtime as Task 8's restore
+      tests do); an empty filter result shows the sentence.
+- [ ] **Step 2:** Run; expect FAIL.
+- [ ] **Step 3: Implement.**
+- [ ] **Step 4:** Views tests, runtime tests, both `tsc -p`, and `sloplint --scope app` over `tokens.css` as in Task 8.
+      Build the app and screenshot the real window under a private Xvfb, as in Task 8: the list on Flow runs, on Loose
+      sessions, and with a filter set, at 1880×930 and 1280×800. Also retake the run view's Build tab once to show it
+      is unchanged.
+- [ ] **Step 5:** Commit: `Give the list a projects rail, a switch between flow runs and loose sessions, a filter bar and tables.`
+
+### Task 8c: The app's own extensions
+
+**Does:** Moves the four built-in views out of the binary into extensions the app loads from disk: default extensions
+that ship with the app, the user's own next to them, each one switchable off in `config.toml`. The app runs on its
+own; nothing about views depends on the Claude Code plugin.
+**Depends on:** Task 8b
+**Added:** 2026-10-29, by the user's decision "Built-in views are compiled into the app".
+
+**Files:**
+
+- Move: `crates/flow-cockpit/app/views/builtin/{list,run,docs,activity}.ts` →
+  `crates/flow-cockpit/extensions/<name>/<name>.ts`; the tests and fixtures (`views.test.ts`, `fixtures/`) move to a
+  place that is not shipped (e.g. `crates/flow-cockpit/extensions/tests/`, which the app and the Nix install skip
+  because it holds no view, or outside `extensions/`).
+- Modify: `app/src/views.rs` (load extensions from two folders, drop `include_dir!` for views), `app/src/main.rs`
+  (folders, CLI), `app/src/paths.rs` (the default folder), `app/src/poll.rs` (watch both folders and `config.toml`),
+  `app/src/commands.rs` (if `view_source`'s `builtin` flag changes meaning), `core/src/index/config.rs` (`disabled`),
+  `app/shell/runtime.js` and `runtime.test.mjs` (an extension's `style.css`; the fallback from a broken replacement),
+  `app/shell/api.d.ts`, `app/views/tsconfig.json` (or its replacement), `flake.nix` (install the defaults; app tests
+  that need them), `.github/workflows/flow-cockpit.yml` (test paths), `plugins/opt-in/flow-cockpit/skills/views/SKILL.md`,
+  `plugins/opt-in/flow-cockpit/README.md`, `CLAUDE.md` (layout, checks, vendored note if paths move), `treefmt`/flake
+  excludes if paths move.
+
+**Shape:**
+
+- **An extension is a folder, no manifest:** `extensions/<name>/` holds one or more view `.ts` files and an optional
+  `style.css`. The folder name is the extension's id; each view still declares its own `id`, `slot` and `title`.
+- **Defaults ship with the app:** list, run, docs, activity. Nix installs them at `$out/share/flow-cockpit/extensions/`.
+  (Windows: Task 13 ships them next to the exe; this task only resolves the folder.)
+- **The user's own** live in `<config dir>/flow-cockpit/extensions/` (`~/.config/...`, following `config_dir` in
+  `paths.rs`). A user extension with a default's name replaces that whole default.
+- **All loaded from disk and reloaded live** when any file in either folder changes.
+- **Switching off:** `disabled = ["<name>", …]` in `config.toml`, read live (a change to `config.toml` takes effect
+  without a restart, for `hidden` too). The window stays read-only: it never writes anything.
+- **The Claude Code plugin** keeps only the views skill and the capture hooks.
+- **Default folder lookup, in order:** `FLOW_COCKPIT_EXTENSIONS` (a dev override: one folder, e.g. this repo's
+  `crates/flow-cockpit/extensions`, so edits show live without a rebuild); then `<exe dir>/../share/flow-cockpit/extensions`
+  (Nix and Linux installs); then `<exe dir>/extensions` (Windows, Task 13). The first that exists wins. None found: the
+  window draws a plain note naming where it looked; it never crashes.
+- **Type imports:** views import their types from one bare module name, `import type { … } from 'flow-cockpit'`, not
+  relative paths. In the repo a tsconfig `paths` entry maps it to the shell's `api.d.ts` and the bindings; for users,
+  `flow-cockpit --print-types` declares `module 'flow-cockpit'`. Type-only imports are stripped at load, as now.
+- **CLI:** `--print-view` goes (copying a default is copying its folder). Add `--print-paths`, printing the default
+  extensions folder in use, the user extensions folder and `config.toml`'s path, one per line with a label. Keep
+  `--version` and `--print-types`.
+- **The old `<config>/flow-cockpit/views/` folder** is no longer read; the README says so once.
+- **`style.css`:** the runtime adds it as one `<style>` for the extension when its views load and removes it when the
+  extension is reloaded, disabled or removed. Scoping stays the author's job (under `section[data-view=<id>]`).
+- **A broken user replacement** still shows its error with the default drawn below it, as Task 7 does.
+- **Two extensions declaring the same view id:** the user's wins over a default; two in the same folder is a load
+  error card naming both.
+- **Disabling a default the window needs** (`list`, `run`): its slot shows a plain note ("The list extension is
+  switched off in config.toml."), never a blank window.
+
+- [ ] **Step 1: Write the failing tests** (Rust unit tests in `views.rs`/`paths.rs`/`config.rs`, jsdom in
+      `runtime.test.mjs`): default folder lookup order; a user extension replaces a default by folder name; `disabled`
+      removes an extension's views; a `config.toml` change re-reads `disabled` and `hidden` (poll emits the right
+      events); a change in either extension folder emits `views-changed`; `style.css` is added once and removed on
+      disable; a disabled `list` draws the note; duplicate view ids; `--print-types` declares `module 'flow-cockpit'`;
+      `--print-paths` output; the Nix-installed tree holds the four defaults and no tests or fixtures.
+- [ ] **Step 2:** Run; expect FAIL.
+- [ ] **Step 3: Implement**, move the files with `git mv` so history follows, update the skill (folders, extension
+      shape, `disabled`, `--print-paths`, the bare `flow-cockpit` import, copying a default to change it), README and
+      CLAUDE.md.
+- [ ] **Step 4:** Core and app tests, clippy `-D warnings`, views and runtime tests, both type checks,
+      `nix develop -c npm test`, `nix build .#flow-cockpit && ./result/bin/flow-cockpit --print-paths`. Real window
+      under a private Xvfb: the Nix build shows the list and a run as before; with `disabled = ["activity"]` added
+      while it runs, the Activity tab goes away without a restart; with `FLOW_COCKPIT_EXTENSIONS` pointing at the repo,
+      an edit to `list.ts` shows live.
+- [ ] **Step 5:** Commit: `Ship the views as the app's own extensions, loaded from disk and switchable off in config.toml.`
+
+### Task 8d: Tasks added during a build show in the cockpit
+
+**Does:** Lets a plan carry tasks added during the build under lettered numbers (`5b`, `8c`), reads them in the core,
+and shows them in the run view in their place, so the Build tab shows where the build really is.
+**Depends on:** Task 8f
+**Added:** 2026-10-29, by the user's decision "Tasks added during a build don't show".
+
+**Files:**
+
+- `crates/flow-cockpit/core/src/doc/plan.rs`, `doc/ledger.rs`, `doc/flow.rs` (wherever a task number is read),
+  `core/src/index/*` (wherever task numbers are compared, counted or sorted), `core/tests/docs.rs`, `core/tests/index.rs`,
+  the core's fixture docs (invented text), `crates/flow-cockpit/bindings/` (regenerated).
+- `crates/flow-cockpit/extensions/run/run.ts` (and any other extension that uses task numbers), its tests and
+  fixtures (re-dump with `dump_view_fixtures`), the design JSON only if a test reads it.
+- `docs/features/flow-observability/plan.md`: Tasks 5b, 8b, 8c, 8d, 8e, 8f and 8g, each placed right after the task it
+  follows, with an `**Added:**` line naming the decision.
+- `plugins/flows/references/flow-rules.md`: one short rule on how a task added during a build is numbered and placed.
+  `scripts/flows-uses.mjs` (`checkTemplates`, `checkOverrides`) still passes.
+
+**Shape:**
+
+- A task id is a string: digits, then optionally one lowercase letter (`8`, `8b`). Order: by number, then the plain
+  task before its lettered ones, letters in order (`8 < 8b < 8c < 9`). Anything else in a heading stays unread (never
+  a panic).
+- `PlanTask` and `LedgerTask` carry the id as a string (`id`); `depends_on` becomes a list of ids. Ledger lines
+  `Task 8b: …` and `Tasks 3-5: …` (ranges stay plain numbers) parse. Counts ("10 of 13 done") include lettered tasks.
+- The run view shows lettered tasks in order in the rail, the card and the graph (graph node ids stay valid Mermaid
+  ids, e.g. `T8b`); the card follows the task being built.
+
+- [ ] **Step 1: Write the failing tests:** core parses `### Task 8b: …` with `**Depends on:** Task 8, Task 5b`; ledger
+      `Task 8b: dispatched …` and a fix round on `8b`; ordering `8 < 8b < 8c < 9`; an index test where the build is on
+      a lettered task and the run's current task is it; `parses_every_flow_md_in_repo` and this plan parse with 20
+      tasks; the run view draws a lettered task in the rail and the graph.
+- [ ] **Step 2:** Run; expect FAIL.
+- [ ] **Step 3: Implement**; add the added tasks to this plan; the rule to flow-rules.md; regenerate bindings;
+      re-dump the view fixtures.
+- [ ] **Step 4:** Core and app tests, clippy `-D warnings`, jsdom, both type checks, `nix develop -c npm test`; the
+      real window under Xvfb on this repo's run: the Build tab lists 20 tasks with 5b and 8b–8g in place.
+- [ ] **Step 5:** Commit: `Read lettered tasks added during a build and show them in their place.`
+
+### Task 8e: Back, forward and reload keep the page
+
+**Does:** The window gets page history: the mouse's back and forward side buttons move between the pages visited, and a
+reload (F5 or Ctrl+R) reopens the page it was on. A fresh start still opens the list. Nothing is written to disk.
+**Depends on:** Task 8c, Task 8d
+**Added:** 2026-10-29, by the user's decision "No way back, and a reload loses the page".
+
+**Files:**
+
+- Modify: `crates/flow-cockpit/app/shell/runtime.js`, `crates/flow-cockpit/app/shell/runtime.test.mjs`,
+  `crates/flow-cockpit/app/shell/api.d.ts` (only if a documented behaviour of `ctx.navigate` or `ctx.route` changes),
+  `plugins/opt-in/flow-cockpit/skills/views/SKILL.md` (one line: navigation is history; views keep using
+  `ctx.navigate`).
+- No view file should need to change; if one does, the report says why.
+
+**Shape:**
+
+- The current route is written to `location.hash` in one stable, readable form (for example `#/run/<project>/<slug>`
+  with the run tab as a further part, `#/session/<project>/<id>`, `#/doc/…`), each part URI-encoded. Every
+  `ctx.navigate` to a different route pushes one history entry; a same-route redraw (`changed`) pushes nothing.
+  Switching run tabs is a navigation (one entry), so back returns to the previous tab.
+- `popstate`/`hashchange` draw the route from the hash, through the same draw path `navigate` uses (no second path).
+  The per-route restore of scroll, folds and focus works as it does for a same-route redraw where it can; module state
+  in views is unaffected.
+- **Start:** a valid hash opens that route; an empty, malformed or unknown hash opens the list and replaces the hash
+  (`history.replaceState`, no extra entry). A route whose project, run or session no longer exists draws the view's
+  normal "not found" state, or the list if the view has none; never a blank window or a thrown error.
+- **Mouse:** the side buttons (`MouseEvent.button` 3 = back, 4 = forward) call `history.back()`/`history.forward()`.
+  If WebKitGTK already does this by itself, no second handler is added (that would move two steps). The listener
+  lives in the shell, not in views, registered once.
+- No top-bar buttons, no key bindings.
+
+- [ ] **Step 1: Write the failing tests** in `runtime.test.mjs` (jsdom): navigate writes the hash and one history
+      entry; a same-route redraw writes none; back (`history.back()` then the event) draws the previous route; a
+      start with a valid hash opens it; a malformed or unknown hash opens the list and replaces the hash; a run tab
+      switch is one entry; hash round-trips for every route kind with awkward ids (spaces, `/`, `#`, unicode); a mouse
+      side-button `mouseup`/`auxclick` (whichever is used) calls back/forward once.
+- [ ] **Step 2:** Run; expect FAIL.
+- [ ] **Step 3: Implement.**
+- [ ] **Step 4:** Runtime and views tests, both `tsc -p`, `nix develop -c npm test` from the root. In the real window
+      under a private Xvfb: open a run, switch to Docs, press F5 and check it stays on Docs; send mouse button 8/9
+      (X11's back/forward) and check it went back. The report says what WebKitGTK did on its own.
+- [ ] **Step 5:** Commit: `Keep the page in the window's address so the mouse's back and forward buttons and a reload work.`
+
+### Task 8f: Activity stays fast on a large running session
+
+**Does:** Makes the Activity tab and a session's own screen open fast and stay responsive while a long session runs:
+the core reads a transcript incrementally, the window gets the newest turns first, and tool inputs load on demand.
+**Depends on:** Task 8c
+**Added:** 2026-10-29, by the user's decision "Activity freezes on a large running session".
+
+**Files:**
+
+- `core/src/activity*` / `core/src/index/*` (incremental reader and cache), `core/tests/*` (new tests, invented
+  fixtures only), `app/src/commands.rs` (paging and tool-input commands), `app/src/poll.rs` if the cache needs a hook,
+  bindings (regenerated), `app/shell/api.d.ts` and `runtime.js` (the new `DataApi` calls), `runtime.test.mjs`,
+  `crates/flow-cockpit/extensions/activity/activity.ts` and its tests/fixtures, the views skill (the new calls),
+  CLAUDE.md only if a layout line changes.
+
+**Shape:**
+
+- **Measure first:** an ignored core test or small example (e.g. `core/tests/activity_timing.rs`, `#[ignore]`) takes a
+  transcript path from an env var (`FLOW_COCKPIT_TIMING`), times `session()` (cold), times a second call after
+  appending one line to a copy (the live tick), and reports the serialised JSON size of what the window receives. Run
+  on a scratch copy of a large session before any code change and at the end; only numbers are recorded, never
+  transcript text.
+- **Incremental reading:** a per-transcript cache (main and each subagent file) keyed by path, holding the byte offset
+  read so far and the parsed state, so a grown file parses only its new bytes. A file that shrank or was replaced
+  (size smaller, or different inode/mtime pattern) is re-read from the start. A partial last line (no newline yet)
+  is left for the next read. Reading happens outside the index lock: take what the session needs (paths) under the
+  lock, release it, then read. Bound the cache (e.g. keep the few most recent sessions) so memory doesn't grow with
+  every session opened.
+- **Paging:** `DataApi.session(id, { before?: number, limit?: number })` or a new call (documented in `api.d.ts`)
+  returns the newest `limit` (default 20) turns before a turn index, the total turn count, agents and live state.
+  Turn indexes count from the oldest turn so they stay stable as new turns arrive.
+- **Lazy tool input:** turns carry each tool call's name, a short summary line and an id, not its full input; a new
+  read-only call returns one tool call's input by session and tool-use id. The fold fetches it on open and shows a
+  short "Loading…" until it arrives; an error shows in the fold.
+- **The view:** draws the newest page; "Show older turns" (a real `<button>`) appends the next page below; the pages
+  loaded stay loaded across `changed` redraws (module state per session), and a redraw fetches only the newest page
+  again and merges it. Open folds and scroll stay as before. A session with no more older turns has no button.
+- No view parses transcript text; no `innerHTML`; no timers or global listeners.
+
+- [ ] **Step 0: Baseline.** Write the timing test, run it, record the numbers (cold open, live tick, JSON size).
+- [ ] **Step 1: Write the failing tests:** incremental read equals a full read (fixture appended in pieces, including a
+      split last line); a shrunk/replaced file re-reads; reading doesn't hold the index lock; paging returns the newest
+      20, then the next 20, with stable indexes after a new turn; tool input fetched by id; the view draws 20 turns
+      and the button, loads more on click, keeps loaded pages across a redraw, fetches input on fold open.
+- [ ] **Step 2:** Run; expect FAIL.
+- [ ] **Step 3: Implement.**
+- [ ] **Step 4:** Core and app tests, clippy `-D warnings`, jsdom, both type checks, `nix develop -c npm test`; the
+      timing test again (numbers next to the baseline); the real window under Xvfb with a large session open in
+      Activity while it grows: the window keeps answering clicks.
+- [ ] **Step 5:** Commit: `Read transcripts incrementally and page Activity's turns so a large running session stays fast.`
+
+### Task 8g: Diagrams drawn ahead so pages don't flash
+
+**Does:** The window draws Mermaid diagrams ahead of time, in idle moments, so a page opens with its diagrams already
+drawn; a diagram not drawn yet shows a quiet placeholder instead of flashing its source text.
+**Depends on:** Task 8e
+**Added:** 2026-10-29, by the user's decision "Diagrams flash when a page first opens".
+
+**Files:**
+
+- `crates/flow-cockpit/app/shell/blocks/mermaid.js`, `blocks/markdown.js` (only to expose the Mermaid sources of a
+  document from its own lexer), `runtime.js`, `runtime.test.mjs` (and a blocks test if one exists), `api.d.ts` (if
+  `ctx.blocks` gains a call), `tokens.css` (the placeholder), `crates/flow-cockpit/extensions/run/run.ts` and
+  `docs/docs.ts` only if they must hand sources over, the views skill (one line if views gain a call).
+
+**Shape:**
+
+- **Draw ahead, in idle time:** a small queue in the shell that draws one diagram at a time when the window is idle
+  (`requestIdleCallback`, or a `setTimeout(0)` chain where WebKitGTK lacks it; this lives in the shell, not in views,
+  so the views' no-timers rule is untouched), never more than one Mermaid render at once, and stops when the queue is
+  empty. A diagram a page needs now jumps the queue.
+- **What gets drawn ahead:** after the list draws, the task graph and the document diagrams (spec, plan, flow.md
+  Mermaid blocks) of the shown project's unfinished runs; when a run opens, the rest of that run's documents. Sources
+  come from typed data and the markdown block's own lexer; views do no format parsing. The task graph's source is
+  built the same way the run view builds it: one shared function, not a copy.
+- **Cache:** keyed by source text and the theme tokens it was drawn with; `KEEP` raised so a project's diagrams fit;
+  memory only, nothing on disk.
+- **Placeholder:** a diagram not drawn yet shows an empty, quiet box sized like the last drawing of that source if
+  known, else a modest default height, with `aria-busy="true"`; the source shows only when drawing fails, with the
+  reason. No layout jump when a cached drawing exists.
+- Drawing ahead must not make the window stutter: measured in the real window, clicking around while the queue runs
+  stays responsive.
+
+- [ ] **Step 1: Write the failing tests** (jsdom with a fake `window.mermaid` that resolves after a delay and counts
+      calls): a page whose diagram was drawn ahead draws the SVG at once with no `<pre>`; a not-yet-drawn diagram
+      shows the placeholder, not its source; a failed drawing shows the source and the reason; the queue renders one at
+      a time and stops when empty; a needed diagram jumps the queue; the same source isn't drawn twice.
+- [ ] **Step 2:** Run; expect FAIL.
+- [ ] **Step 3: Implement.**
+- [ ] **Step 4:** jsdom, both type checks, `nix develop -c npm test`; real window under Xvfb: open the list, wait a
+      few seconds, open a run's Build tab and its Docs right after the click: diagrams drawn, no flash.
+- [ ] **Step 5:** Commit: `Draw diagrams ahead in idle time so pages open without a flash.`
 
 ### Task 9: The plugin, the views skill, the Nix package and CI
 

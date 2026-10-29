@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 use flow_cockpit_core::activity::{PAGE, TranscriptCache};
+use flow_cockpit_core::doc::TaskState;
 use flow_cockpit_core::index::{
     Config, DocName, Entry, FlowRunSummary, Home, Index, LinkCache, Project, Status,
 };
@@ -633,4 +634,45 @@ fn rebuild_finds_a_session_in_a_worktree_made_since() {
     index.rebuild_project(&alpha.id, now());
     assert!(loose(&index, &alpha).contains(&"s-new".to_string()));
     assert!(project(&index, "alpha").roots.contains(&worktree));
+}
+
+#[test]
+fn build_on_a_lettered_task_is_the_current_task() {
+    let w = World::new("lettered");
+    let x = "work/alpha/.claude/worktrees/x";
+    let plan = w.path(&format!("{x}/docs/features/login/plan.md"));
+    let mut text = fs::read_to_string(&plan).unwrap();
+    text.push_str(
+        "\n### Task 2b: The lockout\n\n**Does:** Locks the form after five tries.\n**Depends on:** Task 2\n",
+    );
+    fs::write(&plan, text).unwrap();
+    let log = w.path(&format!("{x}/.superpowers/sdd/login/progress.md"));
+    let mut text = fs::read_to_string(&log).unwrap();
+    text.push_str(
+        "Task 2: complete def4567\nTask 2b: dispatched (base def4567, implementer opus)\n",
+    );
+    fs::write(&log, text).unwrap();
+
+    let index = w.scanned();
+    let alpha = project(&index, "alpha");
+    let login = index.flow_run(&alpha.id, "login").unwrap();
+    // Counts take the added task in.
+    assert_eq!(login.summary.progress, Some((2, 3)));
+    let ids: Vec<String> = login
+        .plan
+        .unwrap()
+        .tasks
+        .into_iter()
+        .map(|t| t.id)
+        .collect();
+    assert_eq!(ids, ["1", "2", "2b"]);
+    let building: Vec<String> = login
+        .ledger
+        .unwrap()
+        .tasks
+        .into_iter()
+        .filter(|t| t.state == TaskState::Building)
+        .map(|t| t.id)
+        .collect();
+    assert_eq!(building, ["2b"]);
 }

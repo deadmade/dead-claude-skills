@@ -23,7 +23,7 @@ type Item =
   | { id: string; kind: 'dec'; d: Decision }
   | { id: string; kind: 'rul'; d: Ruling };
 /** What the user picked in this run, kept while the window is open so a redraw with fresh data keeps it. */
-type Memory = { tab: 'build' | 'decisions'; task: number | null; item: string | null };
+type Memory = { tab: 'build' | 'decisions'; task: string | null; item: string | null };
 
 const memory = new Map<string, Memory>();
 
@@ -253,16 +253,16 @@ function graphable(all: Pair[]): boolean {
   return all.length > 0 && all.every((x) => Array.isArray(x.p.depends_on));
 }
 
-/** The plan's tasks as a graph, numbers only; a node selects its task. */
-function graph(ctx: ViewContext, all: Pair[], selected: number, select: (n: number) => void): HTMLElement {
+/** The plan's tasks as a graph, ids only (node `T8b` for task 8b); a node selects its task. */
+function graph(ctx: ViewContext, all: Pair[], selected: string, select: (id: string) => void): HTMLElement {
   const kind = (t: LedgerTask | undefined) =>
     !t || t.state === 'NotStarted' ? 'todo' : t.state === 'Done' ? 'done' : t.state === 'Waiting' ? 'wait' : 'busy';
   const fill = (v: string) => `fill:${css('--color-paper-2')},stroke:${css(v)},color:${css('--color-ink-2')}`;
   const lines = ['flowchart LR'];
-  for (const { p } of all) lines.push(`  T${p.n}(("${p.n}"))`);
-  for (const { p } of all) for (const d of p.depends_on ?? []) lines.push(`  T${d} --> T${p.n}`);
+  for (const { p } of all) lines.push(`  T${p.id}(("${p.id}"))`);
+  for (const { p } of all) for (const d of p.depends_on ?? []) lines.push(`  T${d} --> T${p.id}`);
   for (const k of ['done', 'busy', 'wait', 'todo']) {
-    const ids = all.filter((x) => kind(x.t) === k).map((x) => `T${x.p.n}`);
+    const ids = all.filter((x) => kind(x.t) === k).map((x) => `T${x.p.id}`);
     if (ids.length) lines.push(`  class ${ids.join(',')} ${k}`);
   }
   lines.push(
@@ -273,14 +273,14 @@ function graph(ctx: ViewContext, all: Pair[], selected: number, select: (n: numb
     `  style T${selected} fill:${css('--color-paper-4')},stroke-width:3px,color:${css('--color-ink')}`,
   );
   const box = el('div', 'graph', ctx.blocks.mermaid(lines.join('\n')));
-  const taskOf = (node: Element) => Number(/T(\d+)/.exec(node.id)?.[1] ?? NaN);
+  const taskOf = (node: Element) => /T(\d+[a-z]?)/.exec(node.id)?.[1];
   // The diagram draws after this returns: its nodes get their names and keys once they exist.
   const wire = () => {
     for (const g of box.querySelectorAll('g.node')) {
-      const n = taskOf(g);
-      const x = all.find((y) => y.p.n === n);
+      const id = taskOf(g);
+      const x = all.find((y) => y.p.id === id);
       if (!x || g.hasAttribute('tabindex')) continue;
-      const words = `Task ${n}, ${inline(ctx, x.p.title).textContent}: ${taskState(x.t).text.toLowerCase()}`;
+      const words = `Task ${id}, ${inline(ctx, x.p.title).textContent}: ${taskState(x.t).text.toLowerCase()}`;
       g.setAttribute('tabindex', '0');
       g.setAttribute('role', 'link');
       g.setAttribute('aria-label', words);
@@ -298,9 +298,9 @@ function graph(ctx: ViewContext, all: Pair[], selected: number, select: (n: numb
   if (!box.querySelector('svg')) watch.observe(box, { childList: true, subtree: true });
   const go = (event: Event) => {
     const node = event.target instanceof window.Element ? event.target.closest('g.node') : null;
-    const n = node ? taskOf(node) : NaN;
-    if (Number.isNaN(n)) return false;
-    select(n);
+    const id = node ? taskOf(node) : undefined;
+    if (id === undefined || !all.some((x) => x.p.id === id)) return false;
+    select(id);
     return true;
   };
   box.addEventListener('click', go);
@@ -310,8 +310,8 @@ function graph(ctx: ViewContext, all: Pair[], selected: number, select: (n: numb
   return box;
 }
 
-function taskView(ctx: ViewContext, all: Pair[], n: number | null, select: (n: number) => void): Node {
-  const x = all.find((y) => y.p.n === n);
+function taskView(ctx: ViewContext, all: Pair[], id: string | null, select: (id: string) => void): Node {
+  const x = all.find((y) => y.p.id === id);
   if (!x)
     return empty(
       'This run has no plan with tasks yet.',
@@ -322,12 +322,12 @@ function taskView(ctx: ViewContext, all: Pair[], n: number | null, select: (n: n
   const facts: string[] = [];
   if (p.depends_on?.length) facts.push(`Needs ${joined(p.depends_on.map((d) => `task ${d}`))} first.`);
   else if (p.depends_on) facts.push('Needs nothing else first.');
-  const after = all.filter((y) => y.p.depends_on?.includes(p.n)).map((y) => `task ${y.p.n}`);
+  const after = all.filter((y) => y.p.depends_on?.includes(p.id)).map((y) => `task ${y.p.id}`);
   if (after.length) facts.push(`${capital(joined(after))} ${after.length === 1 ? 'waits' : 'wait'} for it.`);
   const items = (tag: 'ol' | 'ul', xs: string[]) =>
     el(tag, 'items', ...xs.map((s) => el('li', '', inline(ctx, capital(s)))));
 
-  const title = el('h2', '', el('span', 'n num', String(p.n)), inline(ctx, p.title));
+  const title = el('h2', '', el('span', 'n num', p.id), inline(ctx, p.title));
   title.id = 'task-title';
   const main = el('div', '', el('div', 'task-h', title, el('span', `state ${st.cls}`, st.text)));
   main.append(
@@ -376,7 +376,7 @@ function taskView(ctx: ViewContext, all: Pair[], n: number | null, select: (n: n
         el('span', 'k-wait', 'waiting on you'),
         ', not started; ringed is this task.',
       ),
-      graph(ctx, all, p.n, select),
+      graph(ctx, all, p.id, select),
     );
     card.append(where);
   }
@@ -554,26 +554,26 @@ function frame(
   }
   win.append(left, content);
 
-  const pairs: Pair[] = (run.plan?.tasks ?? []).map((p) => ({ p, t: run.ledger?.tasks.find((t) => t.n === p.n) }));
+  const pairs: Pair[] = (run.plan?.tasks ?? []).map((p) => ({ p, t: run.ledger?.tasks.find((t) => t.id === p.id) }));
   const defaultTask = () =>
     (
       pairs.find((x) => x.t && x.t.state !== 'Done' && x.t.state !== 'NotStarted') ??
       pairs.find((x) => x.t?.state !== 'Done') ??
       pairs[0]
-    )?.p.n ?? null;
+    )?.p.id ?? null;
 
   function build() {
     left.setAttribute('aria-label', 'Phases and tasks');
-    if (!pairs.some((x) => x.p.n === mem.task)) mem.task = defaultTask();
+    if (!pairs.some((x) => x.p.id === mem.task)) mem.task = defaultTask();
     const phases = el('section', 'group', ...track(flow));
     phases.setAttribute('aria-label', 'Phases');
     left.append(phases);
 
-    const select = (n: number) => {
-      mem.task = n;
+    const select = (id: string) => {
+      mem.task = id;
       for (const row of left.querySelectorAll<HTMLElement>('[data-task]'))
-        row.setAttribute('aria-current', String(Number(row.dataset.task) === n));
-      content.replaceChildren(nowBlock(ctx, run!, pairs), taskView(ctx, pairs, n, select));
+        row.setAttribute('aria-current', String(row.dataset.task === id));
+      content.replaceChildren(nowBlock(ctx, run!, pairs), taskView(ctx, pairs, id, select));
       content.scrollTop = 0;
     };
 
@@ -602,12 +602,12 @@ function frame(
         else if (t?.security.length) mark = el('span', 'mark sec', plural(t.security.length, 'security note'));
         else if (t?.fix_rounds) mark = el('span', 'mark fix', plural(t.fix_rounds, 'fix', 'fixes'));
         const title = inline(ctx, p.title);
-        const row = button(state === 'Done' ? 'row done' : 'row', el('span', 'k num', String(p.n)));
+        const row = button(state === 'Done' ? 'row done' : 'row', el('span', 'k num', p.id));
         row.append(el('span', 'ttl', title), ...(mark ? [mark] : []));
-        row.dataset.task = String(p.n);
-        row.title = `Task ${p.n}, ${title.textContent}: ${taskState(t).text.toLowerCase()}`;
-        row.setAttribute('aria-current', String(mem.task === p.n));
-        row.addEventListener('click', () => select(p.n));
+        row.dataset.task = p.id;
+        row.title = `Task ${p.id}, ${title.textContent}: ${taskState(t).text.toLowerCase()}`;
+        row.setAttribute('aria-current', String(mem.task === p.id));
+        row.addEventListener('click', () => select(p.id));
         rows.append(el('li', '', row));
       }
       group.append(rows);

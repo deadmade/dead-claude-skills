@@ -90,9 +90,9 @@
       "tasks": [
         {
           "fix_rounds": 1,
+          "id": "1",
           "later": ["the label wraps on a narrow window"],
           "model": "sonnet",
-          "n": 1,
           "security": [],
           "state": "Done",
           "story": [
@@ -103,9 +103,9 @@
         },
         {
           "fix_rounds": 0,
+          "id": "2",
           "later": [],
           "model": "opus",
-          "n": 2,
           "security": [],
           "state": "Building",
           "story": ["dispatched (base abc1234, implementer opus)"]
@@ -117,15 +117,15 @@
         {
           "depends_on": [],
           "does": "Draws the form.",
+          "id": "1",
           "markdown": "**Does:** Draws the form.\n**Depends on:** none",
-          "n": 1,
           "title": "The form"
         },
         {
-          "depends_on": [1],
+          "depends_on": ["1"],
           "does": "Checks the password.",
+          "id": "2",
           "markdown": "**Does:** Checks the password.\n**Depends on:** Task 1",
-          "n": 2,
           "title": "The check"
         }
       ],

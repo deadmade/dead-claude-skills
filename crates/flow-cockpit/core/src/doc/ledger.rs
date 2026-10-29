@@ -6,7 +6,7 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use super::flow::{Ruling, ruling};
-use super::normalize;
+use super::{TaskId, normalize};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, TS)]
 pub struct Ledger {
@@ -15,9 +15,10 @@ pub struct Ledger {
     pub rulings: Vec<Ruling>,
 }
 
+/// `id` as in the plan: `8`, or `8b` for a task added during a build.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 pub struct LedgerTask {
-    pub n: u32,
+    pub id: String,
     pub state: TaskState,
     pub fix_rounds: u32,
     pub security: Vec<String>,
@@ -36,13 +37,14 @@ pub enum TaskState {
     Done,
 }
 
-/// Reads a ledger. A line that begins `Task <n>:` (or `Task <a>-<b>:`) is an entry; indented lines under it, and
-/// nothing else, are its wrapped text. Any other top-level line (a `Ruling:`, a `Note`) is an entry of its own, never
-/// joined to a task. A `Ruling:` anywhere is collected under `rulings`.
+/// Reads a ledger. A line that begins `Task <id>:` (or `Tasks <a>-<b>:`, a range of plain numbers) is an entry;
+/// indented lines under it, and nothing else, are its wrapped text. Any other top-level line (a `Ruling:`, a `Note`)
+/// is an entry of its own, never joined to a task. A `Ruling:` anywhere is collected under `rulings`. Tasks come in id
+/// order.
 #[must_use]
 pub fn parse_ledger(text: &str) -> Ledger {
     let text = normalize(text);
-    let mut tasks: BTreeMap<u32, LedgerTask> = BTreeMap::new();
+    let mut tasks: BTreeMap<TaskId, LedgerTask> = BTreeMap::new();
     let mut ledger = Ledger::default();
     for entry in entries(&text) {
         if ledger.plan.is_none() && entry.starts_with('#') {
@@ -53,9 +55,9 @@ pub fn parse_ledger(text: &str) -> Ledger {
             r.raw = strip_bullet(&entry).to_string();
             ledger.rulings.push(r);
         }
-        if let Some((numbers, rest)) = task_entry(&entry) {
-            for n in numbers {
-                apply(tasks.entry(n).or_insert_with(|| blank(n)), rest);
+        if let Some((ids, rest)) = task_entry(&entry) {
+            for id in ids {
+                apply(tasks.entry(id).or_insert_with(|| blank(id)), rest);
             }
         }
     }
@@ -63,9 +65,9 @@ pub fn parse_ledger(text: &str) -> Ledger {
     ledger
 }
 
-fn blank(n: u32) -> LedgerTask {
+fn blank(id: TaskId) -> LedgerTask {
     LedgerTask {
-        n,
+        id: id.to_string(),
         state: TaskState::NotStarted,
         fix_rounds: 0,
         security: Vec::new(),
@@ -112,23 +114,27 @@ fn plan_of(heading: &str) -> Option<String> {
     Some(path.trim().to_string()).filter(|p| !p.is_empty())
 }
 
-/// `Task 5: rest` to `([5], "rest")`; `Task 1-5: rest` covers a range.
-fn task_entry(entry: &str) -> Option<(Vec<u32>, &str)> {
-    let rest = strip_bullet(entry).strip_prefix("Task ")?;
+/// `Task 5: rest` to `([5], "rest")`, `Task 8b: rest` to `([8b], "rest")`; `Task 1-5: rest` and `Tasks 1-5: rest`
+/// cover a range of plain numbers.
+fn task_entry(entry: &str) -> Option<(Vec<TaskId>, &str)> {
+    let line = strip_bullet(entry);
+    let rest = line
+        .strip_prefix("Task ")
+        .or_else(|| line.strip_prefix("Tasks "))?;
     let (head, text) = rest.split_once(':')?;
-    let numbers = match head.trim().split_once('-') {
+    let ids = match head.trim().split_once('-') {
         Some((a, b)) => {
             let (a, b) = (a.trim().parse::<u32>().ok()?, b.trim().parse::<u32>().ok()?);
             // A bogus range (`Task 5-99999999: x`) must not allocate millions of tasks.
             if b < a || b - a > 999 {
-                vec![a]
+                vec![TaskId::plain(a)]
             } else {
-                (a..=b).collect()
+                (a..=b).map(TaskId::plain).collect()
             }
         }
-        None => vec![head.trim().parse().ok()?],
+        None => vec![TaskId::parse(head.trim())?],
     };
-    Some((numbers, text.trim()))
+    Some((ids, text.trim()))
 }
 
 /// Updates a task with one entry's text (after `Task <n>:`).
