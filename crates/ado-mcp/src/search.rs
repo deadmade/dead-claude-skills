@@ -229,13 +229,18 @@ fn listed<T>(
     results: Vec<T>,
     line: fn(&T) -> String,
 ) -> Vec<String> {
-    let mut lines: Vec<String> = info_code
-        .and_then(info)
-        .map(str::to_owned)
-        .into_iter()
-        .collect();
+    let mapped = info_code.and_then(info);
+    let mut lines = Vec::new();
+    match (mapped, info_code) {
+        (Some(line), _) => lines.push(line.to_owned()),
+        // A code `info` doesn't know may explain an empty answer too; above hits it says nothing.
+        (None, Some(c)) if c != 0 && results.is_empty() => {
+            lines.push(format!("the server answered with info code {c}"));
+        }
+        _ => {}
+    }
     // A rejected or unindexed search answers with no results: its line says why, `0 hits` would mislead.
-    if lines.is_empty() || !results.is_empty() {
+    if mapped.is_none() || !results.is_empty() {
         let n = count
             .and_then(|c| usize::try_from(c).ok())
             .unwrap_or(results.len());

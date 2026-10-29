@@ -161,6 +161,25 @@ fn info_code_line() {
     assert_eq!(text, "search indexing hasn't started on this collection");
 }
 
+/// An infoCode the server doesn't document for us, with no results, is named above `0 hits`: the empty answer may be
+/// its doing.
+#[test]
+fn unknown_info_code_no_hits() {
+    let fx = Fixture::start();
+    fx.route(WIS, vec![answer(10, &[])]);
+    let text = ok(&mut env(&fx), "search", json!({"kind": "wi", "text": "x"}));
+    assert_eq!(text, "the server answered with info code 10\n0 hits");
+}
+
+/// With results, an unknown infoCode says nothing.
+#[test]
+fn unknown_info_code_with_hits() {
+    let fx = Fixture::start();
+    fx.route(WIS, vec![answer(10, &[hit(1, "a")])]);
+    let text = ok(&mut env(&fx), "search", json!({"kind": "wi", "text": "a"}));
+    assert_eq!(text, "1 hit\n#1 [Task] New  a");
+}
+
 #[test]
 fn no_hits() {
     let fx = Fixture::start();

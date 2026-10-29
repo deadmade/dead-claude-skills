@@ -98,9 +98,10 @@ enum value it doesn't know (D8). Paste back every such line, with the tool it ca
 3. `search kind=wiki text=<a word from a wiki page>`.
 
 Each answer starts with `1 hit` or `N hits`, after a line when the server reports something about the index or the
-query; with no hits, that line is the whole answer. Paste back: for each call those first lines, how many hit lines
-followed, one hit line with names and paths replaced by `…`, and any error line. If Search isn't installed, paste back
-that line, take the `repo_file` path from `repo_list` and the repo's web UI, and skip step 3 of the wiki section.
+query; with no hits, that line is the whole answer (an info code the tool doesn't know comes above `0 hits`). Paste
+back: for each call those first lines, how many hit lines followed, one hit line with names and paths replaced by `…`,
+and any error line. If Search isn't installed, paste back that line, take the `repo_file` path from `repo_list` and the
+repo's web UI, and skip step 3 of the wiki section.
 
 ### repo_file
 
