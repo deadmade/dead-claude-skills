@@ -374,3 +374,20 @@ fn wiki_hits() {
     assert_eq!(body["filters"], json!({"Project": ["My Proj"]}));
     assert_eq!(body["$top"], 21);
 }
+
+/// The `Repository` filter takes the value as given: an id finds nothing, so the schema asks for a name.
+#[test]
+fn repo_arg_is_a_name() {
+    let fx = Fixture::start();
+    let tools = ado(&fx, &[]).request("tools/list", json!({}))["tools"].take();
+    let search = tools
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["name"] == "search")
+        .unwrap();
+    assert_eq!(
+        search["inputSchema"]["properties"]["repo"]["description"],
+        "Repo name, for code; needs project or a clone of it."
+    );
+}

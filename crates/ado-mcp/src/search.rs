@@ -48,7 +48,7 @@ pub(crate) struct SearchArgs {
     pub text: String,
     /// Project name or id. Default: the whole collection.
     pub project: Option<String>,
-    /// Repo name or id, for code; needs project or a clone of it.
+    /// Repo name, for code; needs project or a clone of it.
     pub repo: Option<String>,
     /// How many hits to list. Default 20.
     pub limit: Option<u16>,
