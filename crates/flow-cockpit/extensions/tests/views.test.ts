@@ -799,17 +799,59 @@ test('run_graph_has_no_scrollbar_and_fits_its_column', () => {
   for (const r of graphRules) assert.doesNotMatch(r.body, /overflow(-x|-y)?\s*:\s*(auto|scroll)/, r.sel);
   const svg = rules.find((r) => r.sel === '.graph svg')?.body ?? '';
   assert.match(svg, /max-width:\s*100%/);
-  assert.match(svg, /max-height:\s*100%/);
   assert.doesNotMatch(svg, /min-(width|height)|(^|[\s;])(width|height):\s*\d/, 'the drawing never grows');
+  // The shared Mermaid box scrolls (`.diagram { overflow-x: auto }`); in the graph column it is clipped and laid out
+  // as a column, so a pending source never scrolls and a failure's reason stays visible under it.
+  const box = rules.find((r) => r.sel === '.where-graph .diagram')?.body ?? '';
+  assert.match(box, /overflow:\s*hidden/);
+  assert.match(box, /display:\s*flex/);
+  assert.match(box, /flex-direction:\s*column/);
+  const pending = rules.find((r) => r.sel === '.where-graph .diagram > pre')?.body ?? '';
+  assert.match(pending, /overflow:\s*hidden/);
+  assert.match(pending, /max-height:\s*calc\(100vh/);
   const beside =
     /@media \(min-width: (\d+(?:\.\d+)?)rem\) \{ \.build \{ grid-template-columns: minmax\(0, 1fr\) [^;]+; \}([^@]*)\}/.exec(
       css,
     );
   assert.ok(beside, 'no two-column .build rule');
   assert.equal(Number(beside[1]) * 16, 1200, 'the graph goes beside the card from 1200px');
-  const column = /\.where-graph \{([^}]*)\}/.exec(beside[2])?.[1] ?? '';
-  assert.match(column, /position:\s*sticky/);
-  assert.match(column, /height:\s*calc\(100vh/);
+  assert.match(/\.where-graph \{([^}]*)\}/.exec(beside[2])?.[1] ?? '', /position:\s*sticky/);
+  // Fit to the visible height, but never under 0.85 of full size and never past it.
+  assert.match(
+    /\.where-graph \.graph svg \{([^}]*)\}/.exec(beside[2])?.[1] ?? '',
+    /height:\s*clamp\(calc\(var\(--full-h\) \* 0\.85\), calc\(100vh[^;]*\), var\(--full-h\)\)/,
+  );
+  // Wide windows give the graph a wider column.
+  const wide =
+    /@media \(min-width: (\d+(?:\.\d+)?)rem\) \{ \.build \{ grid-template-columns: minmax\(0, 1fr\) (\d+)rem; \} \}/.exec(
+      css,
+    );
+  assert.ok(wide && Number(wide[2]) >= 26, 'no wider column on wide windows');
+  // Its labels are larger than the docs' diagrams', for this graph only.
+  assert.match(rules.find((r) => r.sel === '.where-graph .graph text')?.body ?? '', /font-size:\s*var\(--text-md\)/);
+});
+
+test('run_graph_draws_its_nodes_larger_and_knows_its_full_height', async () => {
+  const w = window as any;
+  let source = '';
+  w.mermaid = {
+    initialize() {},
+    render: async (id: string, src: string) => {
+      source = src;
+      return { svg: `<svg id="${id}" viewBox="0 0 240 1180"><g class="node" id="flowchart-T1-0"></g></svg>` };
+    },
+  };
+  try {
+    const { box } = await draw('run', { to: 'run', project: ALPHA, slug: 'login' });
+    await tick();
+    // Larger circles for this graph only: its own source asks for more padding.
+    assert.match(source, /^flowchart TB\n%%\{init: \{"flowchart": \{"padding": 13\}\}\}%%\n/);
+    // The drawing's full height, for the stylesheet's fit-to-height floor.
+    const graphBox = box.querySelector('.where-graph .graph') as HTMLElement;
+    assert.equal(graphBox.style.getPropertyValue('--full-h'), '1180px');
+  } finally {
+    delete w.mermaid;
+  }
 });
 
 test('run_graph_has_its_own_column_beside_now_and_card', async () => {

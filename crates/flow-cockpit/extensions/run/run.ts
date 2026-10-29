@@ -258,8 +258,9 @@ function graph(ctx: ViewContext, all: Pair[], selected: string, select: (id: str
   const kind = (t: LedgerTask | undefined) =>
     !t || t.state === 'NotStarted' ? 'todo' : t.state === 'Done' ? 'done' : t.state === 'Waiting' ? 'wait' : 'busy';
   const fill = (v: string) => `fill:${css('--color-paper-2')},stroke:${css(v)},color:${css('--color-ink-2')}`;
-  // Top to bottom, so a long plan grows down the page instead of off its edge.
-  const lines = ['flowchart TB'];
+  // Top to bottom, so a long plan grows down the page instead of off its edge; roomier circles than the docs' diagrams
+  // (Mermaid takes padding from the source, its font from the stylesheet).
+  const lines = ['flowchart TB', '%%{init: {"flowchart": {"padding": 13}}}%%'];
   for (const { p } of all) lines.push(`  T${p.id}(("${p.id}"))`);
   for (const { p } of all) for (const d of p.depends_on ?? []) lines.push(`  T${d} --> T${p.id}`);
   for (const k of ['done', 'busy', 'wait', 'todo']) {
@@ -277,6 +278,9 @@ function graph(ctx: ViewContext, all: Pair[], selected: string, select: (id: str
   const taskOf = (node: Element) => /T(\d+[a-z]?)/.exec(node.id)?.[1];
   // The diagram draws after this returns: its nodes get their names and keys once they exist.
   const wire = () => {
+    // The drawing's full height, which the stylesheet shrinks it from to fit the window, down to a floor.
+    const full = Number(box.querySelector('svg')?.getAttribute('viewBox')?.split(/\s+/)[3]);
+    if (full > 0) box.style.setProperty('--full-h', `${full}px`);
     for (const g of box.querySelectorAll('g.node')) {
       const id = taskOf(g);
       const x = all.find((y) => y.p.id === id);

@@ -144,11 +144,14 @@ a.row:active, button.row:active { background: var(--color-paper-3); }
 .now .summary { margin-top: var(--space-1); font-size: var(--text-sm); color: var(--color-muted); max-width: var(--measure); }
 
 /* Build: where the run stands and the selected task, the one block at full contrast. From 1200px the task's place in
- * the plan has a column of its own beside both, as tall as the visible content and pinned there; narrower, it goes
- * under the card at full width. */
+ * the plan has a column of its own beside both, pinned while it fits; its drawing shrinks to the visible height but
+ * never below 0.85 of full size (past that the page scrolls) and never past full size. Narrower, it goes under the
+ * card at full size. --full-h is the drawing's full height, set by the run view once drawn. */
 .build { display: grid; gap: var(--space-6) var(--space-7); align-items: start; }
 .task { max-width: var(--measure); }
-@media (min-width: 75rem) { .build { grid-template-columns: minmax(0, 1fr) 22rem; } .where-graph { position: sticky; top: 0; height: calc(100vh - var(--bar-h) - var(--space-5) - var(--space-7)); display: grid; grid-template-rows: auto minmax(0, 1fr); } .where-graph .graph, .where-graph .diagram { height: 100%; min-height: 0; } }
+.where-graph { --key-h: 3.5rem; }
+@media (min-width: 75rem) { .build { grid-template-columns: minmax(0, 1fr) 22rem; } .where-graph { position: sticky; top: 0; } .where-graph .graph svg { height: clamp(calc(var(--full-h) * 0.85), calc(100vh - var(--bar-h) - var(--space-5) - var(--space-7) - var(--key-h)), var(--full-h)); } }
+@media (min-width: 105rem) { .build { grid-template-columns: minmax(0, 1fr) 27rem; } }
 .task-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-4); }
 .task-h h2 { font-size: var(--text-lg); line-height: 1.35; }
 .task-h .n { color: var(--color-muted); font-weight: 400; margin-right: var(--space-2); }
@@ -181,8 +184,13 @@ details.unfold > .unfold-body { padding: var(--space-3) 0 var(--space-2); }
 .key .k-now { color: var(--color-current); }
 .key .k-wait { color: var(--color-accent); }
 .key .ring { display: block; }
-/* The task graph runs top to bottom with no scrollbar of its own: its drawing shrinks to fit the column, never grows. */
-.graph svg { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; }
+/* The task graph runs top to bottom with no scrollbar of its own: its drawing shrinks to fit the column, never grows.
+ * Its labels are a step larger than the docs' diagrams'. The shared Mermaid box scrolls; here it is clipped and laid
+ * out as a column, so a source waiting to be drawn never scrolls and a failure's reason stays visible under it. */
+.graph svg { display: block; max-width: 100%; width: auto; height: auto; margin-inline: auto; }
+.where-graph .graph text { font-size: var(--text-md); }
+.where-graph .diagram { overflow: hidden; display: flex; flex-direction: column; }
+.where-graph .diagram > pre { min-height: 0; max-height: calc(100vh - var(--bar-h) - var(--space-5) - var(--space-7) - var(--key-h)); overflow: hidden; }
 .graph .node { cursor: pointer; }
 
 /* ---------- Decisions: master and detail, like Docs ---------- */
