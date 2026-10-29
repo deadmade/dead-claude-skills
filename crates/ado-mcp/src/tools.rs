@@ -39,13 +39,14 @@ pub(crate) const WRITES: [&str; 12] = [
 
 const INSTRUCTIONS: &str = "\
 Azure DevOps Server tools: pull requests (pr_*), work items (wi_*), pipeline runs (pipeline_*), repos and \
-projects. Use them instead of curl or az for anything on the Azure DevOps server; they read the git remote, so they \
+projects, search, wiki pages and files in any repo. Use them instead of curl or az for anything on the Azure DevOps server; they read the git remote, so they \
 work inside a clone without extra arguments (pass project, and repo for the pr_* tools, repo_file and code search, to \
 override it). Outside an Azure DevOps clone, pass project: project_list names them (wi_view takes the work item's own, wi_update needs none).\n\
 - There is no diff tool. To read a pull request's patch, run a local `git diff` against the target branch \
 (pr_files lists the changed files).\n\
 - search finds work items, wiki pages and code in repos that aren't cloned; for the clone itself, search locally.\n\
-- wiki reads the project's wiki pages; repo_file reads files of repos that aren't cloned.\n\
+- wiki reads the project's wiki pages, or lists them without path.\n\
+- repo_file reads files of repos that aren't cloned.\n\
 - Tools that default to the current branch take a `branch` argument. In a git worktree, pass your own branch: \
 the project folder's branch is not necessarily yours.\n\
 - Every write tool (pr_create, pr_update, pr_comment, pr_reply, pr_thread_status, pr_vote, pr_complete, wi_create, \

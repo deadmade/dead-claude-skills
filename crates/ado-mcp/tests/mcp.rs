@@ -26,9 +26,20 @@ fn initialize_has_instructions() {
     assert!(instructions.contains("git diff"), "{instructions}");
     assert!(instructions.contains("branch"), "{instructions}");
     assert!(
-        instructions.contains("- wiki reads the project's wiki pages; repo_file reads files of repos that aren't cloned."),
+        instructions.starts_with(
+            "Azure DevOps Server tools: pull requests (pr_*), work items (wi_*), pipeline runs (pipeline_*), repos \
+and projects, search, wiki pages and files in any repo."
+        ),
         "{instructions}"
     );
+    // One line each for search, wiki and repo_file.
+    for line in [
+        "\n- search finds work items, wiki pages and code in repos that aren't cloned; for the clone itself, search locally.\n",
+        "\n- wiki reads the project's wiki pages, or lists them without path.\n",
+        "\n- repo_file reads files of repos that aren't cloned.\n",
+    ] {
+        assert!(instructions.contains(line), "{line} in {instructions}");
+    }
     assert!(instructions.contains("the wiki tree 100"), "{instructions}");
     assert!(
         instructions.contains(
