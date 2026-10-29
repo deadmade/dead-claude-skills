@@ -1,4 +1,5 @@
-// Boots the window: hands the view runtime the app's read-only commands and its events, and draws the list.
+// Boots the window: hands the view runtime the app's read-only commands and its events, and draws the route the
+// window's address names (kept across a reload), else the list.
 import { createRuntime } from './runtime.js';
 
 const tauri = /** @type {any} */ (window).__TAURI__;

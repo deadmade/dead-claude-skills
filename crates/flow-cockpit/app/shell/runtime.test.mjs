@@ -1236,9 +1236,10 @@ test('missing_default_extensions_name_where_the_window_looked', async () => {
 async function inWindow(url, work) {
   // jsdom can't reload a page (and its `location.reload` can't be replaced): it reports each try on the console.
   const console = new VirtualConsole();
-  const reloads = { count: 0 };
+  const reloads = { count: 0, errors: [] };
   console.on('jsdomError', (err) => {
     if (/navigation/.test(err.message)) reloads.count++;
+    else reloads.errors.push(err.message);
   });
   const own = new JSDOM('<!doctype html><html><body></body></html>', { url, virtualConsole: console });
   const shared = [globalThis.window, globalThis.document];
@@ -1465,10 +1466,16 @@ test('f5_and_ctrl_r_reload_the_window_once_from_anywhere', async () => {
     // F5 held down: the reload already started, and the engine doesn't get the key either.
     assert.ok(key(win.document.body, { key: 'F5', repeat: true }));
     assert.equal(reloads.count, 4);
+    // Ctrl+R on a layout whose R key types another letter: the physical key counts.
+    assert.ok(key(win.document.body, { key: 'к', code: 'KeyR', ctrlKey: true }));
+    assert.equal(reloads.count, 5);
+    // A keydown without a key (Chromium's autofill sends such) is no error.
+    win.document.body.dispatchEvent(new win.Event('keydown', { bubbles: true }));
+    assert.deepEqual(reloads.errors, []);
     // Not a reload: a plain r, Alt+R, another F key.
     for (const init of [{ key: 'r' }, { key: 'r', ctrlKey: true, altKey: true }, { key: 'F6' }])
       assert.ok(!key(win.document.body, init), JSON.stringify(init));
-    assert.equal(reloads.count, 4);
+    assert.equal(reloads.count, 5);
   });
 });
 
@@ -1533,6 +1540,11 @@ test('focus_stays_on_a_named_control_across_a_navigation', async () => {
               box.append(b);
             }
             box.append(document.createElement('button'));
+            // Known only by its position inside a named box: not a name of its own.
+            const panel = document.createElement('div');
+            panel.id = 'panel';
+            panel.append(document.createElement('button'));
+            box.append(panel);
             return box;
           }`,
         ),
@@ -1551,6 +1563,123 @@ test('focus_stays_on_a_named_control_across_a_navigation', async () => {
     runtime.navigate(RUN);
     await runtime.idle();
     assert.equal(win.document.activeElement, win.document.body);
+    root.querySelector('#panel button').focus();
+    runtime.navigate({ ...RUN, tab: 'build' });
+    await runtime.idle();
+    assert.equal(win.document.activeElement, win.document.body, 'a button inside a named box');
+  });
+});
+
+/** A view on every screen with one fold, which shows its route. */
+const FOLDED = {
+  where: {
+    source: view(
+      'where',
+      ['list', 'run', 'doc', 'session'],
+      `const d = document.createElement('details');
+       d.dataset.keep = 'fold';
+       const s = document.createElement('summary');
+       s.textContent = JSON.stringify(ctx.route);
+       d.append(s);
+       globalThis.foldedDraws = (globalThis.foldedDraws ?? 0) + 1;
+       return d;`,
+    ),
+  },
+};
+const fold = (root) => root.querySelector('[data-keep="fold"]');
+/** Moves the address the way back or forward does and tells the window, at once. */
+const moveTo = (win, hash) => {
+  win.history.replaceState(null, '', hash);
+  win.dispatchEvent(new win.PopStateEvent('popstate'));
+};
+
+test('back_restores_at_most_the_50_pages_left_last', async () => {
+  // Going back leaves the last page too: after 49 others the list is the 50th page left, after 50 the 51st.
+  for (const [visited, restored] of [
+    [49, true],
+    [50, false],
+  ]) {
+    await inWindow('http://localhost/', async (win) => {
+      const { root, runtime } = await started(fakeApp(FOLDED));
+      fold(root).open = true;
+      for (let i = 0; i < visited; i++) {
+        runtime.navigate({ to: 'session', project: 'p1', id: `s${i}` });
+        await runtime.idle();
+      }
+      moveTo(win, '#/list');
+      await until(() => fold(root)?.textContent === '{"to":"list"}', 'the list');
+      await runtime.idle();
+      assert.equal(fold(root).open, restored, `after ${visited} other pages`);
+    });
+  }
+});
+
+test('one_back_draws_once_though_popstate_and_hashchange_both_come', async () => {
+  await inWindow('http://localhost/', async (win) => {
+    const { root, runtime } = await started(fakeApp(FOLDED));
+    runtime.navigate(RUN);
+    await runtime.idle();
+    win.history.back();
+    await until(() => fold(root)?.textContent === '{"to":"list"}', 'the list');
+    await runtime.idle();
+    const draws = globalThis.foldedDraws;
+    // The same move announced again (a `hashchange` after its `popstate`) draws nothing.
+    win.dispatchEvent(new win.HashChangeEvent('hashchange'));
+    win.dispatchEvent(new win.PopStateEvent('popstate'));
+    await runtime.idle();
+    assert.equal(globalThis.foldedDraws, draws);
+  });
+});
+
+test('a_click_right_after_back_opens_its_page_fresh', async () => {
+  await inWindow('http://localhost/', async (win) => {
+    const { root, runtime } = await started(fakeApp(FOLDED));
+    fold(root).open = true;
+    runtime.navigate(RUN);
+    await runtime.idle();
+    // Back is taken, and before its draw runs the user opens the list by a click.
+    moveTo(win, '#/session/p1/s1');
+    runtime.navigate({ to: 'list' });
+    await runtime.idle();
+    assert.equal(fold(root).textContent, '{"to":"list"}');
+    assert.equal(fold(root).open, false, 'a page opened by a click starts fresh');
+  });
+});
+
+test('navigate_draws_the_route_the_address_reads_back', async () => {
+  await inWindow('http://localhost/', async (win) => {
+    const { root, runtime } = await started(fakeApp(FOLDED));
+    // Keys in another order, and one no route has.
+    runtime.navigate({ slug: 'flow-cockpit', extra: 1, project: 'p1', to: 'run' });
+    await runtime.idle();
+    assert.equal(fold(root).textContent, JSON.stringify(RUN));
+    // A route the address can't hold opens the list, as a reload of it would.
+    runtime.navigate({ to: 'doc', project: 'p1', slug: 's', name: 'Readme' });
+    await runtime.idle();
+    assert.equal(fold(root).textContent, '{"to":"list"}');
+    assert.equal(win.location.hash, '#/list');
+  });
+});
+
+test('switching_a_runs_tabs_reads_nothing_ahead', async () => {
+  await inWindow('http://localhost/', async (win) => {
+    const app = fakeApp(OWN_TABS_RUN);
+    const { runtime } = await started(app, RUN);
+    const reads = () => app.calls.filter(([cmd]) => cmd === 'flow_run' || cmd === 'doc').length;
+    await until(() => reads() === 4, 'the opened run read ahead');
+    for (const to of [{ ...RUN, tab: 'decisions' }, RUN, { ...RUN, tab: 'docs' }]) {
+      runtime.navigate(to);
+      await runtime.idle();
+    }
+    win.history.back();
+    await until(() => win.location.hash === '#/run/p1/flow-cockpit', 'back to build');
+    await runtime.idle();
+    await settle();
+    assert.equal(reads(), 4);
+    // Another run is read ahead again.
+    runtime.navigate({ ...RUN, slug: 'other' });
+    await runtime.idle();
+    await until(() => reads() === 8, 'the other run read ahead');
   });
 });
 

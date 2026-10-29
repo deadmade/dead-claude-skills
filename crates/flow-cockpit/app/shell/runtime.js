@@ -455,12 +455,14 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     }
     // The same route drawn again (fresh data, a reloaded view) keeps what the user did to it. A new route starts
     // fresh, unless back or forward returns to a page left earlier: that gets back what the user had done to it.
-    // A control with a name (an `id` or `data-keep`), such as a tab, keeps the focus on the next page when that page
-    // has it too.
+    // A control with a name of its own (an `id` or `data-keep`), such as a tab, keeps the focus on the next page when
+    // that page has it too.
     const where = JSON.stringify(at);
     const opened = where !== drawnAt;
     const kept = opened ? null : snapshot(root, moved);
     const leaving = opened && drawnAt ? snapshot(root, moved) : null;
+    /** @type {Route | null} */
+    const was = leaving ? JSON.parse(drawnAt) : null;
     if (leaving) {
       left.delete(drawnAt);
       left.set(drawnAt, leaving);
@@ -472,7 +474,8 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     if (tab) (host ?? root).append(/** @type {Node} */ (tabSection));
     else if (tabSection && host) host.append(tabSection);
     drawnAt = where;
-    const named = leaving?.focused?.place.path[0]?.startsWith('#') ? leaving.focused : null;
+    const name = leaving?.focused?.place.path;
+    const named = name?.length === 1 && name[0].startsWith('#') ? leaving?.focused : null;
     const back =
       kept ??
       (traversed
@@ -481,7 +484,9 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
           ? { scrolled: [], folds: [], expanded: [], focused: { ...named, value: null } }
           : undefined);
     if (back) restore(root, back, moved);
-    drawAhead(at, opened);
+    // Another tab of the same run, or back and forth between its tabs, isn't a run opening: nothing is read ahead.
+    const sameRun = was?.to === 'run' && at.to === 'run' && was.project === at.project && was.slug === at.slug;
+    drawAhead(at, opened && !sameRun);
   }
 
   // Drawing ahead: the diagrams the next pages show, queued to draw in idle time (blocks/mermaid.js). After the list,
@@ -586,9 +591,13 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
   // and forward buttons move between pages and a reload opens the page it was on. Nothing is written to disk.
   /** @param {Route} to */
   function navigate(to) {
-    const hash = hashOf(to);
+    // The route as the address reads it back, so a click, back and a reload draw the same; one the address can't hold
+    // opens the list, as its reload would.
+    const at = routeOf(hashOf(to)) ?? { to: 'list' };
+    const hash = hashOf(at);
     if (hash !== window.location.hash) window.history.pushState(null, '', hash);
-    route = to;
+    route = at;
+    traversing = false; // A click after back or forward, before that draw, opens its page fresh.
     requestDraw();
   }
 
@@ -615,7 +624,9 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
    * @param {KeyboardEvent} event
    */
   function reloadKey(event) {
-    const ctrlR = (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'r';
+    // `code` too: on a layout whose R key types another letter, Ctrl+R still means reload.
+    const r = event.key?.toLowerCase() === 'r' || event.code === 'KeyR';
+    const ctrlR = (event.ctrlKey || event.metaKey) && !event.altKey && r;
     const f5 = event.key === 'F5' && !event.ctrlKey && !event.metaKey && !event.altKey;
     if (!ctrlR && !f5) return;
     event.preventDefault();
