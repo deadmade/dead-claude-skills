@@ -113,9 +113,11 @@ export const HINTS: Record<string, string> = {
 export function unavailable(key: string, platform: string, arch: string, version: string): string | undefined {
   const name = nameOf(key);
   if (platform === 'win32' && name === 'nix-lsp') return 'nixd is not available on Windows';
-  if (platform === 'win32' && name === 'flow-cockpit') return 'the flow cockpit app is not on Windows yet';
   if (name === 'web-builtins-off') return unavailable(`web-mcp@${MARKETPLACE}`, platform, arch, version);
   const bin = BIN_PLUGINS[name];
-  if (bin && !binAsset(bin.name, platform, arch, version)) return `no ${bin.name} build for ${platform}-${arch}`;
+  // A linuxHint points at the flake, which builds for x86_64-linux only.
+  const hinted = bin?.linuxHint && platform === 'linux' && arch === 'x64';
+  if (bin && !hinted && !binAsset(bin.name, platform, arch, version))
+    return `no ${bin.name} build for ${platform}-${arch}`;
   return undefined;
 }

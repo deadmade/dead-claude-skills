@@ -1,10 +1,18 @@
 {
   "name": "flow-cockpit",
   "version": "0.6.0",
-  "description": "Teaches Claude to write and change the flow cockpit's views: the TypeScript views of the window that shows your flow runs, audits and Claude sessions (Linux, app from the flake). Also installs hooks that record questions, permission prompts and agent starts and stops per session into a local capture folder, which only the window reads.",
+  "description": "Teaches Claude to write and change the flow cockpit's views: the TypeScript views of the window that shows your flow runs, audits and Claude sessions (Linux from the flake, Windows from the installer). Also installs hooks that record questions, permission prompts and agent starts and stops per session into a local capture folder, which only the window reads.",
   "author": {
     "name": "deadmade",
     "url": "https://github.com/deadmade"
   },
-  "repository": "https://github.com/deadmade/dead-claude-skills"
+  "repository": "https://github.com/deadmade/dead-claude-skills",
+  "userConfig": {
+    "appPath": {
+      "type": "string",
+      "title": "flow-cockpit app",
+      "description": "Path to the flow-cockpit program. Default: flow-cockpit on PATH.",
+      "default": "flow-cockpit"
+    }
+  }
 }

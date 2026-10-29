@@ -100,7 +100,7 @@
     },
     {
       "name": "flow-cockpit",
-      "description": "Teaches Claude to write and change the flow cockpit's views: the TypeScript views of the window that shows your flow runs, audits and Claude sessions (Linux, app from the flake). Also installs hooks that record questions, permission prompts and agent starts and stops per session into a local capture folder, which only the window reads. Opt-in.",
+      "description": "Teaches Claude to write and change the flow cockpit's views: the TypeScript views of the window that shows your flow runs, audits and Claude sessions (Linux from the flake, Windows from the installer). Also installs hooks that record questions, permission prompts and agent starts and stops per session into a local capture folder, which only the window reads. Opt-in.",
       "source": "./plugins/opt-in/flow-cockpit",
       "category": "development"
     }

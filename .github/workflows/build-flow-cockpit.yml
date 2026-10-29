@@ -1,0 +1,72 @@
+name: Build flow cockpit
+
+# The flow cockpit window for Windows x64: a zip of flow-cockpit.exe and its four default extensions (extensions/<name>/,
+# which the app finds beside the exe), plus its checksum. release.yml calls this and attaches them to the vX.Y.Z release
+# the installer downloads from (BIN_PLUGINS in installer/core/binaries.ts). Linux runs the app from the flake instead,
+# since it links the system's GTK and WebKit. A PR that changes this file, or a run by hand, builds only.
+on:
+  pull_request:
+    paths: ['.github/workflows/build-flow-cockpit.yml']
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      # The release tag to build: the app reports its crate's version, which the installer checks against its own.
+      ref:
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      TARGET: x86_64-pc-windows-msvc
+    defaults:
+      run:
+        shell: bash
+        working-directory: crates/flow-cockpit
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Rust toolchain
+        run: rustup update stable && rustup default stable && rustup target add "$TARGET"
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: crates/flow-cockpit
+          key: ${{ env.TARGET }}
+
+      - name: Build
+        run: cargo build --release --locked -p flow-cockpit --target "$TARGET"
+
+      # A release build is a GUI program with no console: through a pipe it must still print, as the installer reads it.
+      - name: Smoke test
+        run: |
+          out=$("target/$TARGET/release/flow-cockpit.exe" --version | cat)
+          echo "$out"
+          test "$out" = "flow-cockpit $(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)"
+
+      # The exe and every extensions/ folder but tests/; the tsconfig.json beside them isn't copied (as in the flake).
+      - name: Package
+        run: |
+          name=flow-cockpit-$TARGET
+          stage="$RUNNER_TEMP/stage"
+          mkdir -p "$stage/extensions" "$RUNNER_TEMP/dist"
+          cp "target/$TARGET/release/flow-cockpit.exe" "$stage/"
+          for dir in extensions/*/; do
+            ext=$(basename "$dir")
+            [ "$ext" = tests ] || cp -r "$dir" "$stage/extensions/$ext"
+          done
+          test "$(ls "$stage/extensions" | tr '\n' ' ')" = "activity docs list run "
+          (cd "$stage" && 7z a -tzip "$RUNNER_TEMP/dist/$name.zip" flow-cockpit.exe extensions > /dev/null)
+          cd "$RUNNER_TEMP/dist"
+          sha256sum "$name.zip" > "$name.zip.sha256"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: flow-cockpit-x86_64-pc-windows-msvc
+          path: ${{ runner.temp }}/dist/*

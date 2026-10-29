@@ -1,6 +1,6 @@
 // Downloads: release assets checked against their sha256, unpacked and moved into place.
 import { spawnSync } from 'node:child_process';
-import { chmodSync, cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import tls from 'node:tls';
@@ -31,8 +31,18 @@ export async function fetchOk(url: string) {
 }
 
 // Downloads the release asset, checks its sha256, and moves the binary to bin (on Windows the old one is renamed aside
-// first). asset.digest: a pinned checksum instead of the .sha256 file; asset.raw: the download is the binary itself.
-export type Asset = { file: string; url: string; exe: string; sha256?: string; digest?: string; raw?: boolean };
+// first). asset.digest: a pinned checksum instead of the .sha256 file; asset.raw: the download is the binary itself;
+// asset.folder: the whole archive becomes bin's folder, which is the program's own and replaced whole, so nothing an
+// older release shipped there lingers.
+export type Asset = {
+  file: string;
+  url: string;
+  exe: string;
+  sha256?: string;
+  digest?: string;
+  raw?: boolean;
+  folder?: boolean;
+};
 export async function downloadBin(name: string, asset: Asset, bin: string) {
   const [archive, want] = await Promise.all([
     fetchOk(asset.url).then((r) => r.arrayBuffer()),
@@ -46,18 +56,24 @@ export async function downloadBin(name: string, asset: Asset, bin: string) {
   const tmp = mkdtempSync(join(tmpdir(), `${name}-`));
   try {
     const file = join(tmp, asset.file);
+    const out = join(tmp, 'out');
     writeFileSync(file, bytes);
     if (!asset.raw) {
-      const r = spawnSync(tar(), ['-xf', file, '-C', tmp], { encoding: 'utf8' });
+      mkdirSync(out);
+      const r = spawnSync(tar(), ['-xf', file, '-C', out], { encoding: 'utf8' });
       if (r.status !== 0)
         throw new Error(`could not unpack ${asset.file}: ${(r.stderr || r.error?.message || '').trim()}`);
+      if (!existsSync(join(out, asset.exe))) throw new Error(`${asset.file} holds no ${asset.exe}`);
     }
-    mkdirSync(dirname(bin), { recursive: true });
-    const staged = `${bin}.tmp-${process.pid}`;
-    cpSync(asset.raw ? file : join(tmp, asset.exe), staged);
-    chmodSync(staged, 0o755);
-    // Windows can rename a running exe (agent-browser's daemon, a live web-mcp) but not replace it.
-    replaceBin(staged, bin, WIN);
+    const dest = asset.folder ? dirname(bin) : bin;
+    mkdirSync(dirname(dest), { recursive: true });
+    const staged = `${dest}.tmp-${process.pid}`;
+    if (asset.folder) cpSync(out, staged, { recursive: true });
+    else cpSync(asset.raw ? file : join(out, asset.exe), staged);
+    chmodSync(asset.folder ? join(staged, asset.exe) : staged, 0o755);
+    // Windows can rename a running exe (agent-browser's daemon, a live web-mcp) but not replace it. A folder can't be
+    // renamed onto another one anywhere, so the old folder always moves aside first.
+    replaceBin(staged, dest, WIN || asset.folder === true);
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }

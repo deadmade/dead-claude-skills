@@ -70,12 +70,45 @@ test('web-mcp downloads its own archive, and each plugin is configured under its
   const dirs: Record<string, string> = {
     'tui-review': 'plugins/shared/tui-review',
     'web-mcp': 'plugins/shared/web-mcp',
+    'flow-cockpit': 'plugins/opt-in/flow-cockpit',
   };
   for (const [plugin, { key }] of Object.entries(BIN_PLUGINS))
     assert.ok(json(`${dirs[plugin]}/.claude-plugin/plugin.json`).userConfig[key], `${plugin} has userConfig ${key}`);
   assert.match(unavailable('web-mcp', 'linux', 'ia32', '1.0.0')!, /no web-mcp build for linux-ia32/);
   assert.equal(unavailable('web-mcp', 'linux', 'x64', '1.0.0'), undefined);
   assert.match(unavailable('web-mcp', 'darwin', 'arm64', '1.0.0')!, /no web-mcp build for darwin-arm64/);
+});
+
+test('binAsset gives the Windows zip for flow-cockpit', () => {
+  const win = binAsset('flow-cockpit', 'win32', 'x64', '1.2.3')!;
+  assert.equal(
+    win.url,
+    'https://github.com/deadmade/dead-claude-skills/releases/download/v1.2.3/flow-cockpit-x86_64-pc-windows-msvc.zip',
+  );
+  assert.equal(win.sha256, `${win.url}.sha256`);
+  assert.equal(win.exe, 'flow-cockpit.exe');
+  // The zip holds the exe and its default extensions, so it goes into a folder of its own.
+  assert.equal(win.folder, true);
+  assert.equal(binAsset('tui-review', 'win32', 'x64', '1.2.3')!.folder, false);
+  assert.equal(BIN_PLUGINS['flow-cockpit'].key, 'appPath');
+});
+
+test('binAsset has no linux asset for flow-cockpit', () => {
+  assert.equal(binAsset('flow-cockpit', 'linux', 'x64', '1.2.3'), undefined);
+  assert.equal(binAsset('flow-cockpit', 'win32', 'arm64', '1.2.3'), undefined);
+  assert.equal(binAsset('flow-cockpit', 'darwin', 'arm64', '1.2.3'), undefined);
+});
+
+test('flow-cockpit has a pinned linux hint', () => {
+  const hint = BIN_PLUGINS['flow-cockpit'].linuxHint!('1.2.3');
+  assert.match(hint, /nix run github:deadmade\/dead-claude-skills\/v1\.2\.3#flow-cockpit/);
+  assert.equal(BIN_PLUGINS['tui-review'].linuxHint, undefined);
+});
+
+// The hint names the flake's package: the output the installer points Linux users at must exist.
+test('the flake has the flow-cockpit package the linux hint runs', () => {
+  const flake = readFileSync(new URL('../../flake.nix', import.meta.url), 'utf8');
+  assert.match(flake, /^\s+flow-cockpit = pkgs\.rustPlatform\.buildRustPackage/m);
 });
 
 test('tui-review versions match the release the installer fetches', () => {

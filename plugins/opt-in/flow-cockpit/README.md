@@ -10,7 +10,7 @@ extensions ship with the app; your own add to them or replace them, and any of t
 nothing from Claude Code for that. This plugin carries the `views` skill, which teaches Claude to write and change
 views: ask for a new screen or tab, or for a change to one, and it appears in the open window without a restart.
 
-Linux only for now; Windows comes with the next slice.
+It runs on Linux (from the flake) and Windows x64 (from the installer).
 
 The plugin also carries **capture hooks**. They record what transcripts lack: questions Claude asked you, permission
 prompts, agents starting and stopping, turns ending. Each Claude session gets one line-per-event file
@@ -25,11 +25,17 @@ The window shows a run as waiting on you while one of its sessions has a questio
 
 ## Install
 
-1. The app, from this repository's flake (it links the system's GTK and WebKit, so it is not a plain download):
-   `nix run github:deadmade/dead-claude-skills#flow-cockpit`, or `packages.x86_64-linux.flow-cockpit` from the flake
-   in your system config. From a checkout: `nix build .#flow-cockpit`.
-2. The plugin: pick it in the installer (see the [main README](../../../README.md)), on its Tools page. The installer
-   hides it on Windows until the app is built there.
+1. The app.
+   - Linux: from this repository's flake (it links the system's GTK and WebKit, so it is not a plain download):
+     `nix run github:deadmade/dead-claude-skills#flow-cockpit`, or `packages.x86_64-linux.flow-cockpit` from the flake
+     in your system config. From a checkout: `nix build .#flow-cockpit`. The installer prints the command pinned to
+     its release.
+   - Windows x64: the installer downloads the release's zip into `%USERPROFILE%\.claude\bin\flow-cockpit\`
+     (`flow-cockpit.exe` with the default extensions beside it, replaced whole on an update) and sets the plugin's
+     `appPath` to the exe. One `flow-cockpit` on PATH is used instead.
+2. The plugin: pick it in the installer (see the [main README](../../../README.md)), on its Tools page. Without the
+   installer, set `appPath` with `/plugin configure flow-cockpit` when the app isn't on PATH; the `views` skill runs it
+   from there.
 
 ## Use
 
@@ -38,7 +44,8 @@ The window shows a run as waiting on you while one of its sessions has a questio
   extensions folder in use, yours, and `config.toml`) print and exit.
 - An extension is a folder `<name>/` with one or more view files `<id>.ts` and an optional `style.css`. The defaults,
   `list`, `run`, `docs` and `activity`, are installed with the app (`share/flow-cockpit/extensions/` in the Nix
-  package). Yours live in `~/.config/flow-cockpit/extensions/` (`$XDG_CONFIG_HOME`): a new name adds views, a
+  package, `extensions\` beside the exe on Windows). Yours live in `~/.config/flow-cockpit/extensions/`
+  (`$XDG_CONFIG_HOME`; `%APPDATA%\flow-cockpit\extensions\` on Windows, where `config.toml` sits beside it too): a new name adds views, a
   default's name replaces that whole default, and deleting it brings the default back. To change a default, copy its
   folder there. Links are ignored: put real folders and files there. The old `~/.config/flow-cockpit/views/` folder
   is no longer read.

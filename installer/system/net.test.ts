@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { createServer as createHttp, type Server } from 'node:http';
 import { createServer as createHttps } from 'node:https';
 import { tmpdir } from 'node:os';
@@ -79,6 +79,43 @@ test('downloadBin writes nothing when the checksum differs', async () => {
       /checksum mismatch/,
     );
     assert.equal(existsSync(bin), false);
+  } finally {
+    server.close();
+  }
+});
+
+// The flow cockpit's zip holds its exe and its default extensions: the whole archive is its folder, and an update
+// replaces the old folder whole, so a default the release dropped doesn't linger.
+function oldFolder() {
+  const dir = join(mkdtempSync(join(tmpdir(), 'dcs-net-')), 'fake');
+  mkdirSync(join(dir, 'extensions', 'gone'), { recursive: true });
+  writeFileSync(join(dir, 'extensions', 'gone', 'gone.ts'), 'old view');
+  writeFileSync(join(dir, exe), 'old binary');
+  return dir;
+}
+
+test('downloadBin unpacks a folder archive into its own folder, replacing the old copy whole', async () => {
+  const { server, url } = await release(archive);
+  const dir = oldFolder();
+  try {
+    await downloadBin('fake', { file: archive, url, sha256: `${url}.sha256`, exe, folder: true }, join(dir, exe));
+    assert.equal(readFileSync(join(dir, exe), 'utf8'), 'fake binary\n');
+    assert.deepEqual(readdirSync(dir), [exe], 'only what the archive holds');
+    assert.deepEqual(readdirSync(join(dir, '..')), ['fake'], 'no staged or old copy left beside it');
+  } finally {
+    server.close();
+  }
+});
+
+test('downloadBin keeps the old folder when the archive lacks the program', async () => {
+  const { server, url } = await release(archive);
+  const dir = oldFolder();
+  const asset = { file: archive, url, sha256: `${url}.sha256`, exe: 'missing', folder: true };
+  try {
+    await assert.rejects(downloadBin('fake', asset, join(dir, 'missing')), /missing/);
+    assert.equal(readFileSync(join(dir, exe), 'utf8'), 'old binary');
+    assert.ok(existsSync(join(dir, 'extensions', 'gone', 'gone.ts')));
+    assert.deepEqual(readdirSync(join(dir, '..')), ['fake']);
   } finally {
     server.close();
   }

@@ -12,24 +12,29 @@ ship with the app: `list` (projects, flow runs, audits, loose sessions), `run` (
 data and writes nothing. It reloads the views a few seconds after a file in any extensions folder changes, so the
 user sees your change without a restart.
 
-Linux only for now: the app comes from this repository's flake (`nix run github:deadmade/dead-claude-skills#flow-cockpit`,
-or its `flow-cockpit` package in a system config). Windows comes later. Check that `flow-cockpit --version` runs before
-you start; if it doesn't, tell the user how to get it and stop.
+The app is `${user_config.appPath}`, written `"$app"` below. On Linux it comes from this repository's flake
+(`nix run github:deadmade/dead-claude-skills#flow-cockpit`, or its `flow-cockpit` package in a system config). On
+Windows the installer puts it at `%USERPROFILE%\.claude\bin\flow-cockpit\flow-cockpit.exe`, with its default extensions
+beside it. Check that `"$app" --version` runs before you start; if it doesn't, tell the user how to get it and stop.
+
+The commands here are POSIX shell (Git Bash on Windows). Each one starts by setting `app` in single quotes, so a
+Windows path keeps its backslashes; a variable set in one shell call is gone in the next.
 
 ## Where views live
 
-`flow-cockpit --print-paths` prints the three places, one per line with a label: `default extensions:`,
-`user extensions:` and `config:`.
+`"$app" --print-paths` prints the three places, one per line with a label: `default extensions:`,
+`user extensions:` and `config:`. Take the folders from it rather than building them yourself.
 
 - **An extension** is a folder `<name>/` holding one or more view files and an optional `style.css`. The folder name
   is the extension's name. A file `<id>.ts` in it is the view `<id>`. A name with a second dot (`flow-cockpit.d.ts`,
   `x.test.ts`) is not a view, and neither is a file that isn't `.ts`. A folder without a view is not an extension.
 - **Links are ignored**, with no error: a symlinked extension folder, view file or `style.css` doesn't load. Put real
   folders and files there, copies rather than links.
-- **The default extensions** ship with the app (in the Nix package, `share/flow-cockpit/extensions/`). Never write
-  there: an update replaces them.
-- **The user's extensions folder** is `$XDG_CONFIG_HOME/flow-cockpit/extensions/`. When `XDG_CONFIG_HOME` is unset or
-  empty, it is `$HOME/.config/flow-cockpit/extensions/`. Write every extension there.
+- **The default extensions** ship with the app (in the Nix package, `share/flow-cockpit/extensions/`; on Windows,
+  `extensions\` beside `flow-cockpit.exe`). Never write there: an update replaces them.
+- **The user's extensions folder** is `$XDG_CONFIG_HOME/flow-cockpit/extensions/` on Linux. When `XDG_CONFIG_HOME` is
+  unset or empty, it is `$HOME/.config/flow-cockpit/extensions/`. On Windows it is
+  `%APPDATA%\flow-cockpit\extensions\`. Write every extension there.
   - An extension with a new name adds its views.
   - An extension with a default's name replaces that whole default. Deleting it brings the default back.
   - A view id that a default also has replaces that default view, whichever extension it is in.
@@ -64,13 +69,13 @@ you start; if it doesn't, tell the user how to get it and stop.
 
 ## Before you write
 
-Run this as one command: a variable set in one shell call is gone in the next, so every command block here starts
-by setting `dir`.
+Run this as one command:
 
 ```sh
-dir="${XDG_CONFIG_HOME:-$HOME/.config}/flow-cockpit/extensions"
+app='${user_config.appPath}'
+dir=$("$app" --print-paths | sed -n 's/^user extensions: //p')
 mkdir -p "$dir"
-flow-cockpit --print-types > "$dir/flow-cockpit.d.ts"
+"$app" --print-types > "$dir/flow-cockpit.d.ts"
 ```
 
 `flow-cockpit.d.ts` declares the module `flow-cockpit`: the view interface (`View`, `ViewContext`, `Route`, `Slot`,
@@ -92,8 +97,9 @@ like this:
   view) into the user's folder, then edit the copy:
 
   ```sh
-  dir="${XDG_CONFIG_HOME:-$HOME/.config}/flow-cockpit/extensions"
-  defaults=$(flow-cockpit --print-paths | sed -n 's/^default extensions: //p')
+  app='${user_config.appPath}'
+  dir=$("$app" --print-paths | sed -n 's/^user extensions: //p')
+  defaults=$("$app" --print-paths | sed -n 's/^default extensions: //p')
   mkdir -p "$dir" && cp -r "$defaults/list" "$dir/" && chmod -R u+w "$dir/list"
   ```
 
@@ -202,7 +208,8 @@ export default view;
 - If `tsc` is at hand, type-check the extension's views next to the printed types:
 
   ```sh
-  cd "${XDG_CONFIG_HOME:-$HOME/.config}/flow-cockpit/extensions" &&
+  app='${user_config.appPath}'
+  cd "$("$app" --print-paths | sed -n 's/^user extensions: //p')" &&
     tsc --noEmit --strict --target es2023 --lib es2023,dom,dom.iterable --module esnext --moduleResolution bundler \
       --verbatimModuleSyntax --erasableSyntaxOnly flow-cockpit.d.ts <name>/*.ts
   ```

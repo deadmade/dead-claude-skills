@@ -94,8 +94,11 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   only in the fullscreen terminal) and shows the clicked file in a pane, refreshed by a 1 s stat while open.
 - The flow cockpit (`docs/features/flow-observability/`): a Tauri window over flow runs, audits and Claude sessions, in
   `crates/flow-cockpit/`, plus the `plugins/opt-in/flow-cockpit/` plugin, which carries only the `views` skill (Claude
-  writes extensions into the user's extensions folder) and the capture hooks. The plugin is hidden on Windows
-  (`unavailable` in `core/options.ts`) until the app ships there. The workspace: `core/` parses flow.md, plan.md, audit
+  writes extensions into the user's extensions folder, running the app from its `appPath` userConfig) and the capture
+  hooks. The installer offers it on Linux x64 and Windows x64 (`BIN_PLUGINS` in `core/binaries.ts`): on Linux it only
+  prints the flake's `nix run` command pinned to its release (`linuxHint`); on Windows it downloads
+  `build-flow-cockpit.yml`'s zip (`flow-cockpit.exe` plus the default extensions) whole into
+  `~/.claude/bin/flow-cockpit/`, replacing an older folder whole, and sets `appPath`. The workspace: `core/` parses flow.md, plan.md, audit
   reports, build logs and transcripts into a typed model and indexes projects, runs and sessions; `app/` is the window
   (read-only commands, a 2 s poll that also rereads `config.toml`, extension loading, `--print-types`,
   `--print-paths`). `app/shell/` holds the view runtime, the building blocks and `tokens.css` (JavaScript with JSDoc,
@@ -149,7 +152,7 @@ highest `vX.Y.Z` tag (`scripts/next-version.mjs`; fetch tags before a local rele
     npm run release -- minor      # on main, clean tree; bumps, runs npm test, commits and tags
     git push --follow-tags origin main
 
-Either way the merge's run packs the installer (`installer.tgz`), builds tui-review and web-mcp from the tag and
+Either way the merge's run packs the installer (`installer.tgz`), builds tui-review, web-mcp and the flow cockpit's Windows app from the tag and
 publishes the GitHub release npx and the installer download from, then moves the `release` branch to it (never back).
 The installer points the marketplace at that branch (`RELEASE_BRANCH`, `core/release.ts`), so Claude Code's
 marketplace auto-update brings plugin updates without a rerun; the binaries still come from the installer (ADR 0006). Removing a plugin from the marketplace is enough to retire it: the installer uninstalls installed
@@ -192,8 +195,8 @@ CI: `test.yml` (npm test, the installer typecheck and the dead-skills and md-pan
 plus tui-review's budgets, benchmarks and mod tests) for each crate a PR touches; `flow-cockpit.yml` on PRs touching the
 flow cockpit's crate, plugin, the flake or the npm manifests (core tests and clippy on Linux and Windows, the app's Windows build, the
 views tests and both `tsc -p` checks; on Linux `nix build .#flow-cockpit`; with `CI=true` the core's relative-worktree
-test fails instead of skipping on a git older than 2.48); `crates-build.yml` (both binaries) on PRs
-touching it and from `release.yml`; `sync.yml` weekly, one job, PR and set of issues per `SOURCES` entry (new upstream
+test fails instead of skipping on a git older than 2.48); `crates-build.yml` (both binaries) and
+`build-flow-cockpit.yml` (the Windows app's zip) on PRs touching them and from `release.yml`; `sync.yml` weekly, one job, PR and set of issues per `SOURCES` entry (new upstream
 skills, and a "Sync <name> failing" issue it closes on the next green run), and as a dry run (no PR, no issues) on PRs
 touching the sync code.
 

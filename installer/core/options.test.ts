@@ -72,7 +72,14 @@ test('options hidden per platform', () => {
   assert.equal(unavailable(`tui-review@${M}`, 'linux', 'x64', '1.0.0'), undefined);
 });
 
-test('flow-cockpit is unavailable on win32 for now', () => {
-  assert.equal(typeof unavailable(`flow-cockpit@${M}`, 'win32', 'x64', '1.0.0'), 'string');
+// Windows gets the release zip, Linux the flake (its hint); elsewhere neither exists.
+test('flow-cockpit is offered on win32 and linux', () => {
+  assert.equal(unavailable(`flow-cockpit@${M}`, 'win32', 'x64', '1.0.0'), undefined);
   assert.equal(unavailable(`flow-cockpit@${M}`, 'linux', 'x64', '1.0.0'), undefined);
+  for (const [platform, arch] of [
+    ['darwin', 'arm64'],
+    ['linux', 'arm64'],
+    ['win32', 'arm64'],
+  ])
+    assert.match(unavailable(`flow-cockpit@${M}`, platform, arch, '1.0.0')!, /no flow-cockpit build/);
 });

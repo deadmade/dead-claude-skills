@@ -15,9 +15,7 @@ mod trust;
 mod views;
 
 use std::io::Write;
-use std::path::Path;
-#[cfg(test)]
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::Arc;
 use std::thread;
@@ -28,7 +26,7 @@ use jiff::Timestamp;
 use tauri::Emitter;
 
 use crate::commands::Shared;
-use crate::paths::{Defaults, Platform};
+use crate::paths::{Defaults, NoHome, Platform};
 use crate::poll::{ConfigFile, Event, Poller};
 use crate::views::Views;
 
@@ -54,8 +52,10 @@ fn main() -> ExitCode {
         ["--print-types"] => print(&types()),
         ["--print-paths"] => {
             let env = |key: &str| std::env::var(key).ok();
-            let config_dir = paths::config_dir(env, Platform::current());
-            print(&paths_text(&default_extensions(env), &config_dir))
+            match paths::config_dir(env, Platform::current()) {
+                Ok(config_dir) => print(&paths_text(&default_extensions(env), &config_dir)),
+                Err(e) => fail(&format!("flow-cockpit: {e}\n")),
+            }
         }
         _ => fail("usage: flow-cockpit [--version | --print-types | --print-paths]\n"),
     }
@@ -70,13 +70,11 @@ fn should_disable_dmabuf(current: Option<&std::ffi::OsStr>) -> bool {
 
 /// Opens the window: builds the index from the transcripts' heads, starts the poll and serves the commands.
 fn run() -> ExitCode {
-    let platform = Platform::current();
     let env = |key: &str| std::env::var(key).ok();
-    let home = Home {
-        claude_projects: paths::claude_projects(env, platform),
-        capture_dir: paths::capture_dir(env, platform),
+    let (home, config_dir) = match folders(env, Platform::current()) {
+        Ok(folders) => folders,
+        Err(e) => return fail(&format!("flow-cockpit: {e}\n")),
     };
-    let config_dir = paths::config_dir(env, platform);
     let settings = ConfigFile::load(config_dir.join("config.toml"));
     let index = Index::build(&home, &settings.config, Timestamp::now());
     let views = Views::new(
@@ -121,6 +119,19 @@ fn run() -> ExitCode {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => fail(&format!("flow-cockpit: {e}\n")),
     }
+}
+
+/// Where the window reads: Claude's transcripts and the capture files, and the folder of the user's extensions and
+/// `config.toml`. Without a home folder to find them in, nothing is read.
+fn folders(
+    env: impl Fn(&str) -> Option<String>,
+    platform: Platform,
+) -> Result<(Home, PathBuf), NoHome> {
+    let home = Home {
+        claude_projects: paths::claude_projects(&env, platform)?,
+        capture_dir: paths::capture_dir(&env, platform)?,
+    };
+    Ok((home, paths::config_dir(&env, platform)?))
 }
 
 /// The default extensions folder for the running program.
@@ -285,6 +296,26 @@ mod tests {
             let line = format!("export type * from '../../bindings/{name}';");
             assert!(API.contains(&line), "api.d.ts lacks {line}");
         }
+    }
+
+    #[test]
+    fn no_home_reads_no_folder() {
+        let err = folders(|_| None, Platform::Linux).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "HOME is not set, so the flow cockpit can't find its folders"
+        );
+        let all_set = |key: &str| {
+            ["CLAUDE_CONFIG_DIR", "XDG_STATE_HOME", "XDG_CONFIG_HOME"]
+                .contains(&key)
+                .then(|| format!("/{key}"))
+        };
+        let (home, config) = folders(all_set, Platform::Linux).unwrap();
+        assert_eq!(
+            home.claude_projects,
+            Path::new("/CLAUDE_CONFIG_DIR/projects")
+        );
+        assert_eq!(config, Path::new("/XDG_CONFIG_HOME/flow-cockpit"));
     }
 
     #[test]

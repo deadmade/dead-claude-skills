@@ -1,4 +1,4 @@
-// The binaries the installer downloads or points plugins at: tui-review, web-mcp and agent-browser.
+// The binaries the installer downloads or points plugins at: tui-review, web-mcp, the flow cockpit and agent-browser.
 import { createHash } from 'node:crypto';
 import { BUNDLE } from './plugins.ts';
 import { RELEASES, newer, semver } from './release.ts';
@@ -37,11 +37,30 @@ export function missingBinaries(platform: string, wanted: string[], onPath: (bin
   });
 }
 
-// The binaries releases ship, built per platform by .github/workflows/crates-build.yml and attached to the
-// vX.Y.Z release by release.yml. plugin: which plugin needs it; key: its userConfig key for the binary's path.
-export const BIN_PLUGINS: Record<string, { name: string; key: string }> = {
+// The binaries releases ship, built per platform by .github/workflows/crates-build.yml (the flow cockpit by
+// build-flow-cockpit.yml) and attached to the vX.Y.Z release by release.yml. Keyed by plugin; name: the binary;
+// key: the plugin's userConfig key for its path. targets: the BIN_TARGETS keys it is built for, when not all.
+// linuxHint: Linux gets it elsewhere, and this says how. folder: the archive holds more than the binary (the flow
+// cockpit's default extensions), so it is unpacked whole into a folder of its own.
+export interface BinPlugin {
+  name: string;
+  key: string;
+  targets?: string[];
+  linuxHint?: (version: string) => string;
+  folder?: boolean;
+}
+export const BIN_PLUGINS: Record<string, BinPlugin> = {
   'tui-review': { name: 'tui-review', key: 'binPath' },
   'web-mcp': { name: 'web-mcp', key: 'binPath' },
+  // It links the system's GTK and WebKit on Linux, so Linux runs it from the flake, pinned to this release.
+  'flow-cockpit': {
+    name: 'flow-cockpit',
+    key: 'appPath',
+    targets: ['win32-x64'],
+    linuxHint: (version) =>
+      `run the app with \`nix run github:deadmade/dead-claude-skills/v${version}#flow-cockpit\`, or add the flake's flow-cockpit package to your system config`,
+    folder: true,
+  },
 };
 // Windows and Linux x64 only: no macOS or ARM builds.
 const BIN_TARGETS: Record<string, string> = {
@@ -49,13 +68,16 @@ const BIN_TARGETS: Record<string, string> = {
   'linux-x64': 'x86_64-unknown-linux-musl',
 };
 
-// The release archive of binary `name` ('tui-review' or 'web-mcp') at `version` for this machine, or undefined where none is built.
+// The release archive of binary `name` (a BIN_PLUGINS name) at `version` for this machine, or undefined where none is built.
 export function binAsset(name: string, platform: string, arch: string, version: string) {
-  const target = BIN_TARGETS[`${platform}-${arch}`];
-  if (!target) return undefined;
+  const key = `${platform}-${arch}`;
+  const target = BIN_TARGETS[key];
+  const plugin = Object.values(BIN_PLUGINS).find((p) => p.name === name);
+  if (!target || (plugin?.targets && !plugin.targets.includes(key))) return undefined;
   const file = `${name}-${target}.${platform === 'win32' ? 'zip' : 'tar.gz'}`;
   const url = `${RELEASES}/v${version}/${file}`;
-  return { file, url, sha256: `${url}.sha256`, exe: platform === 'win32' ? `${name}.exe` : name };
+  const exe = platform === 'win32' ? `${name}.exe` : name;
+  return { file, url, sha256: `${url}.sha256`, exe, folder: plugin?.folder === true };
 }
 
 // The checksum a `sha256sum` line starts with, lowercased; undefined when the text is not one.

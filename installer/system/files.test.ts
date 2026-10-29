@@ -89,20 +89,42 @@ test('replaceBin: a first install, the in-place swap (Linux), and a sweep that k
   assert.equal(readFileSync(bin, 'utf8'), 'v2');
 });
 
+test('replaceBin: swaps a whole folder and sweeps old folders', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'dcs-bin-'));
+  const app = join(dir, 'app');
+  for (const [folder, file] of [
+    [app, 'v1'],
+    [`${app}.old-1`, 'leftover'],
+    [`${app}.tmp`, 'v2'],
+  ]) {
+    mkdirSync(join(folder, 'extensions'), { recursive: true });
+    writeFileSync(join(folder, 'extensions', file), file);
+  }
+  replaceBin(`${app}.tmp`, app, true);
+  assert.ok(existsSync(join(app, 'extensions', 'v2')) && !existsSync(join(app, 'extensions', 'v1')));
+  assert.ok(!existsSync(`${app}.old-1`) && !existsSync(`${app}.tmp`));
+  assert.ok(!existsSync(`${app}.old-${process.pid}`));
+});
+
 test('replaceBin: a failed swap reports its own error, not the cleanup of the staged copy', () => {
   const dir = mkdtempSync(join(tmpdir(), 'dcs-bin-'));
   // A non-empty directory can't be renamed onto another non-empty one on Linux or Windows (onto a file, Windows
-  // allows it), and a plain rmSync of it throws too.
+  // allows it). Outside Windows a folder without write permission inside it makes the cleanup throw too.
   const bin = join(dir, 'tool');
   mkdirSync(bin);
   writeFileSync(join(bin, 'v1'), 'v1');
   const staged = join(dir, 'staged');
-  mkdirSync(staged);
-  writeFileSync(join(staged, 'x'), '');
-  assert.throws(
-    () => replaceBin(staged, bin, false),
-    (e: NodeJS.ErrnoException) => e.syscall === 'rename',
-  );
+  mkdirSync(join(staged, 'locked'), { recursive: true });
+  writeFileSync(join(staged, 'locked', 'x'), '');
+  chmodSync(join(staged, 'locked'), 0o500);
+  try {
+    assert.throws(
+      () => replaceBin(staged, bin, false),
+      (e: NodeJS.ErrnoException) => e.syscall === 'rename',
+    );
+  } finally {
+    if (existsSync(staged)) chmodSync(join(staged, 'locked'), 0o700);
+  }
   assert.equal(readFileSync(join(bin, 'v1'), 'utf8'), 'v1');
 });
 

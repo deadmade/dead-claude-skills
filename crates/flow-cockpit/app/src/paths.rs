@@ -22,27 +22,28 @@ impl Platform {
 
 /// The hooks' capture folder: `$XDG_STATE_HOME/flow-cockpit/capture` (default `~/.local/state/...`) on Linux,
 /// `%LOCALAPPDATA%\flow-cockpit\capture` (default `%USERPROFILE%\AppData\Local`) on Windows.
-pub fn capture_dir(env: impl Fn(&str) -> Option<String>, platform: Platform) -> PathBuf {
+pub fn capture_dir(
+    env: impl Fn(&str) -> Option<String>,
+    platform: Platform,
+) -> Result<PathBuf, NoHome> {
     let base = match platform {
-        Platform::Linux => var(&env, "XDG_STATE_HOME")
-            .unwrap_or_else(|| home(&env, platform).join(".local").join("state")),
-        Platform::Windows => var(&env, "LOCALAPPDATA")
-            .unwrap_or_else(|| home(&env, platform).join("AppData").join("Local")),
+        Platform::Linux => var_or_home(&env, "XDG_STATE_HOME", platform, &[".local", "state"])?,
+        Platform::Windows => var_or_home(&env, "LOCALAPPDATA", platform, &["AppData", "Local"])?,
     };
-    base.join("flow-cockpit").join("capture")
+    Ok(base.join("flow-cockpit").join("capture"))
 }
 
 /// The user's extensions folder and `config.toml` live here: `$XDG_CONFIG_HOME/flow-cockpit` (default
 /// `~/.config/flow-cockpit`) on Linux, `%APPDATA%\flow-cockpit` (default `%USERPROFILE%\AppData\Roaming`) on Windows.
-pub fn config_dir(env: impl Fn(&str) -> Option<String>, platform: Platform) -> PathBuf {
+pub fn config_dir(
+    env: impl Fn(&str) -> Option<String>,
+    platform: Platform,
+) -> Result<PathBuf, NoHome> {
     let base = match platform {
-        Platform::Linux => {
-            var(&env, "XDG_CONFIG_HOME").unwrap_or_else(|| home(&env, platform).join(".config"))
-        }
-        Platform::Windows => var(&env, "APPDATA")
-            .unwrap_or_else(|| home(&env, platform).join("AppData").join("Roaming")),
+        Platform::Linux => var_or_home(&env, "XDG_CONFIG_HOME", platform, &[".config"])?,
+        Platform::Windows => var_or_home(&env, "APPDATA", platform, &["AppData", "Roaming"])?,
     };
-    base.join("flow-cockpit")
+    Ok(base.join("flow-cockpit"))
 }
 
 /// Where the default extensions, the ones that ship with the app, were looked for and found.
@@ -73,10 +74,11 @@ pub fn default_extensions(env: impl Fn(&str) -> Option<String>, exe: Option<&Pat
 }
 
 /// Claude Code's transcripts: `projects/` in `$CLAUDE_CONFIG_DIR`, default `~/.claude`.
-pub fn claude_projects(env: impl Fn(&str) -> Option<String>, platform: Platform) -> PathBuf {
-    var(&env, "CLAUDE_CONFIG_DIR")
-        .unwrap_or_else(|| home(&env, platform).join(".claude"))
-        .join("projects")
+pub fn claude_projects(
+    env: impl Fn(&str) -> Option<String>,
+    platform: Platform,
+) -> Result<PathBuf, NoHome> {
+    Ok(var_or_home(&env, "CLAUDE_CONFIG_DIR", platform, &[".claude"])?.join("projects"))
 }
 
 /// A variable that is set and not empty (the XDG rule: an empty one counts as unset).
@@ -84,13 +86,39 @@ fn var(env: &impl Fn(&str) -> Option<String>, key: &str) -> Option<PathBuf> {
     env(key).filter(|v| !v.is_empty()).map(PathBuf::from)
 }
 
-/// `$HOME`, or `%USERPROFILE%` on Windows; empty (the current folder) when unset.
-fn home(env: &impl Fn(&str) -> Option<String>, platform: Platform) -> PathBuf {
-    let key = match platform {
+/// The home folder's variable is unset or empty: the folders under it are unknown, and nothing is read in a guessed
+/// one (such as the current folder).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NoHome(&'static str);
+
+impl std::fmt::Display for NoHome {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} is not set, so the flow cockpit can't find its folders",
+            self.0
+        )
+    }
+}
+
+impl std::error::Error for NoHome {}
+
+/// The folder `key` names, else `under` in `$HOME` (`%USERPROFILE%` on Windows).
+fn var_or_home(
+    env: &impl Fn(&str) -> Option<String>,
+    key: &str,
+    platform: Platform,
+    under: &[&str],
+) -> Result<PathBuf, NoHome> {
+    if let Some(dir) = var(env, key) {
+        return Ok(dir);
+    }
+    let home_key = match platform {
         Platform::Linux => "HOME",
         Platform::Windows => "USERPROFILE",
     };
-    var(env, key).unwrap_or_default()
+    let home = var(env, home_key).ok_or(NoHome(home_key))?;
+    Ok(under.iter().fold(home, |dir, part| dir.join(part)))
 }
 
 #[cfg(test)]
@@ -143,7 +171,7 @@ mod tests {
             ),
         ];
         for (got, want) in cases {
-            assert_eq!(got, want);
+            assert_eq!(got, Ok(want));
         }
     }
 
@@ -151,32 +179,68 @@ mod tests {
     fn config_and_claude_folders() {
         assert_eq!(
             config_dir(env(&[("HOME", "/h")]), Platform::Linux),
-            path(&["/h", ".config", "flow-cockpit"])
+            Ok(path(&["/h", ".config", "flow-cockpit"]))
         );
         assert_eq!(
             config_dir(
                 env(&[("HOME", "/h"), ("XDG_CONFIG_HOME", "/c")]),
                 Platform::Linux
             ),
-            path(&["/c", "flow-cockpit"])
+            Ok(path(&["/c", "flow-cockpit"]))
         );
         assert_eq!(
             config_dir(env(&[("APPDATA", r"C:\R")]), Platform::Windows),
-            path(&[r"C:\R", "flow-cockpit"])
+            Ok(path(&[r"C:\R", "flow-cockpit"]))
         );
         assert_eq!(
             claude_projects(env(&[("HOME", "/h")]), Platform::Linux),
-            path(&["/h", ".claude", "projects"])
+            Ok(path(&["/h", ".claude", "projects"]))
         );
         assert_eq!(
             claude_projects(env(&[("USERPROFILE", r"C:\Users\u")]), Platform::Windows),
-            path(&[r"C:\Users\u", ".claude", "projects"])
+            Ok(path(&[r"C:\Users\u", ".claude", "projects"]))
         );
         assert_eq!(
             claude_projects(
                 env(&[("HOME", "/h"), ("CLAUDE_CONFIG_DIR", "/cc")]),
                 Platform::Linux
             ),
+            Ok(path(&["/cc", "projects"]))
+        );
+    }
+
+    /// No home folder is an error that names its variable, never the current folder; a folder whose own variable is
+    /// set needs no home.
+    #[test]
+    fn no_home_is_an_error() {
+        let none = env(&[]);
+        let empty = env(&[("HOME", ""), ("USERPROFILE", "")]);
+        for vars in [&none, &empty] {
+            let err = capture_dir(vars, Platform::Linux).unwrap_err();
+            assert_eq!(
+                err.to_string(),
+                "HOME is not set, so the flow cockpit can't find its folders"
+            );
+            assert!(config_dir(vars, Platform::Linux).is_err());
+            assert!(claude_projects(vars, Platform::Linux).is_err());
+            let err = capture_dir(vars, Platform::Windows).unwrap_err();
+            assert!(
+                err.to_string().starts_with("USERPROFILE is not set"),
+                "{err}"
+            );
+            assert!(config_dir(vars, Platform::Windows).is_err());
+            assert!(claude_projects(vars, Platform::Windows).is_err());
+        }
+        assert_eq!(
+            capture_dir(env(&[("XDG_STATE_HOME", "/s")]), Platform::Linux).unwrap(),
+            path(&["/s", "flow-cockpit", "capture"])
+        );
+        assert_eq!(
+            config_dir(env(&[("APPDATA", r"C:\R")]), Platform::Windows).unwrap(),
+            path(&[r"C:\R", "flow-cockpit"])
+        );
+        assert_eq!(
+            claude_projects(env(&[("CLAUDE_CONFIG_DIR", "/cc")]), Platform::Linux).unwrap(),
             path(&["/cc", "projects"])
         );
     }
