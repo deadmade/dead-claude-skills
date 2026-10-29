@@ -510,41 +510,70 @@ test('changed_redraws_do_not_read_the_runs_again', async () => {
     slug: 'tick',
     status: 'Working',
     phase: 'build',
+    now: 'Building Task 2.',
+    gates: [],
+    open_deviations: 0,
     progress: [1, 3],
     last_activity: '2026-10-29T10:00:00Z',
   };
+  let current = run;
   const app = fakeApp({ list: { source: view('list', 'list', says('list')) } });
   app.answers = {
     projects: () => [{ id: 'p1', name: 'one', roots: [] }],
     entries: () => [{ ...entry }],
-    flow_run: () => run,
+    flow_run: () => current,
     doc: docWith,
   };
   const reads = (cmd) => app.calls.filter(([c]) => c === cmd).length;
   const { runtime } = await started(app, { to: 'list', project: 'p1' });
+  /** A `changed` tick, its redraw and the drawing ahead after it. */
+  const tick = async () => {
+    await app.emit('changed', { project: 'p1' });
+    await runtime.idle();
+    await settle();
+    await settle();
+  };
   await runtime.idle();
   await until(() => drawsOf(taskGraphSource(run)) === 1 && !mermaidCalls.running, 'the first pass');
   await settle();
   assert.deepEqual([reads('flow_run'), reads('doc')], [1, 3]);
-  // Two ticks with nothing new: no run or document is read again.
-  for (let i = 0; i < 2; i++) {
-    await app.emit('changed', { project: 'p1' });
-    await runtime.idle();
-    await settle();
-  }
-  assert.deepEqual([reads('flow_run'), reads('doc')], [1, 3], 'a tick reads nothing again');
-  // New progress reads the run (its graph) again; a new phase, status or activity reads its documents again.
-  entry.progress = [2, 3];
-  await app.emit('changed', { project: 'p1' });
-  await runtime.idle();
-  await until(() => reads('flow_run') === 2, 'the run read again');
-  await settle();
-  assert.equal(reads('doc'), 3);
+  // Two ticks with nothing new, and one where only the last activity moved (a live session writing): nothing is
+  // read again.
+  await tick();
+  await tick();
   entry.last_activity = '2026-10-29T10:05:00Z';
-  await app.emit('changed', { project: 'p1' });
-  await runtime.idle();
-  await until(() => reads('doc') === 6, 'the documents read again');
-  assert.equal(reads('flow_run'), 2);
+  await tick();
+  assert.deepEqual([reads('flow_run'), reads('doc')], [1, 3], 'a tick reads nothing again');
+  // New progress or a new `now:` line reads the run (its graph) and its documents again.
+  entry.progress = [2, 3];
+  await tick();
+  await until(() => reads('flow_run') === 2 && reads('doc') === 6, 'read again for new progress');
+  // The run now waits on the user: a new graph source, drawn ahead again.
+  current = runWith(
+    [
+      ['1', []],
+      ['2', ['1']],
+      ['5', ['2']],
+    ],
+    { 1: 'Done', 2: 'Waiting' },
+  );
+  entry.now = 'Waiting for you: the plan.';
+  await tick();
+  await until(() => drawsOf(taskGraphSource(current)) === 1, 'the waiting graph drawn ahead');
+  assert.deepEqual([reads('flow_run'), reads('doc')], [3, 9]);
+  // Status, phase, gates and open deviations read the documents again; the graph only follows progress and `now`.
+  for (const change of [
+    () => (entry.status = 'Waiting'),
+    () => (entry.phase = 'review'),
+    () => (entry.gates = [{ n: 1, what: 'spec', approved: '2026-10-29' }]),
+    () => (entry.open_deviations = 1),
+  ]) {
+    const docs = reads('doc');
+    change();
+    await tick();
+    await until(() => reads('doc') === docs + 3, 'the documents read again');
+  }
+  assert.equal(reads('flow_run'), 3);
 
   // On the run page, drawing ahead runs when the run opens, not on its redraws.
   const page = fakeApp({ run: { source: view('run', 'run', says('run')) } });
@@ -662,6 +691,32 @@ test('a_diagram_that_left_the_page_waits_behind_the_queue', async () => {
     const order = mermaidCalls.render.map(([, s]) => s).filter((s) => [a, b, c, q].includes(s));
     assert.deepEqual(order, [a, c, q, b]);
     boxC.remove();
+  } finally {
+    mermaidDelay = 0;
+  }
+});
+
+test('the_page_shown_draws_before_pages_passed_through_during_a_render', async () => {
+  mermaidDelay = 30;
+  try {
+    const [a, b, c, d] = ['Pass1', 'Pass2', 'Pass3', 'Pass4'].map((n) => `graph TD; ${n}-->B`);
+    const boxA = mermaid(a);
+    document.body.append(boxA);
+    await until(() => drawsOf(a) === 1, 'the first one drawing');
+    // While A draws, the user clicks through two pages (each box shown, then left) to the one now shown.
+    const boxB = mermaid(b);
+    document.body.append(boxB);
+    boxB.remove();
+    const boxC = mermaid(c);
+    document.body.append(boxC);
+    boxC.remove();
+    const boxD = mermaid(d);
+    document.body.append(boxD);
+    await until(() => [b, c, d].every((s) => drawsOf(s) === 1) && !mermaidCalls.running, 'all drawn');
+    const order = mermaidCalls.render.map(([, s]) => s).filter((s) => [a, b, c, d].includes(s));
+    assert.equal(order[1], d, order.join(' | '));
+    boxA.remove();
+    boxD.remove();
   } finally {
     mermaidDelay = 0;
   }

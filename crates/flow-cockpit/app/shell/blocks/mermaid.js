@@ -205,15 +205,20 @@ async function drawNext() {
   // A diagram whose boxes have all left the page (the user moved on) waits behind the ones drawn ahead.
   for (const job of now.values()) for (const box of job.boxes) if (box.isConnected) placed.add(box);
   for (const [key, job] of now) {
-    if (job.boxes.some((box) => box.isConnected || !placed.has(box))) break;
+    if (job.boxes.some((box) => box.isConnected || !placed.has(box))) continue;
     now.delete(key);
     later.set(key, job);
   }
-  const queue = now.size ? now : later;
-  const first = queue.entries().next();
-  if (first.done) return;
-  const [key, job] = first.value;
-  queue.delete(key);
+  // First a diagram on the page now; then one whose box may still be on its way there (a view hands its node back
+  // before the runtime attaches it), which also covers a page passed through while another drawing ran; then the queue
+  // drawn ahead.
+  /** @param {(box: HTMLElement) => boolean} test */
+  const find = (test) => [...now].find(([, job]) => job.boxes.some(test));
+  const picked = find((box) => box.isConnected) ?? find((box) => !placed.has(box)) ?? later.entries().next().value;
+  if (!picked) return;
+  const [key, job] = picked;
+  now.delete(key);
+  later.delete(key);
   running = { key, job };
   const lib = /** @type {Mermaid | undefined} */ (/** @type {any} */ (window).mermaid);
   const look = theme();

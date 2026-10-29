@@ -429,7 +429,9 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
   let aheadNext = null;
   let aheadBusy = false;
   // What each run (`project/slug`) was last read for, from its list entry: a redraw reads a run's documents again only
-  // when its phase, status or last activity changed, and its task graph only when its progress did.
+  // when what flow.md and plan.md carry changed (phase, status, `now:`, gates, open deviations, progress), and its task
+  // graph only when its progress or `now:` line did. Not on last activity alone, which moves with every transcript
+  // write of a live session; a spec edited mid-run shows when the run opens.
   /** @type {Map<string, { docs: string, graph: string }>} */
   const looked = new Map();
 
@@ -466,7 +468,10 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
       if (e.kind !== 'FlowRun' || e.status === 'Done') continue;
       const key = `${project.id}/${e.slug}`;
       const was = looked.get(key);
-      const now = { docs: JSON.stringify([e.phase, e.status, e.last_activity]), graph: JSON.stringify([e.progress]) };
+      const now = {
+        docs: JSON.stringify([e.phase, e.status, e.now, e.gates, e.open_deviations, e.progress]),
+        graph: JSON.stringify([e.progress, e.now]),
+      };
       if (was?.docs === now.docs && was.graph === now.graph) continue;
       await aheadRun(project.id, e.slug, false, !was || was.graph !== now.graph, !was || was.docs !== now.docs);
       looked.set(key, now);
