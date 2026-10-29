@@ -52,8 +52,10 @@ export type * from '../../bindings/ViewSource';
 /**
  * Where the window is. `list` draws the `list` views, `run` the `run` views, `doc` the `doc` views, `session` the
  * `session` views. A `run` route whose `tab` names a `run-tab` view draws the run views too, and that view inside the
- * run view's `data-slot="run-tab"` element. `session` is one Claude session by its id, such as a loose session that
- * belongs to no flow run.
+ * run view's `data-slot="run-tab"` element. Any other `tab` is the run view's own (the default one's `decisions`; its
+ * Build is the route without a tab): the window says that tab isn't loaded only inside a slot the run view leaves for
+ * it. `session` is one Claude session by its id, such as a loose session that belongs to no flow run. Each route has
+ * its own entry in the window's history, so back, forward and a reload return to it.
  */
 export type Route =
   | { to: 'list'; project?: string }

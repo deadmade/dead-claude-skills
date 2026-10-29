@@ -363,7 +363,11 @@ test('run_shows_now_or_phase', async () => {
   assert.equal(docs.box.querySelector('.content'), null);
   assert.equal(docs.box.querySelector('.tab[aria-selected="true"]')?.textContent, 'Docs');
   press(docs.box, 'Decisions');
-  assert.deepEqual(docs.navigations, [{ to: 'run', project: ALPHA, slug: 'login' }]);
+  press(docs.box, 'Build');
+  assert.deepEqual(docs.navigations, [
+    { to: 'run', project: ALPHA, slug: 'login', tab: 'decisions' },
+    { to: 'run', project: ALPHA, slug: 'login' },
+  ]);
 
   const gone = await draw('run', { to: 'run', project: ALPHA, slug: 'nope' });
   assert.match(text(gone.box.querySelector('.error')), /can't be shown/);
@@ -398,9 +402,10 @@ test('run_task_cards_use_does_and_graph_only_when_all_depends_written', async ()
   assert.equal(partial.box.querySelector('.task .facts'), null);
 });
 
+const DECISIONS = { to: 'run', project: ALPHA, slug: 'login', tab: 'decisions' };
+
 test('run_decisions_list_and_detail', async () => {
-  const { box } = await draw('run', { to: 'run', project: ALPHA, slug: 'login' });
-  press(box, 'Decisions');
+  const { box } = await draw('run', DECISIONS);
   assert.deepEqual(names(box, 'Deviations'), ['The form needs a second field', 'Pick a hash']);
   assert.deepEqual(names(box, 'Decisions'), ['Where the form lives', 'Remember me']);
   assert.deepEqual(names(box, 'Calls the build made'), ["The form keeps the browser's own validation"]);
@@ -410,8 +415,7 @@ test('run_decisions_list_and_detail', async () => {
   runs[`${ALPHA}/login`].ledger.rulings = [
     { date: null, scope: null, call: 'the log keeps its own wording', why: null, cost: null, raw: 'x' },
   ];
-  const merged = await draw('run', { to: 'run', project: ALPHA, slug: 'login' }, { runs });
-  press(merged.box, 'Decisions');
+  const merged = await draw('run', DECISIONS, { runs });
   assert.deepEqual(names(merged.box, 'Calls the build made'), ["The form keeps the browser's own validation"]);
   // The open deviation is selected first.
   assert.equal(text(box.querySelector('.item-h')), 'The form needs a second field');
@@ -420,6 +424,35 @@ test('run_decisions_list_and_detail', async () => {
   press(box, "The form keeps the browser's own validation");
   assert.match(text(box.querySelector('.item')), /Why\s*Fewer moving parts\./);
   assert.match(text(box.querySelector('.item')), /It costs a plainer error text\./);
+});
+
+test('run_build_and_decisions_are_routes_and_keep_their_picks', async () => {
+  const BUILD = { to: 'run', project: ALPHA, slug: 'login' };
+  const view = await load('run');
+  // Build is the bare run route; each tab click is one navigation, and the shown tab's own button none.
+  const build = await draw(view, BUILD);
+  assert.equal(build.box.querySelector('.tab[aria-selected="true"]')?.id, 'run-tab-build');
+  press(build.box, 'Build');
+  press(build.box, 'Decisions');
+  assert.deepEqual(build.navigations, [DECISIONS]);
+  press(build.box, 'The form');
+
+  // Decisions is drawn from the route alone, as after a reload (a fresh copy of the view, nothing remembered).
+  const reloaded = await draw('run', DECISIONS);
+  assert.equal(reloaded.box.querySelector('.tab[aria-selected="true"]')?.id, 'run-tab-decisions');
+  assert.equal(text(reloaded.box.querySelector('.item-h')), 'The form needs a second field');
+  assert.equal(reloaded.box.querySelector('[data-slot="run-tab"]'), null, 'the run view draws it itself');
+
+  // The picked decision and task stay with the run across the tabs.
+  const decisions = await draw(view, DECISIONS);
+  press(decisions.box, 'Remember me');
+  press(decisions.box, 'Build');
+  press(decisions.box, 'Decisions');
+  assert.deepEqual(decisions.navigations, [BUILD]);
+  const back = await draw(view, BUILD);
+  assert.equal(back.box.querySelector('.row[aria-current="true"]')?.getAttribute('data-task'), '1');
+  const again = await draw(view, DECISIONS);
+  assert.equal(text(again.box.querySelector('.item-h')), 'Remember me');
 });
 
 test('docs_enhances_known_parts', async () => {
@@ -768,9 +801,10 @@ test('run_wires_accessibility_like_the_design', async () => {
   const login = await draw('run', { to: 'run', project: ALPHA, slug: 'login' });
   assert.equal(login.box.querySelector('article.task')?.getAttribute('aria-labelledby'), 'task-title');
   resolves(login.box);
-  press(login.box, 'Decisions');
-  assert.equal(login.box.querySelector('article.item')?.getAttribute('aria-labelledby'), 'item-h');
-  resolves(login.box);
+  const decided = await draw('run', DECISIONS);
+  assert.equal(decided.box.querySelector('article.item')?.getAttribute('aria-labelledby'), 'item-h');
+  assert.equal(decided.box.querySelector('#run-panel')?.getAttribute('aria-labelledby'), 'run-tab-decisions');
+  resolves(decided.box);
 
   // Another view's tab: the slot it draws in is the panel the tabs control.
   const docsTab = await draw('run', { to: 'run', project: ALPHA, slug: 'login', tab: 'docs' });

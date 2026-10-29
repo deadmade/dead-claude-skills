@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveObjectURL } from 'node:buffer';
 import { readFileSync } from 'node:fs';
-import { JSDOM } from 'jsdom';
+import { JSDOM, VirtualConsole } from 'jsdom';
 
 const dom = new JSDOM('<!doctype html><html><body><main id="app"></main></body></html>', { url: 'http://localhost/' });
 globalThis.window = dom.window;
@@ -1234,12 +1234,18 @@ test('missing_default_extensions_name_where_the_window_looked', async () => {
  * it follows that history: the runtimes earlier tests started keep listening on the shared window.
  */
 async function inWindow(url, work) {
-  const own = new JSDOM('<!doctype html><html><body></body></html>', { url });
+  // jsdom can't reload a page (and its `location.reload` can't be replaced): it reports each try on the console.
+  const console = new VirtualConsole();
+  const reloads = { count: 0 };
+  console.on('jsdomError', (err) => {
+    if (/navigation/.test(err.message)) reloads.count++;
+  });
+  const own = new JSDOM('<!doctype html><html><body></body></html>', { url, virtualConsole: console });
   const shared = [globalThis.window, globalThis.document];
   globalThis.window = own.window;
   globalThis.document = own.window.document;
   try {
-    return await work(own.window);
+    return await work(own.window, reloads);
   } finally {
     [globalThis.window, globalThis.document] = shared;
   }
@@ -1432,6 +1438,119 @@ test('the_mouse_side_buttons_go_back_and_forward_once', async () => {
     press(1);
     press(0);
     assert.deepEqual(moves, ['back', 'forward']);
+  });
+});
+
+test('f5_and_ctrl_r_reload_the_window_once_from_anywhere', async () => {
+  await inWindow('http://localhost/', async (win, reloads) => {
+    const app = fakeApp({
+      list: {
+        source: view('list', 'list', "const i = document.createElement('input'); i.dataset.keep = 'q'; return i;"),
+      },
+    });
+    const { root } = await started(app);
+    /** @returns {boolean} whether the window kept the key from the engine */
+    const key = (target, init) => {
+      const event = new win.KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init });
+      target.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    assert.ok(key(win.document.body, { key: 'F5' }));
+    assert.equal(reloads.count, 1);
+    assert.ok(key(win.document.body, { key: 'r', ctrlKey: true }));
+    assert.ok(key(win.document.body, { key: 'R', ctrlKey: true, shiftKey: true }));
+    // In a text field too.
+    assert.ok(key(root.querySelector('input'), { key: 'r', ctrlKey: true }));
+    assert.equal(reloads.count, 4);
+    // F5 held down: the reload already started, and the engine doesn't get the key either.
+    assert.ok(key(win.document.body, { key: 'F5', repeat: true }));
+    assert.equal(reloads.count, 4);
+    // Not a reload: a plain r, Alt+R, another F key.
+    for (const init of [{ key: 'r' }, { key: 'r', ctrlKey: true, altKey: true }, { key: 'F6' }])
+      assert.ok(!key(win.document.body, init), JSON.stringify(init));
+    assert.equal(reloads.count, 4);
+  });
+});
+
+/** A run view that draws its own Build and Decisions tabs, as the default one does: no slot for them. */
+const OWN_TABS_RUN = {
+  run: {
+    source: view(
+      'run',
+      'run',
+      `const p = document.createElement('p');
+       p.className = 'own';
+       p.textContent = ctx.route.tab ?? 'build';
+       return p;`,
+    ),
+  },
+};
+
+test('back_and_forward_move_between_the_run_views_own_tabs', async () => {
+  await inWindow('http://localhost/', async (win) => {
+    const { root, runtime } = await started(fakeApp(OWN_TABS_RUN), RUN);
+    const shown = () => root.querySelector('.own')?.textContent;
+    runtime.navigate({ ...RUN, tab: 'decisions' });
+    await runtime.idle();
+    assert.equal(win.location.hash, '#/run/p1/flow-cockpit/decisions');
+    assert.equal(shown(), 'decisions');
+    // A tab the run view draws itself leaves no slot, so nothing says it isn't loaded.
+    assert.doesNotMatch(root.textContent, /isn't loaded/);
+    runtime.navigate(RUN);
+    await runtime.idle();
+    assert.equal(win.history.length, 3);
+    win.history.back();
+    await until(() => shown() === 'decisions', 'decisions again');
+    win.history.back();
+    await until(() => shown() === 'build', 'build again');
+    win.history.forward();
+    await until(() => shown() === 'decisions', 'forward to decisions');
+  });
+});
+
+test('a_reload_on_decisions_opens_decisions', async () => {
+  await inWindow('http://localhost/#/run/p1/flow-cockpit/decisions', async (win) => {
+    const { root } = await started(fakeApp(OWN_TABS_RUN));
+    assert.equal(root.querySelector('.own')?.textContent, 'decisions');
+    assert.doesNotMatch(root.textContent, /isn't loaded/);
+    assert.equal(win.history.length, 1);
+  });
+});
+
+test('focus_stays_on_a_named_control_across_a_navigation', async () => {
+  await inWindow('http://localhost/', async (win) => {
+    const app = fakeApp({
+      run: {
+        source: viewOf(
+          'run',
+          'run',
+          `(ctx) => {
+            const box = document.createElement('div');
+            for (const id of ['build', 'decisions']) {
+              const b = document.createElement('button');
+              b.id = 'tab-' + id;
+              b.addEventListener('click', () => ctx.navigate({ ...ctx.route, tab: id }));
+              box.append(b);
+            }
+            box.append(document.createElement('button'));
+            return box;
+          }`,
+        ),
+      },
+    });
+    const { root, runtime } = await started(app, RUN);
+    const tab = root.querySelector('#tab-decisions');
+    tab.focus();
+    tab.click();
+    await runtime.idle();
+    assert.notEqual(root.querySelector('#tab-decisions'), tab, 'drawn anew');
+    assert.equal(win.document.activeElement, root.querySelector('#tab-decisions'));
+    // A control known only by its position isn't followed onto the next page.
+    const plain = root.querySelector('button:not([id])');
+    plain.focus();
+    runtime.navigate(RUN);
+    await runtime.idle();
+    assert.equal(win.document.activeElement, win.document.body);
   });
 });
 

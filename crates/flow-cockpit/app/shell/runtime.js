@@ -455,21 +455,31 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     }
     // The same route drawn again (fresh data, a reloaded view) keeps what the user did to it. A new route starts
     // fresh, unless back or forward returns to a page left earlier: that gets back what the user had done to it.
+    // A control with a name (an `id` or `data-keep`), such as a tab, keeps the focus on the next page when that page
+    // has it too.
     const where = JSON.stringify(at);
     const opened = where !== drawnAt;
     const kept = opened ? null : snapshot(root, moved);
-    if (opened && drawnAt) {
+    const leaving = opened && drawnAt ? snapshot(root, moved) : null;
+    if (leaving) {
       left.delete(drawnAt);
-      left.set(drawnAt, snapshot(root, moved));
+      left.set(drawnAt, leaving);
       if (left.size > 50) left.delete(/** @type {string} */ (left.keys().next().value));
     }
     root.replaceChildren(...sections);
-    if (tabSection) {
-      const host = sections.map((s) => s.querySelector('[data-slot="run-tab"]')).find(Boolean);
-      (host ?? root).append(tabSection);
-    }
+    const host = sections.map((s) => s.querySelector('[data-slot="run-tab"]')).find(Boolean);
+    // A tab no run-tab view draws says so in the slot; a run view that leaves no slot draws that tab itself.
+    if (tab) (host ?? root).append(/** @type {Node} */ (tabSection));
+    else if (tabSection && host) host.append(tabSection);
     drawnAt = where;
-    const back = kept ?? (traversed ? left.get(where) : undefined);
+    const named = leaving?.focused?.place.path[0]?.startsWith('#') ? leaving.focused : null;
+    const back =
+      kept ??
+      (traversed
+        ? left.get(where)
+        : named
+          ? { scrolled: [], folds: [], expanded: [], focused: { ...named, value: null } }
+          : undefined);
     if (back) restore(root, back, moved);
     drawAhead(at, opened);
   }
@@ -599,6 +609,19 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     requestDraw();
   }
 
+  /**
+   * F5 and Ctrl+R (with Shift too) reload the window, from anywhere in it; the address keeps the page. The key is kept
+   * from the engine, so one that binds it too (WebView2) doesn't reload a second time.
+   * @param {KeyboardEvent} event
+   */
+  function reloadKey(event) {
+    const ctrlR = (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'r';
+    const f5 = event.key === 'F5' && !event.ctrlKey && !event.metaKey && !event.altKey;
+    if (!ctrlR && !f5) return;
+    event.preventDefault();
+    if (!event.repeat) window.location.reload();
+  }
+
   /** The mouse's side buttons: 3 is back, 4 forward. @param {MouseEvent} event */
   function sideButton(event) {
     if (event.button !== 3 && event.button !== 4) return;
@@ -619,6 +642,7 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
       window.addEventListener('popstate', follow);
       window.addEventListener('hashchange', follow);
       window.addEventListener('mouseup', sideButton);
+      window.addEventListener('keydown', reloadKey);
       await listen('views-changed', () => requestReload());
       await listen('changed', (event) => {
         const project = event.payload?.project ?? null;

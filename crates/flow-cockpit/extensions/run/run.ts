@@ -22,8 +22,11 @@ type Item =
   | { id: string; kind: 'dev'; d: Deviation }
   | { id: string; kind: 'dec'; d: Decision }
   | { id: string; kind: 'rul'; d: Ruling };
-/** What the user picked in this run, kept while the window is open so a redraw with fresh data keeps it. */
-type Memory = { tab: 'build' | 'decisions'; task: string | null; item: string | null };
+/**
+ * What the user picked in this run, kept while the window is open so a redraw with fresh data, or a return from the
+ * other tab, keeps it. Which tab is shown is in the route (`tab: 'decisions'`; Build is the bare run route).
+ */
+type Memory = { task: string | null; item: string | null };
 
 const memory = new Map<string, Memory>();
 
@@ -536,7 +539,8 @@ function frame(
     `${kind ? `${capital(kind)} flow` : 'Flow run'}${flow.phase ? `, in ${phaseName(flow)}` : ''}`,
     el('span', `status st-${st}`, STATUS_LABEL[st]),
   );
-  const selected = tab ?? mem.tab;
+  const selected = tab ?? 'build';
+  const own = OWN_TABS.some(([id]) => id === selected);
   // The design's order: Build, Decisions, Docs; then Activity and any other run-tab view.
   const rank = (id: string) => (TAB_ORDER.includes(id) ? TAB_ORDER.indexOf(id) : TAB_ORDER.length);
   const others = [...ctx.tabs].sort((a, b) => rank(a.id) - rank(b.id));
@@ -549,19 +553,14 @@ function frame(
     b.dataset.tab = id;
     b.setAttribute('aria-selected', String(id === selected));
     b.addEventListener('click', () => {
-      if (id === 'build' || id === 'decisions') {
-        mem.tab = id;
-        if (tab !== undefined) ctx.navigate({ to: 'run', project, slug });
-        else paint();
-      } else if (id !== tab) {
-        ctx.navigate({ to: 'run', project, slug, tab: id });
-      }
+      if (id !== selected)
+        ctx.navigate(id === 'build' ? { to: 'run', project, slug } : { to: 'run', project, slug, tab: id });
     });
     tabs.append(b);
   }
   win.append(el('div', 'tabs-bar', tabs, where));
 
-  if (tab !== undefined) {
+  if (!own) {
     // Another view draws this tab, across both columns.
     const slot = el('div');
     slot.dataset.slot = 'run-tab';
@@ -735,22 +734,10 @@ function frame(
     show(current);
   }
 
-  function paint() {
-    for (const b of tabs.querySelectorAll<HTMLElement>('[data-tab]'))
-      b.setAttribute('aria-selected', String(b.dataset.tab === mem.tab));
-    content.setAttribute('aria-labelledby', `run-tab-${mem.tab}`);
-    left.replaceChildren();
-    content.replaceChildren();
-    left.scrollTop = 0;
-    content.scrollTop = 0;
-    if (mem.tab === 'build') build();
-    else decisions();
-  }
-
   // Up and down move through the Decisions list.
   win.addEventListener('keydown', (e) => {
-    if (mem.tab !== 'decisions' || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') || e.altKey || e.ctrlKey || e.metaKey)
-      return;
+    if (selected !== 'decisions') return;
+    if ((e.key !== 'ArrowDown' && e.key !== 'ArrowUp') || e.altKey || e.ctrlKey || e.metaKey) return;
     if (e.target instanceof window.Element && e.target.closest('input, textarea, select, [contenteditable]')) return;
     const rows = [...left.querySelectorAll<HTMLButtonElement>('button.row[data-item]')];
     if (!rows.length) return;
@@ -761,7 +748,9 @@ function frame(
     next.focus();
   });
 
-  paint();
+  content.setAttribute('aria-labelledby', `run-tab-${selected}`);
+  if (selected === 'build') build();
+  else decisions();
   return win;
 }
 
@@ -774,7 +763,7 @@ const view: View = {
     if (route.to !== 'run') return el('div');
     const run = await ctx.data.flowRun(route.project, route.slug);
     const key = `${route.project}/${route.slug}`;
-    const mem = memory.get(key) ?? { tab: 'build', task: null, item: null };
+    const mem = memory.get(key) ?? { task: null, item: null };
     memory.set(key, mem);
     return frame(ctx, route.project, route.slug, route.tab, run, mem);
   },
