@@ -1,6 +1,7 @@
-// The list: what ran in one project's checkouts and worktrees, in the run view's language. The rail holds the projects
-// and the filters and sorts; the content holds three groups of one-line rows: flow runs, audits, and the loose Claude
-// sessions of the last 7 days. A row names its state only when it is the exception; a finished run is quiet.
+// The list: what ran in one project's checkouts and worktrees, in the run view's language. The rail holds only the
+// projects. The content switches between two tabs: Flow runs (a table of runs, then a table of audits) and Loose
+// sessions (the Claude sessions of the last 7 days that belong to no run), each under a filter bar that shows only the
+// controls its rows have fields for. A row names its state only when it is the exception; a finished run is quiet.
 import type { View, ViewContext } from '../../shell/api';
 import type { AuditSummary } from '../../../bindings/AuditSummary';
 import type { Entry } from '../../../bindings/Entry';
@@ -11,16 +12,25 @@ import type { SessionSummary } from '../../../bindings/SessionSummary';
 import type { Status } from '../../../bindings/Status';
 
 type Sort = 'activity' | 'needs' | 'furthest' | 'name';
-/** The filters and sort, kept while the window is open so a redraw with fresh data keeps them. */
+type Tab = 'runs' | 'loose';
+/** The tab, filters and sort, kept while the window is open so a redraw with fresh data keeps them. */
 const state = {
   /** The project the filters were picked in. */
   project: '',
-  statuses: new Set<Status>(),
-  conductors: new Set<string>(),
+  /** `''` is Any. */
+  status: '' as Status | '',
+  conductor: '',
   sort: 'activity' as Sort,
   query: '',
+  /** The tab picked per project. */
+  tabs: new Map<string, Tab>(),
 };
 
+const TABS: [Tab, string][] = [
+  ['runs', 'Flow runs'],
+  ['loose', 'Loose sessions'],
+];
+const PANEL = 'list-panel';
 const STATUSES: [Status, string][] = [
   ['Waiting', 'Waiting on you'],
   ['Working', 'Working'],
@@ -110,27 +120,86 @@ const matches = (fields: (string | null)[]) => {
   return !q || fields.some((f) => f?.toLowerCase().includes(q));
 };
 
-function runRow(ctx: ViewContext, project: string, r: FlowRunSummary): HTMLLIElement {
+/** A cell of column `key`: the class its heading has too, so the two share a width. */
+const td = (key: string, ...kids: (Node | string)[]) => el('td', key === 'name' ? 'name' : `col-${key}`, ...kids);
+
+/**
+ * A table with column headings. `cols` are [key, heading] pairs; a heading in `hidden` is read out but not drawn.
+ * The caption names the table for a screen reader when no visible heading does.
+ */
+function table(kind: string, caption: string, cols: [string, string][], rows: HTMLTableRowElement[], hidden = '') {
+  const head = el(
+    'tr',
+    '',
+    ...cols.map(([key, label]) => {
+      const th = el(
+        'th',
+        key === 'name' ? 'name' : `col-${key}`,
+        label === hidden ? el('span', 'visually-hidden', label) : label,
+      );
+      th.scope = 'col';
+      return th;
+    }),
+  );
+  const t = el('table', `list-table ${kind}`);
+  if (caption) t.append(el('caption', 'visually-hidden', caption));
+  t.append(el('thead', '', head), el('tbody', '', ...rows));
+  return t;
+}
+
+/** A row that opens something: the whole row takes the click, and its name is the one real button. */
+function opener(className: string, name: string, cells: HTMLTableCellElement[], open: () => void) {
+  const tr = el('tr', `opens ${className}`.trim(), td('name', button('', name)), ...cells);
+  tr.addEventListener('click', open);
+  return tr;
+}
+
+const RUN_COLS: [string, string][] = [
+  ['name', 'Name'],
+  ['kind', 'Conductor'],
+  ['now', 'Now or phase'],
+  ['gates', 'Gates'],
+  ['tasks', 'Tasks'],
+  ['mark', 'State'],
+  ['when', 'Last activity'],
+];
+const AUDIT_COLS: [string, string][] = [
+  ['name', 'Audit'],
+  ['scope', 'Scope'],
+  ['findings', 'Findings'],
+  ['picks', 'Picks'],
+  ['mark', 'State'],
+  ['when', 'Date'],
+];
+const LOOSE_COLS: [string, string][] = [
+  ['name', 'First prompt'],
+  ['started', 'Started'],
+  ['when', 'Last activity'],
+];
+
+function runRow(ctx: ViewContext, project: string, r: FlowRunSummary) {
   const ticks = el('span', 'gate-ticks', ...r.gates.map((g) => el('span', g.approved ? 'tick passed' : 'tick')));
   ticks.title = gateWords(r.gates);
   ticks.setAttribute('aria-label', `${gateWords(r.gates)}.`);
   const where = r.now ?? (r.phase === 'done' ? 'Done.' : `In ${r.phase}.`);
-  const row = button(
-    r.status === 'Done' ? 'row done' : 'row',
-    el('span', 'ttl', words(r.slug)),
-    el('span', 'col-kind', words(r.conductor)),
-    el('span', 'col-now', where),
-    ticks,
-    el('span', 'col-tasks num', r.progress ? `${r.progress[0]} of ${r.progress[1]}` : ''),
-    runMark(r),
-    el('span', 'col-when num', when(r.last_activity)),
+  const row = opener(
+    r.status === 'Done' ? 'done' : '',
+    words(r.slug),
+    [
+      td('kind', words(r.conductor)),
+      td('now', where),
+      td('gates', ticks),
+      td('tasks', r.progress ? `${r.progress[0]} of ${r.progress[1]}` : ''),
+      td('mark', runMark(r)),
+      td('when', when(r.last_activity)),
+    ],
+    () => ctx.navigate({ to: 'run', project, slug: r.slug }),
   );
   row.title = `${words(r.slug)}, ${words(r.conductor)} flow. ${where}${r.progress ? ` ${r.progress[0]} of ${r.progress[1]} tasks done.` : ''}`;
-  row.addEventListener('click', () => ctx.navigate({ to: 'run', project, slug: r.slug }));
-  return el('li', '', row);
+  return row;
 }
 
-function auditRow(a: AuditSummary): HTMLLIElement {
+function auditRow(a: AuditSummary) {
   const findings = a.findings_by_severity.length
     ? a.findings_by_severity.map(([s, n]) => `${n} ${s}`).join(', ')
     : 'No findings';
@@ -141,30 +210,26 @@ function auditRow(a: AuditSummary): HTMLLIElement {
         ? el('span', 'mark Waiting', 'Open')
         : el('span', 'mark');
   const row = el(
-    'div',
-    'row',
-    el('span', 'ttl', words(a.conductor)),
-    el('span', 'col-kind num', when(a.date)),
-    el('span', 'col-now', a.scope ?? a.file),
-    el('span', 'col-findings', findings),
-    el('span', 'col-picks', a.picks === null ? '' : `${a.picks} picked, ${a.fixed} fixed`),
-    mark,
+    'tr',
+    '',
+    td('name', words(a.conductor)),
+    td('scope', a.scope ?? a.file),
+    td('findings', findings),
+    td('picks', a.picks === null ? '' : `${a.picks} picked, ${a.fixed} fixed`),
+    td('mark', mark),
+    td('when', when(a.date)),
   );
   row.title = a.file;
-  return el('li', '', row);
+  return row;
 }
 
-function looseRow(ctx: ViewContext, project: string, s: SessionSummary): HTMLLIElement {
+function looseRow(ctx: ViewContext, project: string, s: SessionSummary) {
   const prompt = s.first_prompt?.trim() || `Session ${s.id.slice(0, 8)}`;
-  const row = button(
-    'row',
-    el('span', 'ttl', prompt),
-    el('span', 'col-kind num', when(s.started)),
-    el('span', 'col-when num', when(s.last_activity)),
+  const row = opener('', prompt, [td('started', when(s.started)), td('when', when(s.last_activity))], () =>
+    ctx.navigate({ to: 'session', project, id: s.id }),
   );
   row.title = prompt;
-  row.addEventListener('click', () => ctx.navigate({ to: 'session', project, id: s.id }));
-  return el('li', '', row);
+  return row;
 }
 
 /**
@@ -188,27 +253,23 @@ function placesOf(projects: Project[]): Map<string, string> {
   return places;
 }
 
-function group(title: string, aside: string, className: string, rows: HTMLLIElement[]): HTMLElement {
-  const g = el(
-    'section',
-    'group',
-    el('h2', 'group-h', el('span', '', title), el('span', 'aside', aside)),
-    el('ol', `rows entries ${className}`, ...rows),
-  );
-  g.setAttribute('aria-label', title);
-  return g;
+/** A native select with its visible label; `choices` are [value, label] pairs. */
+function picker(id: string, label: string, choices: [string, string][], value: string, onPick: (v: string) => void) {
+  const select = el('select', '', ...choices.map(([v, text]) => Object.assign(el('option', '', text), { value: v })));
+  select.id = id;
+  select.value = value;
+  select.addEventListener('change', () => onPick(select.value));
+  return el('div', 'field', Object.assign(el('label', '', label), { htmlFor: id }), select);
 }
 
-function railGroup(title: string, rows: HTMLElement[]): HTMLElement {
-  const g = el('section', 'group', el('h2', 'group-h', title), el('ol', 'rows', ...rows.map((r) => el('li', '', r))));
-  g.setAttribute('aria-label', title);
-  return g;
+function empty(first: string, second: string): HTMLElement {
+  return el('div', 'empty', el('p', '', first), el('p', '', second));
 }
 
 function frame(ctx: ViewContext, projects: Project[], project: Project | undefined, entries: Entry[]): HTMLElement {
   const win = el('div', 'window');
   const left = el('aside', 'left');
-  left.setAttribute('aria-label', 'Projects, filters and sort');
+  left.setAttribute('aria-label', 'Projects');
   const content = el('div', 'content');
   const bar = el('div', 'tabs-bar');
   win.append(
@@ -218,176 +279,254 @@ function frame(ctx: ViewContext, projects: Project[], project: Project | undefin
     content,
   );
   if (!project) {
-    content.append(
-      el(
-        'div',
-        'empty',
-        el('p', '', 'No projects yet.'),
-        el('p', '', 'A project shows here once Claude Code has run in one of its folders.'),
-      ),
-    );
+    content.append(empty('No projects yet.', 'A project shows here once Claude Code has run in one of its folders.'));
     return win;
   }
+  const id = project.id;
 
   const runs = entries.flatMap((e) => (e.kind === 'FlowRun' ? [e] : []));
   const audits = entries.flatMap((e) => (e.kind === 'Audit' ? [e] : []));
   const loose = entries.flatMap((e) => (e.kind === 'Loose' ? [e] : []));
 
-  // Moving to another project drops a filter it has no row for, which could not be unpressed there.
-  if (state.project !== project.id) {
-    state.project = project.id;
-    for (const s of state.statuses) if (!runs.some((r) => r.status === s)) state.statuses.delete(s);
-    for (const c of state.conductors)
-      if (![...runs, ...audits].some((x) => x.conductor === c)) state.conductors.delete(c);
+  // Moving to another project drops a filter it has no row for, which could not be picked there.
+  if (state.project !== id) {
+    state.project = id;
+    if (state.status && !runs.some((r) => r.status === state.status)) state.status = '';
+    if (state.conductor && ![...runs, ...audits].some((x) => x.conductor === state.conductor)) state.conductor = '';
   }
+  // A project opens on its flow runs, or on its loose sessions when it has nothing else.
+  if (!state.tabs.has(id)) state.tabs.set(id, runs.length || audits.length || !loose.length ? 'runs' : 'loose');
 
-  const search = el('input');
+  // The rail: the projects, nothing else.
+  const places = placesOf(projects);
+  const projectRows = projects.map((p) => {
+    const b = button('row plain', el('span', 'ttl', p.name), el('span', 'mark', places.get(p.id) ?? ''));
+    b.setAttribute('aria-current', String(p.id === id));
+    b.title = p.roots.join('\n');
+    b.addEventListener('click', () => {
+      if (p.id !== id) ctx.navigate({ to: 'list', project: p.id });
+    });
+    return el('li', '', b);
+  });
+  const projectsGroup = el('section', 'group', el('h2', 'group-h', 'Projects'), el('ol', 'rows', ...projectRows));
+  projectsGroup.setAttribute('aria-label', 'Projects');
+  left.append(projectsGroup);
+
+  // The switch: the run view's tab bar, as a tablist over the content.
+  const tablist = el('div', 'tabs list-tabs');
+  tablist.setAttribute('role', 'tablist');
+  tablist.setAttribute('aria-label', 'What the list shows');
+  const counts: Record<Tab, number> = { runs: runs.length, loose: loose.length };
+  const tabButtons = TABS.map(([tab, label]) => {
+    const b = button('tab', el('span', 'label', label), el('span', 'count num', String(counts[tab])));
+    b.setAttribute('role', 'tab');
+    b.id = `list-tab-${tab}`;
+    b.dataset.tab = tab;
+    b.setAttribute('aria-controls', PANEL);
+    b.addEventListener('click', () => show(tab));
+    tablist.append(b);
+    return b;
+  });
+  // Left and right move between the tabs.
+  tablist.addEventListener('keydown', (e) => {
+    if ((e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') || e.altKey || e.ctrlKey || e.metaKey) return;
+    e.preventDefault();
+    const at = TABS.findIndex(([tab]) => tab === state.tabs.get(id));
+    const next = (at + (e.key === 'ArrowRight' ? 1 : -1) + TABS.length) % TABS.length;
+    show(TABS[next][0]);
+    tabButtons[next].focus();
+  });
+  bar.append(tablist);
+
+  content.id = PANEL;
+  content.setAttribute('role', 'tabpanel');
+  const filters = el('div', 'filters');
+  const body = el('div', 'list-body');
+  content.append(filters, body);
+
+  const search = el('input', 'search');
   search.type = 'search';
   search.id = 'list-search';
-  search.className = 'search';
-  search.placeholder = 'Search';
   search.autocomplete = 'off';
   search.value = state.query;
-  search.setAttribute('aria-label', 'Search flow runs, audits and sessions');
   search.addEventListener('input', () => {
     state.query = search.value;
     paint();
   });
-  bar.append(
+  const searchField = el(
+    'div',
+    'field field-search',
+    Object.assign(el('label', '', 'Search'), { htmlFor: search.id }),
     search,
-    el(
-      'p',
-      'where',
-      `${plural(runs.length, 'flow run')}, ${plural(audits.length, 'audit')}, ${plural(loose.length, 'session')}`,
-    ),
   );
 
-  // The rail: projects, then the filters (a press toggles one; none pressed shows all), then the sort.
-  const places = placesOf(projects);
-  const projectRows = projects.map((p) => {
-    const b = button('row plain', el('span', 'ttl', p.name), el('span', 'mark', places.get(p.id) ?? ''));
-    b.setAttribute('aria-current', String(p.id === project.id));
-    b.title = p.roots.join('\n');
-    b.addEventListener('click', () => {
-      if (p.id !== project.id) ctx.navigate({ to: 'list', project: p.id });
-    });
-    return b;
-  });
-  const toggle = <T>(set: Set<T>, value: T, label: string, count: number) => {
-    const b = button('row plain', el('span', 'ttl', label), el('span', 'mark num', String(count)));
-    b.setAttribute('aria-pressed', String(set.has(value)));
-    b.addEventListener('click', () => {
-      if (set.has(value)) set.delete(value);
-      else set.add(value);
-      b.setAttribute('aria-pressed', String(set.has(value)));
-      paint();
-    });
-    return b;
-  };
-  const statusRows = STATUSES.filter(([s]) => state.statuses.has(s) || runs.some((r) => r.status === s)).map(
-    ([s, label]) => toggle(state.statuses, s, label, runs.filter((r) => r.status === s).length),
-  );
-  const conductors = [...new Set([...runs.map((r) => r.conductor), ...audits.map((a) => a.conductor)])].sort();
-  const conductorRows = conductors.map((c) =>
-    toggle(state.conductors, c, words(c) || 'Not named', [...runs, ...audits].filter((x) => x.conductor === c).length),
-  );
-  const sortRows = SORTS.map(([s, label]) => {
-    const b = button('row plain', el('span', 'ttl', label));
-    b.dataset.sort = s;
-    b.setAttribute('aria-pressed', String(state.sort === s));
-    b.addEventListener('click', () => {
-      state.sort = s;
-      for (const x of left.querySelectorAll<HTMLElement>('[data-sort]'))
-        x.setAttribute('aria-pressed', String(x.dataset.sort === s));
-      paint();
-    });
-    return b;
-  });
-  left.append(railGroup('Projects', projectRows));
-  if (statusRows.length) left.append(railGroup('Status', statusRows));
-  if (conductorRows.length) left.append(railGroup('Conductor', conductorRows));
-  if (runs.length) left.append(railGroup('Sort runs by', sortRows));
-
-  function paint() {
-    const byStatus = state.statuses.size > 0;
-    const byConductor = state.conductors.size > 0;
-    const shownRuns = runs
-      .filter((r) => !byStatus || state.statuses.has(r.status))
-      .filter((r) => !byConductor || state.conductors.has(r.conductor))
-      .filter((r) => matches([r.slug, words(r.slug), r.conductor, r.phase, r.now]))
-      .sort(SORTERS[state.sort]);
-    // Only runs have a status; sessions have no conductor either.
-    const shownAudits = byStatus
-      ? []
-      : audits
-          .filter((a) => !byConductor || state.conductors.has(a.conductor))
-          .filter((a) => matches([a.conductor, words(a.conductor), a.scope, a.file]));
-    const shownLoose = byStatus || byConductor ? [] : loose.filter((s) => matches([s.first_prompt, s.id]));
-
-    const groups: HTMLElement[] = [];
-    if (shownRuns.length) {
-      const open = shownRuns.filter((r) => r.status !== 'Done').length;
-      groups.push(
-        group(
-          'Flow runs',
-          open ? `${open} not done` : 'All done',
-          'runs',
-          shownRuns.map((r) => runRow(ctx, project!.id, r)),
-        ),
-      );
+  /** Selects the tab and draws its filter bar and rows. */
+  function show(tab: Tab) {
+    state.tabs.set(id, tab);
+    for (const b of tabButtons) {
+      const on = b.dataset.tab === tab;
+      b.setAttribute('aria-selected', String(on));
+      b.tabIndex = on ? 0 : -1;
     }
-    if (shownAudits.length) {
-      const open = shownAudits.filter((a) => a.open).length;
-      groups.push(
-        group(
-          'Audits',
-          open ? `${open} open` : plural(shownAudits.length, 'audit'),
-          'audits',
-          shownAudits.map(auditRow),
-        ),
-      );
-    }
-    if (shownLoose.length)
-      groups.push(
-        group(
-          'Loose sessions',
-          'Last 7 days',
-          'loose',
-          shownLoose.map((s) => looseRow(ctx, project!.id, s)),
-        ),
-      );
-
-    if (!groups.length) {
-      const filtered = byStatus || byConductor || state.query.trim() !== '';
-      if (filtered) {
-        const clear = button('row plain', el('span', 'ttl', 'Clear the search and filters'));
-        clear.addEventListener('click', () => {
-          state.statuses.clear();
-          state.conductors.clear();
-          state.query = '';
-          search.value = '';
-          for (const x of left.querySelectorAll('[aria-pressed]'))
-            if (!(x instanceof window.HTMLElement && x.dataset.sort)) x.setAttribute('aria-pressed', 'false');
-          paint();
-        });
-        groups.push(
-          el('div', 'empty', el('p', '', 'Nothing matches.'), el('p', '', 'Try fewer words or filters.')),
-          clear,
-        );
-      } else {
-        groups.push(
-          el(
-            'div',
-            'empty',
-            el('p', '', 'Nothing ran in this project yet.'),
-            el('p', '', 'Flow runs, audits and Claude sessions show here once Claude Code works in it.'),
+    content.setAttribute('aria-labelledby', `list-tab-${tab}`);
+    filters.replaceChildren();
+    const has = tab === 'runs' ? runs.length + audits.length > 0 : loose.length > 0;
+    if (has && tab === 'runs') {
+      // Only the values this project has, with their counts; Sort has no Any.
+      if (runs.length)
+        filters.append(
+          picker(
+            'list-status',
+            'Status',
+            [
+              ['', 'Any'],
+              ...STATUSES.filter(([s]) => runs.some((r) => r.status === s)).map(([s, label]): [string, string] => [
+                s,
+                `${label} (${runs.filter((r) => r.status === s).length})`,
+              ]),
+            ],
+            state.status,
+            (v) => {
+              state.status = v as Status | '';
+              paint();
+            },
           ),
         );
-      }
+      const both = [...runs, ...audits];
+      const conductors = [...new Set(both.map((x) => x.conductor))].sort();
+      filters.append(
+        picker(
+          'list-conductor',
+          'Conductor',
+          [
+            ['', 'Any'],
+            ...conductors.map((c): [string, string] => [
+              c,
+              `${words(c) || 'Not named'} (${both.filter((x) => x.conductor === c).length})`,
+            ]),
+          ],
+          state.conductor,
+          (v) => {
+            state.conductor = v;
+            paint();
+          },
+        ),
+      );
+      if (runs.length)
+        filters.append(
+          picker('list-sort', 'Sort', SORTS, state.sort, (v) => {
+            state.sort = v as Sort;
+            paint();
+          }),
+        );
     }
-    content.replaceChildren(...groups);
+    // Loose sessions come in one order, latest first, so their bar holds only the search.
+    if (has) filters.append(searchField);
+    filters.hidden = !has;
+    content.scrollTop = 0;
+    paint();
   }
-  paint();
+
+  function clearButton(label: string) {
+    const clear = button('row plain', el('span', 'ttl', label));
+    clear.addEventListener('click', () => {
+      state.status = '';
+      state.conductor = '';
+      state.query = '';
+      search.value = '';
+      show(state.tabs.get(id) ?? 'runs');
+    });
+    return clear;
+  }
+
+  /** Draws the shown tab's rows under the filter bar. */
+  function paint() {
+    const tab = state.tabs.get(id) ?? 'runs';
+    if (tab === 'loose') {
+      const shown = loose.filter((s) => matches([s.first_prompt, s.id]));
+      if (shown.length)
+        body.replaceChildren(
+          table(
+            'loose',
+            'Loose sessions of the last 7 days',
+            LOOSE_COLS,
+            shown.map((s) => looseRow(ctx, id, s)),
+          ),
+        );
+      else if (loose.length)
+        body.replaceChildren(
+          empty('No loose session matches this search.', 'Try fewer words.'),
+          clearButton('Clear the search'),
+        );
+      else
+        body.replaceChildren(
+          empty(
+            'No loose session in the last 7 days.',
+            'A Claude session that belongs to no flow run shows here for a week.',
+          ),
+        );
+      return;
+    }
+
+    if (!runs.length && !audits.length) {
+      body.replaceChildren(
+        empty('No flow run or audit in this project yet.', 'They show here once a conductor runs in it.'),
+      );
+      return;
+    }
+    const shownRuns = runs
+      .filter((r) => !state.status || r.status === state.status)
+      .filter((r) => !state.conductor || r.conductor === state.conductor)
+      .filter((r) => matches([r.slug, words(r.slug), r.conductor, r.phase, r.now]))
+      .sort(SORTERS[state.sort]);
+    // Only runs have a status.
+    const shownAudits = state.status
+      ? []
+      : audits
+          .filter((a) => !state.conductor || a.conductor === state.conductor)
+          .filter((a) => matches([a.conductor, words(a.conductor), a.scope, a.file]));
+
+    const parts: HTMLElement[] = [];
+    if (shownRuns.length)
+      parts.push(
+        table(
+          'runs',
+          'Flow runs',
+          RUN_COLS,
+          shownRuns.map((r) => runRow(ctx, id, r)),
+          'State',
+        ),
+      );
+    else if (runs.length)
+      parts.push(
+        empty('No flow run matches these filters.', 'Try fewer words or filters.'),
+        clearButton('Clear the search and filters'),
+      );
+    if (shownAudits.length) {
+      const open = shownAudits.filter((a) => a.open).length;
+      const section = el(
+        'section',
+        'group list-audits',
+        el(
+          'h2',
+          'group-h',
+          el('span', '', 'Audits'),
+          el('span', 'aside', open ? `${open} open` : plural(shownAudits.length, 'audit')),
+        ),
+        table('audits', '', AUDIT_COLS, shownAudits.map(auditRow), 'State'),
+      );
+      section.setAttribute('aria-label', 'Audits');
+      parts.push(section);
+    }
+    if (!parts.length)
+      parts.push(
+        empty('No audit matches these filters.', 'Try fewer words or filters.'),
+        clearButton('Clear the search and filters'),
+      );
+    body.replaceChildren(...parts);
+  }
+
+  show(state.tabs.get(id) ?? 'runs');
   return win;
 }
 

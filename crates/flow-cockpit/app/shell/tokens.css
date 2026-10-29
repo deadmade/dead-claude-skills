@@ -295,22 +295,47 @@ details.unfold > .unfold-body { padding: var(--space-3) 0 var(--space-2); }
 .brand button.app { border: 0; background: none; padding: var(--space-1) var(--space-2); margin-left: calc(-1 * var(--space-2)); border-radius: var(--radius-row); transition: background-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out); }
 .brand button.app:hover { color: var(--color-ink); background: var(--color-paper-2); }
 .brand button.app:active { background: var(--color-paper-3); }
-/* A pressed filter or sort reads like the selected row. */
-.row[aria-pressed="true"] { background: var(--color-paper-3); color: var(--color-ink); }
-
-/* The list: the search on the content's edge, rows sharing one set of columns per group. */
+/* The list: the projects in the rail; over the content a switch between flow runs and loose sessions, then a filter
+ * bar (labelled native selects and the search) and tables whose rows open their run or session. */
+.list-tabs .count { margin-left: var(--space-2); font-size: var(--text-xs); color: var(--color-muted); }
+.list-tabs .tab[aria-selected="true"] .count { color: var(--color-ink-2); }
+.filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-5); margin-bottom: var(--space-5); }
+.field { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-muted); }
+.field-search { flex: 1 1 18rem; }
+.field select { min-height: 36px; padding: 0 var(--space-2); border: 1px solid var(--color-rule); border-radius: var(--radius-row); background: var(--color-paper-2); color: var(--color-ink); font: inherit; font-size: var(--text-sm); color-scheme: dark; transition: border-color var(--dur-micro) var(--ease-out), background-color var(--dur-micro) var(--ease-out); }
+.field select:hover { border-color: var(--color-paper-4); }
+.field select:focus { background: var(--color-paper-3); }
 .search { width: min(24rem, 100%); min-height: 36px; padding: 0 var(--space-3); border: 1px solid var(--color-rule); border-radius: var(--radius-row); background: var(--color-paper-2); color: var(--color-ink); font: inherit; font-size: var(--text-sm); transition: border-color var(--dur-micro) var(--ease-out), background-color var(--dur-micro) var(--ease-out); }
 .search::placeholder { color: var(--color-muted); }
 .search:hover { border-color: var(--color-paper-4); }
 .search:focus { background: var(--color-paper-3); }
 .content > .group + .group { margin-top: var(--space-6); }
-.entries.runs .row { grid-template-columns: minmax(7rem, 1fr) 5.5rem minmax(0, 2fr) 2.5rem 4rem 8rem 4rem; }
-.entries.audits .row { grid-template-columns: minmax(7rem, 1fr) 5.5rem minmax(0, 2fr) 9rem 8rem 8rem; }
-.entries.loose .row { grid-template-columns: minmax(0, 1fr) 5.5rem 4rem; }
-.entries .row > span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.entries .row > [class^="col-"] { color: var(--color-muted); }
-.entries .row .col-when { justify-self: end; }
-.gate-ticks { display: flex; align-items: center; gap: var(--space-1); height: 12px; align-self: center; }
+.list-body > * + * { margin-top: var(--space-4); }
+.list-body > .list-audits { margin-top: var(--space-7); }
+/* Hover fills edge to edge, as on the rows; the text stays on the content's edge. */
+.list-table { width: calc(100% + 2 * var(--space-3)); margin-inline: calc(-1 * var(--space-3)); border-collapse: separate; border-spacing: 0; table-layout: fixed; font-size: var(--text-sm); line-height: 1.7; }
+.list-table th { padding: 0 var(--space-3) var(--space-2); border-bottom: 1px solid var(--color-rule); text-align: left; font-weight: 500; font-size: var(--text-xs); color: var(--color-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.list-table td { padding: var(--space-1) var(--space-3); color: var(--color-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background-color var(--dur-micro) var(--ease-out); }
+.list-table td:first-child { border-radius: var(--radius-row) 0 0 var(--radius-row); }
+.list-table td:last-child { border-radius: 0 var(--radius-row) var(--radius-row) 0; }
+.list-table td.name { color: var(--color-ink-2); }
+.list-table tr.done td.name { color: var(--color-muted); }
+.list-table .col-when { text-align: right; }
+.list-table tr.opens { cursor: pointer; }
+.list-table tr.opens:hover td, .list-table tr.opens:has(:focus-visible) td { background: var(--color-paper-2); }
+.list-table tr.opens:hover td.name { color: var(--color-ink); }
+.list-table tr.opens:active td { background: var(--color-paper-3); }
+.list-table .name button { display: block; width: 100%; padding: 0; border: 0; background: none; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.list-table .name { width: 20%; }
+.list-table .col-kind { width: 6.5rem; }
+.list-table .col-gates { width: 4rem; }
+.list-table .col-tasks { width: 5rem; }
+.list-table .col-mark { width: 8.5rem; }
+.list-table .col-when, .list-table .col-started { width: 6.5rem; }
+.list-table .col-findings { width: 11rem; }
+.list-table .col-picks { width: 9rem; }
+.list-table.loose .name { width: auto; }
+.gate-ticks { display: flex; align-items: center; gap: var(--space-1); height: 12px; }
 
 /* Activity: one turn after another, newest first; the main session's reply is the one block at full contrast. */
 .live-wait { max-width: var(--measure); font-size: var(--text-lg); line-height: 1.4; color: var(--color-accent); padding-bottom: var(--space-5); margin-bottom: var(--space-6); border-bottom: 1px solid var(--color-rule); }
@@ -338,8 +363,6 @@ details.unfold > .unfold-body { padding: var(--space-3) 0 var(--space-2); }
 
 @media (max-width: 64rem) {
   .search { width: 100%; }
-  .entries.runs .row { grid-template-columns: minmax(0, 1fr) 2.5rem 4rem auto 4rem; }
-  .entries.audits .row { grid-template-columns: minmax(0, 1fr) auto auto; }
-  .entries.loose .row { grid-template-columns: minmax(0, 1fr) 4rem; }
-  .entries .row > .col-kind, .entries .row > .col-now, .entries .row > .col-findings { display: none; }
+  .list-table .col-kind, .list-table .col-now, .list-table .col-scope, .list-table .col-findings, .list-table .col-started { display: none; }
+  .list-table .name { width: auto; }
 }

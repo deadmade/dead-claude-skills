@@ -96,28 +96,104 @@ test('views_import_types_only', () => {
   }
 });
 
-test('list_groups_runs_audits_loose', async () => {
-  const { box, navigations } = await draw('list', { to: 'list', project: ALPHA });
-  assert.deepEqual(names(box, 'Flow runs'), ['Login', 'Signup', 'Spiky']);
-  assert.equal(rowsOf(box, 'Audits').length, 2);
-  assert.deepEqual(names(box, 'Loose sessions'), [
-    'Read docs/features/login/flow.md and summarise it.',
-    'A quick question.',
-  ]);
-  // Unfinished runs stand out; a done one is quiet.
-  assert.ok(rowsOf(box, 'Flow runs')[2].classList.contains('done'));
-  assert.match(text(rowsOf(box, 'Flow runs')[1]), /Needs you/);
+/** The list's table of a kind (`runs`, `audits` or `loose`), its body rows, and their name cells' text. */
+const table = (box: Element, kind: string) => box.querySelector(`table.${kind}`);
+const trs = (box: Element, kind: string) =>
+  [...(table(box, kind)?.querySelectorAll('tbody > tr') ?? [])] as HTMLElement[];
+const cells = (box: Element, kind: string) => trs(box, kind).map((tr) => text(tr.querySelector('.name')));
+const heads = (box: Element, kind: string) =>
+  [...(table(box, kind)?.querySelectorAll('thead th[scope="col"]') ?? [])].map((th) => text(th));
+const tabOf = (box: Element, label: string) => {
+  const tab = [...box.querySelectorAll('[role="tab"]')].find((t) => text(t.querySelector('.label')) === label);
+  assert.ok(tab, `no tab ${label}`);
+  return tab as HTMLElement;
+};
+/** Picks a value in one of the filter bar's selects, as the user would. */
+const pick = (box: Element, id: string, value: string) => {
+  const select = box.querySelector(`#${id}`) as HTMLSelectElement | null;
+  assert.ok(select, `no select #${id}`);
+  select.value = value;
+  assert.equal(select.value, value, `#${id} has no option ${value}`);
+  select.dispatchEvent(new window.Event('change', { bubbles: true }));
+};
+const options = (box: Element, id: string) =>
+  [...box.querySelectorAll(`#${id} option`)].map((o) => [(o as HTMLOptionElement).value, text(o)]);
+const typeIn = (box: Element, words: string) => {
+  const search = box.querySelector('#list-search') as HTMLInputElement;
+  search.value = words;
+  search.dispatchEvent(new window.Event('input', { bubbles: true }));
+};
+const key = (target: Element, name: string) =>
+  target.dispatchEvent(new window.KeyboardEvent('keydown', { key: name, bubbles: true }));
 
-  (rowsOf(box, 'Flow runs')[0] as HTMLElement).click();
-  (rowsOf(box, 'Loose sessions')[0] as HTMLElement).click();
-  assert.deepEqual(navigations, [
-    { to: 'run', project: ALPHA, slug: 'login' },
-    { to: 'session', project: ALPHA, id: 's-mention' },
-  ]);
-  assert.ok(
-    rowsOf(box, 'Audits').every((r) => r.tagName !== 'BUTTON'),
-    'an audit row opens nothing',
+test('list_rail_holds_only_projects', async () => {
+  const { box } = await draw('list', { to: 'list', project: ALPHA });
+  const rail = box.querySelector('aside.left') as Element;
+  assert.deepEqual(
+    [...rail.querySelectorAll('.group-h')].map((h) => text(h)),
+    ['Projects'],
   );
+  assert.equal(rail.querySelector('select, input, [aria-pressed], table'), null);
+  assert.equal(text(rail.querySelector('[aria-current="true"] .ttl')), 'alpha');
+});
+
+test('list_switch_shows_counts_and_switches_the_table', async () => {
+  const { box, navigations } = await draw('list', { to: 'list', project: ALPHA });
+  const tabs = [...box.querySelectorAll('.tabs-bar [role="tablist"] [role="tab"]')];
+  assert.deepEqual(
+    tabs.map((t) => [text(t.querySelector('.label')), text(t.querySelector('.count'))]),
+    [
+      ['Flow runs', '3'],
+      ['Loose sessions', '2'],
+    ],
+  );
+  const runsTab = tabOf(box, 'Flow runs');
+  const looseTab = tabOf(box, 'Loose sessions');
+  const panel = box.querySelector('#list-panel');
+  assert.equal(panel?.getAttribute('role'), 'tabpanel');
+  for (const t of tabs) assert.equal(t.getAttribute('aria-controls'), 'list-panel');
+  assert.equal(runsTab.getAttribute('aria-selected'), 'true');
+  assert.equal(panel?.getAttribute('aria-labelledby'), runsTab.id);
+
+  // Flow runs: the runs, unfinished ones standing out, then the audits; no loose sessions.
+  assert.deepEqual(cells(box, 'runs'), ['Login', 'Signup', 'Spiky']);
+  assert.ok(trs(box, 'runs')[2].classList.contains('done'));
+  assert.ok(!trs(box, 'runs')[0].classList.contains('done'));
+  assert.match(text(trs(box, 'runs')[1]), /Needs you/);
+  assert.equal(trs(box, 'audits').length, 2);
+  assert.equal(table(box, 'loose'), null);
+
+  // Loose sessions: only them.
+  looseTab.click();
+  assert.equal(looseTab.getAttribute('aria-selected'), 'true');
+  assert.equal(runsTab.getAttribute('aria-selected'), 'false');
+  assert.equal(box.querySelector('#list-panel')?.getAttribute('aria-labelledby'), looseTab.id);
+  assert.deepEqual(cells(box, 'loose'), ['Read docs/features/login/flow.md and summarise it.', 'A quick question.']);
+  assert.equal(table(box, 'runs'), null);
+  assert.equal(table(box, 'audits'), null);
+
+  // Left and right move between the two tabs, and focus follows.
+  key(looseTab, 'ArrowLeft');
+  assert.equal(runsTab.getAttribute('aria-selected'), 'true');
+  assert.equal(document.activeElement, runsTab);
+  key(runsTab, 'ArrowRight');
+  assert.equal(looseTab.getAttribute('aria-selected'), 'true');
+  assert.equal(document.activeElement, looseTab);
+  assert.equal(looseTab.tabIndex, 0);
+  assert.equal(runsTab.tabIndex, -1);
+
+  // A whole row opens its run or session; its name cell holds the one real button.
+  trs(box, 'loose')[0].click();
+  runsTab.click();
+  trs(box, 'runs')[0].click();
+  (trs(box, 'runs')[1].querySelector('.name button') as HTMLElement).click();
+  assert.deepEqual(navigations, [
+    { to: 'session', project: ALPHA, id: 's-mention' },
+    { to: 'run', project: ALPHA, slug: 'login' },
+    { to: 'run', project: ALPHA, slug: 'signup' },
+  ]);
+  for (const tr of trs(box, 'runs')) assert.equal(tr.querySelectorAll('button').length, 1);
+  assert.equal(table(box, 'audits')?.querySelector('button'), null, 'an audit row opens nothing');
 
   // Without a project in the route, the first project shows; another project is one click away.
   const first = await draw('list', { to: 'list' });
@@ -126,56 +202,111 @@ test('list_groups_runs_audits_loose', async () => {
   assert.deepEqual(first.navigations, [{ to: 'list', project: 'folder-solo' }]);
 });
 
+test('list_tables_have_column_headings', async () => {
+  const { box } = await draw('list', { to: 'list', project: ALPHA });
+  assert.deepEqual(heads(box, 'runs'), [
+    'Name',
+    'Conductor',
+    'Now or phase',
+    'Gates',
+    'Tasks',
+    'State',
+    'Last activity',
+  ]);
+  assert.deepEqual(heads(box, 'audits'), ['Audit', 'Scope', 'Findings', 'Picks', 'State', 'Date']);
+  // The audits sit under the runs, under a heading of their own.
+  const audits = table(box, 'audits') as Element;
+  assert.ok(table(box, 'runs')!.compareDocumentPosition(audits) & window.Node.DOCUMENT_POSITION_FOLLOWING);
+  assert.match(text(audits.closest('section')?.querySelector('h2')), /^Audits/);
+  tabOf(box, 'Loose sessions').click();
+  assert.deepEqual(heads(box, 'loose'), ['First prompt', 'Started', 'Last activity']);
+});
+
 test('list_filters_and_sorts', async () => {
   const { box } = await draw('list', { to: 'list', project: ALPHA });
-  const runs = () => names(box, 'Flow runs');
-  assert.deepEqual(runs(), ['Login', 'Signup', 'Spiky'], 'latest activity first');
-  press(box, 'Name');
-  assert.deepEqual(runs(), ['Login', 'Signup', 'Spiky']);
-  press(box, 'Furthest along');
-  assert.deepEqual(runs(), ['Spiky', 'Login', 'Signup']);
-  press(box, 'Needs you first');
-  assert.deepEqual(runs(), ['Signup', 'Login', 'Spiky'], 'the waiting run first, though it is older');
-  assert.equal(group(box, 'Flow runs')?.querySelector('[aria-pressed="true"]'), null);
-  assert.equal(
-    text([...box.querySelectorAll('button[aria-pressed="true"]')].find((b) => text(b).startsWith('Needs'))),
-    'Needs you first',
+  const runs = () => cells(box, 'runs');
+  // Each control has a visible label.
+  for (const id of ['list-status', 'list-conductor', 'list-sort', 'list-search'])
+    assert.ok(text(box.querySelector(`label[for="${id}"]`)), `#${id} has no label`);
+  // Only values this project has, with counts; Sort has no "Any".
+  assert.deepEqual(options(box, 'list-status'), [
+    ['', 'Any'],
+    ['Waiting', 'Waiting on you (1)'],
+    ['Idle', 'Idle (1)'],
+    ['Done', 'Done (1)'],
+  ]);
+  assert.deepEqual(options(box, 'list-conductor'), [
+    ['', 'Any'],
+    ['doc-audit', 'Doc audit (1)'],
+    ['feature', 'Feature (2)'],
+    ['research', 'Research (1)'],
+    ['test-audit', 'Test audit (1)'],
+  ]);
+  assert.deepEqual(
+    options(box, 'list-sort').map(([, label]) => label),
+    ['Latest activity', 'Needs you first', 'Furthest along', 'Name'],
   );
 
-  // Status: only runs carry one, so audits and sessions step aside.
-  press(box, 'Done');
+  assert.deepEqual(runs(), ['Login', 'Signup', 'Spiky'], 'latest activity first');
+  pick(box, 'list-sort', 'name');
+  assert.deepEqual(runs(), ['Login', 'Signup', 'Spiky']);
+  pick(box, 'list-sort', 'furthest');
+  assert.deepEqual(runs(), ['Spiky', 'Login', 'Signup']);
+  pick(box, 'list-sort', 'needs');
+  assert.deepEqual(runs(), ['Signup', 'Login', 'Spiky'], 'the waiting run first, though it is older');
+
+  // Status: only runs carry one, so the audits step aside.
+  pick(box, 'list-status', 'Done');
   assert.deepEqual(runs(), ['Spiky']);
-  assert.equal(group(box, 'Audits'), undefined);
-  assert.equal(group(box, 'Loose sessions'), undefined);
-  press(box, 'Done');
+  assert.equal(table(box, 'audits'), null);
+  pick(box, 'list-status', '');
   assert.deepEqual(runs(), ['Signup', 'Login', 'Spiky'], 'still needs-you-first');
+  assert.equal(trs(box, 'audits').length, 2);
 
   // Conductor: runs and audits have one.
-  press(box, 'Research');
+  pick(box, 'list-conductor', 'research');
   assert.deepEqual(runs(), ['Spiky']);
-  assert.equal(group(box, 'Audits'), undefined);
-  press(box, 'Research');
-  press(box, 'Doc audit');
-  assert.equal(group(box, 'Flow runs'), undefined);
-  assert.equal(rowsOf(box, 'Audits').length, 1);
-  press(box, 'Doc audit');
+  assert.equal(table(box, 'audits'), null);
+  pick(box, 'list-conductor', 'doc-audit');
+  assert.equal(table(box, 'runs'), null);
+  assert.match(text(box.querySelector('#list-panel')), /No flow run matches these filters\./);
+  assert.equal(trs(box, 'audits').length, 1);
+  pick(box, 'list-conductor', '');
 
-  // Search reads every group, and keeps its text and focus across a redraw (an id the runtime finds it by).
-  const search = box.querySelector('input[type="search"]') as HTMLInputElement;
-  assert.ok(search.id || search.dataset.keep);
-  search.value = 'login';
-  search.dispatchEvent(new window.Event('input', { bubbles: true }));
+  // Search reads the shown tab's rows; the loose tab shows only the search.
+  typeIn(box, 'login');
   assert.deepEqual(runs(), ['Login']);
-  assert.deepEqual(names(box, 'Loose sessions'), ['Read docs/features/login/flow.md and summarise it.']);
-  assert.equal(group(box, 'Audits'), undefined);
-  search.value = 'nothing like this';
-  search.dispatchEvent(new window.Event('input', { bubbles: true }));
-  assert.match(text(box.querySelector('.content')), /Nothing matches/);
+  assert.equal(table(box, 'audits'), null);
+  tabOf(box, 'Loose sessions').click();
+  assert.deepEqual(cells(box, 'loose'), ['Read docs/features/login/flow.md and summarise it.']);
+  assert.equal(box.querySelector('#list-panel select'), null, 'no filters a session has no field for');
+  assert.equal((box.querySelector('#list-search') as HTMLInputElement).value, 'login');
+  typeIn(box, 'nothing like this');
+  assert.match(text(box.querySelector('#list-panel')), /No loose session matches this search\./);
+});
+
+test('list_empty_filter_result_says_so', async () => {
+  const { box } = await draw('list', { to: 'list', project: ALPHA });
+  pick(box, 'list-status', 'Done');
+  pick(box, 'list-conductor', 'feature');
+  assert.equal(table(box, 'runs'), null);
+  assert.match(text(box.querySelector('#list-panel')), /No flow run matches these filters\./);
+  press(box, 'Clear the search and filters');
+  assert.deepEqual(cells(box, 'runs'), ['Login', 'Signup', 'Spiky']);
+  assert.equal((box.querySelector('#list-status') as HTMLSelectElement).value, '');
+  assert.equal((box.querySelector('#list-conductor') as HTMLSelectElement).value, '');
+
+  // A tab with no rows at all says that instead.
+  const delta = await draw('list', { to: 'list', project: 'github-com-acme-delta' });
+  assert.equal(tabOf(delta.box, 'Loose sessions').getAttribute('aria-selected'), 'true', 'the tab that has rows');
+  tabOf(delta.box, 'Flow runs').click();
+  assert.match(text(delta.box.querySelector('#list-panel')), /No flow run or audit in this project yet\./);
+  assert.equal(delta.box.querySelector('#list-panel select'), null);
 });
 
 test('audit_shows_unknown_without_picks', async () => {
   const { box } = await draw('list', { to: 'list', project: ALPHA });
-  const [picked, unknown] = rowsOf(box, 'Audits');
+  const [picked, unknown] = trs(box, 'audits');
   assert.match(text(picked), /2 picked, 1 fixed/);
   assert.match(text(picked), /Open/);
   assert.match(text(picked), /1 high, 1 med, 1 low/);
@@ -444,11 +575,17 @@ test('activity_folds_stay_on_their_turn_across_a_redraw', async () => {
 test('list_clears_filters_the_new_project_has_no_row_for', async () => {
   const list = await load('list');
   const alpha = await draw(list, { to: 'list', project: ALPHA });
-  press(alpha.box, 'Research');
-  press(alpha.box, 'Done');
+  pick(alpha.box, 'list-conductor', 'research');
+  pick(alpha.box, 'list-status', 'Done');
+  pick(alpha.box, 'list-sort', 'name');
+  const gamma = await draw(list, { to: 'list', project: 'github-com-acme-gamma' });
+  assert.equal((gamma.box.querySelector('#list-status') as HTMLSelectElement).value, '');
+  assert.equal((gamma.box.querySelector('#list-conductor') as HTMLSelectElement).value, '');
+  assert.equal((gamma.box.querySelector('#list-sort') as HTMLSelectElement).value, 'name', 'a sort fits any project');
+  assert.deepEqual(cells(gamma.box, 'runs'), ['Dfeat']);
+  // A project without flow runs opens on its loose sessions.
   const solo = await draw(list, { to: 'list', project: 'folder-solo' });
-  assert.equal(solo.box.querySelector('[aria-pressed="true"]:not([data-sort])'), null);
-  assert.deepEqual(names(solo.box, 'Loose sessions'), ['Solo A.', 'Solo B.']);
+  assert.deepEqual(cells(solo.box, 'loose'), ['Solo A.', 'Solo B.']);
 });
 
 test('list_tells_apart_projects_with_one_name', async () => {
@@ -542,4 +679,53 @@ test('run_graph_nodes_select_their_task', async () => {
   } finally {
     delete w.mermaid;
   }
+});
+
+test('list_switch_and_filters_survive_a_redraw', async () => {
+  const { createRuntime } = await import('../../shell/runtime.js');
+  const entries = clone(DATA.entries);
+  const handlers = new Map<string, (event: any) => void>();
+  const invoke = async (cmd: string, args: any = {}) => {
+    if (cmd === 'views') return [{ id: 'list', source: 'Builtin', replaced: false }];
+    if (cmd === 'view_source') return '';
+    if (cmd === 'projects') return DATA.projects;
+    if (cmd === 'entries') return entries[args.project] ?? [];
+    return null;
+  };
+  const root = document.createElement('main');
+  document.body.replaceChildren(root);
+  const runtime = createRuntime({
+    root,
+    invoke,
+    listen: async (name: string, handler: any) => handlers.set(name, handler),
+    importModule: () => import(`./list.ts?t=${++fresh}`),
+  });
+  await runtime.start({ to: 'list', project: ALPHA });
+  const redraw = async () => {
+    handlers.get('changed')!({ payload: { project: ALPHA } });
+    await runtime.idle();
+  };
+
+  // Flow runs, by name, feature only; the conductor select keeps focus when a new run arrives.
+  pick(root, 'list-sort', 'name');
+  pick(root, 'list-conductor', 'feature');
+  (root.querySelector('#list-conductor') as HTMLElement).focus();
+  entries[ALPHA].unshift({ ...clone(entries[ALPHA][0]), slug: 'avatar', last_activity: '2026-01-20T12:00:00Z' });
+  await redraw();
+  assert.deepEqual(cells(root, 'runs'), ['Avatar', 'Login', 'Signup']);
+  assert.equal((root.querySelector('#list-conductor') as HTMLSelectElement).value, 'feature');
+  assert.equal((root.querySelector('#list-sort') as HTMLSelectElement).value, 'name');
+  assert.equal(document.activeElement?.id, 'list-conductor');
+  assert.equal(text(tabOf(root, 'Flow runs').querySelector('.count')), '4');
+
+  // Loose sessions, searched, with the search focused: the tab, the text and the focus stay.
+  tabOf(root, 'Loose sessions').click();
+  const search = root.querySelector('#list-search') as HTMLInputElement;
+  search.focus();
+  typeIn(root, 'quick');
+  await redraw();
+  assert.equal(tabOf(root, 'Loose sessions').getAttribute('aria-selected'), 'true');
+  assert.equal(document.activeElement?.id, 'list-search');
+  assert.equal((root.querySelector('#list-search') as HTMLInputElement).value, 'quick');
+  assert.deepEqual(cells(root, 'loose'), ['A quick question.']);
 });
