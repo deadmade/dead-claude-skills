@@ -114,7 +114,14 @@ export interface CardOpts {
 export interface Blocks {
   /** Sanitised Markdown; a fenced `mermaid` block becomes a diagram. */
   markdown(text: string): Node;
+  /** Drawn at once when drawn before (the window draws diagrams ahead); until then an empty box, `aria-busy`. */
   mermaid(source: string): Node;
+  /**
+   * The run's task graph, top to bottom: a node per plan task (Mermaid id `T8b` for task 8b) with a class per state
+   * (`done`, `busy`, `wait`, `todo`), an arrow per dependency. The same drawing for every picked task, so the window
+   * can draw it ahead: a view rings the picked one itself. Null when a task doesn't say what it depends on.
+   */
+  taskGraph(run: FlowRun): Node | null;
   /** A line diff, unchanged runs folded. */
   diff(old: string, next: string): Node;
   /** The segmented phase track with gate ticks, which opens to the list. */

@@ -22,3 +22,18 @@ export function markdown(text) {
   });
   return box;
 }
+
+/**
+ * The sources of a document's `mermaid` fences, from the lexer `markdown` draws with, each as the page passes it to
+ * the diagram (marked's code block text, ending in one newline), so a drawing made ahead is the one the page finds.
+ * @param {string} text @returns {string[]}
+ */
+export function mermaidSources(text) {
+  /** @type {string[]} */
+  const out = [];
+  marked.walkTokens(marked.lexer(String(text ?? ''), { gfm: true }), (token) => {
+    if (token.type === 'code' && /^\S*/.exec(token.lang ?? '')?.[0] === 'mermaid')
+      out.push(`${token.text.replace(/\n$/, '')}\n`);
+  });
+  return out;
+}

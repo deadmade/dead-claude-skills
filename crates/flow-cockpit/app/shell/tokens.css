@@ -186,11 +186,13 @@ details.unfold > .unfold-body { padding: var(--space-3) 0 var(--space-2); }
 .key .ring { display: block; }
 /* The task graph runs top to bottom with no scrollbar of its own: its drawing shrinks to fit the column, never grows.
  * Its labels are a step larger than the docs' diagrams'. The shared Mermaid box scrolls; here it is clipped and laid
- * out as a column, so a source waiting to be drawn never scrolls and a failure's reason stays visible under it. */
+ * out as a column, so a failed source never scrolls and its reason stays visible under it; a drawing on its way is no
+ * taller than the column. */
 .graph svg { display: block; max-width: 100%; width: auto; height: auto; margin-inline: auto; }
 .where-graph .graph text { font-size: var(--text-md); }
 .where-graph .diagram { overflow: hidden; display: flex; flex-direction: column; }
 .where-graph .diagram > pre { min-height: 0; max-height: calc(100vh - var(--bar-h) - var(--space-5) - var(--space-7) - var(--key-h)); overflow: hidden; }
+.where-graph .diagram-wait { max-height: calc(100vh - var(--bar-h) - var(--space-5) - var(--space-7) - var(--key-h)); }
 .graph .node { cursor: pointer; }
 
 /* ---------- Decisions: master and detail, like Docs ---------- */
@@ -287,6 +289,9 @@ details.unfold > .unfold-body { padding: var(--space-3) 0 var(--space-2); }
 .diagram { overflow-x: auto; }
 .diagram svg { display: block; }
 .diagram .quiet { margin-top: var(--space-2); font-size: var(--text-sm); }
+/* A diagram not drawn yet: an empty, quiet box as tall as its last drawing (`--wait-h`, set by the block), else a modest
+ * default. Its source shows only when drawing fails. */
+.diagram-wait { height: var(--wait-h, 10rem); border-radius: var(--radius-code); background: var(--color-paper-2); }
 
 /* ---------- diff: removed and added lines on the code ground, unchanged runs folded ---------- */
 .diff { display: grid; max-width: var(--measure); max-height: 28rem; overflow: auto; padding: var(--space-3) var(--space-4); border-radius: var(--radius-code); background: var(--color-code-bg); font-family: var(--font-mono); font-size: 0.86em; line-height: 1.5; }

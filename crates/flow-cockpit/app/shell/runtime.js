@@ -5,8 +5,8 @@
 // extensions replaced it; the other views never see it.
 import { card } from './blocks/card.js';
 import { diff } from './blocks/diff.js';
-import { markdown } from './blocks/markdown.js';
-import { mermaid } from './blocks/mermaid.js';
+import { markdown, mermaidSources } from './blocks/markdown.js';
+import { ahead, mermaid, taskGraph, taskGraphSource } from './blocks/mermaid.js';
 import { stepper } from './blocks/stepper.js';
 
 /**
@@ -24,7 +24,9 @@ import { stepper } from './blocks/stepper.js';
  */
 
 const SLOTS = ['list', 'run', 'run-tab', 'doc', 'session'];
-const blocks = Object.freeze({ markdown, mermaid, diff, stepper, card });
+const blocks = Object.freeze({ markdown, mermaid, diff, stepper, card, taskGraph });
+/** @type {DocName[]} */
+const DOCS = ['Spec', 'Plan', 'Flow'];
 
 /** @param {unknown} err */
 const reason = (err) => (err instanceof Error ? err.message : String(err));
@@ -417,6 +419,55 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     }
     drawnAt = where;
     if (kept) restore(root, kept, moved);
+    drawAhead(at);
+  }
+
+  // Drawing ahead: the diagrams the next pages show, queued to draw in idle time (blocks/mermaid.js). After the list,
+  // the task graph and document diagrams of the shown project's unfinished runs; on a run, the rest of that run's,
+  // first in line. One pass at a time; a route drawn meanwhile is taken up after it.
+  /** @type {Route | null} */
+  let aheadNext = null;
+  let aheadBusy = false;
+
+  /** @param {Route} at */
+  async function drawAhead(at) {
+    if (at.to !== 'list' && at.to !== 'run') return;
+    aheadNext = at;
+    if (aheadBusy) return;
+    aheadBusy = true;
+    for (let next = /** @type {Route | null} */ (at); next; next = aheadNext) {
+      aheadNext = null;
+      try {
+        await aheadFor(next);
+      } catch (err) {
+        console.warn('flow-cockpit: drawing ahead:', err);
+      }
+    }
+    aheadBusy = false;
+  }
+
+  /** @param {Route} at */
+  async function aheadFor(at) {
+    if (at.to === 'run') return aheadRun(at.project, at.slug, true);
+    if (at.to !== 'list') return;
+    /** @type {import('../../bindings/Project').Project[]} */
+    const projects = (await data.projects()) ?? [];
+    // The project the list shows.
+    const project = projects.find((p) => p.id === at.project) ?? projects[0];
+    if (!project) return;
+    /** @type {import('../../bindings/Entry').Entry[]} */
+    const listed = (await data.entries(project.id)) ?? [];
+    for (const e of listed) if (e.kind === 'FlowRun' && e.status !== 'Done') await aheadRun(project.id, e.slug, false);
+  }
+
+  /** @param {string} project @param {string} slug @param {boolean} first */
+  async function aheadRun(project, slug, first) {
+    const [run, ...texts] = await Promise.all([
+      data.flowRun(project, slug),
+      ...DOCS.map((name) => data.doc(project, slug, name)),
+    ]);
+    const graph = run ? taskGraphSource(run) : null;
+    ahead([...(graph === null ? [] : [graph]), ...texts.flatMap((t) => (t ? mermaidSources(t) : []))], first);
   }
 
   /** @param {() => Promise<void>} step */

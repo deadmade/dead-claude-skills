@@ -154,7 +154,8 @@ export default view;
     fenced `mermaid` block becomes a diagram.
   - Never set `innerHTML`, `outerHTML` or `insertAdjacentHTML`.
   - Never set an `href` or `src` from data yourself; links in data go through `markdown`.
-  - `ctx.blocks` also has `mermaid`, `diff` (a line diff) and `stepper` (the phase track).
+  - `ctx.blocks` also has `mermaid`, `diff` (a line diff), `stepper` (the phase track) and `taskGraph(run)` (the
+    run's task graph, the same drawing the window draws ahead; ring the picked task on it yourself).
 - **No timers or global listeners**, neither in `render` nor at the top of the module. A view has no teardown, so an
   interval, or a listener on `window` or `document`, piles up with every redraw and every reload. Put listeners on
   the view's own nodes.

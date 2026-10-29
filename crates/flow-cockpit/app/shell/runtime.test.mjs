@@ -3,32 +3,62 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveObjectURL } from 'node:buffer';
+import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 
 const dom = new JSDOM('<!doctype html><html><body><main id="app"></main></body></html>', { url: 'http://localhost/' });
 globalThis.window = dom.window;
 globalThis.document = dom.window.document;
 
-/** @type {{ initialize: unknown[], render: [string, string][] }} */
-const mermaidCalls = { initialize: [], render: [] };
+/**
+ * The fake Mermaid counts its calls and how many renders run at once. A render takes `mermaidDelay` ms; a source
+ * holding `FAIL` (or any while `mermaidFails`) fails, and one holding `%% h=<n>` draws <n> px tall.
+ * @type {{ initialize: unknown[], render: [string, string][], running: number, most: number }}
+ */
+const mermaidCalls = { initialize: [], render: [], running: 0, most: 0 };
 let mermaidFails = false;
+let mermaidDelay = 0;
 dom.window.mermaid = {
   initialize: (config) => mermaidCalls.initialize.push(config),
   render: async (id, source) => {
     mermaidCalls.render.push([id, source]);
-    if (mermaidFails) throw new Error('Parse error on line 1');
-    return { svg: `<svg id="${id}"><g class="node"></g></svg>` };
+    mermaidCalls.most = Math.max(mermaidCalls.most, ++mermaidCalls.running);
+    try {
+      if (mermaidDelay) await new Promise((resolve) => setTimeout(resolve, mermaidDelay));
+      if (mermaidFails || source.includes('FAIL')) throw new Error('Parse error on line 1');
+      const h = /%% h=(\d+)/.exec(source)?.[1] ?? '100';
+      return { svg: `<svg id="${id}" viewBox="0 0 200 ${h}"><g class="node"></g></svg>` };
+    } finally {
+      mermaidCalls.running--;
+    }
   },
+};
+// The window's idle callback, counted, so a test sees the draw-ahead queue stop asking for idle time once it is empty.
+let idleAsks = 0;
+dom.window.requestIdleCallback = (callback) => {
+  idleAsks++;
+  return setTimeout(() => callback({ didTimeout: false, timeRemaining: () => 50 }), 1);
 };
 
 const { createRuntime } = await import('./runtime.js');
-const { markdown } = await import('./blocks/markdown.js');
+const { markdown, mermaidSources } = await import('./blocks/markdown.js');
+const { mermaid, ahead, taskGraph, taskGraphSource } = await import('./blocks/mermaid.js');
 const { diff } = await import('./blocks/diff.js');
 const { stepper } = await import('./blocks/stepper.js');
 const { card } = await import('./blocks/card.js');
 
 /** Lets the blocks' and the runtime's promises settle. */
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+/** Waits until `done()` holds, up to two seconds. */
+async function until(done, what = 'the condition') {
+  for (let i = 0; i < 400; i++) {
+    if (done()) return;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  assert.fail(`timed out waiting for ${what}`);
+}
+/** How many times the fake Mermaid drew `source`. */
+const drawsOf = (source) => mermaidCalls.render.filter(([, s]) => s === source).length;
 
 /** Imports a blob URL the way the webview would, through a data: URL Node can import. */
 async function importBlob(url) {
@@ -58,6 +88,8 @@ function fakeApp(views, extensions = { styles: [], disabled: [], looked: [] }) {
     views,
     extensions,
     calls,
+    /** The data commands' answers, by command: a function of the call's arguments. Unlisted ones answer null. */
+    answers: {},
     invoke(cmd, args = {}) {
       calls.push([cmd, args]);
       if (cmd === 'views') {
@@ -70,6 +102,7 @@ function fakeApp(views, extensions = { styles: [], disabled: [], looked: [] }) {
         );
       }
       if (cmd === 'extensions') return Promise.resolve(app.extensions);
+      if (app.answers[cmd]) return Promise.resolve(app.answers[cmd](args));
       if (cmd === 'view_source') {
         const v = app.views[args.id];
         if (!v) return Promise.reject(`no view ${args.id}`);
@@ -194,9 +227,268 @@ test('mermaid_failure_keeps_the_source_with_the_reason', async () => {
     await settle();
     assert.equal(node.querySelector('.diagram pre')?.textContent.trim(), 'graph TD; A-->');
     assert.match(node.querySelector('.diagram .quiet')?.textContent ?? '', /Parse error on line 1/);
+    assert.equal(node.querySelector('[aria-busy]'), null, 'no longer busy');
+    // The same source again fails at once, without a second try.
+    const again = markdown('```mermaid\ngraph TD; A-->\n```');
+    assert.equal(again.querySelector('.diagram pre')?.textContent.trim(), 'graph TD; A-->');
+    assert.match(again.querySelector('.diagram .quiet')?.textContent ?? '', /Parse error on line 1/);
+    await settle();
+    assert.equal(drawsOf('graph TD; A-->\n'), 1);
   } finally {
     mermaidFails = false;
   }
+});
+
+test('a_diagram_drawn_ahead_shows_at_once', async () => {
+  // A fence at the top and one in a list item: the lexer's sources are the ones the page draws.
+  const doc =
+    'Text.\n\n```mermaid\ngraph TD; Ahead1-->B\n```\n\n- An item:\n\n  ```mermaid\n  graph TD; Ahead2-->B\n  ```\n';
+  const sources = mermaidSources(doc);
+  assert.deepEqual(sources, ['graph TD; Ahead1-->B\n', 'graph TD; Ahead2-->B\n']);
+  assert.deepEqual(mermaidSources('```js\nlet a;\n```\n\n    indented\n'), []);
+  ahead(sources);
+  await until(() => sources.every((s) => drawsOf(s) === 1) && !mermaidCalls.running, 'both drawn ahead');
+  await settle();
+  const node = markdown(doc);
+  assert.equal(node.querySelectorAll('.diagram svg').length, 2, node.outerHTML);
+  assert.equal(node.querySelector('.diagram pre, .diagram-wait, [aria-busy]'), null);
+  await settle();
+  assert.deepEqual(
+    sources.map((s) => drawsOf(s)),
+    [1, 1],
+    'not drawn again',
+  );
+});
+
+test('a_diagram_not_drawn_yet_shows_a_quiet_placeholder', async () => {
+  mermaidDelay = 20;
+  try {
+    const node = markdown('```mermaid\ngraph TD; Wait1-->B\n```');
+    const box = node.querySelector('.diagram');
+    assert.equal(box.getAttribute('aria-busy'), 'true');
+    assert.ok(box.querySelector('.diagram-wait'), box.outerHTML);
+    assert.equal(box.querySelector('pre'), null, 'the source never shows while it draws');
+    assert.doesNotMatch(box.textContent, /Wait1/);
+    await until(() => box.querySelector('svg'), 'the drawing');
+    assert.equal(box.hasAttribute('aria-busy'), false);
+    assert.equal(box.querySelector('.diagram-wait'), null);
+  } finally {
+    mermaidDelay = 0;
+  }
+  // The stylesheet: an empty box as tall as the last drawing, else a modest default; in the task graph's column no
+  // taller than the column.
+  const css = readFileSync(new URL('./tokens.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const rule = (sel) => [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].find(([, s]) => s.trim() === sel)?.[2] ?? '';
+  assert.match(rule('.diagram-wait'), /height:\s*var\(--wait-h,\s*\d+(\.\d+)?rem\)/);
+  assert.match(rule('.where-graph .diagram-wait'), /max-height:\s*calc\(100vh/);
+});
+
+test('ahead_draws_one_at_a_time_and_stops_when_empty', async () => {
+  mermaidDelay = 10;
+  mermaidCalls.most = 0;
+  try {
+    const sources = ['graph TD; Q1-->B', 'graph TD; Q2-->B', 'graph TD; Q3-->B'];
+    const asked = idleAsks;
+    ahead(sources);
+    assert.equal(drawsOf(sources[0]), 0, 'nothing draws until the window is idle');
+    await until(() => sources.every((s) => drawsOf(s) === 1) && !mermaidCalls.running, 'all three drawn');
+    assert.equal(mermaidCalls.most, 1, 'never two renders at once');
+    assert.deepEqual(
+      mermaidCalls.render.map(([, s]) => s).filter((s) => sources.includes(s)),
+      sources,
+    );
+    const after = idleAsks;
+    assert.equal(after - asked, 3, 'one idle moment per diagram');
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    assert.equal(idleAsks, after, 'an empty queue stops asking for idle time');
+  } finally {
+    mermaidDelay = 0;
+  }
+});
+
+test('a_needed_diagram_jumps_the_queue', async () => {
+  mermaidDelay = 10;
+  mermaidCalls.most = 0;
+  try {
+    const queued = ['graph TD; J1-->B', 'graph TD; J2-->B', 'graph TD; J3-->B'];
+    const needed = 'graph TD; Now1-->B';
+    ahead(queued);
+    const box = mermaid(needed);
+    await until(() => box.querySelector('svg'), 'the needed drawing');
+    const order = mermaidCalls.render.map(([, s]) => s).filter((s) => [...queued, needed].includes(s));
+    // At most the one already drawing goes first.
+    assert.ok(order.indexOf(needed) <= 1, order.join(' | '));
+    await until(() => queued.every((s) => drawsOf(s) === 1) && !mermaidCalls.running, 'the queue drawn');
+    assert.equal(mermaidCalls.most, 1);
+  } finally {
+    mermaidDelay = 0;
+  }
+});
+
+test('a_source_is_drawn_once', async () => {
+  mermaidDelay = 10;
+  try {
+    const source = 'graph TD; Once1-->B';
+    ahead([source, source]);
+    const a = mermaid(source);
+    const b = mermaid(source);
+    ahead([source]);
+    await until(() => a.querySelector('svg') && b.querySelector('svg'), 'both boxes drawn');
+    assert.ok(mermaid(source).querySelector('svg'));
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    assert.equal(drawsOf(source), 1);
+  } finally {
+    mermaidDelay = 0;
+  }
+});
+
+test('the_cache_keys_on_the_theme_and_a_placeholder_keeps_the_last_size', async () => {
+  const source = 'graph TD; Theme1-->B\n%% h=321';
+  const first = mermaid(source);
+  await until(() => first.querySelector('svg'), 'the first drawing');
+  const root = document.documentElement;
+  root.style.setProperty('--color-paper', '#101010');
+  mermaidDelay = 10;
+  try {
+    assert.equal(window.getComputedStyle(root).getPropertyValue('--color-paper').trim(), '#101010');
+    const again = mermaid(source);
+    assert.equal(again.querySelector('svg'), null, 'a new theme draws it again');
+    assert.equal(again.querySelector('.diagram-wait')?.style.getPropertyValue('--wait-h'), '321px');
+    await until(() => again.querySelector('svg'), 'the drawing in the new theme');
+    assert.equal(drawsOf(source), 2);
+    assert.equal(mermaidCalls.initialize.at(-1).themeVariables.background, '#101010');
+  } finally {
+    root.style.removeProperty('--color-paper');
+    mermaidDelay = 0;
+  }
+});
+
+/** A run as the core gives it, with only what the task graph reads: the plan's tasks and the ledger's states. */
+const runWith = (tasks, states = {}) => ({
+  plan: {
+    title: null,
+    tasks: tasks.map(([id, deps]) => ({ id, title: `Task ${id}`, does: null, depends_on: deps, markdown: '' })),
+  },
+  ledger: {
+    plan: null,
+    rulings: [],
+    tasks: Object.entries(states).map(([id, state]) => ({
+      id,
+      state,
+      fix_rounds: 0,
+      security: [],
+      later: [],
+      story: [],
+      model: null,
+    })),
+  },
+});
+
+test('task_graph_is_the_plans_tasks_top_to_bottom_with_no_ring', () => {
+  const source = taskGraphSource(
+    runWith(
+      [
+        ['1', []],
+        ['2b', ['1']],
+        ['3', ['1', '2b']],
+      ],
+      { 1: 'Done', '2b': 'Building' },
+    ),
+  );
+  assert.match(source, /^flowchart TB\n%%\{init: \{"flowchart": \{"padding": 13\}\}\}%%\n/);
+  assert.match(source, /^ {2}T2b\(\("2b"\)\)$/m);
+  assert.match(source, /^ {2}T1 --> T2b$/m);
+  assert.match(source, /^ {2}T2b --> T3$/m);
+  assert.match(source, /^ {2}class T1 done$/m);
+  assert.match(source, /^ {2}class T2b busy$/m);
+  assert.match(source, /^ {2}class T3 todo$/m);
+  // The selected task is ringed on the drawing by the run view, so one drawing serves every task.
+  assert.doesNotMatch(source, /^\s*style /m);
+  assert.equal(
+    taskGraphSource(
+      runWith([
+        ['1', []],
+        ['2', null],
+      ]),
+    ),
+    null,
+    'a task that does not say what it needs',
+  );
+  assert.equal(taskGraphSource({ plan: null, ledger: null }), null);
+  assert.equal(taskGraph({ plan: { title: null, tasks: [] }, ledger: null }), null);
+});
+
+/** A run's documents, each with one diagram naming the run and the document. */
+const docWith = ({ slug, name }) => `# ${name}\n\n\`\`\`mermaid\ngraph TD; ${slug}${name}-->B\n\`\`\`\n`;
+const docSources = (slug) => ['Spec', 'Plan', 'Flow'].map((name) => `graph TD; ${slug}${name}-->B\n`);
+
+test('the_list_draws_its_unfinished_runs_diagrams_ahead', async () => {
+  const open = runWith(
+    [
+      ['1', []],
+      ['2', ['1']],
+    ],
+    { 1: 'Done', 2: 'Building' },
+  );
+  const shut = runWith(
+    [
+      ['1', []],
+      ['2', ['1']],
+      ['3', ['2']],
+    ],
+    { 1: 'Done', 2: 'Done', 3: 'Done' },
+  );
+  const entries = [
+    { kind: 'FlowRun', slug: 'listopen', status: 'Working' },
+    { kind: 'FlowRun', slug: 'listshut', status: 'Done' },
+    { kind: 'Loose', id: 's1' },
+  ];
+  const app = fakeApp({ list: { source: view('list', 'list', says('list')) } });
+  app.answers = {
+    projects: () => [
+      { id: 'p0', name: 'zero', roots: [] },
+      { id: 'p1', name: 'one', roots: [] },
+    ],
+    entries: ({ project }) => (project === 'p1' ? entries : []),
+    flow_run: ({ slug }) => (slug === 'listopen' ? open : shut),
+    doc: docWith,
+  };
+  const { runtime } = await started(app, { to: 'list', project: 'p1' });
+  await runtime.idle();
+  const wanted = [taskGraphSource(open), ...docSources('listopen')];
+  await until(() => wanted.every((s) => drawsOf(s) === 1) && !mermaidCalls.running, 'the open run drawn ahead');
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.equal(drawsOf(taskGraphSource(shut)), 0, 'a finished run waits until it is opened');
+  assert.ok(docSources('listshut').every((s) => drawsOf(s) === 0));
+  assert.ok(!app.calls.some(([cmd, args]) => cmd === 'entries' && args.project === 'p0'), 'only the shown project');
+  assert.ok(!app.calls.some(([cmd, args]) => cmd === 'flow_run' && args.slug === 'listshut'));
+
+  // The list shows the first project when the route names none, and drawing ahead follows it.
+  const first = fakeApp({ list: { source: view('list', 'list', says('list')) } });
+  first.answers = { ...app.answers, entries: ({ project }) => (project === 'p0' ? entries : []) };
+  const again = await started(first, { to: 'list' });
+  await again.runtime.idle();
+  await until(
+    () => first.calls.some(([cmd, args]) => cmd === 'flow_run' && args.project === 'p0' && args.slug === 'listopen'),
+    'p0 drawn ahead',
+  );
+});
+
+test('opening_a_run_draws_the_rest_of_its_documents_ahead', async () => {
+  const run = runWith(
+    [
+      ['1', []],
+      ['2', ['1']],
+      ['4', ['2']],
+    ],
+    { 1: 'Done', 2: 'Done', 4: 'Done' },
+  );
+  const app = fakeApp({ run: { source: view('run', 'run', says('run')) } });
+  app.answers = { flow_run: () => run, doc: docWith };
+  const { runtime } = await started(app, { ...RUN, slug: 'opened' });
+  await runtime.idle();
+  const wanted = [taskGraphSource(run), ...docSources('opened')];
+  await until(() => wanted.every((s) => drawsOf(s) === 1) && !mermaidCalls.running, "the run's diagrams drawn ahead");
 });
 
 test('broken_view_falls_back', async () => {
@@ -476,7 +768,7 @@ test('views_get_their_route_tabs_and_blocks_through_ctx', async () => {
   const { root } = await started(app, RUN);
   assert.equal(
     section(root, 'run').textContent,
-    'run|flow-cockpit|activity:Activity|card,diff,markdown,mermaid,stepper',
+    'run|flow-cockpit|activity:Activity|card,diff,markdown,mermaid,stepper,taskGraph',
   );
   assert.equal(section(root, 'activity'), null, 'a run-tab view draws only when its tab is selected');
 });

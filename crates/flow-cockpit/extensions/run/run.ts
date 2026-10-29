@@ -72,7 +72,6 @@ const day = (iso: string) => {
     ? iso
     : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 };
-const css = (name: string) => window.getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 /** `flow-observability` as `Flow observability`. */
 const runName = (slug: string) => capital(slug.replace(/[-_]+/g, ' '));
 
@@ -249,34 +248,30 @@ function track(flow: FlowDoc): Node[] {
   return nodes;
 }
 
-function graphable(all: Pair[]): boolean {
-  return all.length > 0 && all.every((x) => Array.isArray(x.p.depends_on));
-}
-
-/** The plan's tasks as a graph, ids only (node `T8b` for task 8b); a node selects its task. */
-function graph(ctx: ViewContext, all: Pair[], selected: string, select: (id: string) => void): HTMLElement {
-  const kind = (t: LedgerTask | undefined) =>
-    !t || t.state === 'NotStarted' ? 'todo' : t.state === 'Done' ? 'done' : t.state === 'Waiting' ? 'wait' : 'busy';
-  const fill = (v: string) => `fill:${css('--color-paper-2')},stroke:${css(v)},color:${css('--color-ink-2')}`;
-  // Top to bottom, so a long plan grows down the page instead of off its edge; roomier circles than the docs' diagrams
-  // (Mermaid takes padding from the source, its font from the stylesheet).
-  const lines = ['flowchart TB', '%%{init: {"flowchart": {"padding": 13}}}%%'];
-  for (const { p } of all) lines.push(`  T${p.id}(("${p.id}"))`);
-  for (const { p } of all) for (const d of p.depends_on ?? []) lines.push(`  T${d} --> T${p.id}`);
-  for (const k of ['done', 'busy', 'wait', 'todo']) {
-    const ids = all.filter((x) => kind(x.t) === k).map((x) => `T${x.p.id}`);
-    if (ids.length) lines.push(`  class ${ids.join(',')} ${k}`);
-  }
-  lines.push(
-    `  classDef done ${fill('--color-done')}`,
-    `  classDef busy ${fill('--color-current')}`,
-    `  classDef wait ${fill('--color-accent')}`,
-    `  classDef todo fill:${css('--color-paper')},stroke:${css('--color-paper-4')},color:${css('--color-muted')}`,
-    `  style T${selected} fill:${css('--color-paper-4')},stroke-width:3px,color:${css('--color-ink')}`,
-  );
-  const box = el('div', 'graph', ctx.blocks.mermaid(lines.join('\n')));
+/**
+ * The plan's tasks as a graph (the shell's task graph, one drawing for every task, which the window draws ahead); a
+ * node selects its task, and the selected one is ringed on the drawing.
+ */
+function graph(
+  ctx: ViewContext,
+  drawing: Node,
+  all: Pair[],
+  selected: string,
+  select: (id: string) => void,
+): HTMLElement {
+  const box = el('div', 'graph', drawing);
   const taskOf = (node: Element) => /T(\d+[a-z]?)/.exec(node.id)?.[1];
-  // The diagram draws after this returns: its nodes get their names and keys once they exist.
+  // The ring: a heavier outline and full-contrast text, over the state's own colours.
+  const ring = (g: Element) => {
+    g.setAttribute('aria-current', 'true');
+    for (const shape of g.querySelectorAll<SVGElement>('circle')) {
+      shape.style.setProperty('fill', 'var(--color-paper-4)', 'important');
+      shape.style.setProperty('stroke-width', '3px', 'important');
+    }
+    for (const label of g.querySelectorAll<SVGElement>('text, tspan'))
+      label.style.setProperty('fill', 'var(--color-ink)', 'important');
+  };
+  // A drawing not made yet draws after this returns: its nodes get their names and keys once they exist.
   const wire = () => {
     // The drawing's full height, which the stylesheet shrinks it from to fit the window, down to a floor.
     const full = Number(box.querySelector('svg')?.getAttribute('viewBox')?.split(/\s+/)[3]);
@@ -292,9 +287,10 @@ function graph(ctx: ViewContext, all: Pair[], selected: string, select: (id: str
       const tip = document.createElementNS('http://www.w3.org/2000/svg', 'title');
       tip.textContent = words;
       g.prepend(tip);
+      if (id === selected) ring(g);
     }
   };
-  // Watched until the drawing is in (or failed), or the box has left the page; a cached drawing is in already.
+  // Watched until the drawing is in (or failed), or the box has left the page; a drawing made earlier is in already.
   const watch = new window.MutationObserver(() => {
     wire();
     if (box.querySelector('svg, .diagram > .quiet') || !box.isConnected) watch.disconnect();
@@ -371,11 +367,14 @@ function taskView(ctx: ViewContext, all: Pair[], id: string | null, select: (id:
 /** The selected task's place in the plan: the legend over the graph, in a column of its own; null without a graph. */
 function whereGraph(
   ctx: ViewContext,
+  run: FlowRun,
   all: Pair[],
   id: string | null,
   select: (id: string) => void,
 ): HTMLElement | null {
-  if (!graphable(all) || id === null || !all.some((x) => x.p.id === id)) return null;
+  if (id === null || !all.some((x) => x.p.id === id)) return null;
+  const drawing = ctx.blocks.taskGraph(run);
+  if (!drawing) return null;
   const head = el('h2', 'visually-hidden', 'Where it sits in the plan');
   head.id = 'graph-h';
   const where = el('section', 'where-graph', head);
@@ -392,14 +391,14 @@ function whereGraph(
       ', not started; ',
       el('span', 'ring', 'ringed is this task.'),
     ),
-    graph(ctx, all, id, select),
+    graph(ctx, drawing, all, id, select),
   );
   return where;
 }
 
 /** The Build tab's content: where the run stands and the selected task, with its place in the plan beside them. */
 function buildPanel(ctx: ViewContext, run: FlowRun, all: Pair[], id: string | null, select: (id: string) => void) {
-  const where = whereGraph(ctx, all, id, select);
+  const where = whereGraph(ctx, run, all, id, select);
   const main = el('div', 'build-main', nowBlock(ctx, run, all), taskView(ctx, all, id, select));
   return el('div', 'build', main, ...(where ? [where] : []));
 }

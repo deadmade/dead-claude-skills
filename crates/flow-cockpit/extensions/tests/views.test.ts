@@ -14,11 +14,11 @@ g.document = dom.window.document;
 // No Mermaid in jsdom: a diagram stays as its source with the reason, as in the window when Mermaid can't load.
 
 const { markdown } = await import('../../app/shell/blocks/markdown.js');
-const { mermaid } = await import('../../app/shell/blocks/mermaid.js');
+const { mermaid, taskGraph } = await import('../../app/shell/blocks/mermaid.js');
 const { diff } = await import('../../app/shell/blocks/diff.js');
 const { stepper } = await import('../../app/shell/blocks/stepper.js');
 const { card } = await import('../../app/shell/blocks/card.js');
-const blocks = Object.freeze({ markdown, mermaid, diff, stepper, card });
+const blocks = Object.freeze({ markdown, mermaid, diff, stepper, card, taskGraph });
 
 const fixture = (name: string) => JSON.parse(readFileSync(new URL(`fixtures/${name}.json`, import.meta.url), 'utf8'));
 const DATA = {
@@ -957,9 +957,9 @@ test('run_draws_a_lettered_task_in_place', async () => {
     assert.match(source, /^flowchart TB\n/);
     assert.match(source, /^ {2}T2b\(\("2b"\)\)$/m);
     assert.match(source, /^ {2}T2 --> T2b$/m);
-    assert.match(source, /^ {2}style T2b /m);
     const node = box.querySelector('#flowchart-T2b-2') as Element;
     assert.equal(node.getAttribute('aria-label'), 'Task 2b, The lockout: being built');
+    assert.equal(node.getAttribute('aria-current'), 'true', 'the task being built is ringed');
 
     press(box, 'The form');
     assert.match(text(box.querySelector('.task .facts')), /Task 2 waits for it\./);
@@ -967,6 +967,47 @@ test('run_draws_a_lettered_task_in_place', async () => {
     box.querySelector('#flowchart-T2b-2')?.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     assert.equal(text(box.querySelector('.task .does')), 'Locks the form after five tries.');
     assert.equal(box.querySelector('.row[aria-current="true"]')?.getAttribute('data-task'), '2b');
+  } finally {
+    delete w.mermaid;
+  }
+});
+
+test('run_graph_is_one_drawing_that_rings_the_picked_task', async () => {
+  // Its own task states, so its source is one no other test drew (the shell keeps drawings while the page lives).
+  const runs = clone(DATA.runs);
+  runs[`${ALPHA}/login`].ledger.tasks.find((t: any) => t.id === '2').state = 'Waiting';
+  const w = window as any;
+  const sources: string[] = [];
+  w.mermaid = {
+    initialize() {},
+    render: async (id: string, src: string) => {
+      sources.push(src);
+      const node = (n: string, i: number) =>
+        `<g class="node" id="flowchart-T${n}-${i}"><circle r="20"></circle><g class="label"><text><tspan>${n}</tspan></text></g></g>`;
+      return { svg: `<svg id="${id}" viewBox="0 0 120 300">${node('1', 0)}${node('2', 1)}</svg>` };
+    },
+  };
+  try {
+    const { box } = await draw('run', { to: 'run', project: ALPHA, slug: 'login' }, { runs });
+    await tick();
+    assert.equal(sources.length, 1);
+    // No ring in the source: the drawing is the same whichever task is picked.
+    assert.doesNotMatch(sources[0], /^\s*style /m);
+    const ringed = () => [...box.querySelectorAll('.graph g.node[aria-current="true"]')].map((g) => g.id);
+    assert.deepEqual(ringed(), ['flowchart-T2-1']);
+    const circle = (id: string) => box.querySelector(`#${id} circle`) as SVGElement;
+    assert.equal(circle('flowchart-T2-1').style.getPropertyValue('stroke-width'), '3px');
+    assert.equal(circle('flowchart-T2-1').style.getPropertyPriority('fill'), 'important');
+    assert.equal(circle('flowchart-T1-0').style.getPropertyValue('stroke-width'), '');
+
+    press(box, 'The form');
+    // Picking another task draws at once from the same drawing, the ring moved.
+    assert.ok(box.querySelector('.where-graph .graph svg'), 'drawn at once, no placeholder');
+    assert.deepEqual(ringed(), ['flowchart-T1-0']);
+    assert.equal(circle('flowchart-T1-0').style.getPropertyValue('stroke-width'), '3px');
+    assert.equal(circle('flowchart-T2-1').style.getPropertyValue('stroke-width'), '');
+    await settle();
+    assert.equal(sources.length, 1, 'not drawn again');
   } finally {
     delete w.mermaid;
   }
