@@ -419,8 +419,9 @@ fn latest_attempts(mut runs: Vec<TestRun>) -> Vec<TestRun> {
 }
 
 /// `tests: <passed> passed, <failed> failed, <skipped> skipped` over `runs`, then the first 20 failed tests (the
-/// error's first line, the stack trace's first 5 lines), then how many of the counted failures weren't shown.
-fn test_lines(runs: &[TestRun], failed: &[TestCaseResult], rest: &str) -> Vec<String> {
+/// error's first line, the stack trace's first 5 lines), then how many of the counted failures weren't shown, when
+/// `rest` is given (the failed tests couldn't all be read otherwise).
+fn test_lines(runs: &[TestRun], failed: &[TestCaseResult], rest: Option<&str>) -> Vec<String> {
     let n = |v: Option<i32>| usize::try_from(v.unwrap_or(0)).unwrap_or(0);
     let (mut passed, mut fails, mut skipped) = (0, 0, 0);
     for r in runs {
@@ -457,7 +458,7 @@ fn test_lines(runs: &[TestRun], failed: &[TestCaseResult], rest: &str) -> Vec<St
         );
     }
     let left = fails.saturating_sub(shown);
-    if left > 0 {
+    if let Some(rest) = rest.filter(|_| left > 0) {
         let s = if left == 1 { "" } else { "s" };
         lines.push(format!("  … {left} more failed test{s}{rest}"));
     }
@@ -509,14 +510,14 @@ async fn test_results(ctx: &Ctx, proj: &str, run: u32, rest: &str) -> Vec<String
         match page {
             Ok(l) => failed.extend(l.value.into_iter().take(remaining)),
             Err(e) => {
-                let mut lines = test_lines(&runs, &failed, rest);
+                let mut lines = test_lines(&runs, &failed, None);
                 let e = e.with_what("test results");
                 lines.push(format!("  failed tests couldn't be read ({e})"));
                 return lines;
             }
         }
     }
-    test_lines(&runs, &failed, rest)
+    test_lines(&runs, &failed, Some(rest))
 }
 
 /// # Errors
@@ -1444,7 +1445,7 @@ mod tests {
         let lines = test_lines(
             &[test_run(1, "Unit", 30, 4, 25)],
             &failed,
-            ": pipeline_log run=7",
+            Some(": pipeline_log run=7"),
         );
         assert_eq!(lines[0], "tests: 4 passed, 25 failed, 1 skipped");
         assert_eq!(lines[1], "  t0: boom");
@@ -1458,15 +1459,15 @@ mod tests {
             lines[lines.len() - 1],
             "  … 5 more failed tests: pipeline_log run=7"
         );
-        let lines = test_lines(&[test_run(1, "Unit", 21, 0, 21)], &failed, "");
+        let lines = test_lines(&[test_run(1, "Unit", 21, 0, 21)], &failed, Some(""));
         assert_eq!(lines[lines.len() - 1], "  … 1 more failed test");
         // Fewer results than the counts promise: the rest is counted from those shown.
-        let lines = test_lines(&[test_run(1, "Unit", 25, 0, 25)], &failed[..10], "");
+        let lines = test_lines(&[test_run(1, "Unit", 25, 0, 25)], &failed[..10], Some(""));
         assert_eq!(lines[lines.len() - 1], "  … 15 more failed tests");
         // No error message, no stack trace: the name alone.
         let bare: TestCaseResult =
             serde_json::from_value(serde_json::json!({"testCaseTitle": "t"})).unwrap();
-        let lines = test_lines(&[test_run(1, "Unit", 1, 0, 1)], &[bare], "");
+        let lines = test_lines(&[test_run(1, "Unit", 1, 0, 1)], &[bare], Some(""));
         assert_eq!(lines, ["tests: 0 passed, 1 failed, 0 skipped", "  t"]);
     }
 

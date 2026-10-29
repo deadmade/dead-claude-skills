@@ -267,7 +267,8 @@ fn runs_query() {
     );
 }
 
-/// A results call that fails keeps the stages, the issues and the summary, plus one line; a 404 names no path.
+/// A results call that fails keeps the stages, the issues and the summary, plus one line instead of the more line; a
+/// 404 names no path.
 #[test]
 fn results_failure_keeps_summary() {
     for (resp, why) in [
@@ -289,7 +290,6 @@ fn results_failure_keeps_summary() {
             text,
             format!(
                 "{}\ntests: 12 passed, 1 failed, 2 skipped\n\
-                 \x20 … 1 more failed test: pipeline_log run=77\n\
                  \x20 failed tests couldn't be read ({why})",
                 view_base()
             )
@@ -330,6 +330,36 @@ fn failed_cap_across_runs() {
     assert_eq!(tests.len(), 1 + 20 + 1, "{text}");
     assert_eq!((tests[15], tests[16], tests[20]), ("  a14", "  b0", "  b4"));
     assert_eq!(tests[21], "  … 5 more failed tests: pipeline_log run=77");
+}
+
+/// A results call that fails after another run's were read keeps the failures read so far, and no more line.
+#[test]
+fn results_failure_keeps_failures_read() {
+    let fx = Fixture::start();
+    run_routes(&fx);
+    let run = |id: u32, name: &str, failed: u32| json!({"id": id, "name": name, "totalTests": failed, "passedTests": 0, "unanalyzedTests": failed});
+    fx.route(
+        TEST_RUNS,
+        vec![Resp::json(
+            &json!({"count": 2, "value": [run(50, "A", 2), run(51, "B", 3)]}),
+        )],
+    );
+    fx.route(&results(50), vec![failed_results("a", 2)]);
+    fx.route(&results(51), vec![Resp::new(500, "text/plain", "down")]);
+    let text = ok(&mut env(&fx), "pipeline_view", json!({"run": 77}));
+    let tests: Vec<&str> = text
+        .lines()
+        .skip_while(|l| !l.starts_with("tests:"))
+        .collect();
+    assert_eq!(
+        tests,
+        [
+            "tests: 0 passed, 5 failed, 0 skipped",
+            "  a0",
+            "  a1",
+            "  failed tests couldn't be read (the server failed (500); try again)"
+        ]
+    );
 }
 
 /// Review Focus 4: a test-results call that fails keeps the stages and issues, plus one line.
