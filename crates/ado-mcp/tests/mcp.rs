@@ -32,6 +32,12 @@ and projects, search, wiki pages and files in any repo."
         ),
         "{instructions}"
     );
+    assert!(
+        instructions.contains(
+            "(wi_view takes the work item's own, wi_update needs none, and search without it covers the whole collection)"
+        ),
+        "{instructions}"
+    );
     // One line each for search, wiki and repo_file.
     for line in [
         "\n- search finds work items, wiki pages and code in repos that aren't cloned; for the clone itself, search locally.\n",

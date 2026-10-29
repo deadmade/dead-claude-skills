@@ -41,7 +41,7 @@ const INSTRUCTIONS: &str = "\
 Azure DevOps Server tools: pull requests (pr_*), work items (wi_*), pipeline runs (pipeline_*), repos and \
 projects, search, wiki pages and files in any repo. Use them instead of curl or az for anything on the Azure DevOps server; they read the git remote, so they \
 work inside a clone without extra arguments (pass project, and repo for the pr_* tools, repo_file and code search, to \
-override it). Outside an Azure DevOps clone, pass project: project_list names them (wi_view takes the work item's own, wi_update needs none).\n\
+override it). Outside an Azure DevOps clone, pass project: project_list names them (wi_view takes the work item's own, wi_update needs none, and search without it covers the whole collection).\n\
 - There is no diff tool. To read a pull request's patch, run a local `git diff` against the target branch \
 (pr_files lists the changed files).\n\
 - search finds work items, wiki pages and code in repos that aren't cloned; for the clone itself, search locally.\n\
