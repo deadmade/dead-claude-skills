@@ -107,6 +107,21 @@ test('downloadBin unpacks a folder archive into its own folder, replacing the ol
   }
 });
 
+// A staged folder left by an installer killed mid-copy, under the same pid: its files must not ship.
+test('downloadBin ships only the archive, not a leftover staged folder', async () => {
+  const { server, url } = await release(archive);
+  const dir = oldFolder();
+  const leftover = join(`${dir}.tmp-${process.pid}`, 'extensions', 'stale');
+  mkdirSync(leftover, { recursive: true });
+  writeFileSync(join(leftover, 'stale.ts'), 'stale view');
+  try {
+    await downloadBin('fake', { file: archive, url, sha256: `${url}.sha256`, exe, folder: true }, join(dir, exe));
+    assert.deepEqual(readdirSync(dir), [exe], 'only what the archive holds');
+  } finally {
+    server.close();
+  }
+});
+
 test('downloadBin keeps the old folder when the archive lacks the program', async () => {
   const { server, url } = await release(archive);
   const dir = oldFolder();

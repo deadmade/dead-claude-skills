@@ -69,6 +69,9 @@ export async function downloadBin(name: string, asset: Asset, bin: string) {
     mkdirSync(dirname(dest), { recursive: true });
     const staged = `${dest}.tmp-${process.pid}`;
     try {
+      // A copy left by an installer killed mid-copy under the same pid would merge into this one. rmSync doesn't follow
+      // links, so nothing outside the staged path goes.
+      rmSync(staged, { recursive: true, force: true });
       if (asset.folder) cpSync(out, staged, { recursive: true });
       else cpSync(asset.raw ? file : join(out, asset.exe), staged);
       chmodSync(asset.folder ? join(staged, asset.exe) : staged, 0o755);
