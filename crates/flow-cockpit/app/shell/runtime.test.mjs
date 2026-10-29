@@ -12,12 +12,16 @@ globalThis.document = dom.window.document;
 
 /**
  * The fake Mermaid counts its calls and how many renders run at once. A render takes `mermaidDelay` ms; a source
- * holding `FAIL` (or any while `mermaidFails`) fails, and one holding `%% h=<n>` draws <n> px tall.
+ * holding `FAIL` (or any while `mermaidFails`) fails, one holding `HANG` waits until a test calls `unhang()`, and one
+ * holding `%% h=<n>` draws <n> px tall.
  * @type {{ initialize: unknown[], render: [string, string][], running: number, most: number }}
  */
 const mermaidCalls = { initialize: [], render: [], running: 0, most: 0 };
 let mermaidFails = false;
 let mermaidDelay = 0;
+/** @type {(() => void)[]} */
+const hung = [];
+const unhang = () => hung.splice(0).forEach((go) => go());
 dom.window.mermaid = {
   initialize: (config) => mermaidCalls.initialize.push(config),
   render: async (id, source) => {
@@ -25,6 +29,7 @@ dom.window.mermaid = {
     mermaidCalls.most = Math.max(mermaidCalls.most, ++mermaidCalls.running);
     try {
       if (mermaidDelay) await new Promise((resolve) => setTimeout(resolve, mermaidDelay));
+      if (source.includes('HANG')) await new Promise((resolve) => hung.push(resolve));
       if (mermaidFails || source.includes('FAIL')) throw new Error('Parse error on line 1');
       const h = /%% h=(\d+)/.exec(source)?.[1] ?? '100';
       return { svg: `<svg id="${id}" viewBox="0 0 200 ${h}"><g class="node"></g></svg>` };
@@ -489,6 +494,207 @@ test('opening_a_run_draws_the_rest_of_its_documents_ahead', async () => {
   await runtime.idle();
   const wanted = [taskGraphSource(run), ...docSources('opened')];
   await until(() => wanted.every((s) => drawsOf(s) === 1) && !mermaidCalls.running, "the run's diagrams drawn ahead");
+});
+
+test('changed_redraws_do_not_read_the_runs_again', async () => {
+  const run = runWith(
+    [
+      ['1', []],
+      ['2', ['1']],
+      ['5', ['2']],
+    ],
+    { 1: 'Done', 2: 'Building' },
+  );
+  const entry = {
+    kind: 'FlowRun',
+    slug: 'tick',
+    status: 'Working',
+    phase: 'build',
+    progress: [1, 3],
+    last_activity: '2026-10-29T10:00:00Z',
+  };
+  const app = fakeApp({ list: { source: view('list', 'list', says('list')) } });
+  app.answers = {
+    projects: () => [{ id: 'p1', name: 'one', roots: [] }],
+    entries: () => [{ ...entry }],
+    flow_run: () => run,
+    doc: docWith,
+  };
+  const reads = (cmd) => app.calls.filter(([c]) => c === cmd).length;
+  const { runtime } = await started(app, { to: 'list', project: 'p1' });
+  await runtime.idle();
+  await until(() => drawsOf(taskGraphSource(run)) === 1 && !mermaidCalls.running, 'the first pass');
+  await settle();
+  assert.deepEqual([reads('flow_run'), reads('doc')], [1, 3]);
+  // Two ticks with nothing new: no run or document is read again.
+  for (let i = 0; i < 2; i++) {
+    await app.emit('changed', { project: 'p1' });
+    await runtime.idle();
+    await settle();
+  }
+  assert.deepEqual([reads('flow_run'), reads('doc')], [1, 3], 'a tick reads nothing again');
+  // New progress reads the run (its graph) again; a new phase, status or activity reads its documents again.
+  entry.progress = [2, 3];
+  await app.emit('changed', { project: 'p1' });
+  await runtime.idle();
+  await until(() => reads('flow_run') === 2, 'the run read again');
+  await settle();
+  assert.equal(reads('doc'), 3);
+  entry.last_activity = '2026-10-29T10:05:00Z';
+  await app.emit('changed', { project: 'p1' });
+  await runtime.idle();
+  await until(() => reads('doc') === 6, 'the documents read again');
+  assert.equal(reads('flow_run'), 2);
+
+  // On the run page, drawing ahead runs when the run opens, not on its redraws.
+  const page = fakeApp({ run: { source: view('run', 'run', says('run')) } });
+  page.answers = { flow_run: () => run, doc: docWith };
+  const opened = await started(page, { ...RUN, slug: 'tick' });
+  await opened.runtime.idle();
+  await until(() => page.calls.filter(([c]) => c === 'doc').length === 3, 'the open run read');
+  for (let i = 0; i < 2; i++) {
+    await page.emit('changed', { project: 'p1' });
+    await opened.runtime.idle();
+    await settle();
+  }
+  assert.equal(page.calls.filter(([c]) => c === 'doc').length, 3);
+  assert.equal(page.calls.filter(([c]) => c === 'flow_run').length, 1);
+});
+
+/** A fresh copy of the Mermaid block, with its own queue, cache and start time. */
+let copies = 0;
+const freshBlock = () => import(`./blocks/mermaid.js?copy=${++copies}`);
+
+test('without_idle_callbacks_drawing_ahead_waits_for_a_quiet_moment', async () => {
+  // The webview's path: no requestIdleCallback, so the queue runs on timers. Its timers are counted.
+  const idle = window.requestIdleCallback;
+  const timer = window.setTimeout;
+  let timers = 0;
+  delete window.requestIdleCallback;
+  window.setTimeout = (...args) => {
+    timers++;
+    return timer.apply(window, args);
+  };
+  mermaidDelay = 10;
+  mermaidCalls.most = 0;
+  try {
+    const started = performance.now();
+    const block = await freshBlock();
+    const first = 'graph TD; Quiet1-->B';
+    block.ahead([first]);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    assert.equal(drawsOf(first), 0, 'nothing draws ahead in the first second');
+    await until(() => drawsOf(first) === 1, 'the first one drawn ahead');
+    assert.ok(performance.now() - started >= 1000, 'drawn a second after start at the earliest');
+
+    // Input holds the queue back until it has been quiet for a while; a diagram a page needs still draws at once.
+    window.dispatchEvent(new window.Event('pointerdown'));
+    const touched = performance.now();
+    const queued = ['graph TD; Quiet2-->B', 'graph TD; Quiet3-->B'];
+    block.ahead(queued);
+    const needed = block.mermaid('graph TD; Quiet4-->B');
+    await until(() => needed.querySelector('svg'), 'the needed one');
+    assert.ok(performance.now() - touched < 300, 'the needed one did not wait');
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    assert.equal(drawsOf(queued[0]), 0, 'held back by the click');
+    window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'a' }));
+    const typed = performance.now();
+    await until(() => queued.every((s) => drawsOf(s) === 1) && !mermaidCalls.running, 'the queue drawn');
+    assert.ok(performance.now() - typed >= 400, 'drawn after 400 ms without input');
+    assert.equal(mermaidCalls.most, 1, 'one at a time');
+    assert.deepEqual(
+      mermaidCalls.render.map(([, s]) => s).filter((s) => queued.includes(s)),
+      queued,
+    );
+    // An empty queue sets no more timers.
+    await settle();
+    const after = timers;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(timers, after, 'no timers once the queue is empty');
+  } finally {
+    window.requestIdleCallback = idle;
+    window.setTimeout = timer;
+    mermaidDelay = 0;
+  }
+});
+
+test('a_drawing_that_never_finishes_fails_and_the_queue_moves_on', async () => {
+  // The 10 s deadline, shortened for the test.
+  const timer = window.setTimeout;
+  window.setTimeout = (fn, ms, ...rest) => timer.call(window, fn, ms === 10000 ? 20 : ms, ...rest);
+  try {
+    const hang = 'graph TD; HANG-->B';
+    const after = 'graph TD; AfterHang-->B';
+    const box = mermaid(hang);
+    const next = mermaid(after);
+    await until(() => box.querySelector('pre') && next.querySelector('svg'), 'the deadline and the next drawing');
+    assert.equal(box.querySelector('pre').textContent, hang);
+    assert.match(box.querySelector('.quiet').textContent, /took too long/);
+    assert.equal(box.hasAttribute('aria-busy'), false);
+    // Kept as a failure: shown at once, not tried again.
+    const again = mermaid(hang);
+    assert.match(again.querySelector('.quiet')?.textContent ?? '', /took too long/);
+    await settle();
+    assert.equal(drawsOf(hang), 1);
+  } finally {
+    window.setTimeout = timer;
+    // Lets the hung render end, late: the queue has moved on and ignores it.
+    unhang();
+    await settle();
+  }
+});
+
+test('a_diagram_that_left_the_page_waits_behind_the_queue', async () => {
+  mermaidDelay = 15;
+  try {
+    const [a, b, c, q] = ['Left1', 'Left2', 'Left3', 'Left4'].map((n) => `graph TD; ${n}-->B`);
+    const boxA = mermaid(a);
+    const boxB = mermaid(b);
+    document.body.append(boxA, boxB);
+    await until(() => drawsOf(a) === 1, 'the first one drawing');
+    // The page moves on while A draws: B left it, C is on the new page, and Q was queued ahead.
+    boxA.remove();
+    boxB.remove();
+    ahead([q]);
+    const boxC = mermaid(c);
+    document.body.append(boxC);
+    await until(() => [b, c, q].every((s) => drawsOf(s) === 1) && !mermaidCalls.running, 'all drawn');
+    const order = mermaidCalls.render.map(([, s]) => s).filter((s) => [a, b, c, q].includes(s));
+    assert.deepEqual(order, [a, c, q, b]);
+    boxC.remove();
+  } finally {
+    mermaidDelay = 0;
+  }
+});
+
+test('a_placeholder_takes_the_height_the_drawing_had_on_the_page', async () => {
+  // A diagram whose drawing scales to its column is shorter on the page than its viewBox (500).
+  const proto = window.SVGElement.prototype;
+  proto.getBoundingClientRect = () => ({
+    x: 0,
+    y: 0,
+    top: 0,
+    left: 0,
+    right: 200,
+    bottom: 222,
+    width: 200,
+    height: 222,
+  });
+  const source = 'sequenceDiagram\n  A->>B: Shown\n%% h=500';
+  const root = document.documentElement;
+  try {
+    const box = mermaid(source);
+    document.body.append(box);
+    await until(() => box.querySelector('svg'), 'the drawing');
+    box.remove();
+    root.style.setProperty('--color-paper', '#202020');
+    const again = mermaid(source);
+    assert.equal(again.querySelector('.diagram-wait')?.style.getPropertyValue('--wait-h'), '222px');
+    await until(() => again.querySelector('svg'), 'the drawing in the new theme');
+  } finally {
+    delete proto.getBoundingClientRect;
+    root.style.removeProperty('--color-paper');
+  }
 });
 
 test('broken_view_falls_back', async () => {

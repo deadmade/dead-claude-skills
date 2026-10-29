@@ -419,19 +419,24 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     }
     drawnAt = where;
     if (kept) restore(root, kept, moved);
-    drawAhead(at);
+    drawAhead(at, !kept);
   }
 
   // Drawing ahead: the diagrams the next pages show, queued to draw in idle time (blocks/mermaid.js). After the list,
-  // the task graph and document diagrams of the shown project's unfinished runs; on a run, the rest of that run's,
-  // first in line. One pass at a time; a route drawn meanwhile is taken up after it.
+  // the task graph and document diagrams of the shown project's unfinished runs; when a run opens, the rest of that
+  // run's, first in line. One pass at a time; a route drawn meanwhile is taken up after it.
   /** @type {Route | null} */
   let aheadNext = null;
   let aheadBusy = false;
+  // What each run (`project/slug`) was last read for, from its list entry: a redraw reads a run's documents again only
+  // when its phase, status or last activity changed, and its task graph only when its progress did.
+  /** @type {Map<string, { docs: string, graph: string }>} */
+  const looked = new Map();
 
-  /** @param {Route} at */
-  async function drawAhead(at) {
-    if (at.to !== 'list' && at.to !== 'run') return;
+  /** @param {Route} at @param {boolean} opened a new route, not a redraw of the one shown */
+  async function drawAhead(at, opened) {
+    // On a run, the view draws the live graph itself: only opening it draws ahead.
+    if (at.to !== 'list' && !(at.to === 'run' && opened)) return;
     aheadNext = at;
     if (aheadBusy) return;
     aheadBusy = true;
@@ -448,7 +453,7 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
 
   /** @param {Route} at */
   async function aheadFor(at) {
-    if (at.to === 'run') return aheadRun(at.project, at.slug, true);
+    if (at.to === 'run') return aheadRun(at.project, at.slug, true, true, true);
     if (at.to !== 'list') return;
     /** @type {import('../../bindings/Project').Project[]} */
     const projects = (await data.projects()) ?? [];
@@ -457,17 +462,28 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     if (!project) return;
     /** @type {import('../../bindings/Entry').Entry[]} */
     const listed = (await data.entries(project.id)) ?? [];
-    for (const e of listed) if (e.kind === 'FlowRun' && e.status !== 'Done') await aheadRun(project.id, e.slug, false);
+    for (const e of listed) {
+      if (e.kind !== 'FlowRun' || e.status === 'Done') continue;
+      const key = `${project.id}/${e.slug}`;
+      const was = looked.get(key);
+      const now = { docs: JSON.stringify([e.phase, e.status, e.last_activity]), graph: JSON.stringify([e.progress]) };
+      if (was?.docs === now.docs && was.graph === now.graph) continue;
+      await aheadRun(project.id, e.slug, false, !was || was.graph !== now.graph, !was || was.docs !== now.docs);
+      looked.set(key, now);
+    }
   }
 
-  /** @param {string} project @param {string} slug @param {boolean} first */
-  async function aheadRun(project, slug, first) {
+  /**
+   * Queues a run's task graph (`graph`) and its documents' diagrams (`docs`).
+   * @param {string} project @param {string} slug @param {boolean} first @param {boolean} graph @param {boolean} docs
+   */
+  async function aheadRun(project, slug, first, graph, docs) {
     const [run, ...texts] = await Promise.all([
-      data.flowRun(project, slug),
-      ...DOCS.map((name) => data.doc(project, slug, name)),
+      graph ? data.flowRun(project, slug) : null,
+      ...(docs ? DOCS.map((name) => data.doc(project, slug, name)) : []),
     ]);
-    const graph = run ? taskGraphSource(run) : null;
-    ahead([...(graph === null ? [] : [graph]), ...texts.flatMap((t) => (t ? mermaidSources(t) : []))], first);
+    const source = run ? taskGraphSource(run) : null;
+    ahead([...(source === null ? [] : [source]), ...texts.flatMap((t) => (t ? mermaidSources(t) : []))], first);
   }
 
   /** @param {() => Promise<void>} step */

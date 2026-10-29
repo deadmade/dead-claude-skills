@@ -38,6 +38,20 @@ let idleAsked = false;
 /** The theme Mermaid was last set up with. */
 let setFor = '';
 let next = 0;
+// Boxes seen on the page while their drawing waited: one that has left it no longer makes its drawing urgent.
+/** @type {WeakSet<HTMLElement>} */
+const placed = new WeakSet();
+/** How long one render may take before it counts as failed, so one diagram can't hold up the rest. */
+const DEADLINE = 10000;
+// Where the webview has no requestIdleCallback (WebKitGTK), idle time is guessed: drawing ahead starts a second after
+// the window starts at the earliest, and once nothing was clicked or typed for 400 ms.
+const born = window.performance.now();
+let lastInput = -Infinity;
+const touched = () => {
+  lastInput = window.performance.now();
+};
+window.addEventListener('pointerdown', touched, true);
+window.addEventListener('keydown', touched, true);
 
 /** @param {string} name */
 const token = (name) => window.getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -78,6 +92,13 @@ function setUp(lib, look) {
   setFor = look;
 }
 
+/** Keeps a source's last drawing height for its placeholder. @param {string} source @param {number} h */
+function remember(source, h) {
+  heights.delete(source);
+  heights.set(source, h);
+  if (heights.size > KEEP * 4) heights.delete(/** @type {string} */ (heights.keys().next().value));
+}
+
 /** A drawing, or the source with why it failed. @param {HTMLElement} box @param {string} source @param {Drawing} d */
 function show(box, source, d) {
   box.removeAttribute('aria-busy');
@@ -85,6 +106,9 @@ function show(box, source, d) {
     // Mermaid's own SVG: under strict security it runs DOMPurify over the whole SVG before returning it, and the
     // window's CSP blocks inline handlers besides.
     box.innerHTML = d.svg;
+    // Its height on the page, which for a drawing that scales to its column is less than its own.
+    const h = box.isConnected ? (box.querySelector('svg')?.getBoundingClientRect().height ?? 0) : 0;
+    if (h > 0) remember(source, h);
     return;
   }
   const code = document.createElement('pre');
@@ -138,7 +162,7 @@ export function ahead(sources, first = false) {
   for (const source of sources) {
     const key = keyOf(look, source);
     if (drawn.has(key) || now.has(key) || running?.key === key || (!first && later.has(key))) continue;
-    fresh.set(key, { source, boxes: [] });
+    fresh.set(key, later.get(key) ?? { source, boxes: [] });
   }
   if (first) {
     for (const [key, job] of later) if (!fresh.has(key)) fresh.set(key, job);
@@ -154,7 +178,7 @@ function pump() {
   if (now.size) {
     if (soonAsked) return;
     soonAsked = true;
-    setTimeout(() => {
+    window.setTimeout(() => {
       soonAsked = false;
       drawNext();
     }, 0);
@@ -164,15 +188,27 @@ function pump() {
       idleAsked = false;
       drawNext();
     };
-    // Where the webview has no requestIdleCallback, a timer chain stands in.
     const idle = /** @type {any} */ (window).requestIdleCallback;
     if (typeof idle === 'function') idle.call(window, go);
-    else setTimeout(go, 0);
+    else whenQuiet(go);
   }
+}
+
+/** Runs `go` once the window has been up a second and nothing was clicked or typed for 400 ms. @param {() => void} go */
+function whenQuiet(go) {
+  const wait = Math.max(born + 1000, lastInput + 400) - window.performance.now();
+  window.setTimeout(wait > 0 ? () => whenQuiet(go) : go, Math.max(0, wait));
 }
 
 async function drawNext() {
   if (running) return;
+  // A diagram whose boxes have all left the page (the user moved on) waits behind the ones drawn ahead.
+  for (const job of now.values()) for (const box of job.boxes) if (box.isConnected) placed.add(box);
+  for (const [key, job] of now) {
+    if (job.boxes.some((box) => box.isConnected || !placed.has(box))) break;
+    now.delete(key);
+    later.set(key, job);
+  }
   const queue = now.size ? now : later;
   const first = queue.entries().next();
   if (first.done) return;
@@ -183,19 +219,23 @@ async function drawNext() {
   const look = theme();
   /** @type {Drawing} */
   let d;
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
+  let timer;
   try {
     if (!lib) throw new Error('Mermaid did not load.');
     setUp(lib, look);
-    const { svg } = await lib.render(`diagram-${++next}`, job.source);
+    const late = new Promise((_, reject) => {
+      timer = window.setTimeout(() => reject(new Error('Drawing took too long.')), DEADLINE);
+    });
+    const { svg } = await Promise.race([lib.render(`diagram-${++next}`, job.source), late]);
     d = { svg };
+    // The drawing's own height, until a box on the page shows how tall it is there.
     const h = Number(/viewBox="[^"]*\s([\d.]+)"/.exec(svg)?.[1]);
-    if (h > 0) {
-      heights.delete(job.source);
-      heights.set(job.source, h);
-      if (heights.size > KEEP * 4) heights.delete(/** @type {string} */ (heights.keys().next().value));
-    }
+    if (h > 0 && !heights.has(job.source)) remember(job.source, h);
   } catch (err) {
     d = { error: err instanceof Error ? err.message : String(err) };
+  } finally {
+    window.clearTimeout(timer);
   }
   running = null;
   // Mermaid missing is no fault of the source's: the next page that shows it tries again.
