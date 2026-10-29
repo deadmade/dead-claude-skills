@@ -39,10 +39,11 @@ Reads, each named `mcp__plugin_mcp-azure_ado__<tool>`:
 - `repo_list`: the project's repos with their default branch.
 - `project_list`: every project the PAT can see, by name.
 - `search`: the server's own Search, ranked. `kind` is `code`, `wi` (work items) or `wiki`, and `text` is in the
-  server's search syntax; `project`, and `repo` for code, narrow it. It prints `1 hit` or `N hits` (and a line when
-  the server reports something about the index or the query), then a line per hit: `#id [type] state  title`,
-  `<project>/<repo>:<path>  (N matches)` or `<project>/<wiki>:<page path>`, with a snippet under it where there is
-  one. A wiki hit's page path is the one `wiki` takes, relative to a code wiki's published folder.
+  server's search syntax; `project`, and `repo` for code, narrow it. It prints `1 hit` or `N hits`, then a line per
+  hit: `#id [type] state  title`, `<project>/<repo>:<path>  (N matches)` or `<project>/<wiki>:<page path>`, with a
+  snippet under it where there is one. When the server reports something about the index or the query, a line saying
+  so comes first, and with no hits that line is the whole answer. A wiki hit's page path is the one `wiki` takes,
+  relative to a code wiki's published folder.
 - `repo_file`: a file of any repo on the server, as 200 numbered lines per call from `start` (default 1), on the
   repo's default branch unless `branch`. For code hits in repos that aren't cloned; with `project`, `repo` is needed.
 - `wiki`: a wiki page by `path`, as markdown (cut at 4000 characters unless `full`), or without `path` the wiki's
