@@ -134,7 +134,8 @@ export default view;
     sits). Its tool calls come without their input: `ctx.data.toolInput(id, call.id)` reads one, so read it when the
     user opens that call;
   - `ctx.blocks`;
-  - `ctx.navigate(route)`;
+  - `ctx.navigate(route)`, which adds the route to the window's history (the mouse's back and forward buttons and a
+    reload use it), so move between screens only with it, never through `location` or `history`;
   - `ctx.route`;
   - `ctx.tabs`, the run tabs.
 - State that should survive a redraw, such as a picked row or a filter, can live in a module-level variable, as in

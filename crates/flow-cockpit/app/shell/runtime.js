@@ -192,6 +192,43 @@ function restore(root, kept, moved) {
   }
 }
 
+/**
+ * The route's place in the window's address, so back, forward and a reload find it: `#/<kind>/<part>/…`, each part
+ * URI-encoded (`#/run/<project>/<slug>/<tab>`, `#/session/<project>/<id>`).
+ * @param {Route} at
+ */
+function hashOf(at) {
+  const parts =
+    at.to === 'list'
+      ? [at.project]
+      : at.to === 'run'
+        ? [at.project, at.slug, at.tab]
+        : at.to === 'doc'
+          ? [at.project, at.slug, at.name]
+          : [at.project, at.id];
+  return `#/${[at.to, ...parts.filter((p) => p !== undefined)].map(encodeURIComponent).join('/')}`;
+}
+
+/** The route an address names; null when it names none. @param {string} hash @returns {Route | null} */
+function routeOf(hash) {
+  if (!hash.startsWith('#/')) return null;
+  /** @type {string[]} */
+  let parts;
+  try {
+    parts = hash.slice(2).split('/').map(decodeURIComponent);
+  } catch {
+    return null; // A broken escape.
+  }
+  if (parts.some((p) => !p)) return null;
+  const [to, project, a, b] = parts;
+  const n = parts.length;
+  if (to === 'list') return n === 1 ? { to } : n === 2 ? { to, project } : null;
+  if (to === 'run') return n === 3 ? { to, project, slug: a } : n === 4 ? { to, project, slug: a, tab: b } : null;
+  if (to === 'session') return n === 3 ? { to, project, id: a } : null;
+  const name = DOCS.find((d) => d === b);
+  return to === 'doc' && n === 4 && name ? { to, project, slug: a, name } : null;
+}
+
 /** The run route names a tab no loaded view draws. @param {string} id */
 function missingTab(id) {
   const line = document.createElement('p');
@@ -229,6 +266,11 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
   let extensions = { styles: [], disabled: [], looked: [] };
   /** The route last drawn, as JSON. */
   let drawnAt = '';
+  /** The route came from moving through history (back, forward), not from `navigate`. */
+  let traversing = false;
+  /** What the user did to the pages they left, by route JSON, for back and forward to put back; the newest 50. */
+  /** @type {Map<string, Kept>} */
+  const left = new Map();
   /** @type {Promise<void>} */
   let last = Promise.resolve();
   /** The drawn elements that have scrolled, for `snapshot`. `scroll` doesn't bubble, so it is caught on its way down. */
@@ -368,6 +410,8 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
 
   async function draw() {
     const at = Object.freeze({ ...route });
+    const traversed = traversing;
+    traversing = false;
     const tabs = Object.freeze(
       entries
         .filter((e) => slotsOf(e).includes('run-tab'))
@@ -409,17 +453,25 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
       root.replaceChildren(empty);
       return;
     }
-    // The same route drawn again (fresh data, a reloaded view) keeps what the user did to it; a new route starts fresh.
+    // The same route drawn again (fresh data, a reloaded view) keeps what the user did to it. A new route starts
+    // fresh, unless back or forward returns to a page left earlier: that gets back what the user had done to it.
     const where = JSON.stringify(at);
-    const kept = where === drawnAt ? snapshot(root, moved) : null;
+    const opened = where !== drawnAt;
+    const kept = opened ? null : snapshot(root, moved);
+    if (opened && drawnAt) {
+      left.delete(drawnAt);
+      left.set(drawnAt, snapshot(root, moved));
+      if (left.size > 50) left.delete(/** @type {string} */ (left.keys().next().value));
+    }
     root.replaceChildren(...sections);
     if (tabSection) {
       const host = sections.map((s) => s.querySelector('[data-slot="run-tab"]')).find(Boolean);
       (host ?? root).append(tabSection);
     }
     drawnAt = where;
-    if (kept) restore(root, kept, moved);
-    drawAhead(at, !kept);
+    const back = kept ?? (traversed ? left.get(where) : undefined);
+    if (back) restore(root, back, moved);
+    drawAhead(at, opened);
   }
 
   // Drawing ahead: the diagrams the next pages show, queued to draw in idle time (blocks/mermaid.js). After the list,
@@ -520,16 +572,53 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     });
   }
 
+  // The route lives in the window's address too (`hashOf`): each new route is one history entry, so the mouse's back
+  // and forward buttons move between pages and a reload opens the page it was on. Nothing is written to disk.
   /** @param {Route} to */
   function navigate(to) {
+    const hash = hashOf(to);
+    if (hash !== window.location.hash) window.history.pushState(null, '', hash);
     route = to;
     requestDraw();
   }
 
+  /** The route the address names; one that names none becomes the list, in place. @returns {Route} */
+  function fromAddress() {
+    const at = routeOf(window.location.hash) ?? { to: 'list' };
+    const hash = hashOf(at);
+    if (hash !== window.location.hash) window.history.replaceState(null, '', hash);
+    return at;
+  }
+
+  /** Back or forward moved the address: draw its route, the same way `navigate` does. */
+  function follow() {
+    const at = fromAddress();
+    if (hashOf(at) === hashOf(route)) return; // `hashchange` after `popstate`, for the same move.
+    route = at;
+    traversing = true;
+    requestDraw();
+  }
+
+  /** The mouse's side buttons: 3 is back, 4 forward. @param {MouseEvent} event */
+  function sideButton(event) {
+    if (event.button !== 3 && event.button !== 4) return;
+    event.preventDefault();
+    if (event.button === 3) window.history.back();
+    else window.history.forward();
+  }
+
   return {
-    /** Loads the views, draws `start` (the list by default) and follows the app's events. @param {Route} [start] */
+    /**
+     * Loads the views, draws `start` (else the route the window's address names, else the list) and follows the
+     * app's events and the window's history.
+     * @param {Route} [start]
+     */
     async start(start) {
-      if (start) route = start;
+      if (start) window.history.replaceState(null, '', hashOf(start));
+      route = start ?? fromAddress();
+      window.addEventListener('popstate', follow);
+      window.addEventListener('hashchange', follow);
+      window.addEventListener('mouseup', sideButton);
       await listen('views-changed', () => requestReload());
       await listen('changed', (event) => {
         const project = event.payload?.project ?? null;

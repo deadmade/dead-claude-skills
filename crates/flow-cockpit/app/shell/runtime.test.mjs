@@ -1229,6 +1229,212 @@ test('missing_default_extensions_name_where_the_window_looked', async () => {
   );
 });
 
+/**
+ * Runs `work` in a window of its own at `url`, so its history starts with one entry and only the runtime started in
+ * it follows that history: the runtimes earlier tests started keep listening on the shared window.
+ */
+async function inWindow(url, work) {
+  const own = new JSDOM('<!doctype html><html><body></body></html>', { url });
+  const shared = [globalThis.window, globalThis.document];
+  globalThis.window = own.window;
+  globalThis.document = own.window.document;
+  try {
+    return await work(own.window);
+  } finally {
+    [globalThis.window, globalThis.document] = shared;
+  }
+}
+
+/** A view on every screen that shows the route it was drawn for, as JSON. */
+const WHERE = {
+  where: {
+    source: view(
+      'where',
+      ['list', 'run', 'doc', 'session'],
+      "const p = document.createElement('p'); p.textContent = JSON.stringify(ctx.route); return p;",
+    ),
+  },
+};
+const drawnRoute = (root) => JSON.parse(section(root, 'where').textContent);
+/** Waits for a draw after a history move, which the window answers with `popstate`. */
+const afterMove = async (root, runtime, want) => {
+  await until(() => section(root, 'where')?.textContent === JSON.stringify(want), JSON.stringify(want));
+  await runtime.idle();
+};
+
+test('navigate_writes_the_hash_and_one_history_entry', async () => {
+  await inWindow('http://localhost/', async (win) => {
+    const app = fakeApp(WHERE);
+    const { root, runtime } = await started(app);
+    assert.deepEqual(drawnRoute(root), { to: 'list' });
+    assert.equal(win.location.hash, '#/list');
+    assert.equal(win.history.length, 1, 'the start replaces the entry it opened on');
+    runtime.navigate(RUN);
+    await runtime.idle();
+    assert.equal(win.location.hash, '#/run/p1/flow-cockpit');
+    assert.equal(win.history.length, 2);
+    // The same route again, and a redraw for fresh data, write nothing.
+    runtime.navigate({ ...RUN });
+    await app.emit('changed', { project: 'p1' });
+    await runtime.idle();
+    assert.equal(win.history.length, 2);
+    assert.deepEqual(drawnRoute(root), RUN);
+  });
+});
+
+test('back_and_forward_draw_the_route_of_that_entry', async () => {
+  await inWindow('http://localhost/', async (win) => {
+    const app = fakeApp(WHERE);
+    const { root, runtime } = await started(app, { to: 'list', project: 'p1' });
+    runtime.navigate(RUN);
+    await runtime.idle();
+    runtime.navigate({ to: 'session', project: 'p1', id: 's-1' });
+    await runtime.idle();
+    win.history.back();
+    await afterMove(root, runtime, RUN);
+    win.history.back();
+    await afterMove(root, runtime, { to: 'list', project: 'p1' });
+    win.history.forward();
+    await afterMove(root, runtime, RUN);
+    assert.equal(win.location.hash, '#/run/p1/flow-cockpit');
+    assert.equal(win.history.length, 3, 'moving through history adds no entries');
+  });
+});
+
+test('a_start_with_a_valid_hash_opens_it', async () => {
+  await inWindow('http://localhost/#/run/p1/flow-cockpit/docs', async (win) => {
+    const { root } = await started(fakeApp(WHERE));
+    assert.deepEqual(drawnRoute(root), { ...RUN, tab: 'docs' });
+    assert.equal(win.location.hash, '#/run/p1/flow-cockpit/docs');
+    assert.equal(win.history.length, 1);
+  });
+});
+
+test('a_malformed_or_unknown_hash_opens_the_list_and_replaces_it', async () => {
+  const bad = [
+    '',
+    '#',
+    '#/',
+    '#list',
+    '#/nope/p1',
+    '#/run/p1',
+    '#/run/p1/s/t/extra',
+    '#/run//s',
+    '#/run/p1/%E0%A4%A',
+    '#/doc/p1/s/Readme',
+    '#/session/p1',
+    '#/list/p1/more',
+  ];
+  for (const hash of bad) {
+    await inWindow(`http://localhost/${hash}`, async (win) => {
+      const { root } = await started(fakeApp(WHERE));
+      assert.deepEqual(drawnRoute(root), { to: 'list' }, hash);
+      assert.equal(win.location.hash, '#/list', hash);
+      assert.equal(win.history.length, 1, hash);
+    });
+  }
+});
+
+test('a_run_tab_switch_is_one_entry_and_back_returns_to_the_tab_before', async () => {
+  await inWindow('http://localhost/', async (win) => {
+    const app = fakeApp({
+      run: { source: view('run', 'run', RUN_FRAME) },
+      activity: { source: view('activity', 'run-tab', says('activity drawn'), 'Activity') },
+      docs: { source: view('docs', 'run-tab', says('docs drawn'), 'Docs') },
+    });
+    const { root, runtime } = await started(app, RUN);
+    root.querySelector('button[data-tab="docs"]').click();
+    await runtime.idle();
+    assert.equal(win.location.hash, '#/run/p1/flow-cockpit/docs');
+    root.querySelector('button[data-tab="activity"]').click();
+    await runtime.idle();
+    assert.equal(win.history.length, 3);
+    win.history.back();
+    await until(() => section(root, 'docs')?.textContent === 'docs drawn', 'the docs tab');
+    assert.equal(section(root, 'activity'), null);
+    assert.equal(win.location.hash, '#/run/p1/flow-cockpit/docs');
+  });
+});
+
+test('every_route_kind_round_trips_through_the_hash', async () => {
+  const odd = ['a b', 'x/y', 'c#d', 'ünï 字 🙂', '%41', '?q=1&r', "it's"];
+  /** @type {object[]} */
+  const routes = [{ to: 'list' }];
+  for (const s of odd) {
+    routes.push(
+      { to: 'list', project: s },
+      { to: 'run', project: s, slug: s },
+      { to: 'run', project: s, slug: 'run', tab: s },
+      { to: 'doc', project: s, slug: s, name: 'Plan' },
+      { to: 'session', project: s, id: s },
+    );
+  }
+  for (const route of routes) {
+    const hash = await inWindow('http://localhost/', async (win) => {
+      const { runtime } = await started(fakeApp(WHERE));
+      runtime.navigate(route);
+      await runtime.idle();
+      return win.location.hash;
+    });
+    // One readable form: the kind first, every part encoded, so a `/` or `#` in an id never splits it.
+    assert.match(hash, new RegExp(`^#/${route.to}(/[^/#?\\s]+)*$`), hash);
+    await inWindow(`http://localhost/${hash}`, async (win) => {
+      const { root } = await started(fakeApp(WHERE));
+      assert.deepEqual(drawnRoute(root), route, hash);
+      assert.equal(win.location.hash, hash);
+    });
+  }
+});
+
+test('back_restores_the_scroll_and_folds_of_the_page_it_returns_to', async () => {
+  await inWindow('http://localhost/', async (win) => {
+    win.mermaid = dom.window.mermaid;
+    const app = fakeApp({
+      list: { source: viewOf('list', 'list', stateful) },
+      run: { source: view('run', 'run', says('a run')) },
+    });
+    const { root, runtime } = await started(app);
+    const old = section(root, 'list');
+    const pane = old.querySelector('.content');
+    pane.scrollTop = 50;
+    pane.dispatchEvent(new win.Event('scroll'));
+    old.querySelector('details').open = true;
+    runtime.navigate(RUN);
+    await runtime.idle();
+    win.history.back();
+    await until(() => section(root, 'list'), 'the list again');
+    await runtime.idle();
+    const now = section(root, 'list');
+    assert.notEqual(now, old);
+    assert.equal(now.querySelector('.content').scrollTop, 50);
+    assert.ok(now.querySelector('details').open);
+    // Opening a page by a click still starts it fresh.
+    runtime.navigate(RUN);
+    await runtime.idle();
+    runtime.navigate({ to: 'list' });
+    await runtime.idle();
+    assert.ok(!section(root, 'list').querySelector('details').open);
+  });
+});
+
+test('the_mouse_side_buttons_go_back_and_forward_once', async () => {
+  await inWindow('http://localhost/', async (win) => {
+    const moves = [];
+    win.history.back = () => moves.push('back');
+    win.history.forward = () => moves.push('forward');
+    await started(fakeApp(WHERE));
+    const press = (button) => {
+      for (const type of ['mousedown', 'mouseup', 'auxclick'])
+        win.document.body.dispatchEvent(new win.MouseEvent(type, { button, bubbles: true, cancelable: true }));
+    };
+    press(3);
+    press(4);
+    press(1);
+    press(0);
+    assert.deepEqual(moves, ['back', 'forward']);
+  });
+});
+
 test('card_string_body_is_text', () => {
   const node = card({ title: '<b>t</b>', meta: 'meta <i>m</i>', body: '<img src=x onerror="window.pwned = 5">' });
   assert.equal(node.querySelector('img'), null);
