@@ -103,6 +103,15 @@ _Avoid_: build definition, release
 One execution of a pipeline, with a result. The REST API calls it a build. web-mcp's Run is a different thing.
 _Avoid_: build, job (a job is one part of a run)
 
+**Test run**:
+One set of test results a pipeline run published: one per job and attempt, and one per result file unless the
+publishing task merges them; a run can publish several.
+_Avoid_: run (alone), test pass
+
+**Hit**:
+One search result: a file, a work item or a wiki page. A place inside a file that matched is a match.
+_Avoid_: result, match (for the whole hit)
+
 **Step**:
 One task inside a run's job, with its own result and log.
 _Avoid_: task, timeline record
@@ -116,6 +125,6 @@ An mcp-azure tool that never changes anything on the server; the user may allow 
 _Avoid_: query tool
 
 **Write tool**:
-An mcp-azure tool that changes something on the server; Claude Code asks the user before every call, whatever the
-permission mode.
+An mcp-azure tool that changes something on the server; Claude Code asks the user before every call, in every
+permission mode but `dontAsk`, which denies it.
 _Avoid_: action, mutation

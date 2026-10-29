@@ -88,7 +88,8 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
     `tests/fixtures.rs` maps each fixture to the crate model its route returns, so every fixture must fit that model;
     fixtures no crate model reads are listed apart, in `HAND_WRITTEN`. Fitting the model doesn't prove the server's
     shape: build fixtures from real answers or the Server docs' samples (the comments fixture carried a `url` the
-    server leaves out of mentions, D7).
+    server leaves out of mentions, D7). The fixtures' ids (`p1`) aren't GUIDs, so a test that a reply prints no GUID
+    needs a GUID-shaped id in its fixture, or a leak passes unseen.
     Test-only hook: `ADO_TIMEOUT_MS` (debug builds) replaces the 60 s request timeout.
 - `plugins/opt-in/md-pane/`: a mod. Pure path logic in `hooks/paths.ts`; `register.tsx` redraws replies that name an existing
   `.md` file as its own `Markdown` (only a plugin-drawn `Markdown` with `onLinkPress` receives plain link clicks, and
