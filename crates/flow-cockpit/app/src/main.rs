@@ -82,6 +82,7 @@ fn run() -> ExitCode {
         default_extensions(env),
         config_dir.join("extensions"),
         settings.config.disabled.clone(),
+        settings.config.trusted.clone(),
     );
     let shared = Arc::new(Shared::new(index, views));
     let poll_shared = Arc::clone(&shared);

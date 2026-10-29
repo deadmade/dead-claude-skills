@@ -1,8 +1,9 @@
 //! Which views exist and where each one's code comes from. Views come in extensions: a folder `<name>/` holding one
 //! or more view files `<id>.ts` and an optional `style.css`, its name the extension's name. The default extensions
 //! ship with the app; the user's own, in their extensions folder, add to them, and one with a default's name replaces
-//! that whole default. `config.toml`'s `disabled` switches extensions off by name. Both folders are read on every
-//! call, so a changed file shows on the next load.
+//! that whole default. On a project's pages, a repository the user trusts (`config.toml`'s `trusted`) adds its own
+//! `.flow-cockpit/extensions/` above both, the same way. `config.toml`'s `disabled` switches extensions off by name.
+//! Every folder is read on every call, so a changed file shows on the next load.
 
 use std::collections::BTreeSet;
 use std::collections::btree_map::{BTreeMap, Entry};
@@ -23,8 +24,7 @@ pub enum ViewSource {
     Builtin,
     /// One of the user's extensions.
     Global,
-    /// A trusted repository's `.flow-cockpit/views/`.
-    #[expect(dead_code, reason = "repository views load once trust is in (slice 2)")]
+    /// One of a trusted repository's extensions, in its `.flow-cockpit/extensions/`.
     Repo,
 }
 
@@ -33,7 +33,7 @@ pub enum ViewSource {
 pub struct ViewInfo {
     pub id: String,
     pub source: ViewSource,
-    /// One of the user's views stands in for a default view of the same id.
+    /// A view of the user's or of a trusted repository stands in for a default view of the same id.
     pub replaced: bool,
 }
 
@@ -55,12 +55,14 @@ pub struct Style {
     pub css: String,
 }
 
-/// The two extensions folders and the names switched off.
+/// The extensions folders, the names switched off and the repositories trusted.
 pub struct Views {
     defaults: Defaults,
     user: PathBuf,
     /// `config.toml`'s `disabled`, which the poll keeps current.
     disabled: RwLock<Vec<String>>,
+    /// `config.toml`'s `trusted`, which the poll keeps current.
+    trusted: RwLock<Vec<PathBuf>>,
 }
 
 /// One extension folder: its view files by id and its style.
@@ -80,17 +82,27 @@ struct Resolved {
     replaced: bool,
 }
 
+/// The enabled extensions of each folder, lowest first: the defaults, the user's, and a trusted repository's.
+type Layers = Vec<(ViewSource, Vec<Extension>)>;
+
 impl Views {
     #[must_use]
-    pub fn new(defaults: Defaults, user: PathBuf, disabled: Vec<String>) -> Views {
+    pub fn new(
+        defaults: Defaults,
+        user: PathBuf,
+        disabled: Vec<String>,
+        trusted: Vec<PathBuf>,
+    ) -> Views {
         Views {
             defaults,
             user,
             disabled: RwLock::new(disabled),
+            trusted: RwLock::new(trusted),
         }
     }
 
-    /// The folders the poll watches: the default extensions (when found) and the user's.
+    /// The folders the poll watches besides the trusted repositories': the default extensions (when found) and the
+    /// user's.
     pub fn folders(&self) -> impl Iterator<Item = &Path> {
         self.defaults
             .found
@@ -107,6 +119,11 @@ impl Views {
             .unwrap_or_else(PoisonError::into_inner) = disabled;
     }
 
+    /// `config.toml`'s `trusted`, read again.
+    pub fn set_trusted(&self, trusted: Vec<PathBuf>) {
+        *self.trusted.write().unwrap_or_else(PoisonError::into_inner) = trusted;
+    }
+
     fn disabled(&self) -> Vec<String> {
         self.disabled
             .read()
@@ -114,10 +131,37 @@ impl Views {
             .clone()
     }
 
-    /// Every view id once, from the extension that wins, sorted by id.
+    /// The extensions folder of a project with these roots (its checkouts and worktrees), when `trusted` names one of
+    /// them: the first main checkout's `.flow-cockpit/extensions/` that exists, else the first worktree's. Nothing in
+    /// an untrusted project's folders is read. A linked `.flow-cockpit` or `extensions` is no folder, as everywhere
+    /// else.
     #[must_use]
-    pub fn list(&self) -> Vec<ViewInfo> {
-        self.resolve()
+    pub fn repo(&self, roots: &[PathBuf]) -> Option<PathBuf> {
+        let trusted = self.trusted.read().unwrap_or_else(PoisonError::into_inner);
+        if !roots
+            .iter()
+            .any(|root| trusted.iter().any(|t| same_folder(t, root)))
+        {
+            return None;
+        }
+        drop(trusted);
+        // A checkout's `.git` is a folder; a worktree's, a file.
+        let (main, worktrees): (Vec<&PathBuf>, Vec<&PathBuf>) = roots
+            .iter()
+            .partition(|root| is_real_dir(&root.join(".git")));
+        main.into_iter()
+            .chain(worktrees)
+            .map(|root| root.join(".flow-cockpit"))
+            .filter(|dir| is_real_dir(dir))
+            .map(|dir| dir.join("extensions"))
+            .find(|dir| is_real_dir(dir))
+    }
+
+    /// Every view id once, from the extension that wins, sorted by id. `repo` is a trusted repository's extensions
+    /// folder ([`Views::repo`]), given on that project's pages only.
+    #[must_use]
+    pub fn list(&self, repo: Option<&Path>) -> Vec<ViewInfo> {
+        resolve(&self.layers(repo))
             .into_iter()
             .map(|(id, r)| ViewInfo {
                 id,
@@ -128,19 +172,19 @@ impl Views {
     }
 
     /// The view's code with its types stripped. `builtin` reads the default extensions' view of that id even when
-    /// the user's replaces it: the window draws it below a broken replacement.
+    /// another replaces it: the window draws it below a broken replacement.
     ///
     /// # Errors
     /// No view has that id (no default one, with `builtin`), two extensions in one folder both have it, its file
     /// can't be read, or it doesn't strip (the message names the line).
-    pub fn source(&self, id: &str, builtin: bool) -> Result<String, String> {
+    pub fn source(&self, id: &str, builtin: bool, repo: Option<&Path>) -> Result<String, String> {
         // Only ids a listing found: an id is never joined onto a path.
         let found = if builtin {
             self.default_views()
                 .remove(id)
                 .ok_or_else(|| format!("no default view {id}"))?
         } else {
-            self.resolve()
+            resolve(&self.layers(repo))
                 .remove(id)
                 .ok_or_else(|| format!("no view {id}"))?
                 .found
@@ -153,9 +197,9 @@ impl Views {
 
     /// The loaded extensions' styles, the names switched off, and where the defaults were looked for when missing.
     #[must_use]
-    pub fn extensions(&self) -> Extensions {
-        let (defaults, user) = self.enabled();
-        let mut shown: Vec<&Extension> = replaceable(&defaults, &user).chain(&user).collect();
+    pub fn extensions(&self, repo: Option<&Path>) -> Extensions {
+        let layers = self.layers(repo);
+        let mut shown: Vec<&Extension> = shown(&layers).flat_map(|(_, exts)| exts).collect();
         shown.sort_by(|a, b| a.name.cmp(&b.name));
         let styles = shown
             .into_iter()
@@ -183,8 +227,8 @@ impl Views {
         }
     }
 
-    /// The extensions not switched off: the defaults and the user's.
-    fn enabled(&self) -> (Vec<Extension>, Vec<Extension>) {
+    /// The extensions not switched off, by folder: the defaults, the user's, and the repository's when given.
+    fn layers(&self, repo: Option<&Path>) -> Layers {
         let disabled: BTreeSet<String> = self.disabled().into_iter().collect();
         let scan_enabled = |dir: Option<&Path>| -> Vec<Extension> {
             dir.map(scan)
@@ -193,53 +237,76 @@ impl Views {
                 .filter(|e| !disabled.contains(&e.name))
                 .collect()
         };
-        (
-            scan_enabled(self.defaults.found.as_deref()),
-            scan_enabled(Some(&self.user)),
-        )
-    }
-
-    /// The default extensions' views, those the user replaced included.
-    fn default_views(&self) -> BTreeMap<String, Found> {
-        views_of(&self.enabled().0)
-    }
-
-    /// Each view id, from the user's extensions over the defaults they don't replace.
-    fn resolve(&self) -> BTreeMap<String, Resolved> {
-        let (defaults, user) = self.enabled();
-        let behind = views_of(&defaults);
-        let mut out: BTreeMap<String, Resolved> = views_of(replaceable(&defaults, &user))
-            .into_iter()
-            .map(|(id, found)| {
-                let r = Resolved {
-                    source: ViewSource::Builtin,
-                    found,
-                    replaced: false,
-                };
-                (id, r)
-            })
-            .collect();
-        for (id, found) in views_of(&user) {
-            let replaced = behind.contains_key(&id);
-            let r = Resolved {
-                source: ViewSource::Global,
-                found,
-                replaced,
-            };
-            out.insert(id, r);
+        let mut layers = vec![
+            (
+                ViewSource::Builtin,
+                scan_enabled(self.defaults.found.as_deref()),
+            ),
+            (ViewSource::Global, scan_enabled(Some(&self.user))),
+        ];
+        if repo.is_some() {
+            layers.push((ViewSource::Repo, scan_enabled(repo)));
         }
-        out
+        layers
+    }
+
+    /// The default extensions' views, those another extension replaced included.
+    fn default_views(&self) -> BTreeMap<String, Found> {
+        let mut layers = self.layers(None);
+        views_of(&layers.swap_remove(0).1)
     }
 }
 
-/// The default extensions no user extension of the same name replaces.
-fn replaceable<'a>(
-    defaults: &'a [Extension],
-    user: &'a [Extension],
-) -> impl Iterator<Item = &'a Extension> {
-    defaults
-        .iter()
-        .filter(|d| !user.iter().any(|u| u.name == d.name))
+/// Each view id, from the highest folder that has it; `replaced` when a default view of that id is behind it.
+fn resolve(layers: &Layers) -> BTreeMap<String, Resolved> {
+    let behind = layers
+        .first()
+        .map(|(_, defaults)| views_of(defaults))
+        .unwrap_or_default();
+    let mut out = BTreeMap::new();
+    for (source, extensions) in shown(layers) {
+        for (id, found) in views_of(extensions) {
+            let replaced = source != ViewSource::Builtin && behind.contains_key(&id);
+            out.insert(
+                id,
+                Resolved {
+                    source,
+                    found,
+                    replaced,
+                },
+            );
+        }
+    }
+    out
+}
+
+/// Each folder's extensions that no higher folder's extension of the same name replaces.
+fn shown(layers: &Layers) -> impl Iterator<Item = (ViewSource, Vec<&Extension>)> {
+    layers.iter().enumerate().map(|(i, (source, extensions))| {
+        let kept = extensions
+            .iter()
+            .filter(|ext| {
+                !layers[i + 1..]
+                    .iter()
+                    .any(|(_, higher)| higher.iter().any(|h| h.name == ext.name))
+            })
+            .collect();
+        (*source, kept)
+    })
+}
+
+/// The same folder: equal paths, or paths that resolve to the same folder.
+fn same_folder(a: &Path, b: &Path) -> bool {
+    a == b
+        || matches!(
+            (fs::canonicalize(a), fs::canonicalize(b)),
+            (Ok(x), Ok(y)) if x == y
+        )
+}
+
+/// A folder, not a link to one.
+fn is_real_dir(path: &Path) -> bool {
+    fs::symlink_metadata(path).is_ok_and(|m| m.is_dir())
 }
 
 /// The views of extensions from one folder by id; an id two of them have is an error naming both.
@@ -357,6 +424,7 @@ mod tests {
                 },
                 self.0.join("user"),
                 disabled.iter().map(ToString::to_string).collect(),
+                Vec::new(),
             )
         }
     }
@@ -380,16 +448,16 @@ mod tests {
         t.write("defaults/tests/fixtures/x.json", "{}");
         let views = t.views(&[]);
         assert_eq!(
-            views.list(),
+            views.list(None),
             [
                 info("list", ViewSource::Builtin, false),
                 info("run", ViewSource::Builtin, false),
             ]
         );
-        let run = views.source("run", false).unwrap();
+        let run = views.source("run", false, None).unwrap();
         assert!(run.contains("run") && !run.contains(": number"), "{run}");
         t.write("defaults/run/run.ts", "export default { id: 'edited' };\n");
-        assert!(views.source("run", false).unwrap().contains("edited"));
+        assert!(views.source("run", false, None).unwrap().contains("edited"));
     }
 
     #[test]
@@ -404,27 +472,27 @@ mod tests {
         t.write("user/more/extra.ts", "export default {};\n");
         let views = t.views(&[]);
         assert_eq!(
-            views.list(),
+            views.list(None),
             [
                 info("extra", ViewSource::Global, false),
                 info("list", ViewSource::Builtin, false),
                 info("run", ViewSource::Global, true),
             ]
         );
-        assert!(views.source("run", false).unwrap().contains("mine"));
+        assert!(views.source("run", false, None).unwrap().contains("mine"));
         // The default behind it, which the window draws below a broken replacement.
-        let builtin = views.source("run", true).unwrap();
+        let builtin = views.source("run", true, None).unwrap();
         assert!(
             builtin.contains("id: \"run\"") && !builtin.contains("mine"),
             "{builtin}"
         );
         // No default behind a view of its own: an error, so the window shows only the error card.
-        assert!(views.source("extra", true).is_err());
+        assert!(views.source("extra", true, None).is_err());
         // Removing the user's folder brings the default back.
         fs::remove_dir_all(t.0.join("user/run")).unwrap();
         assert_eq!(
             views
-                .list()
+                .list(None)
                 .iter()
                 .map(|v| v.id.as_str())
                 .collect::<Vec<_>>(),
@@ -439,11 +507,11 @@ mod tests {
         let views = t.views(&[]);
         assert!(
             views
-                .list()
+                .list(None)
                 .contains(&info("run", ViewSource::Global, true))
         );
-        assert!(views.source("run", false).unwrap().contains("mine"));
-        assert!(!views.source("run", true).unwrap().contains("mine"));
+        assert!(views.source("run", false, None).unwrap().contains("mine"));
+        assert!(!views.source("run", true, None).unwrap().contains("mine"));
     }
 
     #[test]
@@ -451,16 +519,16 @@ mod tests {
         let t = temp("disabled");
         t.write("user/more/extra.ts", "export default {};\n");
         let views = t.views(&["run", "more"]);
-        assert_eq!(views.list(), [info("list", ViewSource::Builtin, false)]);
-        assert!(views.source("run", false).is_err());
-        assert_eq!(views.extensions().disabled, ["run", "more"]);
+        assert_eq!(views.list(None), [info("list", ViewSource::Builtin, false)]);
+        assert!(views.source("run", false, None).is_err());
+        assert_eq!(views.extensions(None).disabled, ["run", "more"]);
         // Read live: switching it back on brings the views back.
         views.set_disabled(vec![]);
-        assert_eq!(views.list().len(), 3);
+        assert_eq!(views.list(None).len(), 3);
         // A disabled default is no fallback either.
         t.write("user/run/run.ts", "export default { id: 'mine' };\n");
         views.set_disabled(vec!["run".to_string()]);
-        assert_eq!(views.list().len(), 2);
+        assert_eq!(views.list(None).len(), 2);
     }
 
     #[test]
@@ -472,20 +540,20 @@ mod tests {
         let views = t.views(&[]);
         assert!(
             views
-                .list()
+                .list(None)
                 .contains(&info("extra", ViewSource::Global, false))
         );
         assert_eq!(
-            views.source("extra", false).unwrap_err(),
+            views.source("extra", false, None).unwrap_err(),
             "the extensions a and b both have a view extra"
         );
         assert_eq!(
-            views.source("list", false).unwrap_err(),
+            views.source("list", false, None).unwrap_err(),
             "the extensions list and other both have a view list"
         );
         // Across the two folders it is no clash: the user's wins.
         fs::remove_dir_all(t.0.join("user/b")).unwrap();
-        assert!(views.source("extra", false).is_ok());
+        assert!(views.source("extra", false, None).is_ok());
     }
 
     #[test]
@@ -501,7 +569,7 @@ mod tests {
         // A style with no view is no extension.
         t.write("user/lonely/style.css", "body {}\n");
         let views = t.views(&["run"]);
-        let got = views.extensions();
+        let got = views.extensions(None);
         assert_eq!(
             got.styles,
             [
@@ -522,9 +590,139 @@ mod tests {
     fn unknown_or_path_like_id_is_an_error() {
         let t = temp("unknown");
         let views = t.views(&[]);
-        assert!(views.source("nope", false).is_err());
-        assert!(views.source("../list", false).is_err());
-        assert!(views.source("list/list", false).is_err());
+        assert!(views.source("nope", false, None).is_err());
+        assert!(views.source("../list", false, None).is_err());
+        assert!(views.source("list/list", false, None).is_err());
+    }
+
+    /// A trusted repository's extensions sit above the user's, which sit above the defaults: by folder name (the
+    /// whole extension) and by view id.
+    #[test]
+    fn trusted_repo_view_replaces_global() {
+        let t = temp("repo-order");
+        t.write("user/run/run.ts", "export default { id: 'user run' };\n");
+        t.write("user/run/style.css", "/* user run */\n");
+        t.write(
+            "user/notes/notes.ts",
+            "export default { id: 'user notes' };\n",
+        );
+        t.write("user/mine/mine.ts", "export default { id: 'user mine' };\n");
+        t.write("repo/run/run.ts", "export default { id: 'repo run' };\n");
+        t.write("repo/run/style.css", "/* repo run */\n");
+        t.write(
+            "repo/team/notes.ts",
+            "export default { id: 'repo notes' };\n",
+        );
+        t.write("repo/team/list.ts", "export default { id: 'repo list' };\n");
+        t.write("repo/off/off.ts", "export default {};\n");
+        let views = t.views(&["off"]);
+        let repo = t.0.join("repo");
+        let repo = Some(repo.as_path());
+        assert_eq!(
+            views.list(repo),
+            [
+                info("list", ViewSource::Repo, true),
+                info("mine", ViewSource::Global, false),
+                info("notes", ViewSource::Repo, false),
+                info("run", ViewSource::Repo, true),
+            ]
+        );
+        for (id, from) in [
+            ("run", "repo run"),
+            ("notes", "repo notes"),
+            ("list", "repo list"),
+            ("mine", "user mine"),
+        ] {
+            assert!(
+                views.source(id, false, repo).unwrap().contains(from),
+                "{id}"
+            );
+        }
+        // The default behind a broken replacement is still the default.
+        let builtin = views.source("run", true, repo).unwrap();
+        assert!(builtin.contains("id: \"run\""), "{builtin}");
+        // The repository's `run` replaced the user's whole `run`, style and all.
+        let styles: Vec<String> = views
+            .extensions(repo)
+            .styles
+            .into_iter()
+            .map(|s| s.css)
+            .collect();
+        assert_eq!(styles, ["/* repo run */\n"]);
+        // Without the repository (another project's pages) the user's own come back.
+        assert!(
+            views
+                .source("run", false, None)
+                .unwrap()
+                .contains("user run")
+        );
+        assert!(
+            views
+                .source("notes", false, None)
+                .unwrap()
+                .contains("user notes")
+        );
+        assert!(
+            views
+                .list(None)
+                .iter()
+                .all(|v| v.source != ViewSource::Repo)
+        );
+    }
+
+    /// A project is trusted by any of its checkouts' or worktrees' paths; its extensions come from the main checkout
+    /// when several carry them, and from a worktree when only that one does.
+    #[test]
+    fn repo_folder_follows_trust_and_prefers_the_main_checkout() {
+        let t = temp("repo-folder");
+        let main = t.0.join("app");
+        let tree = t.0.join("app/.claude/worktrees/wt");
+        fs::create_dir_all(main.join(".git")).unwrap();
+        t.write(
+            "app/.claude/worktrees/wt/.git",
+            "gitdir: ../../../.git/worktrees/wt\n",
+        );
+        t.write(
+            "app/.claude/worktrees/wt/.flow-cockpit/extensions/x/x.ts",
+            "",
+        );
+        let roots = [main.clone(), tree.clone()];
+        let views = t.views(&[]);
+        assert_eq!(views.repo(&roots), None, "untrusted");
+        views.set_trusted(vec![main.clone()]);
+        let wt_dir = tree.join(".flow-cockpit/extensions");
+        assert_eq!(views.repo(&roots), Some(wt_dir.clone()));
+        t.write("app/.flow-cockpit/extensions/x/x.ts", "");
+        let main_dir = main.join(".flow-cockpit/extensions");
+        assert_eq!(views.repo(&roots), Some(main_dir.clone()));
+        // Trusting the worktree trusts the project: the same folder.
+        views.set_trusted(vec![tree.join("")]);
+        assert_eq!(views.repo(&roots), Some(main_dir));
+        // Another project's path trusts nothing here.
+        views.set_trusted(vec![t.0.join("other")]);
+        assert_eq!(views.repo(&roots), None);
+    }
+
+    /// A linked `.flow-cockpit` or `extensions` folder is no folder, as a linked extension is none.
+    #[cfg(unix)]
+    #[test]
+    fn linked_repo_folder_is_ignored() {
+        let t = temp("repo-link");
+        let main = t.0.join("app");
+        fs::create_dir_all(main.join(".git")).unwrap();
+        t.write("elsewhere/extensions/x/x.ts", "");
+        std::os::unix::fs::symlink(t.0.join("elsewhere"), main.join(".flow-cockpit")).unwrap();
+        let views = t.views(&[]);
+        views.set_trusted(vec![main.clone()]);
+        assert_eq!(views.repo(std::slice::from_ref(&main)), None);
+        fs::remove_file(main.join(".flow-cockpit")).unwrap();
+        fs::create_dir_all(main.join(".flow-cockpit")).unwrap();
+        std::os::unix::fs::symlink(
+            t.0.join("elsewhere/extensions"),
+            main.join(".flow-cockpit/extensions"),
+        )
+        .unwrap();
+        assert_eq!(views.repo(std::slice::from_ref(&main)), None);
     }
 
     #[test]
@@ -539,10 +737,11 @@ mod tests {
             },
             PathBuf::from("/nonexistent/flow-cockpit/extensions"),
             Vec::new(),
+            Vec::new(),
         );
-        assert_eq!(views.list(), []);
+        assert_eq!(views.list(None), []);
         assert_eq!(
-            views.extensions().looked,
+            views.extensions(None).looked,
             [
                 PathBuf::from("/nonexistent/a").display().to_string(),
                 PathBuf::from("/nonexistent/b").display().to_string(),
@@ -561,11 +760,12 @@ mod tests {
             },
             PathBuf::from("/nonexistent/flow-cockpit/extensions"),
             Vec::new(),
+            Vec::new(),
         );
-        let ids: Vec<String> = views.list().into_iter().map(|v| v.id).collect();
+        let ids: Vec<String> = views.list(None).into_iter().map(|v| v.id).collect();
         assert_eq!(ids, ["activity", "docs", "list", "run"]);
         for id in &ids {
-            let source = views.source(id, false).unwrap();
+            let source = views.source(id, false, None).unwrap();
             assert!(source.contains("slot"), "{id}");
         }
     }

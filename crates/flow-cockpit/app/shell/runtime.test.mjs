@@ -83,7 +83,8 @@ const says = (text) => `const p = document.createElement('p'); p.textContent = $
 /**
  * A stand-in for the app: `views` maps an id to `{ source, builtin, from }`, where `source` is what `view_source`
  * answers (a string, or `{ error }`), `builtin` what it answers with `builtin: true`, and `from` the ViewSource.
- * `extensions` is what the `extensions` command answers.
+ * `extensions` is what the `extensions` command answers. `repos` maps a project id to views of the same shape that a
+ * trusted repository adds on that project's pages (asked for with `project`), over `views`.
  */
 function fakeApp(views, extensions = { styles: [], disabled: [], looked: [] }) {
   const listeners = new Map();
@@ -93,13 +94,16 @@ function fakeApp(views, extensions = { styles: [], disabled: [], looked: [] }) {
     views,
     extensions,
     calls,
+    repos: {},
+    /** The views on the pages of the project a call names. */
+    viewsFor: (project) => ({ ...app.views, ...(app.repos[project] ?? {}) }),
     /** The data commands' answers, by command: a function of the call's arguments. Unlisted ones answer null. */
     answers: {},
     invoke(cmd, args = {}) {
       calls.push([cmd, args]);
       if (cmd === 'views') {
         return Promise.resolve(
-          Object.entries(app.views).map(([id, v]) => ({
+          Object.entries(app.viewsFor(args.project)).map(([id, v]) => ({
             id,
             source: v.from ?? 'Builtin',
             replaced: (v.from ?? 'Builtin') !== 'Builtin' && v.builtin !== undefined,
@@ -109,7 +113,7 @@ function fakeApp(views, extensions = { styles: [], disabled: [], looked: [] }) {
       if (cmd === 'extensions') return Promise.resolve(app.extensions);
       if (app.answers[cmd]) return Promise.resolve(app.answers[cmd](args));
       if (cmd === 'view_source') {
-        const v = app.views[args.id];
+        const v = app.viewsFor(args.project)[args.id];
         if (!v) return Promise.reject(`no view ${args.id}`);
         if (args.builtin)
           return v.builtin === undefined ? Promise.reject(`no built-in view ${args.id}`) : answer(v.builtin);
@@ -1112,6 +1116,73 @@ test('a_tab_that_isnt_loaded_says_so_in_the_slot', async () => {
   const { root } = await started(app, { ...RUN, tab: 'nope' });
   const slot = section(root, 'run').querySelector('[data-slot="run-tab"]');
   assert.match(slot.textContent, /The nope tab isn't loaded/);
+});
+
+/** A list view that counts its draws in module state, which a reload of its module would reset. */
+const COUNTING_LIST = `
+  let draws = 0;
+  export default { id: 'list', title: 'list', slot: 'list', render() {
+    const p = document.createElement('p');
+    p.textContent = 'list draw ' + ++draws;
+    return p;
+  } };`;
+
+test('repo_views_show_only_on_their_projects_pages', async () => {
+  const app = fakeApp({
+    list: { source: COUNTING_LIST },
+    run: { source: view('run', 'run', RUN_FRAME) },
+  });
+  app.repos = {
+    p1: { notes: { from: 'Repo', source: view('notes', 'run-tab', says('p1 notes'), 'Notes') } },
+    p2: { notes: { from: 'Repo', source: view('notes', 'run-tab', says('p2 notes'), 'Notes') } },
+  };
+  app.answers.projects = () => [{ id: 'p1', name: 'one', roots: [] }];
+  const { root, runtime } = await started(app, { ...RUN, tab: 'notes' });
+  const tab = () => section(root, 'run').querySelector('[data-slot="run-tab"]');
+  assert.equal(section(tab(), 'notes')?.textContent, 'p1 notes');
+  assert.ok(root.querySelector('button[data-tab="notes"]'), 'its tab is in the bar');
+
+  // Another project's repository has its own notes: its code, not p1's.
+  runtime.navigate({ ...RUN, project: 'p2', tab: 'notes' });
+  await runtime.idle();
+  assert.equal(section(tab(), 'notes')?.textContent, 'p2 notes');
+
+  // A project whose repository adds nothing: no notes tab.
+  runtime.navigate({ ...RUN, project: 'p3', tab: 'notes' });
+  await runtime.idle();
+  assert.match(tab().textContent, /The notes tab isn't loaded/);
+  assert.equal(root.querySelector('button[data-tab="notes"]'), null);
+
+  // The calls for a project's pages name it; the default list's module stays loaded across projects.
+  runtime.navigate({ to: 'list', project: 'p3' });
+  await runtime.idle();
+  runtime.navigate({ to: 'list', project: 'p2' });
+  await runtime.idle();
+  assert.equal(section(root, 'list')?.textContent, 'list draw 2');
+  assert.ok(app.calls.some(([cmd, args]) => cmd === 'view_source' && args.id === 'notes' && args.project === 'p2'));
+  assert.ok(app.calls.some(([cmd, args]) => cmd === 'extensions' && args.project === 'p2'));
+
+  // The list naming no project shows the first one, and so do its views.
+  runtime.navigate({ to: 'list' });
+  await runtime.idle();
+  assert.equal(app.calls.filter(([cmd]) => cmd === 'views').at(-1)?.[1].project, 'p1');
+});
+
+test('views_changed_reloads_the_shown_projects_views', async () => {
+  const app = fakeApp({ run: { source: view('run', 'run', RUN_FRAME) } });
+  app.repos = { p1: { notes: { from: 'Repo', source: view('notes', 'run-tab', says('old'), 'Notes') } } };
+  const { root, runtime } = await started(app, { ...RUN, tab: 'notes' });
+  const notes = () => section(section(root, 'run'), 'notes')?.textContent;
+  assert.equal(notes(), 'old');
+  app.repos.p1.notes.source = view('notes', 'run-tab', says('new'), 'Notes');
+  await app.emit('views-changed', {});
+  await runtime.idle();
+  assert.equal(notes(), 'new');
+  // Trust taken away: the tab goes.
+  app.repos = {};
+  await app.emit('views-changed', {});
+  await runtime.idle();
+  assert.equal(notes(), undefined);
 });
 
 test('session_route_draws_the_session_view_not_the_run_view', async () => {

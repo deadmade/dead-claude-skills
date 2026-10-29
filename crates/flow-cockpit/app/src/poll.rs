@@ -1,13 +1,15 @@
 //! The poll: every 2 s it stats the folders the cockpit reads and tells the window what changed. It stats, and reads
 //! nothing else itself but `config.toml` when that changed and the capture files of sessions linked to a run (only
 //! what they gained): the Claude projects folder (each transcript and subagent
-//! transcript), the capture folder, each project's `docs/` and `.superpowers/sdd/` trees, both extensions folders and
+//! transcript), the capture folder, each project's `docs/` and `.superpowers/sdd/` trees, the default and the user's
+//! extensions folders, the extensions folder of each repository the user trusts (never an untrusted one's) and
 //! `config.toml`. A folder that doesn't exist yet is checked again on every tick, so one made later is seen.
 //!
 //! The poll is the index's only writer. Each tick it rebuilds the projects whose files changed, rescans links when a
 //! transcript changed (the cache reads only what grew), reads what the sessions linked to a run wait for from their
 //! capture files (outside the index lock), and refreshes every status against the clock. A changed
-//! `config.toml` switches extensions on and off, and rebuilds the index when the projects it hides or trusts changed.
+//! `config.toml` switches extensions and repositories' trust on and off, and rebuilds the index when the projects it
+//! hides changed.
 
 use std::collections::{BTreeSet, HashMap};
 use std::ffi::{OsStr, OsString};
@@ -206,9 +208,9 @@ impl Poller {
         events
     }
 
-    /// Reads `config.toml` again when it changed, and hands the views its `disabled`. Returns whether `disabled`
-    /// changed, and whether `hidden` or `trusted` did (the index is then built again). A file that doesn't parse
-    /// changes nothing; a removed one is the defaults.
+    /// Reads `config.toml` again when it changed, and hands the views its `disabled` and `trusted`. Returns whether
+    /// either of those changed (the views are then loaded again), and whether `hidden` did (the index is then built
+    /// again). A file that doesn't parse changes nothing; a removed one is the defaults.
     fn reread_config(&mut self, shared: &Shared) -> (bool, bool) {
         let file = &mut self.settings;
         let now = config_sig(&file.path);
@@ -227,10 +229,13 @@ impl Poller {
         if switched {
             shared.views.set_disabled(config.disabled.clone());
         }
-        let reconfigured =
-            config.hidden != file.config.hidden || config.trusted != file.config.trusted;
+        let trust = config.trusted != file.config.trusted;
+        if trust {
+            shared.views.set_trusted(config.trusted.clone());
+        }
+        let reconfigured = config.hidden != file.config.hidden;
         file.config = config;
-        (switched, reconfigured)
+        (switched || trust, reconfigured)
     }
 
     /// The projects whose transcripts, capture files or documents changed since the last tick.
@@ -395,11 +400,22 @@ fn entries(dir: &Path) -> impl Iterator<Item = (PathBuf, fs::FileType)> {
         .filter_map(|e| Some((e.path(), e.file_type().ok()?)))
 }
 
-/// Both extensions folders' fingerprints together.
+/// The extensions folders' fingerprints together: the default and the user's, and each trusted repository's.
 fn views_fingerprint(shared: &Shared) -> u64 {
+    let roots: Vec<Vec<PathBuf>> = shared
+        .read()
+        .projects()
+        .into_iter()
+        .map(|p| p.roots)
+        .collect();
+    let repos: Vec<PathBuf> = roots
+        .iter()
+        .filter_map(|roots| shared.views.repo(roots))
+        .collect();
     shared
         .views
         .folders()
+        .chain(repos.iter().map(PathBuf::as_path))
         .fold(0_u64, |acc, dir| acc.wrapping_add(fingerprint(dir)))
 }
 
@@ -466,7 +482,7 @@ mod tests {
 
     use super::*;
     use crate::paths::Defaults;
-    use crate::views::Views;
+    use crate::views::{ViewSource, Views};
 
     struct World {
         root: PathBuf,
@@ -592,7 +608,12 @@ mod tests {
             };
             Shared::new(
                 index,
-                Views::new(defaults, self.user.clone(), config.disabled.clone()),
+                Views::new(
+                    defaults,
+                    self.user.clone(),
+                    config.disabled.clone(),
+                    config.trusted.clone(),
+                ),
             )
         }
 
@@ -951,7 +972,7 @@ mod tests {
     }
 
     fn view_ids(shared: &Shared) -> Vec<String> {
-        shared.views.list().into_iter().map(|v| v.id).collect()
+        shared.views.list(None).into_iter().map(|v| v.id).collect()
     }
 
     /// The window reads `config.toml` once at start and builds the index, which can take seconds; a save in between
@@ -1026,7 +1047,7 @@ mod tests {
         let shared = w.shared();
         let mut poller = w.poller(&shared);
         assert_eq!(poller.tick(&shared, Timestamp::now()), []);
-        assert_eq!(shared.views.list().len(), 1);
+        assert_eq!(shared.views.list(None).len(), 1);
 
         // `disabled` switches the extension off: the views reload, the data stays.
         fs::create_dir_all(w.config.parent().unwrap()).unwrap();
@@ -1035,7 +1056,7 @@ mod tests {
             poller.tick(&shared, Timestamp::now()),
             [Event::ViewsChanged]
         );
-        assert_eq!(shared.views.list(), []);
+        assert_eq!(shared.views.list(None), []);
 
         // `hidden` takes the project out of the list.
         fs::write(&w.config, "disabled = ['activity']\nhidden = ['alpha']\n").unwrap();
@@ -1045,7 +1066,7 @@ mod tests {
         // A file that doesn't parse keeps the settings it had.
         fs::write(&w.config, "disabled = [\n").unwrap();
         assert_eq!(poller.tick(&shared, Timestamp::now()), []);
-        assert_eq!(shared.views.list(), []);
+        assert_eq!(shared.views.list(None), []);
 
         // Both back: the project and the extension return.
         fs::remove_file(&w.config).unwrap();
@@ -1053,8 +1074,134 @@ mod tests {
             poller.tick(&shared, Timestamp::now()),
             [Event::ViewsChanged, changed(None)]
         );
-        assert_eq!(shared.views.list().len(), 1);
+        assert_eq!(shared.views.list(None).len(), 1);
         assert_eq!(shared.read().projects().len(), 1);
+    }
+
+    /// alpha with a worktree and a repository extension `team` (a run tab, `notes`) in its main checkout, and beta.
+    fn alpha_with_extension(tag: &str) -> World {
+        let w = World::alpha(tag);
+        let tree = w.path("work/alpha/.claude/worktrees/wt");
+        fs::create_dir_all(&tree).unwrap();
+        fs::write(tree.join(".git"), "gitdir: ../../../.git/worktrees/wt\n").unwrap();
+        w.repo("work/beta");
+        w.session("work/beta", "s-beta", "Hi.");
+        let team = w.path("work/alpha/.flow-cockpit/extensions/team");
+        fs::create_dir_all(&team).unwrap();
+        fs::write(
+            team.join("notes.ts"),
+            "export default { id: 'notes', slot: 'run-tab' };\n",
+        )
+        .unwrap();
+        w
+    }
+
+    fn write_config(w: &World, text: &str) {
+        fs::create_dir_all(w.config.parent().unwrap()).unwrap();
+        fs::write(&w.config, text).unwrap();
+    }
+
+    /// The view ids on one project's pages, with where each comes from.
+    fn views_on(shared: &Shared, project: &str) -> Vec<(String, ViewSource)> {
+        shared
+            .views
+            .list(shared.repo(Some(project)).as_deref())
+            .into_iter()
+            .map(|v| (v.id, v.source))
+            .collect()
+    }
+
+    fn notes() -> Vec<(String, ViewSource)> {
+        vec![("notes".to_string(), ViewSource::Repo)]
+    }
+
+    #[test]
+    fn trust_matches_any_checkout_of_the_project() {
+        let w = alpha_with_extension("trust");
+        let shared = w.shared();
+        let alpha = project_id(&shared, "alpha");
+        let beta = project_id(&shared, "beta");
+        let mut poller = w.poller(&shared);
+        assert_eq!(poller.tick(&shared, Timestamp::now()), []);
+        assert_eq!(views_on(&shared, &alpha), []);
+
+        // Trusting the worktree's path trusts the project: the main checkout's extension loads on alpha's pages, and
+        // only there. The views reload; the index isn't built again.
+        let tree = w.path("work/alpha/.claude/worktrees/wt");
+        write_config(&w, &format!("trusted = ['{}']\n", tree.display()));
+        assert_eq!(
+            poller.tick(&shared, Timestamp::now()),
+            [Event::ViewsChanged]
+        );
+        assert_eq!(views_on(&shared, &alpha), notes());
+        assert_eq!(views_on(&shared, &beta), []);
+        assert_eq!(views_on(&shared, "no-such-project"), []);
+
+        // The trusted repository's folder is watched like the others.
+        fs::write(
+            w.path("work/alpha/.flow-cockpit/extensions/team/style.css"),
+            "section {}\n",
+        )
+        .unwrap();
+        assert_eq!(
+            poller.tick(&shared, Timestamp::now()),
+            [Event::ViewsChanged]
+        );
+        assert_eq!(poller.tick(&shared, Timestamp::now()), []);
+
+        // `disabled` switches a repository extension off by its folder name.
+        write_config(
+            &w,
+            &format!("trusted = ['{}']\ndisabled = ['team']\n", tree.display()),
+        );
+        assert_eq!(
+            poller.tick(&shared, Timestamp::now()),
+            [Event::ViewsChanged]
+        );
+        assert_eq!(views_on(&shared, &alpha), []);
+
+        // Trusted by the main checkout's path, with the extension in the worktree only: the worktree's loads.
+        fs::remove_dir_all(w.path("work/alpha/.flow-cockpit")).unwrap();
+        let in_tree = tree.join(".flow-cockpit/extensions/team");
+        fs::create_dir_all(&in_tree).unwrap();
+        fs::write(in_tree.join("notes.ts"), "export default {};\n").unwrap();
+        write_config(
+            &w,
+            &format!("trusted = ['{}']\n", w.path("work/alpha").display()),
+        );
+        assert_eq!(
+            poller.tick(&shared, Timestamp::now()),
+            [Event::ViewsChanged]
+        );
+        assert_eq!(views_on(&shared, &alpha), notes());
+    }
+
+    #[test]
+    fn untrusted_repo_views_ignored() {
+        let w = alpha_with_extension("untrusted");
+        // Trusting beta trusts nothing of alpha.
+        write_config(
+            &w,
+            &format!("trusted = ['{}']\n", w.path("work/beta").display()),
+        );
+        let settings = ConfigFile::load(w.config.clone());
+        let shared = w.shared_with(&settings.config);
+        let alpha = project_id(&shared, "alpha");
+        let mut poller = Poller::new(w.home.clone(), settings, &shared);
+        assert_eq!(poller.tick(&shared, Timestamp::now()), []);
+        assert_eq!(shared.repo(Some(&alpha)), None);
+        assert_eq!(views_on(&shared, &alpha), []);
+        assert!(shared.views.source("notes", false, None).is_err());
+        let repo = shared.repo(Some(&alpha));
+        assert_eq!(shared.views.extensions(repo.as_deref()).styles.len(), 0);
+
+        // Its folder isn't watched either: a change there tells the window nothing.
+        fs::write(
+            w.path("work/alpha/.flow-cockpit/extensions/team/style.css"),
+            "section {}\n",
+        )
+        .unwrap();
+        assert_eq!(poller.tick(&shared, Timestamp::now()), []);
     }
 
     #[test]

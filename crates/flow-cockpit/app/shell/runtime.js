@@ -1,8 +1,10 @@
 // The view runtime. It loads every view the app lists as code (`view_source` → a `text/javascript` Blob → `import()`,
 // the Blob URL revoked right after), adds each loaded extension's `style.css` as one `<style>`, draws the views of the
-// current route, each in its own section, and loads them again on `views-changed`. A view that fails to load or to
-// draw shows its error card in its own section, with the default of that id drawn below it when one of the user's
-// extensions replaced it; the other views never see it.
+// current route, each in its own section, and loads them again on `views-changed`. The views are those of the route's
+// project: a repository the user trusts adds its own on its project's pages only, so moving to another project loads
+// that project's set (a view from the same place as before is kept, with its module state). A view that fails to load
+// or to draw shows its error card in its own section, with the default of that id drawn below it when another
+// extension replaced it; the other views never see it.
 import { card } from './blocks/card.js';
 import { diff } from './blocks/diff.js';
 import { markdown, mermaidSources } from './blocks/markdown.js';
@@ -284,10 +286,33 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     true,
   );
 
-  /** @param {string} id @param {boolean} builtin @returns {Promise<View>} */
-  async function load(id, builtin) {
+  /** The project whose views are loaded (`''` for none); null before the first load and after `views-changed`. */
+  /** @type {string | null} */
+  let loadedFor = null;
+
+  /** The commands' `project` argument: none for no project. @param {string} project */
+  const scope = (project) => (project ? { project } : {});
+
+  /**
+   * The project a route's page belongs to: the one it names, else (the list) the first project, which the list then
+   * shows; `''` for none.
+   * @param {Route} at @returns {Promise<string>}
+   */
+  async function projectOf(at) {
+    if ('project' in at && at.project) return at.project;
+    try {
+      /** @type {import('../../bindings/Project').Project[] | null} */
+      const projects = await invoke('projects');
+      return projects?.[0]?.id ?? '';
+    } catch {
+      return '';
+    }
+  }
+
+  /** @param {string} id @param {boolean} builtin @param {string} project @returns {Promise<View>} */
+  async function load(id, builtin, project) {
     /** @type {string} */
-    const source = await invoke('view_source', builtin ? { id, builtin: true } : { id });
+    const source = await invoke('view_source', { id, ...(builtin ? { builtin: true } : {}), ...scope(project) });
     const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
     let module;
     try {
@@ -305,9 +330,9 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     return view;
   }
 
-  /** @param {string} id @param {boolean} builtin @returns {Promise<Loaded>} */
-  const loaded = (id, builtin) =>
-    load(id, builtin).then(
+  /** @param {string} id @param {boolean} builtin @param {string} project @returns {Promise<Loaded>} */
+  const loaded = (id, builtin, project) =>
+    load(id, builtin, project).then(
       (view) => ({ view, error: null }),
       (error) => ({ view: null, error }),
     );
@@ -323,17 +348,32 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     }
   }
 
-  async function loadAll() {
+  /**
+   * Loads the views of `project`'s pages. With `keep`, a view the last load got from the same place is kept as it is,
+   * module state and all; a repository's view never is, since another project's repository may have one of that id.
+   * @param {string} project @param {boolean} keep
+   */
+  async function loadAll(project, keep) {
+    loadedFor = project;
     try {
       /** @type {[ViewInfo[], Extensions | null]} */
-      const [infos, ext] = await Promise.all([invoke('views'), invoke('extensions')]);
+      const [infos, ext] = await Promise.all([invoke('views', scope(project)), invoke('extensions', scope(project))]);
       extensions = ext ?? { styles: [], disabled: [], looked: [] };
       applyStyles();
+      const before = keep ? entries : [];
       entries = await Promise.all(
         infos.map(async (info) => {
-          const own = await loaded(info.id, false);
+          const same = before.find(
+            (e) =>
+              info.source !== 'Repo' &&
+              e.info.id === info.id &&
+              e.info.source === info.source &&
+              e.info.replaced === info.replaced,
+          );
+          if (same) return same;
+          const own = await loaded(info.id, false, project);
           // A broken replacement's slot comes from the built-in behind it.
-          const fallback = own.view || !info.replaced ? null : await loaded(info.id, true);
+          const fallback = own.view || !info.replaced ? null : await loaded(info.id, true, project);
           return { info, ...own, fallback };
         }),
       );
@@ -395,7 +435,7 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     }
     box.append(errorCard(entry.info.id, error, entry.info.replaced));
     if (!entry.info.replaced) return box;
-    entry.fallback ??= await loaded(entry.info.id, true);
+    entry.fallback ??= await loaded(entry.info.id, true, loadedFor ?? '');
     const builtin = entry.fallback.view;
     try {
       if (!builtin) throw entry.fallback.error;
@@ -412,6 +452,8 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     const at = Object.freeze({ ...route });
     const traversed = traversing;
     traversing = false;
+    const project = await projectOf(at);
+    if (project !== loadedFor) await loadAll(project, loadedFor !== null);
     const tabs = Object.freeze(
       entries
         .filter((e) => slotsOf(e).includes('run-tab'))
@@ -583,7 +625,8 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     reloadWaiting = true;
     return queue(() => {
       reloadWaiting = false;
-      return loadAll().then(draw);
+      loadedFor = null; // The files changed: every view loads afresh.
+      return draw();
     });
   }
 

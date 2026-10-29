@@ -9,7 +9,7 @@ The flow cockpit (`flow-cockpit`, a desktop window) draws every screen through *
 `export default`ing one `View`. Views come in **extensions**, folders the app loads from disk. Four default extensions
 ship with the app: `list` (projects, flow runs, audits, loose sessions), `run` (one flow run: Build and Decisions),
 `docs` (the run's Docs tab) and `activity` (a run's Activity tab and a session's own screen). The window reads views and
-data and writes nothing. It reloads the views a few seconds after a file in either extensions folder changes, so the
+data and writes nothing. It reloads the views a few seconds after a file in any extensions folder changes, so the
 user sees your change without a restart.
 
 Linux only for now: the app comes from this repository's flake (`nix run github:deadmade/dead-claude-skills#flow-cockpit`,
@@ -34,13 +34,25 @@ you start; if it doesn't, tell the user how to get it and stop.
   - An extension with a default's name replaces that whole default. Deleting it brings the default back.
   - A view id that a default also has replaces that default view, whichever extension it is in.
   - Two of the user's extensions with the same view id are an error that names both.
+- **A repository's own extensions** live in `<checkout>/.flow-cockpit/extensions/<name>/`, the same shape as the
+  user's. Put one there only when the user wants the view to travel with that repository, for example for a team.
+  - They load only once the user trusts the repository (`trusted` in `config.toml`, below). Until then the window
+    never reads that folder.
+  - They show only on that project's pages: the list while that project is picked, its runs (every tab), their
+    documents and its sessions. Other projects' pages get the defaults and the user's extensions only.
+  - On those pages they sit above the user's: a repository extension with the name of one of the user's, or of a
+    default, replaces it whole, and a view id it shares with them wins.
+  - When several checkouts or worktrees of the repository have the folder, the main checkout's loads. A worktree's
+    loads only when no main checkout has one.
 - The old `flow-cockpit/views/` folder is no longer read. Move a view from there into an extension folder of its own.
 - **`config.toml`** sits next to the user's extensions folder. It holds the user's own settings, edited by hand:
-  - `disabled = ["<extension name>", ...]` switches extensions off, defaults or the user's own. When `list` or
-    `run` is off and nothing else draws that screen, the window says so there.
+  - `disabled = ["<extension name>", ...]` switches extensions off, defaults, the user's own or a repository's. When
+    `list` or `run` is off and nothing else draws that screen, the window says so there.
   - `hidden = ["<project id or name>", ...]` leaves projects out of the list.
-  - `trusted = ["/path/to/repo", ...]` names repositories whose own `.flow-cockpit/views/` may load. Those folders
-    aren't read yet, so don't put views there.
+  - `trusted = ["/path/to/repo", ...]` names the repositories whose own extensions load. Write the absolute path of
+    any checkout or worktree of the repository: one path trusts every checkout and worktree of it. A repository's
+    extensions are code that runs in the window, with everything a view can see: every project's runs, documents and
+    sessions. Add a repository only when the user asks for that one, and say so before you do.
   - A change takes effect within a few seconds, without a restart. A file that doesn't parse is ignored, and the
     settings stay as they were.
   - Change it only when the user asks you to, for example to switch an extension off.
@@ -139,8 +151,9 @@ export default view;
   - `ctx.route`;
   - `ctx.tabs`, the run tabs.
 - State that should survive a redraw, such as a picked row or a filter, can live in a module-level variable, as in
-  the defaults. But every view file is imported afresh whenever any file in either extensions folder changes, or
-  `disabled` in `config.toml` does. That resets module state and runs top-level code again.
+  the defaults. But every view file is imported afresh whenever any file in an extensions folder changes, or
+  `disabled` or `trusted` in `config.toml` does. Moving to another project imports a repository's views afresh too,
+  and the views they replaced. That resets module state and runs top-level code again.
 
 ## Rules
 

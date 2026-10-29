@@ -9,6 +9,7 @@
 // Tauri hands a command its `State` by value.
 #![expect(clippy::needless_pass_by_value)]
 
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
@@ -105,6 +106,18 @@ impl Shared {
         self.painted.load(Ordering::Acquire)
     }
 
+    /// The extensions folder of `project`'s repository, when the user trusts it (see [`Views::repo`]).
+    pub fn repo(&self, project: Option<&str>) -> Option<PathBuf> {
+        let project = project?;
+        let roots = self
+            .read()
+            .projects()
+            .into_iter()
+            .find(|p| p.id == project)?
+            .roots;
+        self.views.repo(&roots)
+    }
+
     /// The project's entries; the first answer lets the poll start the link scan.
     pub fn entries(&self, project: &str) -> Vec<Entry> {
         let entries = self.read().entries(project);
@@ -159,22 +172,32 @@ pub fn tool_input(data: Data<'_>, session: &str, tool: &str) -> Option<ToolDetai
     data.tool_input(session, tool)
 }
 
+/// The views on `project`'s pages: its repository's own too, when the user trusts it.
 #[tauri::command(async)]
-pub fn views(data: Data<'_>) -> Vec<ViewInfo> {
-    data.views.list()
+pub fn views(data: Data<'_>, project: Option<String>) -> Vec<ViewInfo> {
+    data.views.list(data.repo(project.as_deref()).as_deref())
 }
 
 /// The view's code, types stripped; the error names the line. `builtin: true` reads the default extensions' view
-/// even when one of the user's replaces it: the runtime draws it below a broken replacement.
+/// even when another replaces it: the runtime draws it below a broken replacement.
 #[tauri::command(async)]
-pub fn view_source(data: Data<'_>, id: &str, builtin: Option<bool>) -> Result<String, String> {
-    data.views.source(id, builtin.unwrap_or(false))
+pub fn view_source(
+    data: Data<'_>,
+    id: &str,
+    builtin: Option<bool>,
+    project: Option<String>,
+) -> Result<String, String> {
+    let repo = data.repo(project.as_deref());
+    data.views
+        .source(id, builtin.unwrap_or(false), repo.as_deref())
 }
 
-/// The loaded extensions' styles, the ones switched off, and where the defaults were looked for when missing.
+/// The loaded extensions' styles on `project`'s pages, the ones switched off, and where the defaults were looked for
+/// when missing.
 #[tauri::command(async)]
-pub fn extensions(data: Data<'_>) -> Extensions {
-    data.views.extensions()
+pub fn extensions(data: Data<'_>, project: Option<String>) -> Extensions {
+    data.views
+        .extensions(data.repo(project.as_deref()).as_deref())
 }
 
 #[cfg(test)]
@@ -230,6 +253,7 @@ mod tests {
                 looked: Vec::new(),
             },
             root.join("extensions"),
+            Vec::new(),
             Vec::new(),
         );
         Home1(root, Shared::new(index, views))
