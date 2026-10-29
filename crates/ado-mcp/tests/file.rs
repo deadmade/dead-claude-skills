@@ -292,6 +292,20 @@ fn start_pages_on() {
     );
 }
 
+/// `start=0` reads as 1.
+#[test]
+fn start_zero_is_the_first_line() {
+    let fx = Fixture::start();
+    let (err, text) = read(
+        &fx,
+        fixture("item.json"),
+        json!({"path": "/src/Program.cs", "start": 0}),
+    );
+    assert!(!err, "{text}");
+    assert!(text.starts_with("    1  using System;\n"), "{text}");
+    assert_eq!(text.lines().count(), 8, "{text}");
+}
+
 #[test]
 fn start_past_the_end() {
     let fx = Fixture::start();

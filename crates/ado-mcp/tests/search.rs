@@ -121,22 +121,25 @@ fn wi_project_filter() {
     assert_eq!(body["$top"], 21);
 }
 
+/// `limit=0` reads as 1.
 #[test]
 fn limit_and_more_quotes() {
-    let fx = Fixture::start();
-    fx.route(WIS, vec![answer(0, &[hit(1, "a"), hit(2, "b")])]);
-    let text = ok(
-        &mut env(&fx),
-        "search",
-        json!({"kind": "wi", "text": "path:\"a b\"", "limit": 1}),
-    );
-    assert!(text.contains("#1 [Task] New  a"), "{text}");
-    assert!(!text.contains("#2 "), "{text}");
-    assert!(
-        text.ends_with("\n… more: search kind=wi text=\"path:\\\"a b\\\"\" limit=2"),
-        "{text}"
-    );
-    assert_eq!(bodies(&fx, WIS)[0]["$top"], 2);
+    for limit in [1, 0] {
+        let fx = Fixture::start();
+        fx.route(WIS, vec![answer(0, &[hit(1, "a"), hit(2, "b")])]);
+        let text = ok(
+            &mut env(&fx),
+            "search",
+            json!({"kind": "wi", "text": "path:\"a b\"", "limit": limit}),
+        );
+        assert!(text.contains("#1 [Task] New  a"), "{limit}: {text}");
+        assert!(!text.contains("#2 "), "{limit}: {text}");
+        assert!(
+            text.ends_with("\n… more: search kind=wi text=\"path:\\\"a b\\\"\" limit=2"),
+            "{limit}: {text}"
+        );
+        assert_eq!(bodies(&fx, WIS)[0]["$top"], 2, "{limit}");
+    }
 }
 
 /// An answer without `count` counts its results.

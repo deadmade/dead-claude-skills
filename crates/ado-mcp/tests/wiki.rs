@@ -149,6 +149,14 @@ fn tree_default() {
         lines[100],
         "… more: wiki project=\"My Proj\" wiki=\"My Proj.wiki\" limit=200"
     );
+
+    // `limit=0` reads as 1.
+    let (err, text) = call(&mut mcp, json!({"limit": 0}));
+    assert!(!err, "{text}");
+    assert_eq!(
+        text,
+        "/P1\n… more: wiki project=\"My Proj\" wiki=\"My Proj.wiki\" limit=2"
+    );
 }
 
 #[test]
@@ -263,6 +271,30 @@ fn code_wiki_version() {
     assert!(text.starts_with("Docs:/Getting Started\n"), "{text}");
     let q = &queries(&fx, DOCS_PAGES)[0];
     assert_eq!(values(q, "versionDescriptor.version"), ["main"], "{q:?}");
+}
+
+/// `wiki=` takes an id, or a name in any case.
+#[test]
+fn wiki_by_id_or_name() {
+    let docs_id = "c84f0b2e-6a1d-4f73-b5e9-3d2a7c1f8e60";
+    for (want, pages, name) in [
+        (WIKI_ID, PAGES, "My Proj.wiki"),
+        (docs_id, DOCS_PAGES, "Docs"),
+        ("DOCS", DOCS_PAGES, "Docs"),
+    ] {
+        let fx = Fixture::start();
+        fx.route(pages, vec![fixture("wiki-page.json")]);
+        let (err, text) = call(
+            &mut env(&fx, fixture("wikis.json")),
+            json!({"wiki": want, "path": "/Getting Started"}),
+        );
+        assert!(!err, "{want}: {text}");
+        assert!(
+            text.starts_with(&format!("{name}:/Getting Started\n")),
+            "{want}: {text}"
+        );
+        assert_eq!(queries(&fx, pages).len(), 1, "{want}");
+    }
 }
 
 /// The page path arrives as exactly one `path` value, escaped once.

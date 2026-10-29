@@ -441,6 +441,40 @@ mod tests {
     }
 
     #[test]
+    fn info_codes_and_their_lines() {
+        let rebuilt = "the search index is being rebuilt; results may be incomplete";
+        let rejected = "the server rejected the query: ";
+        for (code, line) in [
+            (1, rebuilt.to_owned()),
+            (
+                2,
+                "search indexing hasn't started on this collection".into(),
+            ),
+            (3, format!("{rejected}invalid request")),
+            (4, format!("{rejected}prefix wildcard not supported")),
+            (
+                5,
+                format!("{rejected}several words with a code filter not supported"),
+            ),
+            (6, rebuilt.to_owned()),
+            (7, rebuilt.to_owned()),
+            (8, "the server trimmed the results to its maximum".into()),
+            (9, rebuilt.to_owned()),
+            (11, "work items aren't searchable for this PAT".into()),
+            (
+                19,
+                format!("{rejected}phrase with a code filter not supported"),
+            ),
+            (
+                20,
+                format!("{rejected}wildcard with a code filter not supported"),
+            ),
+        ] {
+            assert_eq!(info(code), Some(line.as_str()), "{code}");
+        }
+    }
+
+    #[test]
     fn unknown_info_codes_say_nothing() {
         for code in [0, 10, 12, -1] {
             assert_eq!(info(code), None, "{code}");
