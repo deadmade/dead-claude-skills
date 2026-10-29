@@ -1,12 +1,13 @@
 //! A view's TypeScript to the JavaScript the window imports: types stripped, everything else left as written (no
 //! lowering: the webview runs current JavaScript).
 //!
-//! A view gets everything through `ctx`, so it may import types only. A value import (or a re-export) would load
-//! code from outside the views' interface, and fails here with its line.
+//! A view gets everything through `ctx`, so it may import types only. A value import, a re-export, a dynamic
+//! `import()` or an `import x = …` would load code from outside the views' interface, and fails here with its line.
 
 use std::path::Path;
 
 use oxc_allocator::Allocator;
+use oxc_ast::AstKind;
 use oxc_ast::ast::{ImportDeclarationSpecifier, Statement};
 use oxc_codegen::Codegen;
 use oxc_parser::Parser;
@@ -27,16 +28,32 @@ pub fn strip(source: &str) -> Result<String, String> {
         return Err(report(at, &error.message));
     }
     let mut program = parsed.program;
-    if let Some(span) = program.body.iter().find_map(value_import) {
+    let semantic = SemanticBuilder::new()
+        .with_build_nodes(true)
+        .build(&program)
+        .semantic;
+    // Statements first, then `import()` and `import x = …` anywhere in the code; the earliest one is reported.
+    let nested = semantic.nodes().iter().find_map(|node| match node.kind() {
+        AstKind::ImportExpression(import) => Some(import.span),
+        AstKind::TSImportEqualsDeclaration(import) if import.import_kind.is_value() => {
+            Some(import.span)
+        }
+        _ => None,
+    });
+    let first = program
+        .body
+        .iter()
+        .find_map(value_import)
+        .into_iter()
+        .chain(nested)
+        .min_by_key(|span| span.start);
+    if let Some(span) = first {
         return Err(report(
             span.start,
             "a view may only `import type`; it gets everything else through ctx",
         ));
     }
-    let scoping = SemanticBuilder::new()
-        .build(&program)
-        .semantic
-        .into_scoping();
+    let scoping = semantic.into_scoping();
     let options = TransformOptions::default();
     let transformed = Transformer::new(&allocator, Path::new("view.ts"), &options)
         .build_with_scoping(scoping, &mut program);
@@ -156,6 +173,21 @@ export default view;
                 .starts_with("line 2:")
         );
         assert!(strip("export type { V } from './x';\n").is_ok());
+    }
+
+    #[test]
+    fn dynamic_import_is_an_error() {
+        let err = strip("const a = 1;\nconst m = await import('./x.js');\nexport default m;\n")
+            .unwrap_err();
+        assert!(err.starts_with("line 2:"), "{err}");
+        assert!(err.contains("import type"), "{err}");
+    }
+
+    #[test]
+    fn import_require_is_an_error() {
+        let err = strip("const a = 1;\n\nimport fs = require('fs');\n").unwrap_err();
+        assert!(err.starts_with("line 3:"), "{err}");
+        assert!(strip("import type T = require('./t');\n").is_ok());
     }
 
     #[test]

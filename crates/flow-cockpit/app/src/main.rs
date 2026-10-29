@@ -151,9 +151,10 @@ fn fail(text: &str) -> ExitCode {
 fn attach_console() {
     use std::ffi::c_void;
 
-    const STD_OUTPUT_HANDLE: u32 = -11_i32 as u32;
+    // The Win32 headers define these as `(DWORD)-11` and `(DWORD)-1`; `INVALID_HANDLE_VALUE` is `(HANDLE)-1`.
+    const STD_OUTPUT_HANDLE: u32 = (-11_i32).cast_unsigned();
     const ATTACH_PARENT_PROCESS: u32 = u32::MAX;
-    const INVALID_HANDLE_VALUE: isize = -1;
+    const INVALID_HANDLE_VALUE: usize = usize::MAX;
 
     #[link(name = "kernel32")]
     unsafe extern "system" {
@@ -165,7 +166,7 @@ fn attach_console() {
     // which is compared and never used here. AttachConsole failing (no parent console) leaves things as they were.
     unsafe {
         let handle = GetStdHandle(STD_OUTPUT_HANDLE);
-        if handle.is_null() || handle as isize == INVALID_HANDLE_VALUE {
+        if handle.is_null() || handle.addr() == INVALID_HANDLE_VALUE {
             AttachConsole(ATTACH_PARENT_PROCESS);
         }
     }

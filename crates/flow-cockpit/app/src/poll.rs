@@ -45,8 +45,10 @@ pub struct Poller {
     /// Whether the link scan has run. It waits for the window's first `entries` answer, so the first paint never
     /// waits for transcripts to be read.
     scanned: bool,
-    /// The Claude folders that held a transcript at the last full build. A folder outside this set means a session
-    /// in a working directory no project knew: the tick builds the whole index again.
+    /// The Claude folders the index has caught up with. A folder outside this set holds a session in a working
+    /// directory no project knew; it stays outside, and every tick its transcripts change builds the whole index
+    /// again, until a build has loaded one of its sessions or a tick passes without a change. (Claude Code writes a
+    /// queue line before the prompt, so the first build often finds no `cwd` yet.)
     folders: BTreeSet<OsString>,
     transcripts: HashMap<PathBuf, Sig>,
     captures: HashMap<PathBuf, Sig>,
@@ -94,7 +96,16 @@ impl Poller {
         let captures = list_files(&self.home.capture_dir);
         let folders = folders_with_transcripts(&self.home.claude_projects, &transcripts);
         let trees = trees_of(&self.projects);
-        let new_folder = folders.iter().any(|f| !self.folders.contains(f));
+        let root = &self.home.claude_projects;
+        let moved: BTreeSet<OsString> = changed_paths(&self.transcripts, &transcripts)
+            .filter_map(|p| folder_of(root, p))
+            .collect();
+        let (pending, quiet): (Vec<OsString>, Vec<OsString>) = folders
+            .into_iter()
+            .filter(|f| !self.folders.contains(f))
+            .partition(|f| moved.contains(f));
+        self.folders.extend(quiet);
+        let new_folder = !pending.is_empty();
         let first_scan = !self.scanned && shared.painted();
         let mut touched = BTreeSet::new();
         if new_folder || first_scan {
@@ -105,8 +116,15 @@ impl Poller {
                 fresh.scan_links(&mut self.cache);
                 self.scanned = true;
             }
+            // New folders hold new, short transcripts, so asking the index for one session each is cheap.
+            let loaded: Vec<OsString> = pending
+                .into_iter()
+                .filter(|f| {
+                    sessions_in(root, f, &transcripts).any(|id| fresh.session(id).is_some())
+                })
+                .collect();
+            self.folders.extend(loaded);
             *shared.write() = fresh;
-            self.folders = folders;
         } else {
             let grown = transcripts != self.transcripts;
             touched = self.touched_projects(&transcripts, &captures, &trees);
@@ -252,6 +270,18 @@ fn folders_with_transcripts(
         .collect()
 }
 
+/// The ids of the sessions whose transcripts are directly in `folder`.
+fn sessions_in<'a>(
+    root: &'a Path,
+    folder: &'a OsStr,
+    transcripts: &'a HashMap<PathBuf, Sig>,
+) -> impl Iterator<Item = &'a str> {
+    transcripts
+        .keys()
+        .filter(move |p| p.parent() == Some(root.join(folder).as_path()))
+        .filter_map(|p| p.file_stem()?.to_str())
+}
+
 /// The `.jsonl` files directly in `dir`.
 fn list_files(dir: &Path) -> HashMap<PathBuf, Sig> {
     entries(dir)
@@ -315,10 +345,21 @@ fn fingerprint(dir: &Path) -> u64 {
 pub fn run(shared: &Shared, poller: &mut Poller, mut emit: impl FnMut(Event)) {
     loop {
         std::thread::sleep(std::time::Duration::from_secs(2));
-        for event in poller.tick(shared, Timestamp::now()) {
+        for event in guarded(|| poller.tick(shared, Timestamp::now())) {
             emit(event);
         }
     }
+}
+
+/// Runs one tick's work. A panic in it is reported on stderr (after the panic message itself) and the tick tells the
+/// window nothing; the next tick lists every folder afresh, so the window goes stale for one tick, not for good.
+fn guarded<T: Default>(work: impl FnOnce() -> T) -> T {
+    // AssertUnwindSafe: a poller left half-updated only makes the next tick see more as changed. The shared index's
+    // lock may be poisoned, and `Shared` reads through that.
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(work)).unwrap_or_else(|_| {
+        eprintln!("flow-cockpit: a poll tick failed; polling goes on");
+        T::default()
+    })
 }
 
 #[cfg(test)]
@@ -407,6 +448,14 @@ mod tests {
         }
 
         fn session(&self, repo: &str, id: &str, prompt: &str) -> PathBuf {
+            let file = self.starting(repo, id);
+            append(&file, &self.user_line(repo, prompt));
+            file
+        }
+
+        /// A session as Claude Code starts it: the transcript's first line is a queue entry with no `cwd`, and the
+        /// prompt follows a few milliseconds later.
+        fn starting(&self, repo: &str, id: &str) -> PathBuf {
             let cwd = self.path(repo);
             fs::create_dir_all(&cwd).unwrap();
             let dir = self.home.claude_projects.join(folder(&cwd));
@@ -415,13 +464,20 @@ mod tests {
             fs::write(
                 &file,
                 format!(
-                    "{{\"type\":\"user\",\"message\":{{\"role\":\"user\",\"content\":\"{prompt}\"}},\"timestamp\":\"{}\",\"cwd\":\"{}\"}}\n",
-                    Timestamp::now(),
-                    json_path(&cwd)
+                    "{{\"type\":\"queue-operation\",\"operation\":\"enqueue\",\"timestamp\":\"{}\",\"sessionId\":\"{id}\"}}\n",
+                    Timestamp::now()
                 ),
             )
             .unwrap();
             file
+        }
+
+        fn user_line(&self, repo: &str, prompt: &str) -> String {
+            format!(
+                "{{\"type\":\"user\",\"message\":{{\"role\":\"user\",\"content\":\"{prompt}\"}},\"timestamp\":\"{}\",\"cwd\":\"{}\"}}\n",
+                Timestamp::now(),
+                json_path(&self.path(repo))
+            )
         }
 
         fn shared(&self) -> Shared {
@@ -627,5 +683,57 @@ mod tests {
         let mut sessions = linked(&shared, &alpha);
         sessions.sort();
         assert_eq!(sessions, ["s-big", "s-late"]);
+    }
+
+    fn loose(shared: &Shared, project: &str) -> Vec<String> {
+        shared
+            .read()
+            .entries(project)
+            .into_iter()
+            .filter_map(|e| match e {
+                Entry::Loose(s) => Some(s.id),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn new_folder_waits_for_its_first_session() {
+        let w = World::empty("pending");
+        w.repo("work/alpha");
+        let shared = w.shared();
+        let mut poller = w.poller(&shared);
+
+        // A new project's first tick sees only the queue line Claude Code writes before the prompt.
+        let s1 = w.starting("work/alpha", "s1");
+        poller.tick(&shared, Timestamp::now());
+        assert_eq!(shared.read().projects(), []);
+        append(&s1, &w.user_line("work/alpha", "Hi."));
+        assert_eq!(poller.tick(&shared, Timestamp::now()), [changed(None)]);
+        let alpha = project_id(&shared, "alpha");
+        assert_eq!(loose(&shared, &alpha), ["s1"]);
+
+        // A session in a new subfolder of a known project, caught the same way.
+        let s2 = w.starting("work/alpha/sub", "s2");
+        poller.tick(&shared, Timestamp::now());
+        append(&s2, &w.user_line("work/alpha/sub", "From a subfolder."));
+        poller.tick(&shared, Timestamp::now());
+        let mut ids = loose(&shared, &alpha);
+        ids.sort();
+        assert_eq!(ids, ["s1", "s2"]);
+
+        // Once its session is in the index the folder is known: growth rebuilds only its project.
+        append(&s2, &w.user_line("work/alpha/sub", "More."));
+        assert_eq!(
+            poller.tick(&shared, Timestamp::now()),
+            [changed(Some(&alpha))]
+        );
+    }
+
+    #[test]
+    fn a_panicking_tick_is_reported_and_polling_goes_on() {
+        let failed: Vec<Event> = guarded(|| panic!("a broken tick"));
+        assert_eq!(failed, []);
+        assert_eq!(guarded(|| vec![Event::ViewsChanged]), [Event::ViewsChanged]);
     }
 }
