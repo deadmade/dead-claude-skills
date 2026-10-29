@@ -118,12 +118,13 @@ impl Ctx {
         branch: Option<&str>,
     ) -> Result<Scope, ApiError> {
         let mut scope = if let Some(p) = given(project) {
-            self.named(p, given(repo)).await?
+            self.named(p, p, given(repo)).await?
         } else {
             let base = self.ambient().await?;
             // A repo argument without a project means that repo in the remote's project.
             match given(repo) {
-                Some(r) => self.named(&base.project_id, Some(r)).await?,
+                // Looked up by id, labelled by name: a 404 never shows the GUID.
+                Some(r) => self.named(&base.project_id, &base.project, Some(r)).await?,
                 None => base,
             }
         };
@@ -147,8 +148,13 @@ impl Ctx {
         Ok(s)
     }
 
-    /// A project by name or id, and optionally one of its repos.
-    async fn named(&self, project: &str, repo: Option<&str>) -> Result<Scope, ApiError> {
+    /// A project by name or id, and optionally one of its repos; a 404 names the project as `shown`.
+    async fn named(
+        &self,
+        project: &str,
+        shown: &str,
+        repo: Option<&str>,
+    ) -> Result<Scope, ApiError> {
         // `.` and `..` would climb out of the segment they name.
         if [Some(project), repo]
             .into_iter()
@@ -170,14 +176,14 @@ impl Ctx {
                             .into_future()
                     })
                     .await
-                    .map_err(|e| e.with_what(&format!("repo {r} in {project}")))?;
+                    .map_err(|e| e.with_what(&format!("repo {r} in {shown}")))?;
                 let p = found.project;
                 (p.id, p.name, Some(found.id))
             } else {
                 let found = api
                     .az(|| api.core.projects_client().get(&api.org, &p).into_future())
                     .await
-                    .map_err(|e| e.with_what(&format!("project {project}")))?;
+                    .map_err(|e| e.with_what(&format!("project {shown}")))?;
                 let p = found.team_project_reference;
                 (p.id, p.name, None)
             };

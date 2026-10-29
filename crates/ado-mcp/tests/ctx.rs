@@ -492,3 +492,32 @@ fn negative_pipeline_is_a_name() {
         .unwrap();
     assert!(q.contains("name=-1"), "{q}");
 }
+
+/// A mistyped repo inside a clone is named with the clone's project by name: its id is a GUID.
+#[test]
+fn unknown_repo_in_clone_names_project() {
+    let fx = Fixture::start();
+    fx.route(INFO, vec![fixture("vsts-info.json")]);
+    let mut mcp = in_clone(&fx, &clone_of(&own_remote(&fx)));
+    for (tool, args) in [
+        ("repo_file", json!({"repo": "Nope", "path": "/a"})),
+        (
+            "search",
+            json!({"kind": "code", "text": "x", "repo": "Nope"}),
+        ),
+        ("pr_list", json!({"repo": "Nope"})),
+    ] {
+        assert_eq!(
+            mcp.call(tool, args),
+            (true, "not found: repo Nope in My Proj".into()),
+            "{tool}"
+        );
+    }
+    assert!(
+        paths(&fx)
+            .iter()
+            .any(|p| p.starts_with(&format!("/tfs/Coll/{PROJ_ID}/_apis/git/repositories/Nope"))),
+        "{:?}",
+        paths(&fx)
+    );
+}
