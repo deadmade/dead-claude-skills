@@ -11,6 +11,13 @@ open window without a restart.
 
 Linux only for now; Windows comes with the next slice.
 
+The plugin also carries **capture hooks**. They record what transcripts lack: questions Claude asked you, permission
+prompts, agents starting and stopping, turns ending. Each Claude session gets one line-per-event file
+`<session id>.jsonl` in `$XDG_STATE_HOME/flow-cockpit/capture/` (default `~/.local/state/flow-cockpit/capture/`;
+`%LOCALAPPDATA%\flow-cockpit\capture\` on Windows), the folder readable by you only. A session start deletes capture
+files older than 30 days. The hooks only watch: they never answer a prompt, block a tool or print anything, and they
+write nothing outside that folder. A permission prompt records which tool asked, not its input.
+
 ## Install
 
 1. The app, from this repository's flake (it links the system's GTK and WebKit, so it is not a plain download):

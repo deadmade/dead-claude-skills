@@ -44,7 +44,7 @@
         text = ''
           node --test --experimental-test-coverage --test-coverage-include='installer/**' \
             --test-coverage-exclude='installer/**/*.test.ts' --test-coverage-lines=79 'installer/**/*.test.ts'
-          exec node --test 'scripts/*.test.mjs' 'plugins/default/hooks/*.test.mjs'
+          exec node --test 'scripts/*.test.mjs' 'plugins/default/hooks/*.test.mjs' 'plugins/opt-in/flow-cockpit/hooks/*.test.mjs'
         '';
       };
     in
@@ -72,7 +72,7 @@
             enable = true;
             name = "installer tests";
             entry = "${installer-test}/bin/installer-test";
-            files = "^(installer/|scripts/|crates/|plugins/default/hooks/|\\.claude-plugin/marketplace\\.json$|package\\.json$)";
+            files = "^(installer/|scripts/|crates/|plugins/default/hooks/|plugins/opt-in/flow-cockpit/hooks/|\\.claude-plugin/marketplace\\.json$|package\\.json$)";
             pass_filenames = false;
           };
         };
