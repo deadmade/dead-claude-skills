@@ -128,7 +128,11 @@ export default view;
 - `render(ctx)` returns a DOM node, or a promise of one. It runs again on every change of the data. A render that
   takes longer than 5 seconds shows as an error.
 - A view gets everything through `ctx`:
-  - `ctx.data`: projects, entries, flow runs, raw documents, sessions and views;
+  - `ctx.data`: projects, entries, flow runs, raw documents, sessions and views. A session comes a page of turns at a
+    time: `ctx.data.session(id)` gives the newest 20, `ctx.data.session(id, { before, limit })` the `limit` turns
+    before the turn index `before` (indexes count from the oldest turn, 0, and `start` and `total` say where the page
+    sits). Its tool calls come without their input: `ctx.data.toolInput(id, call.id)` reads one, so read it when the
+    user opens that call;
   - `ctx.blocks`;
   - `ctx.navigate(route)`;
   - `ctx.route`;

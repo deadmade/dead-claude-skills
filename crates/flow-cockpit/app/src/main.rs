@@ -93,6 +93,7 @@ fn run() -> ExitCode {
             commands::flow_run,
             commands::doc,
             commands::session,
+            commands::tool_input,
             commands::views,
             commands::view_source,
             commands::extensions,

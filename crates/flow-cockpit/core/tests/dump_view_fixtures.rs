@@ -7,6 +7,7 @@ use std::fs::{self, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
+use flow_cockpit_core::activity::TranscriptCache;
 use flow_cockpit_core::index::{Config, DocName, Entry, Home, Index, LinkCache};
 use jiff::Timestamp;
 use serde_json::{Value, json};
@@ -152,6 +153,31 @@ fn write(dir: &Path, name: &str, value: &Value, root: &str) {
     fs::write(&path, text).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
 }
 
+/// Each session as one page of all its turns (`sessions.json`; the views' tests page it themselves), and every tool
+/// call's input by `<session>/<call id>` (`inputs.json`).
+#[derive(Default)]
+struct Sessions {
+    cache: TranscriptCache,
+    pages: BTreeMap<String, Value>,
+    inputs: BTreeMap<String, Value>,
+}
+
+impl Sessions {
+    fn add(&mut self, index: &Index, id: &str) {
+        let Some(path) = index.session_path(id) else {
+            self.pages.insert(id.to_string(), Value::Null);
+            return;
+        };
+        let page = self.cache.page(&path, None, usize::MAX);
+        for call in page.turns.iter().flat_map(|t| &t.tools) {
+            let input = self.cache.tool_input(&path, &call.id);
+            self.inputs
+                .insert(format!("{id}/{}", call.id), json!(input));
+        }
+        self.pages.insert(id.to_string(), json!(page));
+    }
+}
+
 #[test]
 #[ignore = "writes the views' test fixtures; run by hand"]
 fn dump_view_fixtures() {
@@ -169,7 +195,7 @@ fn dump_view_fixtures() {
     let mut entries = BTreeMap::new();
     let mut runs = BTreeMap::new();
     let mut docs = BTreeMap::new();
-    let mut sessions = BTreeMap::new();
+    let mut sessions = Sessions::default();
     for project in &projects {
         let list = index.entries(&project.id);
         for entry in &list {
@@ -191,12 +217,10 @@ fn dump_view_fixtures() {
                         .map(|r| r.sessions)
                         .unwrap_or_default()
                     {
-                        sessions.insert(id.clone(), json!(index.session(&id)));
+                        sessions.add(&index, &id);
                     }
                 }
-                Entry::Loose(s) => {
-                    sessions.insert(s.id.clone(), json!(index.session(&s.id)));
-                }
+                Entry::Loose(s) => sessions.add(&index, &s.id),
                 Entry::Audit(_) => {}
             }
         }
@@ -206,6 +230,7 @@ fn dump_view_fixtures() {
     write(&out, "entries.json", &json!(entries), &shown);
     write(&out, "runs.json", &json!(runs), &shown);
     write(&out, "docs.json", &json!(docs), &shown);
-    write(&out, "sessions.json", &json!(sessions), &shown);
+    write(&out, "sessions.json", &json!(sessions.pages), &shown);
+    write(&out, "inputs.json", &json!(sessions.inputs), &shown);
     fs::remove_dir_all(&root).ok();
 }

@@ -51,22 +51,36 @@ function placeOf(el) {
   return { view: home.dataset.view, path };
 }
 
-/** @param {HTMLElement} root @param {Place} place @returns {Element | null} */
-function find(root, place) {
-  /** @type {Element | null | undefined} */
-  let node = [...root.querySelectorAll('section.view')].find(
-    (s) => s instanceof window.HTMLElement && s.dataset.view === place.view,
-  );
-  for (const step of place.path) {
-    if (!node) return null;
-    if (step.startsWith('#')) {
-      const name = step.slice(1);
-      node = [...node.querySelectorAll('[id], [data-keep]')].find(
-        (e) => e.id === name || e.getAttribute('data-keep') === name,
-      );
-    } else {
-      node = node.children[Number(step)];
+/**
+ * Each view's first section, with the first element of each `id` and `data-keep` name in it (nested sections'
+ * included), so a redraw finds every kept place without searching the section again: a long session has thousands.
+ * @typedef {Map<string, { section: Element, names: Map<string, Element> }>} Places
+ * @param {HTMLElement} root @returns {Places}
+ */
+function places(root) {
+  /** @type {Places} */
+  const views = new Map();
+  for (const section of root.querySelectorAll('section.view')) {
+    const view = section instanceof window.HTMLElement ? section.dataset.view : undefined;
+    if (!view || views.has(view)) continue;
+    /** @type {Map<string, Element>} */
+    const names = new Map();
+    for (const el of section.querySelectorAll('[id], [data-keep]')) {
+      for (const name of [el.id, el.getAttribute('data-keep')]) if (name && !names.has(name)) names.set(name, el);
     }
+    views.set(view, { section, names });
+  }
+  return views;
+}
+
+/** A place's element: a name is always the path's first step (see `placeOf`). @param {Places} index @param {Place} place */
+function find(index, place) {
+  const at = index.get(place.view);
+  /** @type {Element | null | undefined} */
+  let node = at?.section;
+  for (const step of place.path) {
+    if (!node || !at) return null;
+    node = step.startsWith('#') ? at.names.get(step.slice(1)) : node.children[Number(step)];
   }
   return node ?? null;
 }
@@ -77,26 +91,28 @@ function find(root, place) {
  * @typedef {{ place: Place, top: number, left: number }} Scrolled
  * @typedef {{ place: Place, value: string | null, start: number | null, end: number | null, direction: string | null }} Focused
  * @typedef {{ scrolled: Scrolled[], folds: { place: Place, open: boolean }[], expanded: { place: Place, value: string }[], focused: Focused | null }} Kept
- * @param {HTMLElement} root @returns {Kept}
+ * `moved` holds the elements that have scrolled (from `scroll` events): only those are measured, since reading the
+ * scroll position of every element of a long session takes seconds. The ones no longer drawn are dropped from it.
+ * @param {HTMLElement} root @param {Set<Element>} moved @returns {Kept}
  */
-function snapshot(root) {
+function snapshot(root, moved) {
   /** @type {Kept} */
   const kept = { scrolled: [], folds: [], expanded: [], focused: null };
-  for (const el of root.querySelectorAll('*')) {
-    const place = () => placeOf(el);
-    if (el.scrollTop || el.scrollLeft) {
-      const at = place();
-      if (at) kept.scrolled.push({ place: at, top: el.scrollTop, left: el.scrollLeft });
+  for (const el of moved) {
+    if (!root.contains(el)) {
+      moved.delete(el);
+      continue;
     }
-    if (el instanceof window.HTMLDetailsElement) {
-      const at = place();
-      if (at) kept.folds.push({ place: at, open: el.open });
-    }
-    const expanded = el.getAttribute('aria-expanded');
-    if (expanded !== null) {
-      const at = place();
-      if (at) kept.expanded.push({ place: at, value: expanded });
-    }
+    const at = el.scrollTop || el.scrollLeft ? placeOf(el) : null;
+    if (at) kept.scrolled.push({ place: at, top: el.scrollTop, left: el.scrollLeft });
+  }
+  for (const el of root.querySelectorAll('details')) {
+    const at = placeOf(el);
+    if (at) kept.folds.push({ place: at, open: el.open });
+  }
+  for (const el of root.querySelectorAll('[aria-expanded]')) {
+    const at = placeOf(el);
+    if (at) kept.expanded.push({ place: at, value: el.getAttribute('aria-expanded') ?? '' });
   }
   const active = document.activeElement;
   const at = active && root.contains(active) ? placeOf(active) : null;
@@ -121,19 +137,30 @@ function snapshot(root) {
   return kept;
 }
 
-/** Puts back what `snapshot` saw, on the elements in the same places. @param {HTMLElement} root @param {Kept} kept */
-function restore(root, kept) {
+/**
+ * Puts back what `snapshot` saw, on the elements in the same places; the panes it scrolls join `moved`.
+ * @param {HTMLElement} root @param {Kept} kept @param {Set<Element>} moved
+ */
+function restore(root, kept, moved) {
+  /** @type {Places | null} */
+  let index = null;
+  /** @param {Place} place */
+  const lookup = (place) => find((index ??= places(root)), place);
   for (const { place, open } of kept.folds) {
-    const el = find(root, place);
+    const el = lookup(place);
     if (el instanceof window.HTMLDetailsElement) el.open = open;
   }
-  // A disclosure opens and closes through its own handler: the view's state follows the click.
+  // A disclosure opens and closes through its own handler: the view's state follows the click. The handler may
+  // draw part of the view again, so the places are looked up afresh after it.
   for (const { place, value } of kept.expanded) {
-    const el = find(root, place);
-    if (el instanceof window.HTMLElement && el.getAttribute('aria-expanded') !== value) el.click();
+    const el = lookup(place);
+    if (el instanceof window.HTMLElement && el.getAttribute('aria-expanded') !== value) {
+      el.click();
+      index = null;
+    }
   }
   const focus = kept.focused;
-  const el = focus && find(root, focus.place);
+  const el = focus && lookup(focus.place);
   if (focus && el instanceof window.HTMLElement) {
     el.focus({ preventScroll: true });
     if ((el instanceof window.HTMLInputElement || el instanceof window.HTMLTextAreaElement) && focus.value !== null) {
@@ -150,12 +177,15 @@ function restore(root, kept) {
         }
       }
     }
+    // The restored text reaches the view as typed (`input`), which may draw part of it again.
+    index = null;
   }
   for (const { place, top, left } of kept.scrolled) {
-    const el = find(root, place);
+    const el = lookup(place);
     if (el) {
       el.scrollTop = top;
       el.scrollLeft = left;
+      moved.add(el);
     }
   }
 }
@@ -180,7 +210,9 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     flowRun: (/** @type {string} */ project, /** @type {string} */ slug) => invoke('flow_run', { project, slug }),
     doc: (/** @type {string} */ project, /** @type {string} */ slug, /** @type {DocName} */ name) =>
       invoke('doc', { project, slug, name }),
-    session: (/** @type {string} */ id) => invoke('session', { id }),
+    session: (/** @type {string} */ id, /** @type {import('./api').SessionPage} */ page = {}) =>
+      invoke('session', { id, before: page.before ?? null, limit: page.limit ?? null }),
+    toolInput: (/** @type {string} */ session, /** @type {string} */ tool) => invoke('tool_input', { session, tool }),
     views: () => invoke('views'),
     viewSource: (/** @type {string} */ id) => invoke('view_source', { id }),
   });
@@ -197,6 +229,16 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
   let drawnAt = '';
   /** @type {Promise<void>} */
   let last = Promise.resolve();
+  /** The drawn elements that have scrolled, for `snapshot`. `scroll` doesn't bubble, so it is caught on its way down. */
+  /** @type {Set<Element>} */
+  const moved = new Set();
+  root.addEventListener(
+    'scroll',
+    (event) => {
+      if (event.target instanceof window.Element) moved.add(event.target);
+    },
+    true,
+  );
 
   /** @param {string} id @param {boolean} builtin @returns {Promise<View>} */
   async function load(id, builtin) {
@@ -367,14 +409,14 @@ export function createRuntime({ root, invoke, listen, importModule = (url) => im
     }
     // The same route drawn again (fresh data, a reloaded view) keeps what the user did to it; a new route starts fresh.
     const where = JSON.stringify(at);
-    const kept = where === drawnAt ? snapshot(root) : null;
+    const kept = where === drawnAt ? snapshot(root, moved) : null;
     root.replaceChildren(...sections);
     if (tabSection) {
       const host = sections.map((s) => s.querySelector('[data-slot="run-tab"]')).find(Boolean);
       (host ?? root).append(tabSection);
     }
     drawnAt = where;
-    if (kept) restore(root, kept);
+    if (kept) restore(root, kept, moved);
   }
 
   /** @param {() => Promise<void>} step */

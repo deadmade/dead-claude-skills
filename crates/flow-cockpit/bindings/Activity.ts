@@ -3,4 +3,8 @@ import type { AgentInfo } from "./AgentInfo";
 import type { Live } from "./Live";
 import type { Turn } from "./Turn";
 
-export type Activity = { turns: Array<Turn>, agents: Array<AgentInfo>, live: Live, };
+/**
+ * A page of a session's turns, oldest first: the turns whose indexes are `start` up to `start + turns.len()`, out of
+ * `total`. Indexes count from the session's oldest turn, so a turn keeps its index as newer ones arrive.
+ */
+export type Activity = { turns: Array<Turn>, start: number, total: number, agents: Array<AgentInfo>, live: Live, };

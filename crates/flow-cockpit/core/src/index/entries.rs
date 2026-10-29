@@ -14,7 +14,7 @@ use ts_rs::TS;
 
 use super::projects::subdirs;
 use super::status::{Facts, Status, status};
-use crate::activity::{Transcript, activity};
+use crate::activity::prompt_of;
 use crate::doc::{
     self, DeviationStatus, FlowDoc, Gate, Ledger, PlanDoc, TaskState, parse_audit, parse_flow,
     parse_ledger, parse_plan,
@@ -197,14 +197,10 @@ pub(crate) fn read_head(path: &Path) -> Option<Head> {
     };
     let cwd = PathBuf::from(first("cwd")?);
     let started = first("timestamp");
-    let first_prompt = activity(&Transcript {
-        main,
-        agents: Vec::new(),
-    })
-    .turns
-    .into_iter()
-    .find_map(|t| t.prompt)
-    .map(|p| p.text.chars().take(PROMPT_CHARS).collect());
+    let first_prompt = main
+        .iter()
+        .find_map(prompt_of)
+        .map(|p| p.text.chars().take(PROMPT_CHARS).collect());
     Some(Head {
         cwd,
         started,

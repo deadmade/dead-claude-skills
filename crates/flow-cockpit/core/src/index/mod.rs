@@ -23,7 +23,6 @@ pub use links::LinkCache;
 pub use projects::Project;
 pub use status::Status;
 
-use crate::activity::{Activity, activity, read_transcript};
 use entries::{Derived, Docs, Session, derive, load_docs, mtime, read_head};
 use projects::{Resolver, roots_of};
 
@@ -187,11 +186,11 @@ impl Index {
         Some(String::from_utf8_lossy(&bytes).into_owned())
     }
 
-    /// What the session did, read from its transcript when asked.
+    /// The session's transcript, for a [`crate::activity::TranscriptCache`] to read: the index never reads one
+    /// whole, so a caller can let go of the index before the read.
     #[must_use]
-    pub fn session(&self, id: &str) -> Option<Activity> {
-        let session = self.sessions.get(id)?;
-        Some(activity(&read_transcript(&session.path)))
+    pub fn session_path(&self, id: &str) -> Option<PathBuf> {
+        Some(self.sessions.get(id)?.path.clone())
     }
 
     /// Adds the sessions in one `~/.claude/projects/<dir>`. With `only`, sessions of other projects are skipped.

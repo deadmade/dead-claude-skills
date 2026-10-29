@@ -152,11 +152,11 @@ impl Poller {
                 fresh.scan_links(&mut self.cache);
                 self.scanned = true;
             }
-            // New folders hold new, short transcripts, so asking the index for one session each is cheap.
+            // A folder is caught up once the fresh index holds one of its sessions.
             let loaded: Vec<OsString> = pending
                 .into_iter()
                 .filter(|f| {
-                    sessions_in(root, f, &transcripts).any(|id| fresh.session(id).is_some())
+                    sessions_in(root, f, &transcripts).any(|id| fresh.session_path(id).is_some())
                 })
                 .collect();
             self.folders.extend(loaded);

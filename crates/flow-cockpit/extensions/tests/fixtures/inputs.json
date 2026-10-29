@@ -1,0 +1,17 @@
+{
+  "s-link/t1": {
+    "file": "/home/you/work/alpha/docs/features/login/flow.md",
+    "kind": "Edit",
+    "new": "b",
+    "old": "a"
+  },
+  "s-link/t3": {
+    "command": "npm test",
+    "description": "Run the tests",
+    "kind": "Command"
+  },
+  "s-mention/t2": {
+    "json": "{\"file_path\":\"/home/you/work/alpha/docs/features/login/flow.md\"}",
+    "kind": "Other"
+  }
+}

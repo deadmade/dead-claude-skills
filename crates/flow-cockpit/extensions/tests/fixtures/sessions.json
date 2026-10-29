@@ -4,6 +4,8 @@
     "live": {
       "waiting": null
     },
+    "start": 0,
+    "total": 1,
     "turns": [
       {
         "prompt": {
@@ -21,6 +23,8 @@
     "live": {
       "waiting": null
     },
+    "start": 0,
+    "total": 1,
     "turns": [
       {
         "prompt": {
@@ -38,6 +42,8 @@
     "live": {
       "waiting": null
     },
+    "start": 0,
+    "total": 1,
     "turns": [
       {
         "prompt": {
@@ -55,6 +61,8 @@
     "live": {
       "waiting": null
     },
+    "start": 0,
+    "total": 1,
     "turns": [
       {
         "prompt": {
@@ -72,6 +80,8 @@
     "live": {
       "waiting": null
     },
+    "start": 0,
+    "total": 2,
     "turns": [
       {
         "prompt": {
@@ -90,12 +100,6 @@
           {
             "agent": null,
             "at": "2026-01-19T10:00:05.000Z",
-            "detail": {
-              "file": "/home/you/work/alpha/docs/features/login/flow.md",
-              "kind": "Edit",
-              "new": "b",
-              "old": "a"
-            },
             "failed": false,
             "id": "t1",
             "summary": "/home/you/work/alpha/docs/features/login/flow.md",
@@ -120,11 +124,6 @@
           {
             "agent": null,
             "at": "2026-01-19T10:05:02.000Z",
-            "detail": {
-              "command": "npm test",
-              "description": "Run the tests",
-              "kind": "Command"
-            },
             "failed": false,
             "id": "t3",
             "summary": "Run the tests",
@@ -139,6 +138,8 @@
     "live": {
       "waiting": null
     },
+    "start": 0,
+    "total": 1,
     "turns": [
       {
         "prompt": {
@@ -157,10 +158,6 @@
           {
             "agent": null,
             "at": "2026-01-19T11:00:05.000Z",
-            "detail": {
-              "json": "{\"file_path\":\"/home/you/work/alpha/docs/features/login/flow.md\"}",
-              "kind": "Other"
-            },
             "failed": false,
             "id": "t2",
             "summary": "/home/you/work/alpha/docs/features/login/flow.md",
@@ -175,6 +172,8 @@
     "live": {
       "waiting": null
     },
+    "start": 0,
+    "total": 1,
     "turns": [
       {
         "prompt": {
@@ -192,6 +191,8 @@
     "live": {
       "waiting": null
     },
+    "start": 0,
+    "total": 1,
     "turns": [
       {
         "prompt": {
@@ -209,6 +210,8 @@
     "live": {
       "waiting": null
     },
+    "start": 0,
+    "total": 1,
     "turns": [
       {
         "prompt": {

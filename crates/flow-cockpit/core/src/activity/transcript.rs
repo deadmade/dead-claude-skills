@@ -1,67 +1,252 @@
-//! Reads a Claude Code session transcript (JSONL) and its subagents' transcripts. Claude Code's transcript format is
-//! parsed here and nowhere else. The format is not documented or stable, so every field is read defensively: a line
-//! that does not parse (a half line at the end of a file still being written) or an entry kind we do not know is
-//! skipped, never an error.
+//! Reads a session's transcript and its subagents' transcripts as they grow. Each file's parsed lines are kept with
+//! the byte offset read so far, so a grown file is read only from there; one that shrank or was replaced is read
+//! again from its start. A last line without its newline yet is parsed on every read and kept apart, until it is
+//! complete.
 
-use std::fs;
-use std::path::Path;
+use std::collections::{BTreeMap, HashMap};
+use std::fs::{self, File};
+use std::io::{BufRead, BufReader, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 use serde_json::Value;
 
-/// One subagent's transcript with the facts from its `.meta.json`.
-pub struct SubTranscript {
-    pub(crate) id: String,
-    pub(crate) meta: Value,
-    pub(crate) entries: Vec<Value>,
+use super::{Activity, AgentParts, Item, Lines, Parts, ToolDetail, input_in, page};
+
+/// How many sessions the cache keeps; the one used longest ago goes first.
+const SESSIONS: usize = 4;
+
+/// The sessions read so far, by the path of their main transcript.
+#[derive(Default)]
+pub struct TranscriptCache {
+    sessions: HashMap<PathBuf, Session>,
+    /// Counts the reads, to find the session used longest ago.
+    clock: u64,
+    bytes_read: u64,
 }
 
-/// A session's entries and its subagents'. Internal: the views get [`super::Activity`].
-pub struct Transcript {
-    pub(crate) main: Vec<Value>,
-    pub(crate) agents: Vec<SubTranscript>,
+#[derive(Default)]
+struct Session {
+    main: Cached,
+    /// By agent id, from `agent-<id>.jsonl`.
+    agents: BTreeMap<String, Agent>,
+    used: u64,
 }
 
-/// Every line of `path` that parses as a JSON object; empty when the file is missing or unreadable.
-fn read_entries(path: &Path) -> Vec<Value> {
-    let Ok(bytes) = fs::read(path) else {
-        return Vec::new();
-    };
-    String::from_utf8_lossy(&bytes)
-        .lines()
-        .filter_map(|line| serde_json::from_str::<Value>(line).ok())
-        .filter(Value::is_object)
-        .collect()
+#[derive(Default)]
+struct Agent {
+    meta: Value,
+    file: Cached,
 }
 
-/// Reads the session at `main` and the subagents in `<session>/subagents/agent-*.jsonl` (the folder next to the
-/// file, named like it without `.jsonl`), each with its `agent-*.meta.json`.
-#[must_use]
-pub fn read_transcript(main: &Path) -> Transcript {
-    let mut agents = Vec::new();
-    if let Ok(dir) = fs::read_dir(main.with_extension("").join("subagents")) {
-        for entry in dir.flatten() {
-            let path = entry.path();
-            let name = entry.file_name().to_string_lossy().into_owned();
-            let Some(id) = name
-                .strip_prefix("agent-")
-                .and_then(|n| n.strip_suffix(".jsonl"))
-            else {
-                continue;
+/// One file as read so far.
+#[derive(Default)]
+struct Cached {
+    size: u64,
+    mtime: Option<SystemTime>,
+    id: u64,
+    /// Just after the last line that ended in a newline: the next read starts here.
+    offset: u64,
+    done: Lines,
+    /// The last line while it has no newline: parsed again on every read.
+    tail: Lines,
+}
+
+impl Cached {
+    fn parts(&self) -> Parts<'_> {
+        Parts {
+            done: &self.done,
+            tail: &self.tail,
+        }
+    }
+
+    /// Reads what the file gained since the last read. A missing file reads as empty.
+    fn refresh(&mut self, path: &Path, agent: Option<&str>, bytes_read: &mut u64) {
+        let Ok(meta) = fs::metadata(path) else {
+            *self = Cached::default();
+            return;
+        };
+        let (size, mtime, id) = (meta.len(), meta.modified().ok(), file_id(&meta));
+        if (size, mtime, id) == (self.size, self.mtime, self.id) {
+            return;
+        }
+        if size < self.offset || mtime < self.mtime || id != self.id {
+            *self = Cached::default();
+        }
+        let Ok(mut file) = File::open(path) else {
+            return;
+        };
+        if file.seek(SeekFrom::Start(self.offset)).is_err() {
+            return;
+        }
+        let mut reader = BufReader::with_capacity(256 * 1024, file);
+        let mut line = Vec::new();
+        self.tail = Lines::default();
+        loop {
+            line.clear();
+            let n = match reader.read_until(b'\n', &mut line) {
+                Ok(0) | Err(_) => break,
+                Ok(n) => n as u64,
             };
-            let meta = fs::read(path.with_extension("meta.json"))
+            *bytes_read += n;
+            if line.ends_with(b"\n") {
+                let text = line.strip_suffix(b"\n").unwrap_or(&line);
+                self.done
+                    .add(text.strip_suffix(b"\r").unwrap_or(text), self.offset, agent);
+                self.offset += n;
+            } else {
+                self.tail.add(&line, self.offset, agent);
+            }
+        }
+        // The size seen before the read: a file that grew during it differs next time, and is read from `offset`.
+        (self.size, self.mtime, self.id) = (size, mtime, id);
+    }
+}
+
+/// The file's identity where the OS gives one cheaply (its inode), so a file moved over the old one reads afresh;
+/// 0 elsewhere.
+#[cfg(unix)]
+fn file_id(meta: &fs::Metadata) -> u64 {
+    use std::os::unix::fs::MetadataExt;
+    meta.ino()
+}
+
+#[cfg(not(unix))]
+fn file_id(_: &fs::Metadata) -> u64 {
+    0
+}
+
+/// `<session>/subagents/agent-<id>.jsonl` for the transcript at `main` (the folder named like it without `.jsonl`).
+fn subagents(main: &Path) -> PathBuf {
+    main.with_extension("").join("subagents")
+}
+
+fn agent_path(main: &Path, id: &str) -> PathBuf {
+    subagents(main).join(format!("agent-{id}.jsonl"))
+}
+
+impl Session {
+    /// Reads what the session's files gained, and finds subagents that started or went.
+    fn refresh(&mut self, main: &Path, bytes_read: &mut u64) {
+        self.main.refresh(main, None, bytes_read);
+        let mut ids: Vec<String> = fs::read_dir(subagents(main))
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter_map(|e| {
+                let name = e.file_name().to_string_lossy().into_owned();
+                Some(
+                    name.strip_prefix("agent-")?
+                        .strip_suffix(".jsonl")?
+                        .to_string(),
+                )
+            })
+            .collect();
+        ids.sort();
+        self.agents.retain(|id, _| ids.binary_search(id).is_ok());
+        for id in ids {
+            let path = agent_path(main, &id);
+            let agent = self.agents.entry(id.clone()).or_default();
+            agent.meta = fs::read(path.with_extension("meta.json"))
                 .ok()
                 .and_then(|b| serde_json::from_slice(&b).ok())
                 .unwrap_or(Value::Null);
-            agents.push(SubTranscript {
-                id: id.to_string(),
-                meta,
-                entries: read_entries(&path),
-            });
+            agent.file.refresh(&path, Some(&id), bytes_read);
         }
     }
-    agents.sort_by(|a, b| a.id.cmp(&b.id));
-    Transcript {
-        main: read_entries(main),
-        agents,
+
+    fn page(&self, before: Option<usize>, limit: usize) -> Activity {
+        let agents: Vec<AgentParts> = self
+            .agents
+            .iter()
+            .map(|(id, a)| AgentParts {
+                id,
+                meta: &a.meta,
+                parts: a.file.parts(),
+            })
+            .collect();
+        page(&self.main.parts(), &agents, before, limit)
+    }
+
+    /// The file and line offset of the call `id`.
+    fn find(&self, main: &Path, id: &str) -> Option<(PathBuf, u64)> {
+        let has = |parts: Parts<'_>| {
+            parts.items().find_map(|item| match item {
+                Item::Said { tools, .. } => tools.iter().find(|s| s.id == id).map(|s| s.offset),
+                Item::Prompt(_) => None,
+            })
+        };
+        if let Some(offset) = has(self.main.parts()) {
+            return Some((main.to_path_buf(), offset));
+        }
+        self.agents
+            .iter()
+            .find_map(|(agent, a)| Some((agent_path(main, agent), has(a.file.parts())?)))
+    }
+}
+
+impl TranscriptCache {
+    /// How many bytes of transcripts this cache has read so far.
+    #[must_use]
+    pub fn bytes_read(&self) -> u64 {
+        self.bytes_read
+    }
+
+    /// The session's files brought up to date, read in full when the cache doesn't hold it.
+    fn session(&mut self, main: &Path) -> &Session {
+        self.clock += 1;
+        if !self.sessions.contains_key(main) && self.sessions.len() >= SESSIONS {
+            let oldest = self
+                .sessions
+                .iter()
+                .min_by_key(|(_, s)| s.used)
+                .map(|(p, _)| p.clone());
+            if let Some(oldest) = oldest {
+                self.sessions.remove(&oldest);
+            }
+        }
+        let session = self.sessions.entry(main.to_path_buf()).or_default();
+        session.used = self.clock;
+        session.refresh(main, &mut self.bytes_read);
+        session
+    }
+
+    /// The session at `main` (its subagents in `<session>/subagents/`): the `limit` turns before turn index `before`,
+    /// or the newest when it is `None`, with its agents. A missing transcript reads as a session with no turns.
+    pub fn page(&mut self, main: &Path, before: Option<usize>, limit: usize) -> Activity {
+        self.session(main).page(before, limit)
+    }
+
+    /// The input of the session's tool call `id`, read back from its line; `None` when no call has that id.
+    pub fn tool_input(&mut self, main: &Path, id: &str) -> Option<ToolDetail> {
+        let (path, offset) = self.session(main).find(main, id)?;
+        let mut file = File::open(path).ok()?;
+        file.seek(SeekFrom::Start(offset)).ok()?;
+        let mut line = Vec::new();
+        BufReader::new(file).read_until(b'\n', &mut line).ok()?;
+        input_in(&line, id)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn keeps_only_the_sessions_used_last() {
+        let dir = std::env::temp_dir().join(format!("flow-cockpit-cache-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let mut cache = TranscriptCache::default();
+        let paths: Vec<PathBuf> = (0..=SESSIONS)
+            .map(|i| dir.join(format!("s{i}.jsonl")))
+            .collect();
+        for p in &paths {
+            fs::write(p, "").unwrap();
+            cache.page(p, None, 1);
+        }
+        fs::remove_dir_all(&dir).ok();
+        assert_eq!(cache.sessions.len(), SESSIONS);
+        assert!(!cache.sessions.contains_key(&paths[0]), "the oldest went");
+        assert!(cache.sessions.contains_key(&paths[SESSIONS]));
     }
 }

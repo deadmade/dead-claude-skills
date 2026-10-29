@@ -360,6 +360,7 @@ details.unfold > .unfold-body { padding: var(--space-3) 0 var(--space-2); }
 .tool-call.failed > summary .count { color: var(--color-error); }
 .reply + .reply { margin-top: var(--space-4); }
 .reply-by { font-size: var(--text-xs); color: var(--color-muted); margin-bottom: var(--space-1); }
+.turns-older { max-width: var(--measure); margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--color-rule); }
 
 /* Docs: Options as decision cards. */
 .decisions .card .item-lead { margin-top: 0; }

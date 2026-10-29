@@ -297,9 +297,15 @@ test('changed_redraw_keeps_scroll_folds_and_focus', async () => {
   await settle();
   const old = section(root, 'list');
   assert.ok(old.querySelector('.diagram svg'), 'the diagram drew before the redraw');
-  old.querySelector('.left').scrollTop = 30;
-  old.querySelector('.content').scrollTop = 50;
-  old.querySelector('.content').scrollLeft = 7;
+  // jsdom keeps a scroll position but fires no `scroll`, as a browser does: the test fires it.
+  const scroll = (selector, top, left = 0) => {
+    const el = old.querySelector(selector);
+    el.scrollTop = top;
+    el.scrollLeft = left;
+    el.dispatchEvent(new window.Event('scroll'));
+  };
+  scroll('.left', 30);
+  scroll('.content', 50, 7);
   old.querySelector('details').open = true;
   old.querySelector('button.track').click();
   const search = old.querySelector('input');
@@ -331,6 +337,78 @@ test('changed_redraw_keeps_scroll_folds_and_focus', async () => {
   runtime.navigate({ to: 'list', project: 'other' });
   await runtime.idle();
   assert.ok(!section(root, 'list').querySelector('details').open);
+});
+
+/** A view of 2000 keyed folds and one pane that scrolls: a long session's tool calls. */
+function manyFolds() {
+  const box = document.createElement('div');
+  const pane = document.createElement('div');
+  pane.className = 'pane';
+  for (let i = 0; i < 2000; i++) {
+    const fold = document.createElement('details');
+    fold.dataset.keep = `fold-${i}`;
+    const summary = document.createElement('summary');
+    summary.textContent = `Fold ${i}`;
+    fold.append(summary, document.createElement('p'));
+    pane.append(fold);
+  }
+  box.append(pane);
+  return box;
+}
+
+/** Counts `querySelectorAll` calls and `scrollTop` reads on elements while `work` runs. */
+async function counting(work) {
+  const proto = window.Element.prototype;
+  const query = proto.querySelectorAll;
+  const scroll = Object.getOwnPropertyDescriptor(proto, 'scrollTop');
+  const counts = { queries: 0, scrollReads: 0 };
+  proto.querySelectorAll = function (...args) {
+    counts.queries++;
+    return query.apply(this, args);
+  };
+  Object.defineProperty(proto, 'scrollTop', {
+    ...scroll,
+    get() {
+      counts.scrollReads++;
+      return scroll.get.call(this);
+    },
+  });
+  try {
+    await work();
+  } finally {
+    proto.querySelectorAll = query;
+    Object.defineProperty(proto, 'scrollTop', scroll);
+  }
+  return counts;
+}
+
+test('a_redraw_does_not_search_or_measure_every_element', async () => {
+  const app = fakeApp({ list: { source: viewOf('list', 'list', manyFolds) } });
+  const { root, runtime } = await started(app, { to: 'list' });
+  const old = section(root, 'list');
+  const pane = old.querySelector('.pane');
+  // The user scrolls the pane (a browser then fires `scroll`) and opens the last fold.
+  pane.scrollTop = 40;
+  pane.dispatchEvent(new window.Event('scroll'));
+  old.querySelector('[data-keep="fold-1999"]').open = true;
+
+  const counts = await counting(async () => {
+    await app.emit('changed', { project: 'p1' });
+    await runtime.idle();
+  });
+  const now = section(root, 'list');
+  assert.notEqual(now, old, 'the view drew again');
+  assert.equal(now.querySelector('.pane').scrollTop, 40);
+  assert.ok(now.querySelector('[data-keep="fold-1999"]').open);
+  assert.ok(!now.querySelector('[data-keep="fold-0"]').open);
+  // Each fold is found without listing the section's keyed elements again, and only what scrolled is measured.
+  assert.ok(counts.queries < 50, `${counts.queries} queries`);
+  assert.ok(counts.scrollReads < 50, `${counts.scrollReads} scrollTop reads`);
+
+  // A second redraw still finds the pane the first one scrolled back.
+  await app.emit('changed', { project: 'p1' });
+  await runtime.idle();
+  assert.equal(section(root, 'list').querySelector('.pane').scrollTop, 40);
 });
 
 test('queued_changed_draws_collapse_into_one', async () => {
@@ -506,6 +584,32 @@ test('session_route_draws_the_session_view_not_the_run_view', async () => {
   const { root: runRoot } = await started(app, { ...RUN, tab: 'activity' });
   const slot = section(runRoot, 'run').querySelector('[data-slot="run-tab"]');
   assert.equal(section(slot, 'activity')?.textContent, 'run:undefined');
+});
+
+test('session_pages_and_tool_inputs_reach_the_app', async () => {
+  const app = fakeApp({
+    activity: {
+      source: viewOf(
+        'activity',
+        'session',
+        `async (ctx) => {
+        await ctx.data.session('s-1');
+        await ctx.data.session('s-1', { before: 40, limit: 20 });
+        await ctx.data.toolInput('s-1', 'toolu_1');
+        return document.createElement('p');
+      }`,
+      ),
+    },
+  });
+  await started(app, { to: 'session', project: 'p1', id: 's-1' });
+  assert.deepEqual(
+    app.calls.filter(([cmd]) => cmd === 'session' || cmd === 'tool_input'),
+    [
+      ['session', { id: 's-1', before: null, limit: null }],
+      ['session', { id: 's-1', before: 40, limit: 20 }],
+      ['tool_input', { session: 's-1', tool: 'toolu_1' }],
+    ],
+  );
 });
 
 test('a_slot_list_with_an_unknown_slot_is_a_load_error', async () => {

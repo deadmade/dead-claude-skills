@@ -8,6 +8,7 @@ import type { Entry } from '../../bindings/Entry';
 import type { FlowRun } from '../../bindings/FlowRun';
 import type { PhaseState } from '../../bindings/PhaseState';
 import type { Project } from '../../bindings/Project';
+import type { ToolDetail } from '../../bindings/ToolDetail';
 import type { ViewInfo } from '../../bindings/ViewInfo';
 
 // Every data type, so a view takes them all from `flow-cockpit` too.
@@ -63,6 +64,17 @@ export type Route =
 /** Where a view draws: one of these, or a list of them for a view that serves several (see `View.slot`). */
 export type Slot = 'list' | 'run' | 'run-tab' | 'doc' | 'session';
 
+/**
+ * Which of a session's turns to read. Turn indexes count from the session's oldest turn (0), so a turn keeps its
+ * index as newer ones arrive.
+ */
+export interface SessionPage {
+  /** Read the turns before this index; the newest when left out. */
+  before?: number;
+  /** How many turns at most; 20 when left out. */
+  limit?: number;
+}
+
 /** The core's read-only data. Each call asks the app afresh; nothing is cached. */
 export interface DataApi {
   projects(): Promise<Project[]>;
@@ -70,7 +82,14 @@ export interface DataApi {
   flowRun(project: string, slug: string): Promise<FlowRun | null>;
   /** The document's raw Markdown. */
   doc(project: string, slug: string, name: DocName): Promise<string | null>;
-  session(id: string): Promise<Activity | null>;
+  /**
+   * A page of the session's turns, oldest first: the newest `limit` before `before`, with the session's turn count
+   * (`total`), the page's first index (`start`), its agents and what it waits for. Its tool calls come without their
+   * input: `toolInput` reads one.
+   */
+  session(id: string, page?: SessionPage): Promise<Activity | null>;
+  /** The input of the session's tool call `id`; null when the transcript no longer holds it. */
+  toolInput(session: string, id: string): Promise<ToolDetail | null>;
   views(): Promise<ViewInfo[]>;
   /** A view's code, types stripped; rejects with the error, which names the line. */
   viewSource(id: string): Promise<string>;

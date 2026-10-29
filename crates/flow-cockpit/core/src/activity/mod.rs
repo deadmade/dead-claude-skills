@@ -1,4 +1,11 @@
-//! What a Claude session and its subagents did, turn by turn, from the transcripts.
+//! What a Claude session and its subagents did, turn by turn, from the transcripts. Claude Code's transcript format
+//! is parsed here and nowhere else. The format is not documented or stable, so every field is read defensively: a
+//! line that does not parse (a half line at the end of a file still being written) or an entry kind we do not know
+//! is skipped, never an error.
+//!
+//! A session is read through a [`TranscriptCache`], which reads only what each file gained since its last read, and
+//! answers a page of turns at a time. A tool call's input stays out of the turns: [`TranscriptCache::tool_input`]
+//! reads it, one call at a time.
 
 mod transcript;
 
@@ -8,7 +15,10 @@ use serde::Serialize;
 use serde_json::Value;
 use ts_rs::TS;
 
-pub use transcript::{Transcript, read_transcript};
+pub use transcript::TranscriptCache;
+
+/// How many turns a page holds when the window doesn't say.
+pub const PAGE: usize = 20;
 
 /// A prompt or a reply, with the entry's timestamp. `agent` is the subagent that wrote it, `None` for the main session.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -41,7 +51,8 @@ pub enum ToolDetail {
     },
 }
 
-/// One tool call. `agent` is the subagent that made it, `None` for the main session.
+/// One tool call, without its input (that comes from `tool_input`, by `id`). `agent` is the subagent that made it,
+/// `None` for the main session.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 pub struct ToolCall {
     pub id: String,
@@ -49,7 +60,6 @@ pub struct ToolCall {
     pub agent: Option<String>,
     pub tool: String,
     pub summary: String,
-    pub detail: ToolDetail,
     pub failed: bool,
 }
 
@@ -78,9 +88,13 @@ pub struct Live {
     pub waiting: Option<String>,
 }
 
+/// A page of a session's turns, oldest first: the turns whose indexes are `start` up to `start + turns.len()`, out of
+/// `total`. Indexes count from the session's oldest turn, so a turn keeps its index as newer ones arrive.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, TS)]
 pub struct Activity {
     pub turns: Vec<Turn>,
+    pub start: usize,
+    pub total: usize,
     pub agents: Vec<AgentInfo>,
     pub live: Live,
 }
@@ -99,26 +113,6 @@ fn at(entry: &Value) -> String {
 
 fn content(entry: &Value) -> Option<&Value> {
     entry.get("message")?.get("content")
-}
-
-/// The tool-result ids that failed, over all entries.
-fn failures<'a>(entries: impl Iterator<Item = &'a Value>) -> HashMap<String, bool> {
-    let mut out = HashMap::new();
-    for e in entries.filter(|e| str_of(e, "type") == Some("user")) {
-        let Some(blocks) = content(e).and_then(Value::as_array) else {
-            continue;
-        };
-        for b in blocks
-            .iter()
-            .filter(|b| str_of(b, "type") == Some("tool_result"))
-        {
-            if let Some(id) = str_of(b, "tool_use_id") {
-                let failed = b.get("is_error").and_then(Value::as_bool) == Some(true);
-                out.insert(id.to_string(), failed);
-            }
-        }
-    }
-    out
 }
 
 fn detail(tool: &str, input: &Value) -> ToolDetail {
@@ -171,45 +165,56 @@ fn summary(tool: &str, input: &Value) -> String {
     .map_or_else(|| tool.to_string(), line)
 }
 
-/// The assistant entry's text blocks and tool calls. Thinking blocks and anything unknown are skipped.
-fn assistant_parts(
-    entry: &Value,
-    agent: Option<&str>,
-    failed: &HashMap<String, bool>,
-) -> (Vec<Text>, Vec<ToolCall>) {
+/// A tool call as the cache keeps it: its input is left in the file, at the line starting at `offset`.
+struct Stub {
+    id: String,
+    at: String,
+    agent: Option<String>,
+    tool: String,
+    summary: String,
+    offset: u64,
+}
+
+/// What one transcript line adds to the turns: a prompt that opens one, or an assistant entry's text blocks and tool
+/// calls. Thinking blocks and anything unknown are left out.
+enum Item {
+    Prompt(Text),
+    Said {
+        at: String,
+        texts: Vec<Text>,
+        tools: Vec<Stub>,
+    },
+}
+
+/// The assistant entry's text blocks and tool calls, or `None` when it has neither.
+fn said(entry: &Value, agent: Option<&str>, offset: u64) -> Option<Item> {
     let (mut texts, mut tools) = (Vec::new(), Vec::new());
     let when = at(entry);
+    let text = |text: String| Text {
+        at: when.clone(),
+        text,
+        agent: agent.map(str::to_string),
+    };
     match content(entry) {
-        Some(Value::String(s)) if !s.trim().is_empty() => texts.push(Text {
-            at: when,
-            text: s.clone(),
-            agent: agent.map(str::to_string),
-        }),
+        Some(Value::String(s)) if !s.trim().is_empty() => texts.push(text(s.clone())),
         Some(Value::Array(blocks)) => {
             for b in blocks {
                 match str_of(b, "type") {
                     Some("text") => {
-                        let text = owned(b, "text");
-                        if !text.trim().is_empty() {
-                            texts.push(Text {
-                                at: when.clone(),
-                                text,
-                                agent: agent.map(str::to_string),
-                            });
+                        let t = owned(b, "text");
+                        if !t.trim().is_empty() {
+                            texts.push(text(t));
                         }
                     }
                     Some("tool_use") => {
-                        let id = owned(b, "id");
                         let tool = owned(b, "name");
-                        let input = b.get("input").unwrap_or(&Value::Null);
-                        tools.push(ToolCall {
-                            failed: failed.get(&id).copied().unwrap_or(false),
-                            id,
+                        tools.push(Stub {
+                            id: owned(b, "id"),
                             at: when.clone(),
                             agent: agent.map(str::to_string),
-                            summary: summary(&tool, input),
-                            detail: detail(&tool, input),
+                            summary: summary(&tool, b.get("input").unwrap_or(&Value::Null)),
                             tool,
+                            offset,
                         });
                     }
                     _ => {}
@@ -218,13 +223,17 @@ fn assistant_parts(
         }
         _ => {}
     }
-    (texts, tools)
+    (!texts.is_empty() || !tools.is_empty()).then_some(Item::Said {
+        at: when,
+        texts,
+        tools,
+    })
 }
 
 /// A user entry that is not `isMeta` and whose text does not start with `<` (injected reminders and command echoes)
 /// is a prompt and opens a turn. The text is the string content or the array's `text` blocks joined, so a prompt
 /// with an image still counts and a tool result (no text blocks) does not.
-fn prompt_of(entry: &Value) -> Option<Text> {
+pub(crate) fn prompt_of(entry: &Value) -> Option<Text> {
     if str_of(entry, "type") != Some("user")
         || entry.get("isMeta").and_then(Value::as_bool) == Some(true)
     {
@@ -247,99 +256,219 @@ fn prompt_of(entry: &Value) -> Option<Text> {
     })
 }
 
-/// The turn open at `when`: the last one that started at or before it, else the first; made when there is none.
-fn turn_at<'a>(
-    turns: &'a mut Vec<Turn>,
-    starts: &mut Vec<String>,
-    when: &str,
-) -> Option<&'a mut Turn> {
-    if turns.is_empty() {
-        starts.push(when.to_string());
-        turns.push(Turn::default());
-    }
-    let i = starts.iter().rposition(|s| s.as_str() <= when).unwrap_or(0);
-    turns.get_mut(i)
+/// What a run of a transcript's lines holds, in order.
+#[derive(Default)]
+struct Lines {
+    items: Vec<Item>,
+    /// Tool-result id to whether it failed; a later result for the same id wins.
+    results: HashMap<String, bool>,
+    first_at: Option<String>,
+    last_at: Option<String>,
 }
 
-fn agent_info(sub: &transcript::SubTranscript) -> AgentInfo {
-    let meta = |k: &str| str_of(&sub.meta, k).map(str::to_string);
-    let times = || sub.entries.iter().filter_map(|e| str_of(e, "timestamp"));
-    let finished = sub.meta.get("finished").and_then(Value::as_bool) == Some(true);
+impl Lines {
+    /// Adds one line (its newline stripped), which starts at byte `offset` of its file. A subagent's transcript
+    /// (`agent` set) opens no turns: only the main session's prompts do.
+    fn add(&mut self, line: &[u8], offset: u64, agent: Option<&str>) {
+        let Ok(entry) = serde_json::from_str::<Value>(&String::from_utf8_lossy(line)) else {
+            return;
+        };
+        if !entry.is_object() {
+            return;
+        }
+        if let Some(t) = str_of(&entry, "timestamp") {
+            self.first_at.get_or_insert_with(|| t.to_string());
+            self.last_at = Some(t.to_string());
+        }
+        match str_of(&entry, "type") {
+            Some("user") => {
+                for b in content(&entry)
+                    .and_then(Value::as_array)
+                    .into_iter()
+                    .flatten()
+                    .filter(|b| str_of(b, "type") == Some("tool_result"))
+                {
+                    if let Some(id) = str_of(b, "tool_use_id") {
+                        let failed = b.get("is_error").and_then(Value::as_bool) == Some(true);
+                        self.results.insert(id.to_string(), failed);
+                    }
+                }
+                if agent.is_none()
+                    && let Some(prompt) = prompt_of(&entry)
+                {
+                    self.items.push(Item::Prompt(prompt));
+                }
+            }
+            Some("assistant") => self.items.extend(said(&entry, agent, offset)),
+            _ => {}
+        }
+    }
+}
+
+/// One file's lines as read so far: the complete ones, then the last line while it has no newline yet.
+struct Parts<'a> {
+    done: &'a Lines,
+    tail: &'a Lines,
+}
+
+impl<'a> Parts<'a> {
+    fn items(&self) -> impl Iterator<Item = &'a Item> {
+        self.done.items.iter().chain(&self.tail.items)
+    }
+
+    fn result(&self, id: &str) -> Option<bool> {
+        self.tail
+            .results
+            .get(id)
+            .or_else(|| self.done.results.get(id))
+            .copied()
+    }
+}
+
+/// A subagent's lines with the facts from its `.meta.json`.
+struct AgentParts<'a> {
+    id: &'a str,
+    meta: &'a Value,
+    parts: Parts<'a>,
+}
+
+fn agent_info(a: &AgentParts<'_>) -> AgentInfo {
+    let meta = |k: &str| str_of(a.meta, k).map(str::to_string);
+    let finished = a.meta.get("finished").and_then(Value::as_bool) == Some(true);
+    let (done, tail) = (a.parts.done, a.parts.tail);
     AgentInfo {
-        id: sub.id.clone(),
+        id: a.id.to_string(),
         description: meta("description"),
         kind: meta("agentType"),
         model: meta("model"),
-        started: times().next().map(str::to_string),
+        started: done.first_at.clone().or_else(|| tail.first_at.clone()),
         ended: if finished {
-            times().next_back().map(str::to_string)
+            tail.last_at.clone().or_else(|| done.last_at.clone())
         } else {
             None
         },
     }
 }
 
-/// Groups the transcript into turns. A subagent's tool calls go into the turn that was open when they were made.
-#[must_use]
-pub fn activity(t: &Transcript) -> Activity {
-    let failed = failures(
-        t.main
-            .iter()
-            .chain(t.agents.iter().flat_map(|a| a.entries.iter())),
-    );
-    let mut turns: Vec<Turn> = Vec::new();
-    let mut starts: Vec<String> = Vec::new();
-    for e in &t.main {
-        if let Some(prompt) = prompt_of(e) {
-            starts.push(prompt.at.clone());
-            turns.push(Turn {
-                prompt: Some(prompt),
-                ..Turn::default()
+/// A turn while the page is assembled: where it starts and the items that went into it.
+struct Slot<'a> {
+    prompt: Option<&'a Text>,
+    start: &'a str,
+    items: Vec<&'a Item>,
+}
+
+/// Groups the transcripts into turns and builds the page of the `limit` turns before index `before` (the newest when
+/// `None`). A subagent's entries go into the turn that was open when they were written. Only the page's turns are
+/// built; the rest are counted.
+fn page(
+    main: &Parts<'_>,
+    agents: &[AgentParts<'_>],
+    before: Option<usize>,
+    limit: usize,
+) -> Activity {
+    let mut slots: Vec<Slot> = Vec::new();
+    for item in main.items() {
+        match item {
+            Item::Prompt(p) => slots.push(Slot {
+                prompt: Some(p),
+                start: &p.at,
+                items: Vec::new(),
+            }),
+            Item::Said { at, .. } => {
+                if slots.is_empty() {
+                    slots.push(Slot {
+                        prompt: None,
+                        start: at,
+                        items: Vec::new(),
+                    });
+                }
+                if let Some(last) = slots.last_mut() {
+                    last.items.push(item);
+                }
+            }
+        }
+    }
+    // The open turn at `at` is the last that started at or before it, else the first. Turns start in time order in
+    // every transcript seen; a binary search finds it then.
+    let sorted = slots.windows(2).all(|w| w[0].start <= w[1].start);
+    for item in agents.iter().flat_map(|a| a.parts.items()) {
+        let Item::Said { at, .. } = item else {
+            continue;
+        };
+        if slots.is_empty() {
+            slots.push(Slot {
+                prompt: None,
+                start: at,
+                items: Vec::new(),
             });
-            continue;
         }
-        if str_of(e, "type") != Some("assistant") {
-            continue;
-        }
-        let (texts, tools) = assistant_parts(e, None, &failed);
-        if texts.is_empty() && tools.is_empty() {
-            continue;
-        }
-        if turns.is_empty() {
-            starts.push(at(e));
-            turns.push(Turn::default());
-        }
-        if let Some(turn) = turns.last_mut() {
-            turn.replies.extend(texts);
-            turn.tools.extend(tools);
-        }
+        let i = if sorted {
+            slots
+                .partition_point(|s| s.start <= at.as_str())
+                .saturating_sub(1)
+        } else {
+            slots
+                .iter()
+                .rposition(|s| s.start <= at.as_str())
+                .unwrap_or(0)
+        };
+        slots[i].items.push(item);
     }
-    for sub in &t.agents {
-        for e in sub
-            .entries
+
+    let total = slots.len();
+    let end = before.unwrap_or(total).min(total);
+    let start = end.saturating_sub(limit);
+    // The last result for a call wins, files in the order main, then the agents by id.
+    let failed = |id: &str| {
+        agents
             .iter()
-            .filter(|e| str_of(e, "type") == Some("assistant"))
-        {
-            let (texts, tools) = assistant_parts(e, Some(&sub.id), &failed);
-            for text in texts {
-                if let Some(turn) = turn_at(&mut turns, &mut starts, &text.at) {
-                    turn.replies.push(text);
+            .rev()
+            .map(|a| &a.parts)
+            .chain(std::iter::once(main))
+            .find_map(|p| p.result(id))
+            .unwrap_or(false)
+    };
+    let turns = slots[start..end]
+        .iter()
+        .map(|slot| {
+            let mut turn = Turn {
+                prompt: slot.prompt.cloned(),
+                ..Turn::default()
+            };
+            for item in &slot.items {
+                if let Item::Said { texts, tools, .. } = item {
+                    turn.replies.extend(texts.iter().cloned());
+                    turn.tools.extend(tools.iter().map(|s| ToolCall {
+                        id: s.id.clone(),
+                        at: s.at.clone(),
+                        agent: s.agent.clone(),
+                        tool: s.tool.clone(),
+                        summary: s.summary.clone(),
+                        failed: failed(&s.id),
+                    }));
                 }
             }
-            for call in tools {
-                if let Some(turn) = turn_at(&mut turns, &mut starts, &call.at) {
-                    turn.tools.push(call);
-                }
-            }
-        }
-    }
-    for turn in &mut turns {
-        turn.replies.sort_by(|a, b| a.at.cmp(&b.at));
-        turn.tools.sort_by(|a, b| a.at.cmp(&b.at));
-    }
+            turn.replies.sort_by(|a, b| a.at.cmp(&b.at));
+            turn.tools.sort_by(|a, b| a.at.cmp(&b.at));
+            turn
+        })
+        .collect();
     Activity {
         turns,
-        agents: t.agents.iter().map(agent_info).collect(),
+        start,
+        total,
+        agents: agents.iter().map(agent_info).collect(),
         live: Live::default(),
     }
+}
+
+/// The input of the call `id` in the line read back from its file, when that line still holds it.
+fn input_in(line: &[u8], id: &str) -> Option<ToolDetail> {
+    let entry: Value = serde_json::from_str(&String::from_utf8_lossy(line)).ok()?;
+    content(&entry)?
+        .as_array()?
+        .iter()
+        .filter(|b| str_of(b, "type") == Some("tool_use"))
+        .find(|b| str_of(b, "id") == Some(id))
+        .map(|b| detail(&owned(b, "name"), b.get("input").unwrap_or(&Value::Null)))
 }

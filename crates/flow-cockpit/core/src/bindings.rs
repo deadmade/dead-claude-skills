@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use ts_rs::{Config, TS};
 
-use crate::activity::Activity;
+use crate::activity::{Activity, ToolDetail};
 use crate::doc::{AuditDoc, FlowDoc, Ledger, PlanDoc};
 use crate::index::{DocName, Entry, FlowRun, Project};
 
@@ -21,6 +21,7 @@ fn export_all_to(dir: &Path) -> Result<(), ts_rs::ExportError> {
     AuditDoc::export_all(&cfg)?;
     Ledger::export_all(&cfg)?;
     Activity::export_all(&cfg)?;
+    ToolDetail::export_all(&cfg)?;
     Project::export_all(&cfg)?;
     Entry::export_all(&cfg)?;
     FlowRun::export_all(&cfg)?;

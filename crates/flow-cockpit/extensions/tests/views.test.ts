@@ -27,7 +27,20 @@ const DATA = {
   runs: fixture('runs'),
   docs: fixture('docs'),
   sessions: fixture('sessions'),
+  inputs: fixture('inputs'),
 };
+
+/**
+ * The page the core answers `session` with, from a whole session: the newest `limit` turns (20 by default) before the
+ * turn index `before`, indexes counting from the oldest turn.
+ */
+function pageOf(activity: any, opts: { before?: number | null; limit?: number | null } = {}) {
+  if (!activity) return null;
+  const total = activity.turns.length;
+  const before = Math.min(opts.before ?? total, total);
+  const start = Math.max(0, before - (opts.limit ?? 20));
+  return { ...activity, turns: activity.turns.slice(start, before), start, total };
+}
 const ALPHA = 'github-com-acme-alpha';
 // In the runtime's order (by id); the run view puts Docs first, as the design does.
 const TABS = [
@@ -49,7 +62,8 @@ function context(route: any, data: Partial<typeof DATA> = {}, api: Record<string
       entries: async (p: string) => d.entries[p] ?? [],
       flowRun: async (p: string, s: string) => d.runs[`${p}/${s}`] ?? null,
       doc: async (p: string, s: string, n: string) => d.docs[`${p}/${s}`]?.[n] ?? null,
-      session: async (id: string) => d.sessions[id] ?? null,
+      session: async (id: string, opts?: any) => pageOf(d.sessions[id], opts),
+      toolInput: async (session: string, id: string) => d.inputs[`${session}/${id}`] ?? null,
       views: async () => [],
       viewSource: async () => '',
       ...api,
@@ -442,6 +456,40 @@ test('docs_enhances_known_parts', async () => {
   assert.match(text(login.box.querySelector('.reading')), /This run has no spec\.md/);
 });
 
+const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+/** Lets a click's or a toggle's reads answer and draw. */
+const settle = async () => {
+  for (let i = 0; i < 5; i++) await tick();
+};
+/** Opens the turn's first tool call fold, as the user would, and waits for its input to be drawn. */
+async function openCall(turn: Element) {
+  const call = turn.querySelector('details.tool-call') as HTMLDetailsElement;
+  const toggled = new Promise((resolve) => call.addEventListener('toggle', resolve, { once: true }));
+  call.open = true;
+  await toggled;
+  await settle();
+  return call;
+}
+const olderButton = (box: Element) =>
+  [...box.querySelectorAll('button')].find((b) => text(b) === 'Show older turns') as HTMLButtonElement | undefined;
+
+/** An invented session of `n` turns, prompts `Prompt 0` (oldest) on, each with one command. */
+function longSession(n: number) {
+  const at = (i: number) =>
+    `2026-01-19T${String(10 + Math.floor(i / 60)).padStart(2, '0')}:${String(i % 60).padStart(2, '0')}:00.000Z`;
+  return {
+    agents: [],
+    live: { waiting: null },
+    start: 0,
+    total: n,
+    turns: Array.from({ length: n }, (_, i) => ({
+      prompt: { at: at(i), text: `Prompt ${i}`, agent: null },
+      replies: [],
+      tools: [{ id: `t${i}`, at: at(i), agent: null, tool: 'Bash', summary: `Step ${i}`, failed: false }],
+    })),
+  };
+}
+
 test('activity_groups_turns_newest_first', async () => {
   const { box } = await draw('activity', { to: 'run', project: ALPHA, slug: 'login', tab: 'activity' });
   const turns = [...box.querySelectorAll('.turn')];
@@ -454,19 +502,14 @@ test('activity_groups_turns_newest_first', async () => {
   const tools = turns[0].querySelector('details.unfold');
   assert.match(text(tools?.querySelector('summary')), /1 tool call/);
   assert.match(text(tools), /Bash\s*Run the tests/);
-  // A call's input is drawn when its fold opens: a long session has hundreds.
+  // A call's input is fetched and drawn when its fold opens: a long session has hundreds.
   assert.doesNotMatch(text(turns[0]), /npm test/);
-  const open = async (turn: Element) => {
-    const call = turn.querySelector('details.tool-call') as HTMLDetailsElement;
-    const toggled = new Promise((resolve) => call.addEventListener('toggle', resolve, { once: true }));
-    call.open = true;
-    await toggled;
-  };
-  await open(turns[0]);
+  await openCall(turns[0]);
   assert.match(text(turns[0].querySelector('details.tool-call pre')), /^npm test$/);
-  await open(turns[1]);
+  await openCall(turns[1]);
   assert.ok(turns[1].querySelector('details.tool-call .diff'), 'an edit shows as a diff');
   assert.deepEqual(names(box, 'Sessions'), ['Latest session']);
+  assert.equal(olderButton(box), undefined, 'a session with no older turns has no button');
 
   // A loose session has a screen of its own.
   const loose = await draw('activity', { to: 'session', project: ALPHA, id: 's-mention' });
@@ -485,7 +528,6 @@ function deferred() {
   const session = (id: string) => new Promise((resolve, reject) => calls.push({ id, resolve, reject }));
   return { calls, session };
 }
-const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 const twoSessions = () => {
   const runs = clone(DATA.runs);
   runs[`${ALPHA}/login`].sessions = ['s-link', 's-mention'];
@@ -536,16 +578,10 @@ test('activity_reads_only_the_selected_session', async () => {
   assert.deepEqual(read, ['s-link']);
 });
 
-test('activity_folds_stay_on_their_turn_across_a_redraw', async () => {
+/** The runtime drawing the activity view's screen for session `id`, over `invoke`. */
+async function activityRuntime(invoke: (cmd: string, args?: any) => Promise<any>, id: string) {
   const { createRuntime } = await import('../../app/shell/runtime.js');
-  const sessions = clone(DATA.sessions);
   const handlers = new Map<string, (event: any) => void>();
-  const invoke = async (cmd: string, args: any = {}) => {
-    if (cmd === 'views') return [{ id: 'activity', source: 'Builtin', replaced: false }];
-    if (cmd === 'view_source') return '';
-    if (cmd === 'session') return sessions[args.id] ?? null;
-    return null;
-  };
   const root = document.createElement('main');
   document.body.replaceChildren(root);
   const runtime = createRuntime({
@@ -554,7 +590,101 @@ test('activity_folds_stay_on_their_turn_across_a_redraw', async () => {
     listen: async (name: string, handler: any) => handlers.set(name, handler),
     importModule: () => import(`../activity/activity.ts?t=${++fresh}`),
   });
-  await runtime.start({ to: 'session', project: ALPHA, id: 's-link' });
+  await runtime.start({ to: 'session', project: ALPHA, id });
+  return { root, runtime, handlers };
+}
+
+test('activity_draws_the_newest_20_turns_and_loads_older_ones_on_click', async () => {
+  const long = longSession(45);
+  const asked: any[] = [];
+  const session = async (id: string, opts?: any) => {
+    asked.push(opts ?? {});
+    return pageOf(long, opts);
+  };
+  const { box } = await draw('activity', { to: 'session', project: ALPHA, id: 's-long' }, {}, { session });
+  const shown = () => [...box.querySelectorAll('.turn-h')].map((h) => text(h));
+  assert.equal(shown().length, 20);
+  assert.deepEqual([shown()[0], shown()[19]], ['Prompt 44', 'Prompt 25']);
+  // The screen's title is the session's first prompt, though that turn isn't drawn yet.
+  assert.equal(text(box.querySelector('h1')), 'Prompt 0');
+
+  const more = olderButton(box);
+  assert.ok(more, 'a real button loads older turns');
+  more.click();
+  await settle();
+  assert.equal(shown().length, 40);
+  assert.deepEqual([shown()[20], shown()[39]], ['Prompt 24', 'Prompt 5']);
+  assert.deepEqual(asked.at(-1), { before: 25, limit: 20 });
+  olderButton(box)!.click();
+  await settle();
+  assert.equal(shown().length, 45);
+  assert.equal(shown().at(-1), 'Prompt 0');
+  assert.equal(olderButton(box), undefined, 'none left to load');
+});
+
+test('activity_keeps_older_turns_across_a_redraw_and_fetches_only_the_newest', async () => {
+  const long = longSession(45);
+  const asked: any[] = [];
+  const invoke = async (cmd: string, args: any = {}) => {
+    if (cmd === 'views') return [{ id: 'activity', source: 'Builtin', replaced: false }];
+    if (cmd === 'view_source') return '';
+    if (cmd === 'session') {
+      asked.push(args);
+      return pageOf(long, args);
+    }
+    return null;
+  };
+  const { root, runtime, handlers } = await activityRuntime(invoke, 's-long');
+  const shown = () => [...root.querySelectorAll('.turn-h')].map((h) => text(h));
+  olderButton(root)!.click();
+  await settle();
+  assert.equal(shown().length, 40);
+
+  // A new turn arrives: the redraw asks for the newest page only and keeps the older turns it loaded.
+  const next = longSession(46).turns[45];
+  long.turns.push(next);
+  asked.length = 0;
+  handlers.get('changed')!({ payload: { project: ALPHA } });
+  await runtime.idle();
+  assert.deepEqual(asked, [{ id: 's-long', before: null, limit: null }]);
+  assert.equal(shown().length, 41);
+  assert.deepEqual([shown()[0], shown().at(-1)], ['Prompt 45', 'Prompt 5']);
+  assert.ok(olderButton(root));
+});
+
+test('activity_fetches_a_calls_input_when_its_fold_opens', async () => {
+  const asked: string[][] = [];
+  const answers: { resolve: (v: any) => void; reject: (e: any) => void }[] = [];
+  const toolInput = (session: string, id: string) => {
+    asked.push([session, id]);
+    return new Promise((resolve, reject) => answers.push({ resolve, reject }));
+  };
+  const { box } = await draw('activity', { to: 'session', project: ALPHA, id: 's-link' }, {}, { toolInput });
+  assert.deepEqual(asked, [], 'nothing is fetched before a fold opens');
+  const [newer, older] = [...box.querySelectorAll('.turn')];
+  const call = await openCall(newer);
+  assert.deepEqual(asked, [['s-link', 't3']]);
+  assert.equal(text(call.querySelector('.unfold-body')), 'Loading…');
+  answers[0].resolve({ kind: 'Command', command: 'npm test', description: 'Run the tests' });
+  await settle();
+  assert.equal(text(call.querySelector('pre')), 'npm test');
+
+  // An input that can't be read says so in its fold.
+  const failing = await openCall(older);
+  answers[1].reject(new Error('the transcript is gone'));
+  await settle();
+  assert.match(text(failing.querySelector('.unfold-body')), /couldn't be read.*the transcript is gone/);
+});
+
+test('activity_folds_stay_on_their_turn_across_a_redraw', async () => {
+  const sessions = clone(DATA.sessions);
+  const invoke = async (cmd: string, args: any = {}) => {
+    if (cmd === 'views') return [{ id: 'activity', source: 'Builtin', replaced: false }];
+    if (cmd === 'view_source') return '';
+    if (cmd === 'session') return pageOf(sessions[args.id], args);
+    return null;
+  };
+  const { root, runtime, handlers } = await activityRuntime(invoke, 's-link');
   const fold = (prompt: string) =>
     [...root.querySelectorAll('.turn')]
       .find((t) => text(t.querySelector('.turn-h')) === prompt)

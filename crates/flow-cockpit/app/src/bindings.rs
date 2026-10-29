@@ -6,7 +6,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use flow_cockpit_core::activity::Activity;
+use flow_cockpit_core::activity::{Activity, ToolDetail};
 use flow_cockpit_core::doc::{AuditDoc, FlowDoc, Ledger, PlanDoc};
 use flow_cockpit_core::index::{DocName, Entry, FlowRun, Project};
 use ts_rs::{Config, TS};
@@ -31,6 +31,7 @@ fn export_core_to(dir: &Path) -> Result<(), ts_rs::ExportError> {
     AuditDoc::export_all(&cfg)?;
     Ledger::export_all(&cfg)?;
     Activity::export_all(&cfg)?;
+    ToolDetail::export_all(&cfg)?;
     Project::export_all(&cfg)?;
     Entry::export_all(&cfg)?;
     FlowRun::export_all(&cfg)?;

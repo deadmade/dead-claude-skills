@@ -9,6 +9,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
+use flow_cockpit_core::activity::{PAGE, TranscriptCache};
 use flow_cockpit_core::index::{
     Config, DocName, Entry, FlowRunSummary, Home, Index, LinkCache, Project, Status,
 };
@@ -305,7 +306,7 @@ fn hidden_project_is_left_out() {
     let w = World::new("hidden");
     let index = w.index();
     assert!(index.projects().iter().all(|p| p.name != "secret"));
-    assert!(index.session("s-secret").is_none());
+    assert!(index.session_path("s-secret").is_none());
 }
 
 #[test]
@@ -435,9 +436,10 @@ fn flow_run_reads_its_documents() {
 fn session_reads_its_activity() {
     let w = World::new("activity");
     let index = w.index();
-    let turns = index.session("s-wt").unwrap().turns;
+    let path = index.session_path("s-wt").unwrap();
+    let turns = TranscriptCache::default().page(&path, None, PAGE).turns;
     assert_eq!(turns.len(), 1);
-    assert!(index.session("nope").is_none());
+    assert!(index.session_path("nope").is_none());
 }
 
 #[test]
