@@ -3,7 +3,8 @@
 //!
 //! The commands run off the main thread (`async`), so reading a large transcript for `session` never stalls the
 //! window, and they share the index through a read lock. A session's transcript is read outside that lock, through
-//! the transcript cache, which reads only what the files gained since.
+//! the transcript cache, which reads only what the files gained since. A session's capture file, likewise, through
+//! the capture cache.
 
 // Tauri hands a command its `State` by value.
 #![expect(clippy::needless_pass_by_value)]
@@ -11,7 +12,9 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-use flow_cockpit_core::activity::{Activity, PAGE, ToolDetail, TranscriptCache};
+use flow_cockpit_core::activity::{
+    Activity, CaptureCache, Live, PAGE, ToolDetail, TranscriptCache,
+};
 use flow_cockpit_core::index::{DocName, Entry, FlowRun, Index, Project};
 use tauri::State;
 
@@ -24,6 +27,7 @@ pub struct Shared {
     /// Set by the first `entries` answer: the window has painted, and the poll may start the link scan.
     painted: AtomicBool,
     transcripts: Mutex<TranscriptCache>,
+    captures: Mutex<CaptureCache>,
 }
 
 impl Shared {
@@ -34,6 +38,7 @@ impl Shared {
             views,
             painted: AtomicBool::new(false),
             transcripts: Mutex::new(TranscriptCache::default()),
+            captures: Mutex::new(CaptureCache::default()),
         }
     }
 
@@ -44,8 +49,8 @@ impl Shared {
             .unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// A page of the session's turns (see [`TranscriptCache::page`]), `limit` [`PAGE`] when not given. The index is
-    /// only asked for the transcript's path: the read itself never holds the index lock.
+    /// A page of the session's turns (see [`TranscriptCache::page`]), `limit` [`PAGE`] when not given, with what it
+    /// waits for. The index is only asked for the paths: the reads never hold the index lock.
     pub fn session(
         &self,
         id: &str,
@@ -53,10 +58,26 @@ impl Shared {
         limit: Option<usize>,
     ) -> Option<Activity> {
         let path = self.read().session_path(id)?;
-        Some(
-            self.transcripts()
-                .page(&path, before, limit.unwrap_or(PAGE)),
-        )
+        let mut page = self
+            .transcripts()
+            .page(&path, before, limit.unwrap_or(PAGE));
+        page.live = self.live(id).unwrap_or_default();
+        Some(page)
+    }
+
+    /// What the session waits for, from its capture file; `None` for a session the index doesn't know. Like
+    /// [`Shared::session`], the read never holds the index lock.
+    pub fn live(&self, id: &str) -> Option<Live> {
+        let (path, capture) = {
+            let index = self.read();
+            (index.session_path(id)?, index.capture_path(id))
+        };
+        Some(self.captures().live(&capture, &path))
+    }
+
+    /// Like the transcripts: a panic during a read leaves what was read, which is still worth showing.
+    fn captures(&self) -> MutexGuard<'_, CaptureCache> {
+        self.captures.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
     /// One tool call's input, by the session and the call's id.

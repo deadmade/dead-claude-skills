@@ -17,6 +17,8 @@ use std::path::{Path, PathBuf};
 
 use jiff::Timestamp;
 
+use crate::activity::Live;
+
 pub use config::{Config, Home};
 pub use entries::{AuditSummary, DocName, Entry, FlowRun, FlowRunSummary, SessionSummary};
 pub use links::LinkCache;
@@ -45,6 +47,8 @@ pub struct Index {
     sessions: HashMap<String, Session>,
     /// Session id to the slugs of the flow.md files it edited, from the link scans.
     links: HashMap<String, Vec<String>>,
+    /// Session id to what it waits for, from the capture: set by [`Index::set_live`].
+    live: HashMap<String, Live>,
 }
 
 impl Index {
@@ -60,6 +64,7 @@ impl Index {
             projects: BTreeMap::new(),
             sessions: HashMap::new(),
             links: HashMap::new(),
+            live: HashMap::new(),
         };
         for dir in projects::subdirs(&home.claude_projects) {
             index.load_dir(&dir, None, &mut HashMap::new());
@@ -129,6 +134,31 @@ impl Index {
         for id in ids {
             self.derive_project(&id, now);
         }
+    }
+
+    /// The sessions linked to a flow run, in any project: the ones whose capture a run's status reads.
+    #[must_use]
+    pub fn linked_sessions(&self) -> Vec<String> {
+        let mut ids: Vec<String> = self
+            .projects
+            .values()
+            .flat_map(|p| p.derived.linked.values().flatten().cloned())
+            .collect();
+        ids.sort_unstable();
+        ids.dedup();
+        ids
+    }
+
+    /// The session's capture file, where the hooks write it.
+    #[must_use]
+    pub fn capture_path(&self, id: &str) -> PathBuf {
+        self.home.capture_dir.join(format!("{id}.jsonl"))
+    }
+
+    /// What the sessions wait for, read from their capture files outside the index's lock (a session left out waits
+    /// for nothing). The statuses take it in at the next [`Index::refresh`].
+    pub fn set_live(&mut self, live: HashMap<String, Live>) {
+        self.live = live;
     }
 
     #[must_use]
@@ -268,7 +298,7 @@ impl Index {
             .map(|(k, s)| (k.as_str(), s))
             .collect();
         if let Some(p) = self.projects.get_mut(id) {
-            p.derived = derive(&p.docs, &sessions, &self.links, now);
+            p.derived = derive(&p.docs, &sessions, &self.links, &self.live, now);
         }
     }
 }

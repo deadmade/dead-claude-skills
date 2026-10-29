@@ -5,8 +5,10 @@
 //!
 //! A session is read through a [`TranscriptCache`], which reads only what each file gained since its last read, and
 //! answers a page of turns at a time. A tool call's input stays out of the turns: [`TranscriptCache::tool_input`]
-//! reads it, one call at a time.
+//! reads it, one call at a time. What the session waits for comes from the hooks' capture file, through a
+//! [`CaptureCache`].
 
+mod capture;
 mod transcript;
 
 use std::collections::HashMap;
@@ -15,6 +17,7 @@ use serde::Serialize;
 use serde_json::Value;
 use ts_rs::TS;
 
+pub use capture::{CaptureCache, CaptureEvent, live, read_capture};
 pub use transcript::TranscriptCache;
 
 /// How many turns a page holds when the window doesn't say.
@@ -82,10 +85,21 @@ pub struct AgentInfo {
     pub ended: Option<String>,
 }
 
-/// What the session waits for, from capture (always `None` until capture is read).
+/// What a session waits for the user on.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(tag = "kind")]
+pub enum Waiting {
+    /// An `AskUserQuestion`: its first question (its header when the question is empty), and whether the capture hook
+    /// cut the questions short.
+    Question { text: String, cut: bool },
+    /// A permission prompt for this tool.
+    Permission { tool: String },
+}
+
+/// What the session waits for, from the capture file; `None` when it waits for nothing or has no capture.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, TS)]
 pub struct Live {
-    pub waiting: Option<String>,
+    pub waiting: Option<Waiting>,
 }
 
 /// A page of a session's turns, oldest first: the turns whose indexes are `start` up to `start + turns.len()`, out of

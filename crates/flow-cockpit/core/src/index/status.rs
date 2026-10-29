@@ -27,19 +27,21 @@ pub(crate) struct Facts<'a> {
     pub last_activity: Timestamp,
     /// When the newest linked session's transcript last grew.
     pub transcript: Option<Timestamp>,
+    /// A linked session has a question or permission prompt open, from the capture.
+    pub asked: bool,
 }
 
-/// Done (`phase: done`) first, then Waiting (`now:` starts `Waiting for you`), Working (a transcript grew in the last
-/// 2 minutes), Stale (nothing for 3 days), else Idle. Waiting from the capture is not read yet.
+/// Done (`phase: done`) first, then Waiting (`now:` starts `Waiting for you`, or a linked session has a question or
+/// permission prompt open), Working (a transcript grew in the last 2 minutes), Stale (nothing for 3 days), else Idle.
 pub(crate) fn status(f: &Facts, now: Timestamp) -> Status {
     let age = |t: Timestamp| now.as_second() - t.as_second();
     if f.phase
         .is_some_and(|p| p.trim().eq_ignore_ascii_case("done"))
     {
         Status::Done
-    } else if f
-        .now_line
-        .is_some_and(|n| n.trim_start().starts_with("Waiting for you"))
+    } else if f.asked
+        || f.now_line
+            .is_some_and(|n| n.trim_start().starts_with("Waiting for you"))
     {
         Status::Waiting
     } else if f.transcript.is_some_and(|t| age(t) <= WORKING_SECS) {
@@ -66,23 +68,27 @@ mod tests {
         let day = 24 * 3600;
         let waiting = Some("Waiting for you to approve.");
         let busy = Some("Building.");
-        // phase, now:, last activity ago, transcript grew ago, expected
+        // phase, now:, last activity ago, transcript grew ago, a capture wait, expected
         let table = [
-            (Some("build"), waiting, 60, None, Status::Waiting),
-            (Some("done"), waiting, 60, None, Status::Done),
-            (Some("build"), busy, 4 * day, None, Status::Stale),
-            (Some("build"), busy, 60, Some(60), Status::Working),
-            (Some("build"), busy, 180, Some(180), Status::Idle),
-            (Some("build"), None, 2 * day, None, Status::Idle),
-            (None, None, 4 * day, Some(4 * day), Status::Stale),
-            (Some("done"), None, 9 * day, None, Status::Done),
+            (Some("build"), waiting, 60, None, false, Status::Waiting),
+            (Some("done"), waiting, 60, None, false, Status::Done),
+            (Some("build"), busy, 4 * day, None, false, Status::Stale),
+            (Some("build"), busy, 60, Some(60), false, Status::Working),
+            (Some("build"), busy, 180, Some(180), false, Status::Idle),
+            (Some("build"), None, 2 * day, None, false, Status::Idle),
+            (None, None, 4 * day, Some(4 * day), false, Status::Stale),
+            (Some("done"), None, 9 * day, None, false, Status::Done),
+            (Some("build"), busy, 60, Some(60), true, Status::Waiting),
+            (Some("build"), busy, 4 * day, None, true, Status::Waiting),
+            (Some("done"), busy, 60, Some(60), true, Status::Done),
         ];
-        for (phase, now_line, last, grew, want) in table {
+        for (phase, now_line, last, grew, asked, want) in table {
             let facts = Facts {
                 phase,
                 now_line,
                 last_activity: ago(last),
                 transcript: grew.map(ago),
+                asked,
             };
             let got = status(&facts, ago(0));
             assert_eq!(got, want, "{phase:?} {now_line:?} {last}");

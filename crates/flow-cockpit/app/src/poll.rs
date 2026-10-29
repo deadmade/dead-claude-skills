@@ -1,10 +1,12 @@
 //! The poll: every 2 s it stats the folders the cockpit reads and tells the window what changed. It stats, and reads
-//! nothing else itself but `config.toml` when that changed: the Claude projects folder (each transcript and subagent
+//! nothing else itself but `config.toml` when that changed and the capture files of sessions linked to a run (only
+//! what they gained): the Claude projects folder (each transcript and subagent
 //! transcript), the capture folder, each project's `docs/` and `.superpowers/sdd/` trees, both extensions folders and
 //! `config.toml`. A folder that doesn't exist yet is checked again on every tick, so one made later is seen.
 //!
 //! The poll is the index's only writer. Each tick it rebuilds the projects whose files changed, rescans links when a
-//! transcript changed (the cache reads only what grew), and refreshes every status against the clock. A changed
+//! transcript changed (the cache reads only what grew), reads what the sessions linked to a run wait for from their
+//! capture files (outside the index lock), and refreshes every status against the clock. A changed
 //! `config.toml` switches extensions on and off, and rebuilds the index when the projects it hides or trusts changed.
 
 use std::collections::{BTreeSet, HashMap};
@@ -14,6 +16,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
+use flow_cockpit_core::activity::Live;
 use flow_cockpit_core::index::{Config, Entry, Home, Index, LinkCache, Project};
 use jiff::Timestamp;
 use serde::Serialize;
@@ -174,8 +177,13 @@ impl Poller {
                 }
             }
         }
-        // Every tick, files changed or not: a session that stopped writing goes from Working to Idle.
-        shared.write().refresh(now);
+        // Every tick, files changed or not: a session that stopped writing goes from Working to Idle, and a permission
+        // prompt ends once its transcript is written after it. The capture files are read outside the index lock.
+        let live = read_live(shared);
+        let mut index = shared.write();
+        index.set_live(live);
+        index.refresh(now);
+        drop(index);
         self.transcripts = transcripts;
         self.captures = captures;
 
@@ -260,6 +268,19 @@ impl Poller {
         );
         touched
     }
+}
+
+/// What each session linked to a flow run waits for, from its capture file. The index lock is held only to look up
+/// the paths.
+fn read_live(shared: &Shared) -> HashMap<String, Live> {
+    let linked = shared.read().linked_sessions();
+    linked
+        .into_iter()
+        .filter_map(|id| {
+            let live = shared.live(&id)?;
+            Some((id, live))
+        })
+        .collect()
 }
 
 /// The projects and each one's entries, as the window sees them.
@@ -440,7 +461,8 @@ mod tests {
     use std::path::{Path, PathBuf};
     use std::time::{Duration, Instant};
 
-    use flow_cockpit_core::index::{Entry, Index};
+    use flow_cockpit_core::activity::Waiting;
+    use flow_cockpit_core::index::{Entry, Index, Status};
 
     use super::*;
     use crate::paths::Defaults;
@@ -768,6 +790,78 @@ mod tests {
         let mut sessions = linked(&shared, &alpha);
         sessions.sort();
         assert_eq!(sessions, ["s-big", "s-late"]);
+    }
+
+    /// One capture line as the hooks write it, of invented content.
+    fn capture_line(event: &str, extra: &str) -> String {
+        format!(
+            "{{\"v\":1,\"ts\":\"{}\",\"session\":\"s-q\",\"event\":\"{event}\"{extra}}}\n",
+            Timestamp::now()
+        )
+    }
+
+    #[test]
+    fn question_in_a_linked_session_makes_its_run_wait_within_one_tick() {
+        let w = World::alpha("question");
+        let session = w.session("work/alpha", "s-q", "Ask me.");
+        append(
+            &session,
+            &format!(
+                "{{\"type\":\"assistant\",\"message\":{{\"role\":\"assistant\",\"content\":[{{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"Edit\",\"input\":{{\"file_path\":\"{}/docs/features/login/flow.md\",\"old_string\":\"a\",\"new_string\":\"b\"}}}}]}}}}\n",
+                json_path(&w.path("work/alpha"))
+            ),
+        );
+        let shared = w.shared();
+        let alpha = project_id(&shared, "alpha");
+        let mut poller = w.poller(&shared);
+        shared.entries(&alpha);
+        poller.tick(&shared, Timestamp::now());
+        let status = || {
+            shared
+                .read()
+                .flow_run(&alpha, "login")
+                .unwrap()
+                .summary
+                .status
+        };
+        assert_eq!(status(), Status::Working);
+
+        fs::create_dir_all(&w.home.capture_dir).unwrap();
+        let capture = w.home.capture_dir.join("s-q.jsonl");
+        fs::write(
+            &capture,
+            capture_line(
+                "PreToolUse",
+                r#","tool_use_id":"toolu_q1","questions":[{"question":"Tabs or spaces?","header":"Indent"}]"#,
+            ),
+        )
+        .unwrap();
+        assert_eq!(
+            poller.tick(&shared, Timestamp::now()),
+            [changed(Some(&alpha))]
+        );
+        assert_eq!(status(), Status::Waiting);
+        assert_eq!(
+            shared.session("s-q", None, None).unwrap().live.waiting,
+            Some(Waiting::Question {
+                text: "Tabs or spaces?".to_string(),
+                cut: false
+            })
+        );
+
+        append(
+            &capture,
+            &capture_line("PostToolUse", r#","tool_use_id":"toolu_q1""#),
+        );
+        assert_eq!(
+            poller.tick(&shared, Timestamp::now()),
+            [changed(Some(&alpha))]
+        );
+        assert_eq!(status(), Status::Working);
+        assert_eq!(
+            shared.session("s-q", None, None).unwrap().live.waiting,
+            None
+        );
     }
 
     fn loose(shared: &Shared, project: &str) -> Vec<String> {

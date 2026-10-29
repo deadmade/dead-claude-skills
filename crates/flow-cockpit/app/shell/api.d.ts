@@ -48,6 +48,7 @@ export type * from '../../bindings/ToolDetail';
 export type * from '../../bindings/Turn';
 export type * from '../../bindings/ViewInfo';
 export type * from '../../bindings/ViewSource';
+export type * from '../../bindings/Waiting';
 
 /**
  * Where the window is. `list` draws the `list` views, `run` the `run` views, `doc` the `doc` views, `session` the

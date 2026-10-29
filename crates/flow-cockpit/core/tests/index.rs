@@ -9,7 +9,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
-use flow_cockpit_core::activity::{PAGE, TranscriptCache};
+use flow_cockpit_core::activity::{CaptureCache, PAGE, TranscriptCache};
 use flow_cockpit_core::doc::TaskState;
 use flow_cockpit_core::index::{
     Config, DocName, Entry, FlowRunSummary, Home, Index, LinkCache, Project, Status,
@@ -468,6 +468,56 @@ fn run_statuses_come_from_documents_and_transcripts() {
     let waiting = w.scanned();
     let runs_waiting = runs(&waiting, &alpha);
     assert_eq!(run(&runs_waiting, "login").status, Status::Waiting);
+}
+
+/// What each linked session waits for, read as the poll reads it (outside the index), handed to the index.
+fn read_live(index: &mut Index, cache: &mut CaptureCache) {
+    let live = index
+        .linked_sessions()
+        .into_iter()
+        .map(|id| {
+            let transcript = index.session_path(&id).unwrap();
+            let live = cache.live(&index.capture_path(&id), &transcript);
+            (id, live)
+        })
+        .collect();
+    index.set_live(live);
+    index.refresh(now());
+}
+
+#[test]
+fn status_waiting_from_capture() {
+    let w = World::new("capture");
+    let mut index = w.scanned();
+    let alpha = project(&index, "alpha");
+    let login_status = |index: &Index| run(&runs(index, &alpha), "login").status;
+    let fixture = |name: &str| {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/capture")
+            .join(name)
+    };
+    let mut cache = CaptureCache::default();
+    fs::create_dir_all(&w.home.capture_dir).unwrap();
+
+    // A loose session's question makes no run wait.
+    fs::copy(
+        fixture("open-question.jsonl"),
+        w.home.capture_dir.join("s-mention.jsonl"),
+    )
+    .unwrap();
+    read_live(&mut index, &mut cache);
+    assert_eq!(login_status(&index), Status::Idle);
+
+    // s-link edited login's flow.md: its open question makes login wait.
+    let capture = w.home.capture_dir.join("s-link.jsonl");
+    fs::copy(fixture("open-question.jsonl"), &capture).unwrap();
+    read_live(&mut index, &mut cache);
+    assert_eq!(login_status(&index), Status::Waiting);
+
+    // Answered: back to what the documents and transcripts say.
+    fs::copy(fixture("answered-question.jsonl"), &capture).unwrap();
+    read_live(&mut index, &mut cache);
+    assert_eq!(login_status(&index), Status::Idle);
 }
 
 #[test]

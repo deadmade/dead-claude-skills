@@ -106,13 +106,13 @@ impl Cached {
 /// The file's identity where the OS gives one cheaply (its inode), so a file moved over the old one reads afresh;
 /// 0 elsewhere.
 #[cfg(unix)]
-fn file_id(meta: &fs::Metadata) -> u64 {
+pub(super) fn file_id(meta: &fs::Metadata) -> u64 {
     use std::os::unix::fs::MetadataExt;
     meta.ino()
 }
 
 #[cfg(not(unix))]
-fn file_id(_: &fs::Metadata) -> u64 {
+pub(super) fn file_id(_: &fs::Metadata) -> u64 {
     0
 }
 
@@ -121,7 +121,7 @@ fn subagents(main: &Path) -> PathBuf {
     main.with_extension("").join("subagents")
 }
 
-fn agent_path(main: &Path, id: &str) -> PathBuf {
+pub(super) fn agent_path(main: &Path, id: &str) -> PathBuf {
     subagents(main).join(format!("agent-{id}.jsonl"))
 }
 

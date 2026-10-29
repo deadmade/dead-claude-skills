@@ -182,7 +182,17 @@ async function newest(ctx: ViewContext, id: string): Promise<{ page: Activity; k
 function turns(ctx: ViewContext, id: string, page: Activity | null, kept: Map<number, Turn>): Node {
   if (!page) return empty("This session isn't there any more.", 'Its transcript was moved or deleted.');
   const box = el('div', 'activity');
-  if (page.live.waiting) box.append(el('p', 'live-wait', `Waiting on you: ${page.live.waiting}`));
+  const wait = page.live.waiting;
+  if (wait)
+    box.append(
+      el(
+        'p',
+        'live-wait',
+        wait.kind === 'Question'
+          ? `Waiting on you: ${wait.text}${wait.cut ? '…' : ''}`
+          : `Waiting on you to allow ${wait.tool}.`,
+      ),
+    );
   if (!page.total) {
     box.append(empty('Nothing happened in this session yet.', 'Its turns show once a prompt is sent.'));
     return box;

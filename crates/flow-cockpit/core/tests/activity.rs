@@ -2,7 +2,11 @@ use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use flow_cockpit_core::activity::{Activity, PAGE, ToolCall, ToolDetail, TranscriptCache};
+use flow_cockpit_core::activity::{
+    Activity, CaptureCache, CaptureEvent, PAGE, ToolCall, ToolDetail, TranscriptCache, Waiting,
+    live, read_capture,
+};
+use jiff::Timestamp;
 
 fn fixture(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -358,4 +362,287 @@ fn pages_count_from_the_oldest_turn() {
     assert_eq!((newest.start, newest.total), (26, 46));
     assert_eq!(prompts(&newest)[19], "Prompt 45");
     assert_eq!(prompts(&cache.page(&main, Some(25), PAGE))[0], "Prompt 5");
+}
+
+// Capture: what the session waits for, from the hooks' capture file. Every text here is invented.
+
+fn capture_fixture(name: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/capture")
+        .join(name)
+}
+
+fn capture(name: &str) -> Vec<CaptureEvent> {
+    read_capture(&capture_fixture(name))
+}
+
+/// What the events wait for, with no transcript written since.
+fn waiting(events: &[CaptureEvent]) -> Option<Waiting> {
+    live(events, |_| None).waiting
+}
+
+/// One capture line of the hook's shape at 09:00:`sec`, with `extra` fields (each starting with a comma).
+fn line(sec: u32, event: &str, extra: &str) -> String {
+    format!(
+        "{{\"v\":1,\"ts\":\"2026-03-02T09:00:{sec:02}.000Z\",\"session\":\"s-q\",\"cwd\":\"/work/alpha\",\"event\":\"{event}\"{extra}}}\n"
+    )
+}
+
+/// The fixture's lines followed by `more`, read back from a file in `t`.
+fn with(t: &Temp, fixture: &str, more: &[String]) -> Vec<CaptureEvent> {
+    let path = t.0.join("capture.jsonl");
+    let text = fs::read_to_string(capture_fixture(fixture)).unwrap();
+    fs::write(&path, text + &more.concat()).unwrap();
+    read_capture(&path)
+}
+
+fn at(sec: u32) -> Timestamp {
+    format!("2026-03-02T09:00:{sec:02}.000Z").parse().unwrap()
+}
+
+fn set_mtime(path: &Path, sec: u32) {
+    OpenOptions::new()
+        .write(true)
+        .open(path)
+        .unwrap()
+        .set_modified(at(sec).into())
+        .unwrap();
+}
+
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "compared with `Live::waiting` as it is"
+)]
+fn question(text: &str, cut: bool) -> Option<Waiting> {
+    Some(Waiting::Question {
+        text: text.to_string(),
+        cut,
+    })
+}
+
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "compared with `Live::waiting` as it is"
+)]
+fn permission(tool: &str) -> Option<Waiting> {
+    Some(Waiting::Permission {
+        tool: tool.to_string(),
+    })
+}
+
+const COLOUR: &str = "Which colour should the save button be?";
+
+#[test]
+fn open_question_waits() {
+    let events = capture("open-question.jsonl");
+    assert_eq!(waiting(&events), question(COLOUR, false));
+    // Claude writes the question to the transcript itself: a later transcript write leaves it open.
+    assert_eq!(
+        live(&events, |_| Some(at(59))).waiting,
+        question(COLOUR, false)
+    );
+}
+
+#[test]
+fn question_text_falls_back_to_its_header_and_keeps_the_cut() {
+    let t = Temp::new("capture-header");
+    let events = with(
+        &t,
+        "permission.jsonl",
+        &[line(
+            9,
+            "PreToolUse",
+            r#","tool_use_id":"toolu_q2","questions":[{"question":"","header":"Pick a name"},{"question":"Second?"}],"questions_cut":true"#,
+        )],
+    );
+    assert_eq!(waiting(&events), question("Pick a name", true));
+}
+
+#[test]
+fn answered_question_clears() {
+    let t = Temp::new("capture-answered");
+    assert_eq!(waiting(&capture("answered-question.jsonl")), None);
+    let failed = with(
+        &t,
+        "open-question.jsonl",
+        &[line(
+            9,
+            "PostToolUseFailure",
+            r#","tool_use_id":"toolu_q1""#,
+        )],
+    );
+    assert_eq!(waiting(&failed), None, "a failed call ends the question");
+    let prompted = with(
+        &t,
+        "open-question.jsonl",
+        &[line(9, "UserPromptSubmit", "")],
+    );
+    assert_eq!(waiting(&prompted), None, "a new prompt ends the question");
+    let other = with(
+        &t,
+        "open-question.jsonl",
+        &[line(9, "PostToolUse", r#","tool_use_id":"toolu_other""#)],
+    );
+    assert_eq!(
+        waiting(&other),
+        question(COLOUR, false),
+        "another call's result"
+    );
+}
+
+#[test]
+fn permission_prompt_waits() {
+    assert_eq!(waiting(&capture("permission.jsonl")), permission("Bash"));
+    assert_eq!(
+        waiting(&capture("subagent-permission.jsonl")),
+        permission("Bash")
+    );
+}
+
+#[test]
+fn any_later_event_clears_permission() {
+    let t = Temp::new("capture-later");
+    // A denial too: the next thing the session does ends the prompt.
+    for later in [
+        line(9, "PreToolUse", r#","tool_use_id":"toolu_n""#),
+        line(9, "Stop", ""),
+    ] {
+        let events = with(&t, "permission.jsonl", std::slice::from_ref(&later));
+        assert_eq!(waiting(&events), None, "after {later}");
+    }
+    let next = with(
+        &t,
+        "permission.jsonl",
+        &[line(9, "PermissionRequest", r#","permission_tool":"Edit""#)],
+    );
+    assert_eq!(
+        waiting(&next),
+        permission("Edit"),
+        "the next prompt replaces it"
+    );
+    let asked = with(
+        &t,
+        "permission.jsonl",
+        &[line(
+            9,
+            "PreToolUse",
+            r#","tool_use_id":"toolu_q3","questions":[{"question":"Keep going?"}]"#,
+        )],
+    );
+    assert_eq!(waiting(&asked), question("Keep going?", false));
+    // A notification says the prompt is up; it is not the session moving on.
+    let notified = with(
+        &t,
+        "permission.jsonl",
+        &[line(
+            5,
+            "Notification",
+            r#","notification_type":"permission_prompt","message":"Claude needs your permission to use Bash""#,
+        )],
+    );
+    assert_eq!(waiting(&notified), permission("Bash"));
+    // A subagent's prompt ends with that subagent's next event, not another one's.
+    let other = with(
+        &t,
+        "subagent-permission.jsonl",
+        &[line(
+            9,
+            "SubagentStart",
+            r#","agent":"a2","agent_type":"Plan""#,
+        )],
+    );
+    assert_eq!(waiting(&other), permission("Bash"));
+    let stopped = with(
+        &t,
+        "subagent-permission.jsonl",
+        &[line(
+            9,
+            "SubagentStop",
+            r#","agent":"a1","agent_type":"Explore""#,
+        )],
+    );
+    assert_eq!(waiting(&stopped), None);
+}
+
+#[test]
+fn permission_wait_clears_when_its_transcript_moves_on() {
+    let main = capture("permission.jsonl");
+    assert_eq!(live(&main, |_| Some(at(3))).waiting, permission("Bash"));
+    // Claude Code finishes writing the entry that raised the prompt a few milliseconds after the hook took its time
+    // (37 ms in a real session): a write within 2 s of the prompt is that entry, not the session moving on.
+    let flushed = at(4)
+        .checked_add(jiff::SignedDuration::from_millis(37))
+        .unwrap();
+    assert_eq!(live(&main, |_| Some(flushed)).waiting, permission("Bash"));
+    assert_eq!(live(&main, |_| Some(at(6))).waiting, permission("Bash"));
+    assert_eq!(live(&main, |_| Some(at(7))).waiting, None);
+    // A subagent's prompt goes by the subagent's own transcript.
+    let sub = capture("subagent-permission.jsonl");
+    let written = |a: Option<&str>| Some(if a == Some("a1") { at(3) } else { at(30) });
+    assert_eq!(live(&sub, written).waiting, permission("Bash"));
+    assert_eq!(live(&sub, |_| Some(at(7))).waiting, None);
+
+    // The cache reads `<session>/subagents/agent-<id>.jsonl` next to the session's transcript.
+    let t = Temp::new("capture-moves-on");
+    let transcript = t.0.join("s-q.jsonl");
+    let agent = t.0.join("s-q/subagents/agent-a1.jsonl");
+    fs::create_dir_all(agent.parent().unwrap()).unwrap();
+    fs::write(&transcript, "").unwrap();
+    fs::write(&agent, "").unwrap();
+    let file = t.0.join("capture.jsonl");
+    fs::copy(capture_fixture("subagent-permission.jsonl"), &file).unwrap();
+    set_mtime(&transcript, 30);
+    set_mtime(&agent, 3);
+    let mut cache = CaptureCache::default();
+    assert_eq!(cache.live(&file, &transcript).waiting, permission("Bash"));
+    set_mtime(&agent, 7);
+    assert_eq!(cache.live(&file, &transcript).waiting, None);
+}
+
+#[test]
+fn stop_without_start_is_ignored() {
+    let events = capture("unmatched.jsonl");
+    assert_eq!(events.len(), 4);
+    assert_eq!(waiting(&events), None);
+}
+
+#[test]
+fn capture_skips_lines_it_does_not_know() {
+    let t = Temp::new("capture-unknown");
+    let events = with(
+        &t,
+        "permission.jsonl",
+        &[
+            "not json\n".to_string(),
+            line(9, "Stop", "").replace("\"v\":1", "\"v\":2"),
+            line(9, "Stop", "").replace("2026-03-02T09:00:09.000Z", "soon"),
+        ],
+    );
+    assert_eq!(events.len(), 3);
+    assert_eq!(waiting(&events), permission("Bash"));
+}
+
+#[test]
+fn capture_ignores_partial_last_line() {
+    let t = Temp::new("capture-partial");
+    let file = t.0.join("capture.jsonl");
+    let answer = line(9, "PostToolUse", r#","tool_use_id":"toolu_q1""#);
+    let (head, rest) = answer.split_at(40);
+    let asked = fs::read_to_string(capture_fixture("open-question.jsonl")).unwrap();
+    fs::write(&file, asked + head).unwrap();
+    assert_eq!(read_capture(&file).len(), 3);
+    let transcript = t.0.join("s-q.jsonl");
+    let mut cache = CaptureCache::default();
+    assert_eq!(
+        cache.live(&file, &transcript).waiting,
+        question(COLOUR, false)
+    );
+    // The line completes: the cache reads on from where it stopped.
+    append(&file, rest.as_bytes());
+    assert_eq!(cache.live(&file, &transcript).waiting, None);
+    // A file that shrank is read again from its start; a missing one waits for nothing.
+    fs::copy(capture_fixture("permission.jsonl"), &file).unwrap();
+    assert_eq!(cache.live(&file, &transcript).waiting, permission("Bash"));
+    fs::remove_file(&file).unwrap();
+    assert_eq!(cache.live(&file, &transcript).waiting, None);
 }

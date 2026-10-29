@@ -555,6 +555,21 @@ test('activity_groups_turns_newest_first', async () => {
   assert.match(text(none.box), /isn't there any more/);
 });
 
+test('activity_says_what_the_session_waits_for', async () => {
+  const waiting = (w: any) => {
+    const sessions = clone(DATA.sessions);
+    sessions['s-mention'].live = { waiting: w };
+    return { sessions };
+  };
+  const route = { to: 'session', project: ALPHA, id: 's-mention' };
+  const asked = await draw('activity', route, waiting({ kind: 'Question', text: 'Tabs or spaces?', cut: true }));
+  assert.equal(text(asked.box.querySelector('.live-wait')), 'Waiting on you: Tabs or spaces?…');
+  const allow = await draw('activity', route, waiting({ kind: 'Permission', tool: 'Bash' }));
+  assert.equal(text(allow.box.querySelector('.live-wait')), 'Waiting on you to allow Bash.');
+  const none = await draw('activity', route);
+  assert.equal(none.box.querySelector('.live-wait'), null);
+});
+
 /** A promise per call, settled by the test. */
 function deferred() {
   const calls: { id: string; resolve: (v: any) => void; reject: (e: any) => void }[] = [];
