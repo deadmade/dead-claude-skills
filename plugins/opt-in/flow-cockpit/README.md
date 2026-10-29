@@ -2,8 +2,9 @@
 
 The flow cockpit is a desktop window that shows what your flow runs are doing: every project's flow runs, audits and
 loose Claude sessions in a list, and for one run its phases, gates, tasks, decisions, documents and the sessions that
-worked on it. It reads the flow files, plans, build logs and Claude Code's transcripts, writes nothing, and redraws
-within a few seconds when they change.
+worked on it. It reads the flow files, plans, build logs and Claude Code's transcripts and redraws within a few
+seconds when they change. Our code writes nothing; the webview engine keeps its own small folder
+(`~/.local/share/dev.deadmade.flow-cockpit/`, `%LOCALAPPDATA%\dev.deadmade.flow-cockpit\` on Windows).
 
 Each screen is a **view**, a TypeScript file in an **extension**, a folder the app loads from disk. The four default
 extensions ship with the app; your own add to them or replace them, and any of them can be switched off. The app needs
@@ -18,9 +19,11 @@ prompts, agents starting and stopping, turns ending. Each Claude session gets on
 `<session id>.jsonl` in `$XDG_STATE_HOME/flow-cockpit/capture/` (default `~/.local/state/flow-cockpit/capture/`;
 `%LOCALAPPDATA%\flow-cockpit\capture\` on Windows), the folder readable by you only. A session start deletes capture
 files older than 30 days. The hooks only watch: they never answer a prompt, block a tool or print anything, and they
-write nothing outside that folder. A permission prompt records which tool asked, not its input. Long text is shortened: once the questions pass 16 KiB each keeps only its text (cut to 4,096
-characters) and its header (cut to 64), the options are dropped and trailing questions are dropped until it fits, and a notification message is cut at 1,024 characters; such a line carries
-`questions_cut` or `message_cut`.
+write nothing outside that folder. A line holds only what the window reads: the event, its time, the agent and tool
+call it belongs to, the questions Claude asked, and a permission prompt's tool name (not its input); never a
+notification's text. Long questions are shortened: once they pass 16 KiB each keeps only its text (cut to 4,096
+characters) and its header (cut to 64), the options are dropped and trailing questions are dropped until it fits; such
+a line carries `questions_cut`.
 
 The window shows a run as waiting on you while one of its sessions has a question or permission prompt open, unless that session has written nothing for a day (the window then says the question or prompt was left open). Allowing a prompt writes nothing it can see, so the run keeps saying it waits on you until the allowed tool finishes.
 

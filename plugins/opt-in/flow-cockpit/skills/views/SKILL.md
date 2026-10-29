@@ -9,8 +9,8 @@ The flow cockpit (`flow-cockpit`, a desktop window) draws every screen through *
 `export default`ing one `View`. Views come in **extensions**, folders the app loads from disk. Four default extensions
 ship with the app: `list` (projects, flow runs, audits, loose sessions), `run` (one flow run: Build and Decisions),
 `docs` (the run's Docs tab) and `activity` (a run's Activity tab and a session's own screen). The window reads views and
-data and writes nothing. It reloads the views a few seconds after a file in any extensions folder changes, so the
-user sees your change without a restart.
+data; its own code writes nothing (the webview engine keeps its own small folder). It reloads the views a few
+seconds after a file in any extensions folder changes, so the user sees your change without a restart.
 
 The app is the plugin's `appPath` setting, `${user_config.appPath}`, or `flow-cockpit` on PATH when that is not set;
 it is written `"$app"` below. On Linux it comes from this repository's flake

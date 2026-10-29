@@ -154,6 +154,12 @@ their npm tarballs (each tarball checked against the registry's `dist.integrity`
   `sha512-B/pSlYVHQ58kqISD/yDjuJ1yfzI34m1gF4lAod2bwSRhiN4K5Cl3H8Af7hqB2PmTL911tdEudnnXn5FnhRoz0w==`.
 - **mermaid** 12.2.0: MIT, https://github.com/mermaid-js/mermaid (`dist/mermaid.min.js`; `LICENSE-mermaid`). Tarball
   `sha512-w7nr/SFrLO7BaVTs3dQTvYSV6nYSBj0Yy9DjBhsIJtAcHqRzXSq4Pg32ujHZ/AdWsAMNEvvhbm5dt9E2tOiHzw==`.
+  `mermaid.min.js` is a bundle: it also carries mermaid's dependencies, each under its own license. Its license
+  banners name DOMPurify 3.4.12 (Apache-2.0 or MPL-2.0), lodash-es (MIT, through dagre-d3-es) and cytoscape (MIT).
+  The rest, from mermaid 12.2.0's `package.json` with the licenses the registry gives for the versions it allows:
+  elkjs (EPL-2.0), chevrotain (Apache-2.0), d3 (ISC), d3-sankey (BSD-3-Clause), and MIT for @braintree/sanitize-url,
+  @iconify/utils, @mermaid-js/parser, @upsetjs/venn.js, cytoscape-cose-bilkent, cytoscape-fcose, dagre-d3-es, dayjs,
+  es-toolkit, katex, khroma, marked, roughjs, stylis, ts-dedent and uuid.
 
 ## Night City (dead-skills)
 

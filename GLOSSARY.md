@@ -118,3 +118,20 @@ _Avoid_: orphan session, ad-hoc session
 **Capture**:
 The record of what one Claude session did, written event by event by the flow-cockpit plugin's hooks.
 _Avoid_: log, telemetry, trace
+
+**View**:
+One screen or tab of the flow cockpit: a TypeScript file that `export default`s a `View`, drawn by the window.
+_Avoid_: page, panel, widget
+
+**Extension**:
+A folder of views (and an optional `style.css`) the flow cockpit loads from disk; one can add views or replace others.
+_Avoid_: plugin (that's Claude Code's), theme, add-on
+
+**Default extension**:
+One of the four extensions that ship with the flow cockpit: `list`, `run`, `docs` and `activity`.
+_Avoid_: built-in view, core view
+
+**Trusted repository**:
+A checkout named under `trusted` in the flow cockpit's `config.toml`; only then do the extensions in its
+`.flow-cockpit/extensions/` load.
+_Avoid_: allowed repository, safe repository
