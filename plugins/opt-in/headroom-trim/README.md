@@ -19,7 +19,9 @@ Measured on real sessions, it saves 7.0% of tool-result tokens.
   first session builds it.
 - The environment lives in `<plugin data>/venv`, and the server writes only to the plugin data folder. uv keeps its
   download cache and the Python it installs in its own folders (`uv cache dir`, `uv python dir`). The server is shared
-  by every session, so the launcher leaves out the session's `UV_*`, `PYTHON*` and `VIRTUAL_ENV` variables.
+  by every session, so the launcher and the installer leave out the session's `UV_*`, `PYTHON*` and `VIRTUAL_ENV`
+  variables. That includes uv's index and cache settings (`UV_INDEX_URL`, `UV_CACHE_DIR`, …), so the environment is
+  always built from PyPI with uv's default folders; proxy variables (`HTTPS_PROXY`) still apply.
 - There is no network: the server sets headroom's offline and telemetry switches before importing it, and blocks
   outgoing connections. Without the installer (or if its fetch of tiktoken's vocabulary failed) headroom estimates
   token counts instead of using that vocabulary; trims still work.
