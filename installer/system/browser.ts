@@ -22,9 +22,11 @@ export function findChromeForTesting(home: string, platform: NodeJS.Platform) {
   return newest && binary(newest);
 }
 
-// Whether web-mcp will find a search browser that runs.
+// Whether web-mcp will find a search browser that runs. On Windows `chrome.exe --version` opens a window instead, so
+// there, like web-mcp, a found Chrome for Testing counts without being started.
 export function searchBrowserWorks(home: string, platform: NodeJS.Platform) {
   const cft = findChromeForTesting(home, platform);
+  if (cft && platform === 'win32') return true;
   if (cft && startSync(cft, ['--version'], { timeout: 10000 }).status === 0) return true;
   return !!(which('helium') || which('chromium'));
 }

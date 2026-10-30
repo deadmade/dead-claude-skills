@@ -396,7 +396,7 @@ fn utf8(p: &Path) -> Result<&str, String> {
 }
 
 /// The browser for search and its Chrome major (findings.md, "Order and version"): `WEB_MCP_CHROME`, the newest
-/// Chrome for Testing if it starts, `helium` or `chromium` on `path`. Never the user's branded Chrome: it ignores
+/// Chrome for Testing if it starts (on Windows: if it exists), `helium` or `chromium` on `path`. Never the user's branded Chrome: it ignores
 /// extensions loaded from a folder.
 async fn pick(
     chrome_env: Option<PathBuf>,
@@ -420,8 +420,9 @@ async fn pick(
         let m = major_of(&p).await;
         return Ok((p, m));
     }
+    // On Windows its binary existing is enough: `version` never runs there.
     if let Some((bin, m)) = home.and_then(newest_cft)
-        && version(&bin).await.is_some()
+        && (cfg!(windows) || version(&bin).await.is_some())
     {
         return Ok((bin, m));
     }
@@ -456,10 +457,16 @@ fn newest_cft(home: &Path) -> Option<(PathBuf, u32)> {
         .map(|(v, bin)| (bin, v[0]))
 }
 
+/// Each binary `version` ran and its answer.
+static VERSIONS: Mutex<BTreeMap<PathBuf, Option<String>>> = Mutex::new(BTreeMap::new());
+
 /// `<bin> --version`'s output, `None` when it doesn't start or fails; one spawn per binary per process.
+/// Always `None` on Windows, where Chrome opens a window for `--version` instead of printing it.
 async fn version(bin: &Path) -> Option<String> {
-    static SEEN: Mutex<BTreeMap<PathBuf, Option<String>>> = Mutex::new(BTreeMap::new());
-    if let Some(v) = SEEN.lock().expect("versions").get(bin) {
+    if cfg!(windows) {
+        return None;
+    }
+    if let Some(v) = VERSIONS.lock().expect("versions").get(bin) {
         return v.clone();
     }
     let run = Command::new(bin)
@@ -473,7 +480,8 @@ async fn version(bin: &Path) -> Option<String> {
         }
         _ => None,
     };
-    SEEN.lock()
+    VERSIONS
+        .lock()
         .expect("versions")
         .insert(bin.to_owned(), v.clone());
     v
@@ -958,6 +966,38 @@ mod tests {
 
         let none = p.ready_with(None, None, OsStr::new("")).await.unwrap_err();
         assert!(none.contains("WEB_MCP_CHROME"), "{none}");
+    }
+
+    /// On Windows `chrome.exe --version` opens a window: Chrome for Testing is taken on its folder, never started.
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn windows_never_runs_a_browser_for_its_version() {
+        let dir = seeded("win-cft");
+        let p = profiles(&dir);
+        let home = dir.join("home");
+        let cft = home.join(".agent-browser/browsers/chrome-156.0.1.2/chrome-win64/chrome.exe");
+        std::fs::create_dir_all(cft.parent().unwrap()).unwrap();
+        std::fs::write(&cft, "not a program: it can't start").unwrap();
+
+        let r = p.ready_with(None, Some(&home), OsStr::new("")).await.unwrap();
+        assert_eq!(r.chrome, cft);
+        assert!(r.ua.contains("Chrome/156.0.0.0"), "{}", r.ua);
+
+        let mine = dir.join("mine.exe");
+        std::fs::write(&mine, "").unwrap();
+        let r = p
+            .ready_with(Some(mine.clone()), Some(&home), OsStr::new(""))
+            .await
+            .unwrap();
+        assert_eq!(r.chrome, mine);
+        assert!(
+            r.ua.contains(&format!("Chrome/{FALLBACK_MAJOR}.0.0.0")),
+            "{}",
+            r.ua
+        );
+        // `version` records every binary it ran.
+        let ran = VERSIONS.lock().unwrap();
+        assert!(!ran.contains_key(&cft) && !ran.contains_key(&mine), "{ran:?}");
     }
 
     #[cfg(unix)]
