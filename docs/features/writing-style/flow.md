@@ -545,6 +545,15 @@ state.chosen)` runs first (`install.ts:225`); the marker would never be written.
   - **One folder** (the user: "I just dont enjoy having two writing skills in different folders"): `/copyedit`'s
     procedure moved to `skills/writing/references/copyedit.md` and `compare.mjs` to `skills/writing/scripts/`; the
     copyedit runs as `/flows:writing copyedit <file.md>`, and the `copyedit` skill and its `uses.json` are gone.
+  - **The whole book** (the user: "im not sure if we really took the whole book and converted it"): four agents
+    converted every lesson and both appendices from the user's copy into `references/`, one file each, at most 1,000
+    words, as procedures in their own words with invented software examples. A script listed every run of 7 or more
+    words shared with the book; the four that read as the book's own phrasing were reworded, and what remains is terms
+    of art and fixed lists. The agents' reports found places where `SKILL.md` was stricter than the book or left
+    something out (holding the point behind a promise, chronological order for procedures, the "there is" that
+    introduces a topic, active metadiscourse, the book's intensifier list, softening bad news); `SKILL.md` now states
+    the book's position and says where it chooses otherwise for technical documents. The copyedit editor may read the
+    references.
 
 ## Walkthrough
 

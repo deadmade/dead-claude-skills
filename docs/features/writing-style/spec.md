@@ -47,9 +47,12 @@ book:
 | Words                   | Lesson 9: the six cuts, metadiscourse, hedges and intensifiers, concise but not terse, with the density test of technical-writing-density |
 | Honesty                 | Lesson 12: the subject decides whether a sentence says who acted                                                |
 
-A last section holds rules for technical documents that the book doesn't cover: no conversation shorthand, a decision
-recorded once, the code's own names, whole sentences in prose, lists for four or more parallel items. Lessons 2 and 11
-are left out. Every statement was checked against the book, lesson by lesson (flow.md, **Book check**). The skill
+Behind `SKILL.md` sits one reference per lesson and appendix in `references/` (about 14,000 words for a book of about
+75,000 in these chapters): every principle, diagnostic, revision technique, exception and caution, as procedures in
+our own words with invented software examples. `SKILL.md` is the short form and links them; Lessons 2 and 11 and the
+appendices are covered there too, as a last pass, for quoting, and for the rare elegant passage. A last section holds
+rules for technical documents that the book doesn't cover: no conversation shorthand, a decision
+recorded once, the code's own names, whole sentences in prose, lists for four or more parallel items. Every statement was checked against the book, lesson by lesson (flow.md, **Book check**). The skill
 copies no passage and credits technical-writing-density for its one borrowed test.
 
 `/doc-audit` and `/integrate` use it where they used `technical-writing` and `unslop`; `sync-pstack.mjs` stops
@@ -114,7 +117,8 @@ The user decided:
 - The copyedit shows a diff against a saved copy and commits nothing.
 - 2026-10-30: verify the skill against the book, cut the rest, keep what is worth using, and make the skill more
   useful. Then one skill folder, not two ("I just dont enjoy having two writing skills in different folders"): the
-  copyedit moved into `skills/writing/`.
+  copyedit moved into `skills/writing/`. Then the whole book, not a summary ("im not sure if we really took the whole
+  book and converted it"): one reference per lesson and appendix.
 
 Claude decided, open to change:
 

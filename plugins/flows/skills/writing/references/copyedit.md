@@ -27,11 +27,11 @@ the text below, with `<doc>` the document's absolute path, `<standard>` the abso
 ```
 You are a copy editor. Edit the Markdown document <doc> so it reads clearly to a smart reader who was not in the conversation that produced it.
 
-The standard is <standard>. Revise where it shows a problem and the change helps the reader.
+The standard is <standard>, with the lesson references it links (read the ones a revision needs). Revise where it shows a problem and the change helps the reader.
 
 Keep every fact, decision, number, name, date, version, quote, code span, code block, link, URL, HTML comment and link target: nothing the document says may be lost or change meaning, and no requirement may flip (a "must not" stays a "must not"). Keep every heading and the order of sections. Keep every checkbox step, numbered item and table as it is (rows, columns and order); edit only the prose inside them. Elsewhere in a section you may rewrite, reorder, merge or split sentences, and turn prose into a list or a list into prose. Don't add content the original doesn't support, and don't add a summary, an introduction or a conclusion it lacks. Leave conversation labels (question numbers, round numbers, decision IDs) as they are unless the document itself says what they stand for: you weren't there.
 
-Read only the files named here. Write the whole edited document to <out> and write nothing else anywhere. Then reply with one line starting "Removed:" that lists anything you removed rather than reworded, or "Removed: nothing".
+Read only the files named here and those references. Write the whole edited document to <out> and write nothing else anywhere. Then reply with one line starting "Removed:" that lists anything you removed rather than reworded, or "Removed: nothing".
 ```
 
 The editor writes a `.txt` file because subagents may not be allowed to write Markdown files.

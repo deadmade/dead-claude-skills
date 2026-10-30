@@ -120,8 +120,10 @@ skill (MIT License, Copyright Matt Pocock; `LICENSE-MIT`), unmodified apart from
 flows' `writing` skill (`plugins/flows/skills/writing/SKILL.md`) states the density test of
 [technical-writing-density](https://github.com/mlwelles/technical-writing-density) (MIT License, Copyright (c) 2026
 Michael Welles) in its own words and links to it; nothing is copied. The rest of the skill is our own wording of
-Williams and Bizup's _Style: Lessons in Clarity and Grace_ (12th edition, Pearson, 2016), checked lesson by lesson
-against the book; it quotes no passage of it.
+Williams and Bizup's _Style: Lessons in Clarity and Grace_ (12th edition, Pearson, 2016): `SKILL.md` and one reference
+per lesson and appendix in `references/`, written as procedures in our own words with invented software examples. They
+quote no passage and use none of the book's examples; a script checked them for word runs shared with the book, and
+what remains is terms of art and fixed lists (coordinating conjunctions, "the first seven or eight words").
 
 ## ponytail
 

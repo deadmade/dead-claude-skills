@@ -121,6 +121,7 @@ flows holds one standard for prose a person will read, in one skill, plus a chec
   order the reader needs rather than the order the work happened in, topic strings and old-before-new, characters as
   subjects and actions as verbs, the book's six concision cuts limited by a density test, and naming who acted. A
   short section adds rules for technical documents that the book doesn't cover, such as no conversation shorthand.
+  `references/` holds the full method of every lesson and both appendices, which Claude reads when a pass needs it.
   Unlike the conductors, Claude may load it on its own (`flows:writing`) whenever it writes a spec, a plan, a report,
   a README, a PR description or a commit message. `/doc-audit` reads changed docs against it and `/integrate`
   revises PR text by it.

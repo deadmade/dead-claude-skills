@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { checkUses, readUses } from './flows-uses.mjs';
 
@@ -41,4 +41,14 @@ test('flow-rules runs the copyedit before gates', () => {
   const rules = read('plugins/flows/references/flow-rules.md');
   assert.match(rules, /\$\{CLAUDE_SKILL_DIR\}\/\.\.\/writing\/references\/copyedit\.md/);
   assert.match(rules, /flows:writing/);
+});
+
+test('SKILL.md links every lesson reference, and every link resolves', () => {
+  const dir = 'plugins/flows/skills/writing';
+  const links = [...read(`${dir}/SKILL.md`).matchAll(/\]\((references\/[^)]+\.md)\)/g)].map((m) => m[1]);
+  const files = readdirSync(join(ROOT, dir, 'references'))
+    .filter((f) => f.endsWith('.md'))
+    .map((f) => `references/${f}`);
+  assert.deepEqual([...new Set(links)].sort(), files.sort());
+  for (const f of files) assert.match(read(`${dir}/${f}`), /^# /, f);
 });

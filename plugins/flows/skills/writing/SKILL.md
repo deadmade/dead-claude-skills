@@ -19,6 +19,23 @@ from the top down: the document, then its sections and paragraphs, then sentence
 beginnings: the document's opening, each section's opening, each sentence's first words. A reader decides there
 whether the rest makes sense, and a fix at the top changes more than a fix at the bottom.
 
+**This file is the short form.** Each lesson of the book has a full reference in `references/`: every principle,
+diagnostic, revision technique, exception and caution the lesson gives, with examples from software documents. Read
+the reference for a pass when you revise a long document, when a check below doesn't settle a sentence, or when you
+copyedit.
+
+| Pass                       | References                                                                                                                                                           |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Why and how to revise      | [Lesson 1, Understanding Style](references/lesson-01-understanding-style.md)                                                                                         |
+| 1. The document            | [Lesson 7, Motivation](references/lesson-07-motivation.md), [Lesson 8, Global Coherence](references/lesson-08-global-coherence.md)                                   |
+| 2. Sections and paragraphs | [Lesson 5, Cohesion and Coherence](references/lesson-05-cohesion-and-coherence.md), [Lesson 6, Emphasis](references/lesson-06-emphasis.md)                           |
+| 3. Sentences               | [Lesson 3, Actions](references/lesson-03-actions.md), [Lesson 4, Characters](references/lesson-04-characters.md), [Lesson 10, Shape](references/lesson-10-shape.md) |
+| 4. Words                   | [Lesson 9, Concision](references/lesson-09-concision.md)                                                                                                             |
+| 5. Honesty                 | [Lesson 12, The Ethics of Style](references/lesson-12-ethics.md)                                                                                                     |
+| Last, and small            | [Lesson 2, Correctness](references/lesson-02-correctness.md), [Appendix I, Punctuation](references/appendix-1-punctuation.md)                                        |
+| Quoting and citing         | [Appendix II, Using Sources](references/appendix-2-using-sources.md)                                                                                                 |
+| Rarely, in technical text  | [Lesson 11, Elegance](references/lesson-11-elegance.md)                                                                                                              |
+
 ## 1. The document: a problem, a point, and the order the reader needs
 
 Most of what makes an agent's document hard to read is here, not in its sentences.
@@ -35,10 +52,12 @@ A spec, plan or fix has a practical problem (something costs us; the answer is a
 has a conceptual one (we don't know something, so we can't know or decide something bigger; the answer is
 information). Skip the context when every reader has it; drop the cost when it really is obvious.
 
-**State the point at the end of a short opening (Lesson 8).** Every unit, the document, a section, a long paragraph,
-gets a short opening whose last sentence states its point and names the terms the rest develops. The body then uses
-those terms. The point is the verdict, not a promise of one: "The migration is safe to run; the one risk is lock time
-on `orders`.", not "This section describes the checks we ran."
+**State the point at the end of a short opening (Lesson 8).** The document and each section get a short opening whose
+last sentence states its point and names the terms the rest develops. The body then uses those terms. In a technical
+document the point is the verdict, not a promise of one: "The migration is safe to run; the one risk is lock time on
+`orders`.", not "This section describes the checks we ran." (The book allows holding the point for the conclusion
+behind a promise that names the themes; a reader who has to act rarely wants that.) For paragraphs this is guidance,
+not a template: apply it to long ones.
 
 **Run the outline test.** Read only the title, the headings and each section's point sentence. Together they should
 make the argument. If they don't, the reader can't skim the document, and the structure needs work before any
@@ -47,7 +66,8 @@ sentence does. Headings should carry the section's key terms, not just a topic w
 **Turn the story of the work into the order the reader needs.** Writers fall back on the order they found things in:
 what was tried, what failed, what was learned. The reader needs the result first, then its reasons and evidence. A
 report that walks through each step before its verdict, or a spec that retells the conversation, is in discovery
-order. Rebuild it around the point.
+order. Rebuild it around the point. Chronological order is still right when the reader follows steps, as in an
+install procedure or a migration plan.
 
 **Cut what doesn't serve the point.** Every paragraph should do one of these for the point: give background the reader
 needs, state the point or a sub-point, give a reason, give evidence, explain a method, or answer another view. Text
@@ -69,19 +89,22 @@ paragraph around its few main characters.
 - After: "The client retries every 5xx. It backs off exponentially, and it reads its limit from `retry.ts`."
 
 **Don't vary a name for variety.** Once something has a name, use that name every time; a synonym reads as a second
-thing.
+thing. The one exception: when the same words fill the same slot sentence after sentence, replace a few with _it_ or
+_this_.
 
 **Don't fake coherence.** _Therefore_, _however_, _moreover_ and _also_ promise a logical link. Use them only when the
 link is real, and sparingly; deleting one that isn't shows whether the sentences connect on their own.
 
 **Clear the throat less.** A sentence that piles a connector, an attitude ("importantly"), and a time or place before
-its subject makes the reader wait. Cut what doesn't help, and move the rest after the verb.
+its subject makes the reader wait. Cut what doesn't help, move a connector inside the sentence, and keep at most one
+short, familiar time or place phrase in front.
 
 **Put the new and the important at the end (Lesson 6).** The end of a sentence is where readers look for its weight.
 Read the last few words of each sentence: if they don't deserve that weight, move context to the front and the new
 information to the end. Unfamiliar terms and long, complex material belong there too, after a short subject and verb
 that give the reader momentum. In a section's opening sentence, the words at the end name the themes the section
-develops.
+develops. "There is" and "there are" earn their place when they introduce a new topic at the end of the sentence
+("There are three ways the cache can go stale."); rewrite them only when a verb-noun follows (section 3).
 
 ## 3. Sentences: characters as subjects, actions as verbs (Lessons 3, 4 and 10)
 
@@ -95,7 +118,7 @@ Revise when the simple subject is an abstract noun, or when seven or eight words
 2. Find their actions. Actions hide in nouns made from verbs ("failure", "validation", "decision") and in adjectives
    ("is dependent on" → "depends on").
 3. Rewrite: the character as subject, the action as verb, and the clauses joined by the word that states their logic:
-   _because_, _if_, _when_, _although_, _unless_.
+   _because_, _if_, _when_, _although_, _unless_, or a _how_, _why_ or _whether_ clause.
 
 - Before: "Failure of the hash verification results in termination of the download."
 - After: "If the hash doesn't match, the installer stops the download."
@@ -162,16 +185,18 @@ The book's six cuts:
 **Metadiscourse**, writing about the writing, is needed in small amounts ("first", "in short", "we decided").
 Cut the two kinds that bury ideas: announcing a topic ("This section outlines…", "It is important to note that…")
 and attributing a fact to an observer ("It has been observed that…"). Recaps that repeat a section are the same
-habit at document size.
+habit at document size. Metadiscourse you keep goes in the active voice with _we_ or _I_: "we conclude", not "it is
+concluded". A little of it can land a new term at the end of a sentence ("we call this the run folder").
 
 **Hedges and intensifiers: neither too many nor too few.** Too many hedges sound evasive; none at all sounds
 aggressive. Readers trust a claim stated as strongly as its evidence: "the heap dumps indicate the leak is in the
-pool", not "this might possibly suggest". Intensifiers ("key", "critical", "crucial", "essential", "fundamental",
-"robust", "comprehensive") mostly weaken what they touch; a sentence that opens with "clearly" or "obviously" invites
-doubt.
+pool", not "this might possibly suggest". Use intensifiers even less than hedges: "key", "central", "crucial",
+"essential", "fundamental" and "major" (the book's list), and "critical", "robust" and "comprehensive" (ours), mostly
+weaken what they touch. A sentence that opens with "clearly" or "obviously" invites doubt.
 
 **Concise, not terse.** Cutting can go too far. Prose stripped of its reasons, conditions and links reads like a
-telegram, and the reader loses what made it worth reading. Before cutting, apply the density test, after
+telegram, and the reader loses what made it worth reading. The book's only test is a reader's reaction. Without a
+reader, apply the density test, after
 [technical-writing-density](https://github.com/mlwelles/technical-writing-density): would a careful reader misread
 the topic without these words, because they carry a reason, a limit or a distinction that matters to it? Then they
 stay, and the sentence is longer for it. The aim is not short text; it is text with nothing needless in it.
@@ -181,7 +206,9 @@ stay, and the sentence is longer for it. The aim is not short text; it is text w
 Write to the reader as you would want to be written to. The subjects you choose decide whether a sentence is honest.
 "Errors occurred" and "some tests were not executed" hide who acted; "I skipped the four integration tests because
 they need a database" doesn't. Name who acted, especially for errors, costs and skipped work, and make the person
-affected a character. Prose should be as complex as its ideas, and no harder.
+affected a character. A passive is fine when the actor is unimportant, but not when the actor is you and the news is
+bad. Softening bad news out of kindness is fine; hiding who caused it isn't. Prose should be as complex as its ideas,
+and no harder.
 
 ## 6. Rules for technical documents (not from the book)
 
@@ -211,8 +238,10 @@ a gate with a spec, a plan or an audit report, follow [references/copyedit.md](r
 Opus agent revises the document by this standard, and `scripts/compare.mjs` replaces it only when nothing was lost.
 It commits nothing.
 
-## What this standard leaves out
+## Length, correctness and punctuation
 
-Lessons 2 (correctness) and 11 (elegance) aren't part of it. There are no length limits, no banned words and no
-rules against em dashes, semicolons or colons: a long document for a long feature is fine when every paragraph serves
-its point.
+There are no length limits and no banned words: a long document for a long feature is fine when every paragraph serves
+its point. Lesson 2 (correctness) and Appendix I (punctuation) are a short last pass, not a focus: Claude rarely breaks
+the rules that matter, and Lesson 2 shows that most "rules" people cite are folklore. Em dashes, semicolons and colons
+are fine where Appendix I says they are. Lesson 11 (elegance) seldom belongs in a spec or a report; its reference is
+there for a README's opening or a release note.
