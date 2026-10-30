@@ -103,6 +103,20 @@ export const agentBrowserPlan = ({
     ? { use: 'path' }
     : { use: 'ours', download: agentBrowserAction({ installed: ours, pinned }) };
 
+// Why web-mcp's one browser window can't open on this machine, or undefined. search, browser and the fetch fallback all need it.
+export function windowProblem(o: {
+  browserRuns: boolean;
+  platform: NodeJS.Platform;
+  display: boolean;
+  xvfb: boolean;
+}): string | undefined {
+  if (!o.browserRuns)
+    return "web-mcp's browser window can't open: no browser it can use. search, browser and the fetch fallback won't work until you run agent-browser install, or install Helium or Chromium.";
+  if (o.platform === 'linux' && !o.display && !o.xvfb)
+    return "web-mcp's browser window can't open: this Linux has no display and no Xvfb. search, browser and the fetch fallback won't work until you install Xvfb or run Claude Code in a desktop session.";
+  return undefined;
+}
+
 // agent-browser's own release binaries (statically linked musl on Linux, so NixOS runs it), keyed like BIN_TARGETS.
 export const AGENT_BROWSER_FILES: Record<string, string> = {
   'win32-x64': 'agent-browser-win32-x64.exe',

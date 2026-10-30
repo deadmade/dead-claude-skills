@@ -103,12 +103,6 @@ impl Engine {
         matches!(self, Self::Scholar | Self::SemanticScholar)
     }
 
-    /// Whether the engine needs a visible browser window: none does (findings.md).
-    #[allow(clippy::unused_self)] // per-engine in the signature, in case one needs a window later
-    pub fn headed(self) -> bool {
-        false
-    }
-
     /// The `agent-browser wait --fn` expression that is true once the page shows results, no results or a block.
     pub fn ready_js(self) -> &'static str {
         match self {
@@ -340,10 +334,9 @@ mod tests {
     }
 
     #[test]
-    fn every_engine_waits_on_an_expression_and_runs_headless() {
+    fn every_engine_waits_on_an_expression() {
         for e in Engine::ALL {
             assert!(e.ready_js().starts_with("!!(") && e.ready_js().ends_with(");"));
-            assert!(!e.headed(), "{}", e.name());
         }
     }
 

@@ -36,8 +36,8 @@ pub struct Config {
     pub papers_deadline: Duration,
     pub project: PathBuf,
     pub agent_browser: String,
-    /// The search profiles' folder: per user and machine, not per project. `None` without a home folder: search
-    /// then fails, the other tools work.
+    /// The search folder (profile slots, the cookie extension, engine rests): per user and machine, not per project.
+    /// `None` without a home folder: search then fails, the other tools work.
     pub search_dir: Option<PathBuf>,
 }
 

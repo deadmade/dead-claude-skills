@@ -97,7 +97,8 @@ from the user. Recommended answers are fine here.
 - The tree has one branch per cross-cutting concern: the seam question from Phase 2. Each answer goes into the spec
   as one line: `<concern>: resolved in <module>; never seen by <modules>`.
 - Resolved terms go into `GLOSSARY.md` (or the one `GLOSSARY-MAP.md` points at) as they happen; ADRs only under
-  domain-modeling's three conditions. Link them in flow.md.
+  domain-modeling's three conditions. Link them in flow.md. An ADR takes the next free number in `docs/adr/` on the
+  base branch; check again when it is committed, since another branch may have taken that number meanwhile.
 - Fold every settled decision back into the spec. The spec is the single source the plan is written from.
 
 **Gate 1:** when the frontier is empty, give a five-line summary of what changed in the spec and ask the user to

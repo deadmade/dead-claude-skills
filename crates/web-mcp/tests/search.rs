@@ -6,10 +6,47 @@ use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use common::{Fixture, Mcp, PUBLIC, Resp, is_error, pages, tempdir, text};
+use common::{
+    Fixture, Mcp, PUBLIC, Resp, attached, command_of, is_error, pages, session_of, tempdir, text,
+};
 use serde_json::{Value, json};
 
 const ENGINES: [&str; 4] = ["google", "bing", "duckduckgo", "brave"];
+
+/// `mcp`'s agent-browser session for engine `e` in generation `g`.
+fn engine_session(mcp: &Mcp, g: u32, e: &str) -> String {
+    format!("web-mcp-{}-g{g}-search-{e}", mcp.pid())
+}
+
+/// The sessions of the logged batches, sorted.
+fn batches(pages: &Path) -> Vec<String> {
+    let mut s: Vec<String> = log(pages)
+        .iter()
+        .filter(|c| command_of(c) == "batch --json")
+        .map(|c| session_of(c).to_owned())
+        .collect();
+    s.sort();
+    s
+}
+
+/// `mcp`'s engine sessions of generation `g`, sorted, each `n` times.
+fn engine_sessions(mcp: &Mcp, g: u32, n: usize) -> Vec<String> {
+    let mut s: Vec<String> = ENGINES
+        .iter()
+        .flat_map(|e| std::iter::repeat_n(engine_session(mcp, g, e), n))
+        .collect();
+    s.sort();
+    s
+}
+
+/// The logged calls running `cmd`, as (session, attached).
+fn ran(pages: &Path, cmd: &str) -> Vec<(String, bool)> {
+    log(pages)
+        .iter()
+        .filter(|c| command_of(c) == cmd)
+        .map(|c| (session_of(c).to_owned(), attached(c)))
+        .collect()
+}
 
 /// An article about `word` of about `paras` 500-char paragraphs.
 fn page(title: &str, word: &str, paras: usize) -> Resp {
@@ -173,6 +210,136 @@ fn search_fuses_all_four_engines() {
         "Zebra herds migrate across the plains."
     );
     assert_eq!(record["skipped"], json!({}));
+    // One window: its owner opened once, and each engine ran as a tab of it.
+    let owner = format!("web-mcp-{}-window", mcp.pid());
+    assert_eq!(ran(&pages, "open about:blank"), [(owner, false)]);
+    assert_eq!(batches(&pages), engine_sessions(&mcp, 1, 1));
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn engine_tab_stays_between_searches() {
+    let (_fx, pages) = setup();
+    let mut mcp = start(&pages, &[]);
+    for _ in 0..2 {
+        let r = search(&mut mcp, json!({"query": "zebra"}));
+        assert!(!is_error(&r), "{r}");
+    }
+    assert_eq!(batches(&pages), engine_sessions(&mcp, 1, 2));
+    for cmd in ["tab new", "tab close", "close"] {
+        assert_eq!(ran(&pages, cmd), [], "{cmd}");
+    }
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn engine_tab_is_rebound_once() {
+    let (_fx, pages) = setup();
+    let mut mcp = start(&pages, &[]);
+    let bing = engine_session(&mcp, 1, "bing");
+    std::fs::write(mcp.state.join(format!("{bing}.gone")), "").unwrap();
+    let t = text(&search(&mut mcp, json!({"query": "zebra"}))).to_owned();
+    assert!(
+        first_line(&t).starts_with("Source: google, bing, duckduckgo, brave (searched "),
+        "{t}"
+    );
+    assert_eq!(ran(&pages, "tab new"), [(bing.clone(), true)]);
+    assert_eq!(batches(&pages).iter().filter(|s| **s == bing).count(), 2);
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn dead_chrome_is_replaced() {
+    let (_fx, pages) = setup();
+    let mut mcp = start(&pages, &[]);
+    assert!(!is_error(&search(&mut mcp, json!({"query": "zebra"}))));
+    // Chrome died: the owner relaunched it on a new url, and the old one refuses every connect.
+    std::fs::write(mcp.state.join("chrome"), "2").unwrap();
+    std::fs::write(mcp.state.join("dead-g1"), "").unwrap();
+    let t = text(&search(&mut mcp, json!({"query": "zebra"}))).to_owned();
+    assert!(
+        first_line(&t).starts_with("Source: google, bing, duckduckgo, brave (searched "),
+        "{t}"
+    );
+    let mut both = engine_sessions(&mcp, 1, 1);
+    both.extend(engine_sessions(&mcp, 2, 1));
+    both.sort();
+    assert_eq!(batches(&pages), both);
+    // The old generation's sessions close in the background, without `--cdp`.
+    let mut old: Vec<(String, bool)> = engine_sessions(&mcp, 1, 1)
+        .into_iter()
+        .map(|s| (s, false))
+        .collect();
+    old.sort();
+    let until = Instant::now() + Duration::from_secs(10);
+    let closed = loop {
+        let mut closed = ran(&pages, "close");
+        closed.sort();
+        if closed == old || Instant::now() > until {
+            break closed;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    };
+    assert_eq!(closed, old);
+    assert_eq!(ran(&pages, "tab close"), []);
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn closed_window_rebinds_every_engine() {
+    let (_fx, pages) = setup();
+    let mut mcp = start(&pages, &[]);
+    assert!(!is_error(&search(&mut mcp, json!({"query": "zebra"}))));
+    for e in ENGINES {
+        let s = engine_session(&mcp, 1, e);
+        std::fs::write(mcp.state.join(format!("{s}.gone")), "").unwrap();
+    }
+    let t = text(&search(&mut mcp, json!({"query": "zebra"}))).to_owned();
+    assert!(
+        first_line(&t).starts_with("Source: google, bing, duckduckgo, brave (searched "),
+        "{t}"
+    );
+    let mut rebound: Vec<String> = ran(&pages, "tab new").into_iter().map(|s| s.0).collect();
+    rebound.sort();
+    assert_eq!(rebound, engine_sessions(&mcp, 1, 1));
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn two_servers_take_two_slots() {
+    let (_fx, pages) = setup();
+    let mut a = start(&pages, &[]);
+    let shared = ("WEB_MCP_SEARCH_DIR", a.search.display().to_string());
+    let mut b = start(&pages, &[shared]);
+    for mcp in [&mut a, &mut b] {
+        let r = search(mcp, json!({"query": "zebra", "engines": "bing"}));
+        assert!(!is_error(&r), "{r}");
+    }
+    for (n, mcp) in [(1, &a), (2, &b)] {
+        let slot = a.search.join("profiles").join(n.to_string());
+        let owner = std::fs::read_to_string(slot.join("owner")).unwrap();
+        assert_eq!(owner, format!("web-mcp-{}-window", mcp.pid()));
+        assert!(slot.join("agent-browser.json").is_file());
+    }
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn window_start_is_outside_the_engine_deadline() {
+    let (_fx, pages) = setup();
+    // The window takes 8 s to start and each engine 3 s more: 11 s in all, past the 10 s engine deadline.
+    let mut mcp = start(
+        &pages,
+        &[
+            ("FAKE_AB_OWNER_DELAY_MS", "8000".into()),
+            ("FAKE_AB_DELAY_MS", "3000".into()),
+        ],
+    );
+    let t = text(&search(&mut mcp, json!({"query": "zebra"}))).to_owned();
+    assert!(
+        first_line(&t).starts_with("Source: google, bing, duckduckgo, brave (searched "),
+        "{t}"
+    );
 }
 
 #[cfg(debug_assertions)]
@@ -213,7 +380,7 @@ fn consent_clears_by_the_next_search() {
     // Google is the engine with a consent page to recognise (Bing's was never seen, findings.md).
     mark(&pages, "google.consent-once");
     let mut mcp = start(&pages, &[]);
-    let seen = mcp.search.join("google/consent-seen");
+    let seen = mcp.search.join("profiles/1/google/consent-seen");
     let r = search(&mut mcp, json!({"query": "zebra"}));
     assert!(!is_error(&r), "{r}");
     let t = text(&r);
@@ -246,10 +413,11 @@ fn second_consent_counts_as_blocked() {
     let t = text(&search(&mut mcp, json!({"query": "zebra"}))).to_owned();
     assert!(t.contains("(skipped: google: consent (clearing))"), "{t}");
     assert!(!mcp.search.join("google/rest").exists());
+    assert!(mcp.search.join("profiles/1/google/consent-seen").exists());
     let t = text(&search(&mut mcp, json!({"query": "zebra"}))).to_owned();
     assert!(t.contains("(skipped: google: consent (.web/"), "{t}");
     assert!(mcp.search.join("google/rest").exists());
-    assert!(!mcp.search.join("google/consent-seen").exists());
+    assert!(!mcp.search.join("profiles/1/google/consent-seen").exists());
 }
 
 #[cfg(debug_assertions)]
@@ -359,20 +527,13 @@ fn all_blocked_names_each_reason() {
 
 #[cfg(debug_assertions)]
 #[test]
-fn concurrent_searches_both_answer() {
+fn concurrent_searches_in_one_server_both_answer() {
     let (_fx, pages) = setup();
-    let delay = ("FAKE_AB_DELAY_MS", "1000".to_owned());
-    let a = start(&pages, std::slice::from_ref(&delay));
-    let shared = ("WEB_MCP_SEARCH_DIR", a.search.display().to_string());
-    let b = start(&pages, &[delay, shared]);
-    let threads: Vec<_> = [a, b]
-        .into_iter()
-        .map(|mut mcp| std::thread::spawn(move || search(&mut mcp, json!({"query": "zebra"}))))
-        .collect();
-    for th in threads {
-        let r = th.join().unwrap();
+    let mut mcp = start(&pages, &[("FAKE_AB_DELAY_MS", "1000".to_owned())]);
+    let q = json!({"query": "zebra"});
+    for r in mcp.calls(vec![("search", q.clone()), ("search", q)]) {
         assert!(!is_error(&r), "{r}");
-        // Each engine's lock waits for the other server's search instead of skipping it as busy.
+        // Each engine's turn waits for the other search instead of skipping it as busy.
         let t = text(&r);
         assert!(
             first_line(t).starts_with("Source: google, bing, duckduckgo, brave (searched "),
@@ -385,20 +546,12 @@ fn concurrent_searches_both_answer() {
 #[test]
 fn lock_won_late_starts_no_render() {
     let (_fx, pages) = setup();
-    // Both ask at once: the winner's 8 s render leaves it 2 s, the loser under READ_MARGIN of its 10 s.
-    let delay = ("FAKE_AB_DELAY_MS", "8000".to_owned());
-    let a = start(&pages, std::slice::from_ref(&delay));
-    let shared = ("WEB_MCP_SEARCH_DIR", a.search.display().to_string());
-    let b = start(&pages, &[delay, shared]);
-    let threads: Vec<_> = [a, b]
-        .into_iter()
-        .map(|mut mcp| {
-            std::thread::spawn(move || {
-                search(&mut mcp, json!({"query": "zebra", "engines": "bing"}))
-            })
-        })
-        .collect();
-    let rs: Vec<_> = threads.into_iter().map(|t| t.join().unwrap()).collect();
+    // Both ask at once: the winner's 8.5 s render leaves the loser under READ_MARGIN of its 10 s. Each deadline
+    // starts after its search's warm, so the window starts first: then both warms are one quick owner call.
+    let mut mcp = start(&pages, &[("FAKE_AB_DELAY_MS", "8500".to_owned())]);
+    mcp.call("browser", json!({"action": "snapshot", "session": "s"}));
+    let q = json!({"query": "zebra", "engines": "bing"});
+    let rs = mcp.calls(vec![("search", q.clone()), ("search", q)]);
     let (ok, lost): (Vec<_>, Vec<_>) = rs.iter().partition(|r| !is_error(r));
     assert_eq!(ok.len(), 1, "{rs:?}");
     assert_eq!(text(lost[0]), "No engine answered: bing: timed out");
@@ -451,7 +604,7 @@ fn filters() {
         "{}",
         text(&r)
     );
-    // Windows also closes each session after a search: those calls have no stdin.
+    // The window's owner calls have no stdin.
     let batches: Vec<_> = log(&pages)
         .into_iter()
         .filter_map(|c| {
@@ -490,26 +643,28 @@ fn render_scrubs_env_and_sets_cwd() {
     let mut mcp = start(&pages, &[("AGENT_BROWSER_AUTO_CONNECT", "1".into())]);
     assert!(!is_error(&search(&mut mcp, json!({"query": "zebra"}))));
     let calls = log(&pages);
-    assert!(calls.len() >= 4, "{calls:?}"); // a batch per engine, and on Windows a close
+    assert_eq!(calls.len(), 6, "{calls:?}"); // the owner's open and get cdp-url, a batch per engine
     for c in &calls {
-        let args: Vec<&str> = c["args"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|a| a.as_str().unwrap())
-            .collect();
+        let args = common::argv(c);
         let at = args
             .iter()
             .position(|a| *a == "--config")
             .expect("--config");
-        let folder = Path::new(args[at + 1]).parent().unwrap();
-        let engine = folder.file_name().unwrap().to_str().unwrap();
-        assert!(ENGINES.contains(&engine), "{c}");
-        assert_eq!(folder, mcp.search.join(engine));
+        let (config, env) = if attached(c) {
+            (
+                mcp.search.join("attach.json"),
+                json!({"AGENT_BROWSER_DEFAULT_TIMEOUT": "8000"}),
+            )
+        } else {
+            (mcp.search.join("profiles/1/agent-browser.json"), json!({}))
+        };
+        assert_eq!(Path::new(args[at + 1]), config, "{c}");
         let cwd = PathBuf::from(c["cwd"].as_str().unwrap());
-        assert_eq!(cwd.canonicalize().unwrap(), folder.canonicalize().unwrap());
-        let env: Vec<_> = c["env"].as_object().unwrap().keys().collect();
-        assert_eq!(env, ["AGENT_BROWSER_DEFAULT_TIMEOUT"], "{c}");
+        assert_eq!(
+            cwd.canonicalize().unwrap(),
+            mcp.search.canonicalize().unwrap()
+        );
+        assert_eq!(c["env"], env, "{c}");
     }
 }
 

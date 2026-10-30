@@ -193,6 +193,8 @@ pub struct Mcp {
     pub project: PathBuf,
     /// The server's `WEB_MCP_SEARCH_DIR`.
     pub search: PathBuf,
+    /// The fake agent-browser's `FAKE_AB_STATE`: its `chrome`, `dead-g<n>` and `<session>.gone` files.
+    pub state: PathBuf,
     child: Child,
     stdin: Option<ChildStdin>,
     out: BufReader<ChildStdout>,
@@ -206,19 +208,24 @@ impl Mcp {
 
     /// In `project` (so a second server there sees the first one's `.web`), with extra environment.
     /// Unless `envs` says otherwise, agent-browser is the fake, the browser a dummy file, and the search
-    /// folder a fresh one; whichever it is gets Consent-O-Matic already unpacked: no test starts a browser or
+    /// folder a fresh one; whichever it is gets the cookie extension already unpacked: no test starts a browser or
     /// downloads.
     pub fn start_with(project: PathBuf, envs: &[(&str, String)]) -> Self {
         let search = envs
             .iter()
             .find(|(k, _)| *k == "WEB_MCP_SEARCH_DIR")
             .map_or_else(tempdir, |(_, v)| PathBuf::from(v));
-        let ext = search.join("extensions/consent-o-matic-37cec881");
+        let ext = search.join("extensions/idcac-8f70ab94");
         std::fs::create_dir_all(&ext).unwrap();
         std::fs::write(ext.join("manifest.json"), "{}").unwrap();
         std::fs::write(search.join("chrome"), "").unwrap();
+        let state = envs
+            .iter()
+            .find(|(k, _)| *k == "FAKE_AB_STATE")
+            .map_or_else(tempdir, |(_, v)| PathBuf::from(v));
         let mut cmd = Command::new(env!("CARGO_BIN_EXE_web-mcp"));
         cmd.env("WEB_MCP_SEARCH_DIR", &search)
+            .env("FAKE_AB_STATE", &state)
             .env("WEB_MCP_CHROME", search.join("chrome"))
             .env(
                 "WEB_MCP_AGENT_BROWSER",
@@ -245,6 +252,7 @@ impl Mcp {
         let mut m = Self {
             project,
             search,
+            state,
             child,
             stdin: Some(stdin),
             out,
@@ -347,6 +355,52 @@ impl Drop for Mcp {
         let _ = self.child.kill();
         let _ = self.child.wait();
     }
+}
+
+/// The fake agent-browser's calls logged to `log`.
+pub fn logged(log: &Path) -> Vec<Value> {
+    std::fs::read_to_string(log)
+        .unwrap_or_default()
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect()
+}
+
+/// A logged call's argv.
+pub fn argv(call: &Value) -> Vec<&str> {
+    call["args"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| a.as_str().unwrap())
+        .collect()
+}
+
+/// A logged call's `--session`.
+pub fn session_of(call: &Value) -> &str {
+    let a = argv(call);
+    let at = a.iter().position(|x| *x == "--session").unwrap();
+    call["args"][at + 1].as_str().unwrap()
+}
+
+/// A logged call's command, after the global flags, joined by spaces.
+pub fn command_of(call: &Value) -> String {
+    let a = argv(call);
+    let mut i = 0;
+    while i < a.len() {
+        i += match a[i] {
+            "--session" | "--config" | "--cdp" | "--max-output" => 2,
+            "--json" | "--content-boundaries" | "--pin-tab" => 1,
+            _ => break,
+        };
+    }
+    a[i..].join(" ")
+}
+
+/// Whether a logged call attached to the window (`--cdp … --pin-tab`).
+pub fn attached(call: &Value) -> bool {
+    let a = argv(call);
+    a.contains(&"--cdp") || a.contains(&"--pin-tab")
 }
 
 /// The text of the first text block.
