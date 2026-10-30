@@ -262,6 +262,15 @@ origin/main d1428c6.
   (#85), and CLAUDE.md cites ADR 0005 for flows' agents — none.
 - 2026-10-30, final review: a rebound tab answers with no note that its page was lost (review Minor 3) — the spec says
   nothing errors — a Claude session may be puzzled by an empty snapshot.
+- 2026-10-30, verify: self-review ran as three combined agents (bugs with silent failures and test gaps; security;
+  CLAUDE.md with comments and docs), not one per pass — the fable final review had just covered bugs, spec and
+  standards — a type-design finding goes unseen.
+- 2026-10-30, verify: the docs pass stands in for `/doc-audit branch` — it checked every doc and comment the diff
+  touches and grepped the repo for the old design's words; its findings are fixed in dacbf9a — a doc outside the
+  diff that describes web-mcp stays stale.
+- 2026-10-30, verify: `npm test`'s check-repo fails on `claude plugin validate plugins/default/` (`register.tsx`)
+  and `system/files.test.ts` "clean slate" fails with symlink EPERM; both also fail on main on this machine and the
+  branch touches neither — none; CI's Linux and Windows jobs run them.
 
 ## Deviations
 
