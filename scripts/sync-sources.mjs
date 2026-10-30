@@ -192,7 +192,7 @@ export const SOURCES = [
     check: () => {
       const d = 'plugins/flows/packs/pstack-picks';
       json(`${d}/.claude-plugin/plugin.json`);
-      count('pstack-picks skills', skillCount(`${d}/skills`), 18);
+      count('pstack-picks skills', skillCount(`${d}/skills`), 16);
       exists(`${d}/agents/comment-sicko.md`);
       return { sha: upstream(`${d}/UPSTREAM`) };
     },

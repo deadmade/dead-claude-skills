@@ -1,0 +1,24 @@
+{
+  "description": "Prose check after every Markdown write or edit: prose-check.mjs flags conversation shorthand (Q11, D2, round 2, my call) in the new text. FLOWS_PROSE_CHECK=off turns it off.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Write(**/*.md)",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/prose-check.mjs"]
+          },
+          {
+            "type": "command",
+            "if": "Edit(**/*.md)",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/prose-check.mjs"]
+          }
+        ]
+      }
+    ]
+  }
+}

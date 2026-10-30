@@ -36,11 +36,18 @@ export function stableTags(lsRemote) {
 }
 
 // Blobless, sparse clone of `url` into a temp dir, checked out to `patterns`: the default branch at depth 1, or `ref`
-// (a branch or tag); `depth: 0` keeps the whole history. Returns the clone dir.
+// (a branch, a tag or a 40-hex commit); `depth: 0` keeps the whole history. `clone --branch` takes only names, so a
+// commit is fetched and checked out after the clone. Returns the clone dir.
 export function sparseClone(url, patterns, { noCone = false, ref, depth = 1 } = {}) {
   const dir = join(tempDir(), 'up');
-  const opts = [...(depth ? ['--depth', String(depth)] : []), ...(ref ? ['--branch', ref] : [])];
+  const commit = ref && /^[0-9a-f]{40}$/.test(ref);
+  const depthOpt = depth ? ['--depth', String(depth)] : [];
+  const opts = [...depthOpt, ...(ref && !commit ? ['--branch', ref] : [])];
   git('clone', '--quiet', ...opts, '--filter=blob:none', '--sparse', url, dir);
+  if (commit) {
+    git('-C', dir, 'fetch', '--quiet', ...depthOpt, 'origin', ref);
+    git('-C', dir, 'checkout', '--quiet', '--detach', ref);
+  }
   git('-C', dir, 'sparse-checkout', 'set', ...(noCone ? ['--no-cone'] : []), ...patterns);
   return dir;
 }

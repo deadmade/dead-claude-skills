@@ -4,7 +4,7 @@ description: "Apply when designing types, reviewing a function signature, or wri
 disable-model-invocation: true
 ---
 
-> **Claude Code port:** skills this file names (for example **how**, **why**, **unslop**, **arena**, or a **...** principle skill) are sibling skills in this plugin. They are user-invoked, so the Skill tool can't load them. To use one, read `${CLAUDE_SKILL_DIR}/../<name>/SKILL.md` (principle skills: `${CLAUDE_SKILL_DIR}/../principle-<name>/SKILL.md`) and follow it. Subagents use the Agent tool; valid `model` values are `fable`, `opus`, `sonnet`, `haiku`.
+> **Claude Code port:** skills this file names (for example **how**, **why**, **recall**, **arena**, or a **...** principle skill) are sibling skills in this plugin. They are user-invoked, so the Skill tool can't load them. To use one, read `${CLAUDE_SKILL_DIR}/../<name>/SKILL.md` (principle skills: `${CLAUDE_SKILL_DIR}/../principle-<name>/SKILL.md`) and follow it. Subagents use the Agent tool; valid `model` values are `fable`, `opus`, `sonnet`, `haiku`.
 
 # Type System Discipline
 

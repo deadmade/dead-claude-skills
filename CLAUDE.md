@@ -61,6 +61,16 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   tree from them, and check-repo fails when a listed skill is gone or the generated parts are stale. `/self-review`
   was a plugin of its own until 0.5.0; its skill and its five agents (`agents/`, next to tob's checker) now ship in
   flows, so its agents are `flows:pr-test-analyzer` and so on, and the installer keeps flows on a machine that had it.
+  flows also owns the prose standard: `skills/writing/` is the one skill in it Claude may load on its own
+  (`flows:writing`). `flows-uses.mjs` treats only `disable-model-invocation: true` skills as conductors, so a
+  `uses.json` may list `writing` under `flows`. `hooks/prose-check.mjs` (logic in `prose.mjs`) is a code-only `PostToolUse`
+  check on `*.md` writes for conversation shorthand, off with `FLOWS_PROSE_CHECK=off`. The writing skill also holds the copyedit
+  (`references/copyedit.md`, run as `/flows:writing copyedit <file>`): a fresh Opus `general-purpose` agent edits a
+  document by the skill, then `scripts/compare.mjs` replaces it only when nothing code can check was lost (the list is
+  in `references/copyedit.md`). The conductors run it, per flow-rules, before a gate shows a spec, plan or audit report. `compare.mjs`
+  imports `check` and `report` from `hooks/prose.mjs`, so a change there can break the copyedit; their tests are
+  `scripts/copyedit.test.mjs` and `plugins/flows/hooks/prose.test.mjs`. `SKILL.md` and `references/` state _Style_ in
+  our own words: never quote the book or reuse its examples (THIRD_PARTY.md).
 - `plugins/shared/tui-review/`: a Claude Code mod (TypeScript, `hooks/`) driving the Rust binary `tui-review` (`crates/tui-review/`). The two
   share a binary cache format (`crates/tui-review/src/format.rs` ↔ `hooks/chunks.ts`) and a stdout line protocol; change both sides
   together.
@@ -78,7 +88,13 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   `scripts/sync-*.mjs`. They are not marketplace plugins and nothing there loads on its own (Claude Code scans only a
   plugin's root `skills/`, `agents/` and `hooks/hooks.json`); conductors read a pack's skills by path
   (`${CLAUDE_PLUGIN_ROOT}/packs`), and the installer retires old installs of them and checks none remains
-  (`stillInstalled`). The folder list is the source of truth, not this file. tob's spec checker ships as flows' own agent,
+  (`stillInstalled`). The folder list is the source of truth, not this file. pstack-picks leaves out pstack's
+  `technical-writing` and `unslop` (flows' `writing` replaces them, and the sync rewrites the lines that named them);
+  `sync-pstack.mjs --ref <hash>` syncs one commit, given as a full 40-character hash, instead of upstream's default
+  branch; its entry in `scripts/sync-sources.mjs` checks the number of vendored skills (16), so change that count
+  whenever you change `SKILLS`. pstack-picks' `UPSTREAM`
+  stays at `519d36a` on purpose: upstream's newer commits fail the sync's `GUARD`, so its weekly `sync.yml` job
+  (no `--ref`) fails until a PR adapts the rewrites; don't hand-edit the pack to get past it. tob's spec checker ships as flows' own agent,
   `plugins/flows/agents/spec-compliance-checker.md` (vendored by `sync-tob`), because a pack's agents don't load.
   Where a conductor changes a pack's rule it quotes the sentence in an `<!-- overrides <pack>/<path>: "..." -->`
   marker in flows' own `.md` files; `checkOverrides` (`scripts/flows-uses.mjs`, run by check-repo and by every pack
@@ -112,7 +128,7 @@ entry's version from its `ref` (`shippedVersions`).
 ## Vendored content: don't edit
 
 These are copied from upstream by `scripts/sync-*.mjs` (the weekly `sync.yml` opens the PRs) and overwritten on every
-sync: `plugins/opt-in/hallmark/`, `plugins/flows/packs/` (`tob-picks` is CC BY-SA 4.0), `plugins/flows/agents/`,
+sync: `plugins/opt-in/hallmark/`, `plugins/flows/packs/` (`tob-picks` is CC BY-SA 4.0; pstack-picks' `.claude-plugin/plugin.json` is hand-written), `plugins/flows/agents/`,
 `plugins/shared/graphify/skills/`, `plugins/opt-in/implementation/*-skills/{library,skills}/`, `plugins/opt-in/implementation/*-skills/LICENSE` and `UPSTREAM` (their `plugin.json` and `evals/` are hand-written), `plugins/opt-in/implementation/postgres/skills/` (their `plugin.json` is hand-written),
 `plugins/flows/skills/self-review/references/upstream/` with its `LICENSE` and `LICENSE-MIT`, and the `plugin.json` version of the ponytail and superpowers packs (set by the sync and bumped by `release.mjs`). To change them, change the sync script's transform.
 When what's vendored or its license changes, update THIRD_PARTY.md.
@@ -137,7 +153,7 @@ plugins of ours that the manifest no longer lists.
 
 ## Checks
 
-- `npm test`: repo checks plus all `installer/**/*.test.ts`, `scripts/*.test.mjs` and `plugins/default/hooks/*.test.mjs`
+- `npm test`: repo checks plus all `installer/**/*.test.ts`, `scripts/*.test.mjs`, `plugins/default/hooks/*.test.mjs` and `plugins/flows/hooks/*.test.mjs`
   (`claude plugin validate` is skipped when `claude` isn't on PATH). The installer tests run with a line-coverage floor
   (`--test-coverage-lines` in `package.json` and `flake.nix`; raise it, never lower it), and `installer/modules.test.ts`
   loads every module so none hides from it. `system/` tests use the real OS: Windows-only cases skip elsewhere. Parsers of what other tools write test against captured output in `core/fixtures/`,

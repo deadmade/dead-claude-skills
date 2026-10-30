@@ -16,11 +16,11 @@ is the bug.
 | 2 Claims    | tob `spec-to-code-compliance`, docs as spec | contradicted, unbacked, undocumented           |
 | 3 CLAUDE.md | `claude-md-improver`, report only           | stale or missing instructions                  |
 | 4 Mechanics | commands, paths, links, versions            | broken references                              |
-| 5 Prose     | pstack `technical-writing` + `unslop`       | wording findings, changed docs only            |
+| 5 Prose     | `flows:writing`                             | wording findings, changed docs only            |
 | 6 Report    | flow-rules **Reports**                      | `docs/audits/…-doc-audit-<scope>.md`. **Gate** |
 
-[flow-rules.md](../../references/flow-rules.md) applies: read it first. Packs: `${CLAUDE_PLUGIN_ROOT}/packs` (tob and
-pstack are its `-picks` folders).
+[flow-rules.md](../../references/flow-rules.md) applies: read it first. Packs: `${CLAUDE_PLUGIN_ROOT}/packs` (tob is
+its `tob-picks` folder).
 
 ## Phase 1: Scope
 
@@ -70,7 +70,7 @@ In the scoped docs, check what can be checked by running something:
 
 ## Phase 5: Prose
 
-Docs the diff changed (branch) or that Phase 2 flagged (all): pstack `technical-writing`, then `unslop`. Findings
+Docs the diff changed (branch) or that Phase 2 flagged (all), read against `flows:writing`, loaded with the Skill tool. Findings
 only, severity low unless the wording misleads.
 
 ## Phase 6: Report

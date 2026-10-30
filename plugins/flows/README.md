@@ -16,7 +16,7 @@ keeps a state file so the next session can resume. Claude proposes and recommend
 | `/harden [branch\|all]`     | security, footguns, bloat, architecture           | claude-security, cloudflare `security-audit` domain checklists, tob `sharp-edges`, ponytail audit/review, `improve-codebase-architecture`          | fixes you pick       |
 | `/self-review [base]`       | review your branch before a PR                    | bug pass, spec and standards pass, `security-review`, `claude-md-improver`, specialist agents (silent failures, tests, types, comments)            | fixes you pick       |
 | `/verify [base]`            | is this branch ready for a PR?                    | checks once, `/self-review`, `/doc-audit branch`, optional `/test-audit branch`, tui-review, a Decisions gate on the build's rulings and shortcuts | how to integrate     |
-| `/integrate [base]`         | commit, open the PR, watch CI                     | commits shown first, `blast-radius` + `unslop` for the PR body, `!` lines for push and `gh` (never run), `Monitor` on the checks                   | PR open, CI green    |
+| `/integrate [base]`         | commit, open the PR, watch CI                     | commits shown first, `blast-radius` + `writing` for the PR body, `!` lines for push and `gh` (never run), `Monitor` on the checks                  | PR open, CI green    |
 | `/learn [flow]`             | keep what the work taught                         | `revise-claude-md`, `domain-modeling`, a `docs/solutions/` note, `writing-skills` for a skill or conductor lesson                                  | done                 |
 
 `branch` (the default) audits what changed against the base, plus the tests and docs that should have changed with
@@ -34,7 +34,7 @@ doc-audit
 ├ tob-picks: spec-to-code-compliance, spec-compliance, spec-compliance-checker
 ├ claude-md-management@claude-plugins-official: claude-md-improver
 ├ web-mcp: fetch
-└ pstack-picks: technical-writing, unslop
+└ flows: writing
 
 feature-flow
 ├ pstack-picks: how, why, architect, arena, interrogate, blast-radius, principle-redesign-from-first-principles, principle-boundary-discipline
@@ -64,7 +64,8 @@ implement
 
 integrate
 ├ claude-code: Monitor
-├ pstack-picks: blast-radius, unslop
+├ flows: writing
+├ pstack-picks: blast-radius
 └ superpowers: verification-before-completion, systematic-debugging
 
 learn
@@ -111,6 +112,34 @@ are in [references/flow-rules.md](references/flow-rules.md).
 
 Calls between conductors (`/fix-flow` → `/verify`) aren't listed. Each conductor still has a fallback for a
 plugin that isn't there, for installs that skipped one.
+
+## Writing
+
+flows holds one standard for prose a person will read: a skill that states it, a check on every Markdown write, and a
+copyedit that revises a document by it before a gate.
+
+- **The `writing` skill** (`skills/writing/`) is Williams and Bizup's _Style: Lessons in Clarity and Grace_ in our own
+  words, as checks to run on a draft from the top down: the problem and the point at the end of a short opening, the
+  order the reader needs rather than the order the work happened in, topic strings and old-before-new, characters as
+  subjects and actions as verbs, the book's six concision cuts limited by a density test, and naming who acted. A
+  short section adds rules for technical documents that the book doesn't cover, such as no conversation shorthand.
+  `references/` holds the full method of every lesson and both appendices, which Claude reads when a pass needs it.
+  Unlike the conductors, Claude may load it on its own (`flows:writing`) whenever it writes a spec, a plan, a report,
+  a README, a PR description or a commit message. `/doc-audit` reads changed docs against it and `/integrate`
+  revises PR text by it.
+- **The prose check** (`hooks/prose-check.mjs`, a `PostToolUse` hook on every `Write` and `Edit` of a `*.md` file)
+  reports conversation shorthand (`Q4`, `D2`, `round 2`, `my call`) in the new text only: an Edit's new string, or the
+  lines a Write added to the file, unless the file defines the label. It is Node code with no model call, so it costs no
+  tokens. Claude sees its findings and may leave a sentence that a finding gets wrong. In `flow.md` files it is off,
+  since flow.md is the log where those labels belong. `FLOWS_PROSE_CHECK=off` in the environment turns the check off.
+- **The copyedit** (`skills/writing/references/copyedit.md`, `/flows:writing copyedit <file.md>`) has a fresh Opus
+  agent revise a document by the skill for a reader who wasn't in the conversation, then lets the edit through only when
+  code finds nothing lost that it can check. It refuses the edit when a heading or its order, a code block, a code span,
+  a link target or link definition, a URL, an HTML comment, a number, a checkbox step, a table's shape or a quote is
+  lost, when the edit has under 60% as many prose words as the original, when the editor wrote nothing, or when the
+  document changed since it was saved. Code can't see meaning, so a dropped sentence or a flipped negation still needs
+  the diff it shows. It commits nothing. Before a gate shows a spec, a plan or an audit report, the conductors run it on
+  that document; when it refuses an edit, the gate shows the unedited document and what the edit lost.
 
 ## Packs
 
