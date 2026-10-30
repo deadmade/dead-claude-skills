@@ -43,7 +43,8 @@ export async function installAgentBrowser(): Promise<{ path?: string; works: boo
         ? `agent-browser: bad pin in installer/assets/agent-browser.json (${JSON.stringify(pin)})`
         : `agent-browser: no upstream build for ${key}`,
     );
-    return { works: windowWorks() };
+    windowWorks();
+    return { works: false };
   }
   // --with-deps runs sudo, so it is offered only with a download, behind its own prompt (default no).
   let deps = false;
@@ -51,7 +52,8 @@ export async function installAgentBrowser(): Promise<{ path?: string; works: boo
     const what = plan.download === 'install' ? 'Download' : `Upgrade ${ours} to`;
     if (!(await ask(`${what} agent-browser ${pinned} (upstream's release binary) to ${bin}, then its browser?`, true))) {
       done.push('agent-browser: install skipped by you');
-      return { works: windowWorks() };
+      windowWorks();
+      return { works: false };
     }
     deps =
       process.platform === 'linux' &&
@@ -62,7 +64,8 @@ export async function installAgentBrowser(): Promise<{ path?: string; works: boo
     });
     if (!r.ok) {
       failures.push(`agent-browser ${pinned}: ${r.err}`);
-      return { works: windowWorks() };
+      windowWorks();
+      return { works: false };
     }
     done.push(`agent-browser: ${plan.download === 'install' ? 'installed' : 'upgraded to'} ${pinned} at ${bin}`);
   }
@@ -83,7 +86,7 @@ function useAgentBrowser(path: string, deps: boolean) {
   return { path, works: windowWorks() };
 }
 
-// Warns when web-mcp's one browser window can't open; true when it can.
+// Warns when web-mcp's one browser window can't open; returns whether it can.
 function windowWorks() {
   const browserRuns = searchBrowserWorks(homedir(), process.platform);
   const problem = windowProblem({
