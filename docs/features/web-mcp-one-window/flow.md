@@ -1,6 +1,6 @@
 ---
 flow: feature
-phase: execute
+phase: done
 ---
 
 # web-mcp one search window: flow
@@ -419,3 +419,5 @@ decisions (every Ruling, D-T1, D-T5, D-T6, D-T7 and the one `shortcut:` line): "
 - `docs/solutions/chrome-version-opens-a-window-on-windows.md`: D-T7's symptom, cause, fix and how to spot it.
 
 ## Run verdict
+
+2026-10-30, the user: worked as a whole: yes; clean: yes ("Worked, clean").
