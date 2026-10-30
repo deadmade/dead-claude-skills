@@ -30,9 +30,6 @@ Installing flows installs every plugin below; the packs ship inside flows itself
 <!-- uses:start -->
 
 ```text
-copyedit
-└ claude-code: general-purpose
-
 doc-audit
 ├ tob-picks: spec-to-code-compliance, spec-compliance, spec-compliance-checker
 ├ claude-md-management@claude-plugins-official: claude-md-improver
@@ -117,7 +114,7 @@ plugin that isn't there, for installs that skipped one.
 
 ## Writing
 
-flows holds one standard for prose a person will read, and two ways to apply it.
+flows holds one standard for prose a person will read, in one skill, plus a check that runs on every write.
 
 - **The `writing` skill** (`skills/writing/`) is Williams and Bizup's _Style: Lessons in Clarity and Grace_ in our own
   words, as checks to run on a draft from the top down: the problem and the point at the end of a short opening, the
@@ -132,8 +129,8 @@ flows holds one standard for prose a person will read, and two ways to apply it.
   the lines a Write added to the file. It is Node code with no model call, so it costs nothing per write. Claude sees
   its findings and may leave a sentence that a finding gets wrong. In `flow.md` files it is off, since flow.md is the
   log where those labels belong. `FLOWS_PROSE_CHECK=off` in the environment turns the check off.
-- **`/copyedit <file.md>`** has a fresh Opus agent revise a document by the `writing` skill for a reader who wasn't in
-  the conversation, then lets the edit through only when code shows that no heading, code block, code span, link, URL,
+- **The copyedit** (`skills/writing/references/copyedit.md`, `/flows:writing copyedit <file.md>`) has a fresh Opus
+  agent revise a document by the skill for a reader who wasn't in the conversation, then lets the edit through only when code shows that no heading, code block, code span, link, URL,
   HTML comment, number, checkbox step or table row was lost. Code can't see meaning, so a dropped sentence or a
   flipped negation still needs the diff it shows. It commits nothing. Before a gate shows a spec, a plan or an audit
   report, the conductors run it on that document; when it refuses an edit, the gate shows the unedited document and

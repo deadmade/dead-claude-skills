@@ -13,9 +13,9 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { lost, newFindings } from '../plugins/flows/skills/copyedit/scripts/compare.mjs';
+import { lost, newFindings } from '../plugins/flows/skills/writing/scripts/compare.mjs';
 
-const COMPARE = join(import.meta.dirname, '../plugins/flows/skills/copyedit/scripts/compare.mjs');
+const COMPARE = join(import.meta.dirname, '../plugins/flows/skills/writing/scripts/compare.mjs');
 
 const DOC = [
   '# Title',

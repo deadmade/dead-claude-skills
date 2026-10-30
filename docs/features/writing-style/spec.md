@@ -22,7 +22,7 @@ words.
    Claude may load it on its own.
 2. **A shorthand check on every write.** A code-only `PostToolUse` hook flags conversation labels in new Markdown text,
    while the writer still knows what they mean.
-3. **A copyedit before each gate.** `/copyedit` has a fresh Opus editor revise a spec, plan or audit report by the
+3. **A copyedit before each gate.** The writing skill's copyedit has a fresh Opus editor revise a spec, plan or audit report by the
    skill, and replaces the document only when code shows nothing was lost.
 
 ## Non-goals
@@ -67,7 +67,8 @@ off.
 
 ## The copyedit
 
-`/copyedit <file.md>` saves the document to the scratchpad, has a fresh `general-purpose` agent on Opus write an
+The copyedit lives in the writing skill (`references/copyedit.md`, `scripts/compare.mjs`) and runs as
+`/flows:writing copyedit <file.md>`. It saves the document to the scratchpad, has a fresh `general-purpose` agent on Opus write an
 edited version by the skill, and runs `compare.mjs`. The script refuses the edit, and leaves the document as it was,
 when a heading, code block, code span, link target, link definition, URL, HTML comment, number, checkbox step, table
 shape or quote is gone, when under 60% of the prose words remain, or when the document changed meanwhile. Otherwise
@@ -112,7 +113,8 @@ The user decided:
 - Everything ships inside flows; the check covers every Markdown file Claude writes.
 - The copyedit shows a diff against a saved copy and commits nothing.
 - 2026-10-30: verify the skill against the book, cut the rest, keep what is worth using, and make the skill more
-  useful.
+  useful. Then one skill folder, not two ("I just dont enjoy having two writing skills in different folders"): the
+  copyedit moved into `skills/writing/`.
 
 Claude decided, open to change:
 

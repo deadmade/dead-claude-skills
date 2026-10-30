@@ -50,7 +50,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   hand.
 - `plugins/opt-in/mcp/mcp-github/`, `plugins/opt-in/mcp/mcp-azure/`: MCP server configs only.
 - `plugins/flows/`: the conductor skills (`/feature-flow`, `/research-flow`, `/implement`, `/fix-flow`, `/upgrade`,
-  `/test-audit`, `/doc-audit`, `/harden`, `/self-review`, `/verify`, `/integrate`, `/understand`, `/learn`, `/copyedit`). Each runs other plugins' skills in order;
+  `/test-audit`, `/doc-audit`, `/harden`, `/self-review`, `/verify`, `/integrate`, `/understand`, `/learn`). Each runs other plugins' skills in order;
   the rules they share (state files, gates, loading `disable-model-invocation` skills by path, fallbacks per missing
   plugin, audit scope and report format) live once in `references/flow-rules.md`, so a SKILL.md only says what it runs.
   Conductors call each other by reading the callee's SKILL.md (`/fix-flow` → `/verify` → `/doc-audit branch`). Each
@@ -61,10 +61,10 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   flows also owns the prose standard: `skills/writing/` is the one skill in it Claude may load on its own
   (`flows:writing`; `flows-uses.mjs` treats only `disable-model-invocation: true` skills as conductors, and a
   `uses.json` may list it under `flows`); `hooks/prose-check.mjs` (logic in `prose.mjs`) is a code-only `PostToolUse`
-  check on `*.md` writes for conversation shorthand, off with `FLOWS_PROSE_CHECK=off`; and `/copyedit` has a fresh
-  Opus `general-purpose` agent edit a document by the `writing` skill, then `scripts/compare.mjs` replaces it only when
-  no heading, code, link, URL, comment, number, checkbox step or table row was lost.
-  flow-rules runs `/copyedit` before a gate shows a spec, plan or audit report.
+  check on `*.md` writes for conversation shorthand, off with `FLOWS_PROSE_CHECK=off`. The writing skill also holds the copyedit
+  (`references/copyedit.md`, run as `/flows:writing copyedit <file>`): a fresh Opus `general-purpose` agent edits a
+  document by the skill, then `scripts/compare.mjs` replaces it only when no heading, code, link, URL, comment, number,
+  checkbox step or table row was lost. flow-rules runs it before a gate shows a spec, plan or audit report.
 - `plugins/shared/tui-review/`: a Claude Code mod (TypeScript, `hooks/`) driving the Rust binary `tui-review` (`crates/tui-review/`). The two
   share a binary cache format (`crates/tui-review/src/format.rs` ↔ `hooks/chunks.ts`) and a stdout line protocol; change both sides
   together.

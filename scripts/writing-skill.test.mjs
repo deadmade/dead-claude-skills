@@ -25,21 +25,20 @@ test('the writing skill is model-invocable and states the rule', () => {
   }
 });
 
-test('copyedit is a conductor', () => {
-  const text = read('plugins/flows/skills/copyedit/SKILL.md');
-  for (const t of [text, text.replace(/\n/g, '\r\n')])
-    assert.match(parts(t)[0], /^disable-model-invocation: true\r?$/m);
+test('the copyedit procedure and its script sit in the writing skill', () => {
+  assert.match(read('plugins/flows/skills/writing/SKILL.md'), /\(references\/copyedit\.md\)/);
+  const procedure = read('plugins/flows/skills/writing/references/copyedit.md');
+  assert.match(procedure, /\$\{CLAUDE_SKILL_DIR\}\/\.\.\/writing\/scripts\/compare\.mjs/);
+  assert.ok(!('writing' in readUses(ROOT)), 'writing is not a conductor');
   const marketplace = JSON.parse(read('.claude-plugin/marketplace.json'));
-  const uses = readUses(ROOT);
-  assert.ok(uses.copyedit, 'copyedit has a uses.json');
   assert.deepEqual(
-    checkUses(ROOT, marketplace).filter((p) => p.includes('copyedit')),
+    checkUses(ROOT, marketplace).filter((p) => p.includes('writing')),
     [],
   );
 });
 
-test('flow-rules runs /copyedit before gates', () => {
+test('flow-rules runs the copyedit before gates', () => {
   const rules = read('plugins/flows/references/flow-rules.md');
-  assert.match(rules, /\$\{CLAUDE_SKILL_DIR\}\/\.\.\/copyedit\/SKILL\.md/);
+  assert.match(rules, /\$\{CLAUDE_SKILL_DIR\}\/\.\.\/writing\/references\/copyedit\.md/);
   assert.match(rules, /flows:writing/);
 });

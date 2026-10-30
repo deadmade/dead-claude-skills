@@ -1,18 +1,12 @@
----
-name: copyedit
-description: "Copyedit a Markdown document for a reader who was not in the conversation: a fresh Opus editor revises it by flows' writing skill, code checks that no heading, code, link, URL, comment, number, checkbox step or table row was lost, and only then the document is replaced. Commits nothing. Use for /copyedit <file.md>; the flows run it before a gate shows a spec, a plan or an audit report."
-disable-model-invocation: true
-argument-hint: '<file.md>'
----
+# Copyedit a document
 
-# copyedit
-
-A document written during a conversation reads well to the people who were there. This skill has a fresh editor,
+A document written during a conversation reads well to the people who were there. This procedure has a fresh editor,
 who wasn't, revise it, and lets the edit through only when code shows that nothing the document says was lost. It
 commits nothing, so it works the same on any branch and inside the other flows.
 
-Other conductors run it by reading this file. Its paths go through `"${CLAUDE_SKILL_DIR}/../copyedit/"` and
-`"${CLAUDE_SKILL_DIR}/../writing/"`, so they resolve from whichever skill read it.
+The `writing` skill runs it when asked to copyedit a file (`/flows:writing copyedit <file.md>`), and the flows run it
+by reading this file before a gate. Its paths go through `"${CLAUDE_SKILL_DIR}/../writing/"`, so they resolve from
+whichever skill read it.
 
 ## 1. Save the document
 
@@ -45,7 +39,7 @@ The editor writes a `.txt` file because subagents may not be allowed to write Ma
 ## 3. Check and show
 
 ```bash
-node "${CLAUDE_SKILL_DIR}/../copyedit/scripts/compare.mjs" "<run folder>/saved.md" "<run folder>/edited.txt" "<document>"
+node "${CLAUDE_SKILL_DIR}/../writing/scripts/compare.mjs" "<run folder>/saved.md" "<run folder>/edited.txt" "<document>"
 ```
 
 - **Exit 1:** it printed what the edit lost, one item per line, or that the document changed since step 1 saved it.
@@ -62,5 +56,5 @@ node "${CLAUDE_SKILL_DIR}/../copyedit/scripts/compare.mjs" "<run folder>/saved.m
 quotes, and that at least 60% of the prose words remain. It can't see meaning: a dropped sentence without a number in
 it, or a negation that flipped, passes. Read the diff before you accept the edit.
 
-Don't commit. Whoever ran `/copyedit` decides what to keep; the saved copy stays in the run folder until the next run
+Don't commit. Whoever asked for the copyedit decides what to keep; the saved copy stays in the run folder until the next run
 on the same document.

@@ -106,7 +106,7 @@ new text, with no model call. `FLOWS_PROSE_CHECK=off` turns it off.
 _Avoid_: linter, lint, model check
 
 **Copyedit pass**:
-A run of `/copyedit` on a spec, plan or audit report before its gate: a fresh Opus editor revises it for a reader who
+A run of the `writing` skill's copyedit (`references/copyedit.md`) on a spec, plan or audit report before its gate: a fresh Opus editor revises it for a reader who
 wasn't in the conversation, by the `writing` skill (Williams and Bizup's _Style_), and code checks that nothing
 was lost. A refused edit leaves the document as it was, and the gate says so.
 _Avoid_: review, rewrite, polish

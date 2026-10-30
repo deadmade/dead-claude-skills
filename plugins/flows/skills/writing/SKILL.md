@@ -1,6 +1,7 @@
 ---
 name: writing
-description: "How to write and revise prose a person will read, by the method of Williams and Bizup's Style: Lessons in Clarity and Grace: a problem and a point up front, an order the reader needs, sentences about characters doing things, and nothing needless. Use when writing or revising specs, plans, reports, READMEs, PR descriptions, commit messages, or any answer longer than a few sentences."
+description: "How to write and revise prose a person will read, by the method of Williams and Bizup's Style: Lessons in Clarity and Grace: a problem and a point up front, an order the reader needs, sentences about characters doing things, and nothing needless. Use when writing or revising specs, plans, reports, READMEs, PR descriptions, commit messages, or any answer longer than a few sentences, and for `copyedit <file.md>`: a fresh editor revises a document by this standard and code checks nothing was lost."
+argument-hint: '[copyedit <file.md>]'
 ---
 
 # Writing
@@ -202,6 +203,13 @@ These keep a technical document from being read two ways, or from reading as not
   under 5 s". Use the plain word, not a metaphor noun ("base", not "substrate").
 - **A README or guide picks one mode**: a tutorial, a how-to, a reference or an explanation.
 - **No chatbot phrases or flattery**: no "I hope this helps", no "Great question".
+
+## Copyedit a finished document
+
+You can't see your own draft as a reader who wasn't there would. When asked to copyedit a file, or when a flow reaches
+a gate with a spec, a plan or an audit report, follow [references/copyedit.md](references/copyedit.md): a fresh
+Opus agent revises the document by this standard, and `scripts/compare.mjs` replaces it only when nothing was lost.
+It commits nothing.
 
 ## What this standard leaves out
 

@@ -19,7 +19,7 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
 - **Audits** (`/test-audit`, `/doc-audit`, `/harden`) write `docs/audits/<YYYY-MM-DD>-<flow>-<scope>.md`: the scope
   line, the findings table, the user's pick per finding, and what was fixed.
 - `/verify`, `/understand` and `/learn` keep no state file of their own; called from a build flow, they write their
-  result into its flow.md. `/copyedit` keeps no state either; its diff is in the working tree.
+  result into its flow.md. The copyedit keeps no state either; its diff is in the working tree.
 
 ## Running a flow
 
@@ -35,10 +35,10 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
   <!-- overrides superpowers/skills/subagent-driven-development/references/final-review.md: "Use superpowers:finishing-a-development-branch." -->
 - **Gates:** a gate passes only on the user's explicit approval of the artifact it names, recorded with the date in
   the state file. "Sounds good" to an idea isn't approval of a document. Nothing past a gate starts before it passes.
-- **Copyedit pass:** before a gate shows the user a `spec.md`, a `plan.md` or an audit report, run `/copyedit` on it
-  (read `${CLAUDE_SKILL_DIR}/../copyedit/SKILL.md`), each time the document goes to a gate, and say in the gate message
-  that it was copyedited. When `/copyedit` refuses the edit (it lost something, or failed), the flow goes on: the gate
-  shows the unedited document and `/copyedit`'s lines, and says the copyedit was refused. flow.md gets only the
+- **Copyedit pass:** before a gate shows the user a `spec.md`, a `plan.md` or an audit report, copyedit it
+  (read `${CLAUDE_SKILL_DIR}/../writing/references/copyedit.md`), each time the document goes to a gate, and say in the gate message
+  that it was copyedited. When the copyedit refuses the edit (it lost something, or failed), the flow goes on: the gate
+  shows the unedited document and the copyedit's lines, and says the copyedit was refused. flow.md gets only the
   write-time check: it changes after every phase.
 - The user may skip a phase by saying so ("skip grilling"); record it. Never skip one on your own, and never skip a
   gate.

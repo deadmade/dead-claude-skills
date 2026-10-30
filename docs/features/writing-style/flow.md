@@ -542,6 +542,9 @@ state.chosen)` runs first (`install.ts:225`); the marker would never be written.
     skills as built.
   - **Rewritten:** the writing skill, as top-down revision passes built on the book check, with the repo's own rules
     in a separate section marked as not from the book. The spec was rewritten for the smaller scope.
+  - **One folder** (the user: "I just dont enjoy having two writing skills in different folders"): `/copyedit`'s
+    procedure moved to `skills/writing/references/copyedit.md` and `compare.mjs` to `skills/writing/scripts/`; the
+    copyedit runs as `/flows:writing copyedit <file.md>`, and the `copyedit` skill and its `uses.json` are gone.
 
 ## Walkthrough
 
