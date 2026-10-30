@@ -564,6 +564,9 @@ state.chosen)` runs first (`install.ts:225`); the marker would never be written.
   [2026-10-30-doc-audit-branch.md](../../audits/2026-10-30-doc-audit-branch.md), 13 findings, all fixed in the docs
   ("All 13"). The report was copyedited before its gate; compare.mjs accepted the edit.
 
+- 2026-10-30, /verify decisions gate: the 12 Rulings and 6 Deviations above, confirmed by the user ("Confirm all").
+  The branch adds no `shortcut:` lines.
+
 ## Walkthrough
 
 | spec goal                    | file:line                                                                                                                                                          | test                                                                                       |
