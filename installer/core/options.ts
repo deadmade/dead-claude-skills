@@ -1,5 +1,5 @@
 // The installer's pages and toggles, and what each option runs or why it can't run here.
-import { BIN_PLUGINS, binAsset } from './binaries.ts';
+import { BIN_PLUGINS, UV_FILES, binAsset } from './binaries.ts';
 import { OFFICIAL, nameOf } from './plugins.ts';
 import { MARKETPLACE } from './release.ts';
 import { CLEAN_TARGETS } from './settings.ts';
@@ -67,7 +67,7 @@ export const CATEGORIES: Page[] = [
     id: 'tools',
     title: 'Tools',
     blurb: 'Plugins that bring their own binary or pane.',
-    keys: ['graphify', 'tui-review', 'web-mcp', 'web-builtins-off', 'md-pane'],
+    keys: ['graphify', 'tui-review', 'web-mcp', 'headroom-trim', 'web-builtins-off', 'md-pane'],
   },
   {
     id: 'system',
@@ -114,6 +114,7 @@ export function unavailable(key: string, platform: string, arch: string, version
   const name = nameOf(key);
   if (platform === 'win32' && name === 'nix-lsp') return 'nixd is not available on Windows';
   if (name === 'web-builtins-off') return unavailable(`web-mcp@${MARKETPLACE}`, platform, arch, version);
+  if (name === 'headroom-trim' && !UV_FILES[`${platform}-${arch}`]) return `no uv build for ${platform}-${arch}`;
   const bin = BIN_PLUGINS[name];
   if (bin && !binAsset(bin.name, platform, arch, version)) return `no ${bin.name} build for ${platform}-${arch}`;
   return undefined;

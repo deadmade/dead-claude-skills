@@ -1,6 +1,7 @@
 // Downloads: release assets checked against their sha256, unpacked and moved into place.
 import { spawnSync } from 'node:child_process';
 import { chmodSync, cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { connect } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import tls from 'node:tls';
@@ -28,6 +29,26 @@ export async function fetchOk(url: string) {
   if (res.status === 404) throw new Error(`no release at ${url} yet`);
   if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${url}`);
   return res;
+}
+
+// Asks the local server on `port` to exit (POST /shutdown) and waits up to waitMs for the port to stop accepting;
+// true when nothing listens any more (also when nothing did).
+export async function stopLocalServer(port: number, waitMs = 2000) {
+  await fetch(`http://127.0.0.1:${port}/shutdown`, { method: 'POST', signal: AbortSignal.timeout(1000) }).catch(
+    () => {},
+  );
+  const open = () =>
+    new Promise<boolean>((resolve) => {
+      const s = connect(port, '127.0.0.1');
+      s.on('connect', () => {
+        s.destroy();
+        resolve(true);
+      });
+      s.on('error', () => resolve(false));
+    });
+  for (const end = Date.now() + waitMs; Date.now() < end; await new Promise((r) => setTimeout(r, 50)))
+    if (!(await open())) return true;
+  return !(await open());
 }
 
 // Downloads the release asset, checks its sha256, and moves the binary to bin (on Windows the old one is renamed aside

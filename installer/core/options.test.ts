@@ -70,4 +70,7 @@ test('options hidden per platform', () => {
     assert.equal(unavailable(k, 'darwin', 'arm64', '1.0.0'), undefined);
   }
   assert.equal(unavailable(`tui-review@${M}`, 'linux', 'x64', '1.0.0'), undefined);
+  assert.ok(unavailable(`headroom-trim@${M}`, 'darwin', 'arm64', '1.0.0'));
+  assert.equal(unavailable(`headroom-trim@${M}`, 'win32', 'x64', '1.0.0'), undefined);
+  assert.equal(unavailable(`headroom-trim@${M}`, 'linux', 'x64', '1.0.0'), undefined);
 });

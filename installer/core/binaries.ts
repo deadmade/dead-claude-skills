@@ -3,8 +3,8 @@ import { createHash } from 'node:crypto';
 import { BUNDLE } from './plugins.ts';
 import { RELEASES, newer, semver } from './release.ts';
 
-// installer/assets/agent-browser.json.
-export interface AgentBrowserPin {
+// installer/assets/agent-browser.json and uv.json.
+export interface UpstreamPin {
   upstream?: string;
   sha256?: Record<string, string>;
 }
@@ -84,13 +84,14 @@ export function binAction({
   return supported ? 'download' : 'unsupported';
 }
 
-// installed: version from `agent-browser --version` or undefined; pinned: installer/assets/agent-browser.json. A newer one stays.
-export const agentBrowserAction = ({ installed, pinned }: { installed: string | undefined; pinned: string }) =>
+// installed: version from `<tool> --version` or undefined; pinned: the tool's installer/assets pin (agent-browser, uv).
+// A newer one stays.
+export const upstreamAction = ({ installed, pinned }: { installed: string | undefined; pinned: string }) =>
   !installed ? 'install' : installed === pinned || newer(installed, pinned) ? 'skip' : 'upgrade';
 
-// Which agent-browser web-mcp runs: a current one on PATH as is, else ours in ~/.claude/bin, downloaded when missing
-// or older than the pin.
-export const agentBrowserPlan = ({
+// Which copy of a pinned tool runs (agent-browser for web-mcp): a current one on PATH as is, else ours in ~/.claude/bin,
+// downloaded when missing or older than the pin.
+export const upstreamPlan = ({
   theirs,
   ours,
   pinned,
@@ -99,9 +100,9 @@ export const agentBrowserPlan = ({
   ours: string | undefined;
   pinned: string;
 }) =>
-  theirs && agentBrowserAction({ installed: theirs, pinned }) === 'skip'
+  theirs && upstreamAction({ installed: theirs, pinned }) === 'skip'
     ? { use: 'path' }
-    : { use: 'ours', download: agentBrowserAction({ installed: ours, pinned }) };
+    : { use: 'ours', download: upstreamAction({ installed: ours, pinned }) };
 
 // Why web-mcp's one browser window can't open on this machine, or undefined. search, browser and the fetch fallback all need it.
 export function windowProblem(o: {
@@ -125,12 +126,31 @@ export const AGENT_BROWSER_FILES: Record<string, string> = {
 
 // The upstream binary for pin (installer/assets/agent-browser.json) on this machine, checked against the pin's sha256, or
 // undefined where there is no build or no pinned hash.
-export function agentBrowserAsset(platform: string, arch: string, pin: AgentBrowserPin) {
+export function agentBrowserAsset(platform: string, arch: string, pin: UpstreamPin) {
   const key = `${platform}-${arch}`;
   const [file, digest] = [AGENT_BROWSER_FILES[key], pin.sha256?.[key]];
   if (!file || !semver(pin.upstream) || !/^[0-9a-f]{64}$/.test(digest ?? '')) return undefined;
   const url = `https://github.com/vercel-labs/agent-browser/releases/download/v${pin.upstream}/${file}`;
   return { file, url, digest, raw: true, exe: platform === 'win32' ? 'agent-browser.exe' : 'agent-browser' };
+}
+
+// uv's own release archives (musl on Linux, so NixOS runs it), keyed like BIN_TARGETS. inner: the binary's path in the archive.
+export const UV_FILES: Record<string, { file: string; inner: string }> = {
+  'win32-x64': { file: 'uv-x86_64-pc-windows-msvc.zip', inner: 'uv.exe' },
+  'linux-x64': {
+    file: 'uv-x86_64-unknown-linux-musl.tar.gz',
+    inner: 'uv-x86_64-unknown-linux-musl/uv',
+  },
+};
+
+// The upstream archive for pin (installer/assets/uv.json) on this machine, checked against the pin's sha256, or
+// undefined where there is no build or no pinned hash. exe: the path inside the archive.
+export function uvAsset(platform: string, arch: string, pin: UpstreamPin) {
+  const key = `${platform}-${arch}`;
+  const [entry, digest] = [UV_FILES[key], pin.sha256?.[key]];
+  if (!entry || !semver(pin.upstream) || !/^[0-9a-f]{64}$/.test(digest ?? '')) return undefined;
+  const url = `https://github.com/astral-sh/uv/releases/download/${pin.upstream}/${entry.file}`;
+  return { file: entry.file, url, digest, exe: entry.inner };
 }
 
 // `agent-browser --version` may print a name prefix ("agent-browser 0.39.1"); undefined when no version is in it.

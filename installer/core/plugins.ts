@@ -1,4 +1,5 @@
 // Which plugins exist, which are ours, and what installing a selection means.
+import { join } from 'node:path';
 import { MARKETPLACE, newer } from './release.ts';
 
 // .claude-plugin/marketplace.json and a plugin's .claude-plugin/plugin.json, as far as the installer reads them.
@@ -93,6 +94,21 @@ export const retiredPlugins = (installedIds: string[], managedIds: string[]) =>
 export const stillInstalled = (rows: PluginRow[], packs: string[]) => [
   ...new Set(rows.map((r) => r.id).filter((id) => marketOf(id) === MARKETPLACE && packs.includes(nameOf(id)))),
 ];
+
+// Where Claude Code installed plugin `id`, from its installed_plugins.json; undefined when it isn't installed.
+export const pluginInstallPath = (installed: any, id: string): string | undefined =>
+  installed?.plugins?.[id]?.[0]?.installPath;
+
+// The folder Claude Code keeps for a plugin's data (CLAUDE_PLUGIN_DATA): the id with @ replaced by -.
+export const pluginDataDir = (config: string, id: string) => join(config, 'plugins', 'data', id.replace('@', '-'));
+
+// The port of a plugin's PostToolUse http hook (hooks/hooks.json), or undefined when there is none.
+export function hookPort(hooksJson: any): number | undefined {
+  const hooks: any[] = (hooksJson?.hooks?.PostToolUse ?? []).flatMap((g: any) => g?.hooks ?? []);
+  const url = hooks.find((h) => h?.type === 'http')?.url;
+  const port = /^http:\/\/127\.0\.0\.1:(\d+)\//.exec(url ?? '')?.[1];
+  return port ? Number(port) : undefined;
+}
 
 export const foreignMarketplaces = (names: string[]) => names.filter((n) => n !== MARKETPLACE && n !== OFFICIAL);
 

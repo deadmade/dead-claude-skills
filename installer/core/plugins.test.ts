@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   optIns,
   needsToken,
@@ -16,6 +17,9 @@ import {
   manifestPath,
   idOf,
   withDependencies,
+  pluginInstallPath,
+  pluginDataDir,
+  hookPort,
   BUNDLE,
   type Marketplace,
   type PluginJson,
@@ -37,6 +41,7 @@ test('opt-ins from the real manifests', () => {
         'flows',
         'graphify',
         'hallmark',
+        'headroom-trim',
         'mcp-azure',
         'mcp-github',
         'md-pane',
@@ -195,4 +200,28 @@ test('manifestPath finds a local plugin manifest, null for url sources and unkno
   );
   assert.equal(manifestPath(m, 'superpowers@dead-claude-skills'), null);
   assert.equal(manifestPath(m, 'nope@dead-claude-skills'), null);
+});
+
+test('pluginInstallPath reads Claude Code installed_plugins.json', () => {
+  const installed = json('installer/core/fixtures/installed_plugins.json');
+  assert.equal(
+    pluginInstallPath(installed, 'flows@dead-claude-skills'),
+    'C:\\Users\\someone\\.claude\\plugins\\cache\\dead-claude-skills\\flows\\0.6.0',
+  );
+  assert.equal(pluginInstallPath(installed, 'headroom-trim@dead-claude-skills'), undefined);
+  assert.equal(pluginInstallPath({}, 'flows@dead-claude-skills'), undefined);
+  assert.equal(pluginInstallPath({ plugins: { 'a@b': [] } }, 'a@b'), undefined);
+});
+
+test('pluginDataDir replaces @ with - in the id', () => {
+  assert.equal(
+    pluginDataDir('/c', 'headroom-trim@dead-claude-skills'),
+    join('/c', 'plugins', 'data', 'headroom-trim-dead-claude-skills'),
+  );
+});
+
+test('hookPort reads the PostToolUse http hook url of the real hooks.json', () => {
+  assert.equal(hookPort(json('plugins/opt-in/headroom-trim/hooks/hooks.json')), 47811);
+  assert.equal(hookPort({}), undefined);
+  assert.equal(hookPort({ hooks: { PostToolUse: [{ hooks: [{ type: 'http', url: 'nope' }] }] } }), undefined);
 });

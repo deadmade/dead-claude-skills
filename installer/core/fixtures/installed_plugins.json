@@ -1,0 +1,112 @@
+{
+  "version": 2,
+  "plugins": {
+    "unifi-network@unifi-plugins": [
+      {
+        "scope": "user",
+        "installPath": "C:\\Users\\someone\\.claude\\plugins\\cache\\unifi-plugins\\unifi-network\\0.24.1",
+        "version": "0.24.1",
+        "installedAt": "2026-07-31T21:59:18.043Z",
+        "lastUpdated": "2026-07-31T21:59:18.043Z",
+        "gitCommitSha": "52deb81ca8c48277bcfb8f87659a72e2ae5d289c"
+      }
+    ],
+    "flows@dead-claude-skills": [
+      {
+        "scope": "user",
+        "installPath": "C:\\Users\\someone\\.claude\\plugins\\cache\\dead-claude-skills\\flows\\0.6.0",
+        "version": "0.6.0",
+        "installedAt": "2026-10-25T00:21:35.012Z",
+        "lastUpdated": "2026-10-25T00:21:35.012Z",
+        "gitCommitSha": "f3dab0bad064c0b469b02e263cc933a7bb68a4e4"
+      }
+    ],
+    "claude-md-management@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "C:\\Users\\someone\\.claude\\plugins\\cache\\claude-plugins-official\\claude-md-management\\1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-10-25T00:21:35.102Z",
+        "lastUpdated": "2026-10-25T00:21:35.102Z",
+        "gitCommitSha": "58267944f92187b7d6a1c822165c96c81c864806",
+        "auto": true
+      }
+    ],
+    "claude-security@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "C:\\Users\\someone\\.claude\\plugins\\cache\\claude-plugins-official\\claude-security\\0.12.0",
+        "version": "0.12.0",
+        "installedAt": "2026-10-25T00:21:35.144Z",
+        "lastUpdated": "2026-10-25T00:21:35.144Z",
+        "gitCommitSha": "58267944f92187b7d6a1c822165c96c81c864806",
+        "auto": true
+      }
+    ],
+    "dead-skills@dead-claude-skills": [
+      {
+        "scope": "user",
+        "installPath": "C:\\Users\\someone\\.claude\\plugins\\cache\\dead-claude-skills\\dead-skills\\0.6.0",
+        "version": "0.6.0",
+        "installedAt": "2026-10-25T00:21:35.173Z",
+        "lastUpdated": "2026-10-25T00:21:35.173Z",
+        "gitCommitSha": "f3dab0bad064c0b469b02e263cc933a7bb68a4e4"
+      }
+    ],
+    "graphify@dead-claude-skills": [
+      {
+        "scope": "user",
+        "installPath": "C:\\Users\\someone\\.claude\\plugins\\cache\\dead-claude-skills\\graphify\\0.6.0",
+        "version": "0.6.0",
+        "installedAt": "2026-10-25T00:21:35.201Z",
+        "lastUpdated": "2026-10-25T00:21:35.201Z",
+        "gitCommitSha": "f3dab0bad064c0b469b02e263cc933a7bb68a4e4",
+        "auto": true
+      }
+    ],
+    "tui-review@dead-claude-skills": [
+      {
+        "scope": "user",
+        "installPath": "C:\\Users\\someone\\.claude\\plugins\\cache\\dead-claude-skills\\tui-review\\0.6.0",
+        "version": "0.6.0",
+        "installedAt": "2026-10-25T00:21:35.239Z",
+        "lastUpdated": "2026-10-25T00:21:35.239Z",
+        "gitCommitSha": "f3dab0bad064c0b469b02e263cc933a7bb68a4e4",
+        "auto": true
+      }
+    ],
+    "web-mcp@dead-claude-skills": [
+      {
+        "scope": "user",
+        "installPath": "C:\\Users\\someone\\.claude\\plugins\\cache\\dead-claude-skills\\web-mcp\\0.6.0",
+        "version": "0.6.0",
+        "installedAt": "2026-10-25T00:21:35.256Z",
+        "lastUpdated": "2026-10-25T00:21:35.256Z",
+        "gitCommitSha": "f3dab0bad064c0b469b02e263cc933a7bb68a4e4",
+        "auto": true
+      }
+    ],
+    "claude-code-setup@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "C:\\Users\\someone\\.claude\\plugins\\cache\\claude-plugins-official\\claude-code-setup\\1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-10-25T00:21:35.325Z",
+        "lastUpdated": "2026-10-25T00:21:35.325Z",
+        "gitCommitSha": "58267944f92187b7d6a1c822165c96c81c864806",
+        "auto": true
+      }
+    ],
+    "security-guidance@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "C:\\Users\\someone\\.claude\\plugins\\cache\\claude-plugins-official\\security-guidance\\2.0.17",
+        "version": "2.0.17",
+        "installedAt": "2026-10-25T00:21:35.380Z",
+        "lastUpdated": "2026-10-30T09:34:10.747Z",
+        "gitCommitSha": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28",
+        "auto": true
+      }
+    ]
+  }
+}

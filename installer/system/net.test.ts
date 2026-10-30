@@ -8,7 +8,7 @@ import { createServer as createHttps } from 'node:https';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import tls from 'node:tls';
-import { downloadBin, trustSystemCerts } from './net.ts';
+import { downloadBin, stopLocalServer, trustSystemCerts } from './net.ts';
 
 const fixture = (f: string) => readFileSync(new URL(`./fixtures/${f}`, import.meta.url));
 const listen = (server: Server) =>
@@ -81,5 +81,32 @@ test('downloadBin writes nothing when the checksum differs', async () => {
     assert.equal(existsSync(bin), false);
   } finally {
     server.close();
+  }
+});
+
+const portOf = async (server: Server) => Number((await listen(server)).split(':')[1]);
+
+test('stopLocalServer posts /shutdown and waits for the port to close', async () => {
+  const server = createHttp((req, res) => {
+    res.end('bye');
+    if (req.url === '/shutdown' && req.method === 'POST')
+      setTimeout(() => {
+        server.close();
+        server.closeAllConnections();
+      }, 50);
+  }).unref();
+  const port = await portOf(server);
+  assert.equal(await stopLocalServer(port), true);
+  assert.equal(await stopLocalServer(port, 200), true, 'nothing listens any more');
+});
+
+test('stopLocalServer reports a server that stays up', async () => {
+  const server = createHttp((_, res) => res.end('no')).unref();
+  const port = await portOf(server);
+  try {
+    assert.equal(await stopLocalServer(port, 300), false);
+  } finally {
+    server.close();
+    server.closeAllConnections();
   }
 });
