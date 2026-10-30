@@ -1,15 +1,14 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
-import { check, loadTerms, main, mask, newRanges, report } from './prose.mjs';
+import { check, main, mask, newRanges, report } from './prose.mjs';
 
-const TERMS = loadTerms(readFileSync(new URL('./common-terms.txt', import.meta.url), 'utf8'));
 const all = (text) => [[0, text.length]];
-const run = (text, file = 'docs/x.md') => check(text, all(text), { file, terms: TERMS });
+const run = (text, file = 'docs/x.md') => check(text, all(text), { file });
 const rules = (findings, rule) => findings.filter((f) => f.rule === rule).map((f) => f.match);
 
 test('shorthand flags conversation labels', () => {
@@ -24,43 +23,24 @@ test('shorthand skips quarters, defined labels and flow.md', () => {
   assert.deepEqual(run(text, 'docs/features/x/flow.md'), []);
 });
 
-test('undefined flags abbreviations used before their definition', () => {
-  const found = run('The CMP answers. The CMPs vary. A Consent Management Platform (CMP) asks.');
-  assert.deepEqual(rules(found, 'undefined'), ['CMP']);
-  assert.equal(found[0].col, 5);
-  assert.deepEqual(rules(run('BM25 ranks.'), 'undefined'), ['BM25']);
-  assert.deepEqual(rules(run('The CMPs vary.'), 'undefined'), ['CMPs']);
-  assert.deepEqual(rules(run('XYZ and XYZ again.'), 'undefined'), ['XYZ']);
-});
-
-test('undefined accepts every definition form', () => {
-  const forms = [
-    'ADR (Architecture Decision Record) records a choice.',
-    'An Architecture Decision Record (ADR) records a choice.',
-    '| ADR | Architecture Decision Record |\n|---|---|',
-    '`ADR` (Architecture Decision Record) records a choice.',
-  ];
-  for (const form of forms) assert.deepEqual(run(`${form}\n\nLater the ADR passes.`), [], form);
-});
-
 test('real docs stay clean', () => {
   const text = readFileSync(new URL('./fixtures/clean.md', import.meta.url), 'utf8');
-  assert.deepEqual(rules(run(text), 'undefined'), []);
+  assert.deepEqual(run(text), []);
 });
 
 test('masking leaves code, front matter, link targets and quotes alone', () => {
   const text = [
     '---',
-    'title: Q7 and XYZ',
+    'title: Q7 and D7',
     '---',
     '',
     '```js',
-    'const Q7 = XYZ;',
+    'const Q7 = D7;',
     '```',
     '',
-    'Inline `Q7 XYZ` code, a [link](https://example.com/XYZ/Q7) and [ref][r].',
+    'Inline `Q7 D7` code, a [link](https://example.com/XYZ/Q7) and [ref][r].',
     '',
-    '> Q7 said XYZ here.',
+    '> Q7 said D7 here.',
     '',
     '[r]: https://example.com/XYZ',
     '',
@@ -68,7 +48,7 @@ test('masking leaves code, front matter, link targets and quotes alone', () => {
   assert.equal(mask(text).length, text.length);
   assert.equal(mask(text).split('\n').length, text.split('\n').length);
   assert.deepEqual(run(text), []);
-  assert.equal(run(`${text}\nXYZ`).length, 1);
+  assert.equal(run(`${text}\nSee D7.`).length, 1);
 });
 
 test('edit checks every occurrence of new_string and nothing else', () => {
@@ -79,7 +59,7 @@ test('edit checks every occurrence of new_string and nothing else', () => {
     [10, 17],
     [26, 33],
   ]);
-  const found = check(file, ranges, { file: 'a.md', terms: TERMS });
+  const found = check(file, ranges, { file: 'a.md' });
   assert.deepEqual(
     found.map((f) => [f.line, f.match]),
     [
@@ -90,6 +70,20 @@ test('edit checks every occurrence of new_string and nothing else', () => {
   assert.deepEqual(newRanges(file, { tool_name: 'Edit', tool_input: { new_string: '' } }), []);
   assert.deepEqual(newRanges(file, { tool_name: 'Read', tool_input: { new_string: 'Q3' } }), []);
   assert.deepEqual(newRanges(file, { tool_name: 'Write', tool_input: { content: file } }), [[0, file.length]]);
+});
+
+test('a rewrite checks only the lines the old file lacked', () => {
+  for (const eol of ['\n', '\r\n']) {
+    const old = ['# Notes', 'Settled in Q3.', ''].join(eol);
+    const text = ['# Notes', 'Settled in Q3.', 'Then D4 came.', ''].join(eol);
+    const input = { tool_name: 'Write', tool_input: { content: text }, tool_response: { originalFile: old } };
+    const found = check(text, newRanges(text, input), { file: 'a.md' });
+    assert.deepEqual(
+      found.map((f) => [f.line, f.match]),
+      [[3, 'D4']],
+      JSON.stringify(eol),
+    );
+  }
 });
 
 test('CRLF keeps positions and finds edits', () => {
@@ -124,13 +118,13 @@ test('main fails open', () => {
   const ok = { code: 0, stderr: '' };
   const readFile = () => 'Q1x Q11';
   const json = (file_path) => JSON.stringify({ tool_name: 'Write', tool_input: { file_path, content: 'Q11' } });
-  assert.deepEqual(main({ stdin: '{nope', readFile, terms: TERMS }), ok);
-  assert.deepEqual(main({ stdin: json('notes.txt'), readFile, terms: TERMS }), ok);
+  assert.deepEqual(main({ stdin: '{nope', readFile }), ok);
+  assert.deepEqual(main({ stdin: json('notes.txt'), readFile }), ok);
   const throwing = () => {
     throw new Error('gone');
   };
-  assert.deepEqual(main({ stdin: json('a.md'), readFile: throwing, terms: TERMS }), ok);
-  const hit = main({ stdin: json('a.md'), readFile, terms: TERMS });
+  assert.deepEqual(main({ stdin: json('a.md'), readFile: throwing }), ok);
+  const hit = main({ stdin: json('a.md'), readFile });
   assert.equal(hit.code, 2);
   assert.match(hit.stderr, /^a\.md:1:5 shorthand: "Q11"/);
 });
@@ -138,17 +132,6 @@ test('main fails open', () => {
 test('shorthand leaves lowercase q and d numbers alone', () => {
   assert.deepEqual(run('Use d3.js and q4 data, see d12.'), []);
   assert.deepEqual(rules(run('We chose Round 2 and My Call.'), 'shorthand'), ['Round 2', 'My Call']);
-});
-
-test('prose-check exits 0 and prints nothing when common-terms.txt cannot be read', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'prose-'));
-  for (const name of ['prose.mjs', 'prose-check.mjs'])
-    copyFileSync(new URL(`./${name}`, import.meta.url), join(dir, name));
-  const doc = join(dir, 'doc.md');
-  writeFileSync(doc, 'The API returns a URL.\n');
-  const stdin = JSON.stringify({ tool_name: 'Write', tool_input: { file_path: doc, content: 'x' } });
-  const ran = spawnSync(process.execPath, [join(dir, 'prose-check.mjs')], { input: stdin, encoding: 'utf8' });
-  assert.deepEqual([ran.status, ran.stdout, ran.stderr], [0, '', '']);
 });
 
 const CLOSING = 'Fix what makes the prose worse for a reader. Leave a sentence as is when the finding is wrong.';
@@ -168,13 +151,12 @@ function hook(payload) {
 test('prose-check exits 2 with the findings and the closing line after a Write', () => {
   for (const eol of ['\n', '\r\n']) {
     const doc = join(mkdtempSync(join(tmpdir(), 'prose-')), 'doc.md');
-    const content = `# Notes${eol}${eol}Decided in Q11, XYZ rules.${eol}`;
+    const content = `# Notes${eol}${eol}Decided in Q11 and D2.${eol}`;
     writeFileSync(doc, content);
     const ran = hook({ tool_name: 'Write', tool_input: { file_path: doc, content } });
     assert.equal(ran.status, 2);
     assert.equal(ran.stdout, '');
     assert.match(ran.stderr, /doc\.md:3:12 shorthand: "Q11"/);
-    assert.match(ran.stderr, /doc\.md:3:17 undefined: "XYZ"/);
     assert.ok(ran.stderr.endsWith(`${CLOSING}\n`), ran.stderr);
   }
 });
@@ -194,7 +176,7 @@ test('prose-check exits 0 after an Edit that adds a clean line to a file with an
 test("inline code doesn't pair across list items", () => {
   for (const eol of ['\n', '\r\n']) {
     const text = ['- a `b` and a stray ` here', '- `pub const REST: Duration` (30 min)', ''].join(eol);
-    assert.deepEqual(rules(run(text), 'undefined'), [], JSON.stringify(eol));
+    assert.deepEqual(run(text), [], JSON.stringify(eol));
     const masked = mask(text);
     assert.ok(!masked.includes('REST'));
     assert.ok(masked.includes('(30 min)'));
@@ -214,15 +196,6 @@ test('an inline span ends at any line that starts a block', () => {
   }
 });
 
-test('mask can read code as a word', () => {
-  assert.equal(mask('Run `npm test` now', { code: 'X' }), 'Run X          now');
-  assert.equal(mask('Run `npm test` now'), 'Run            now');
-  assert.equal(mask('`a`', { code: 'X' }), 'X  ');
-  const wrapped = 'Run `npm\r\ntest` now';
-  assert.equal(mask(wrapped, { code: 'X' }), 'Run X   \r\n      now');
-  assert.equal(mask(wrapped, { code: 'X' }).length, wrapped.length);
-});
-
 test('a label defined mid-line counts as defined', () => {
   for (const eol of ['\n', '\r\n']) {
     const text = (s) => s.replaceAll('\n', eol);
@@ -240,16 +213,10 @@ test('a label defined mid-line counts as defined', () => {
 test('FLOWS_PROSE_CHECK=off turns the check off', () => {
   const stdin = JSON.stringify({ tool_name: 'Write', tool_input: { file_path: 'a.md', content: 'See Q4' } });
   const readFile = () => 'See Q4';
-  assert.deepEqual(main({ stdin, readFile, terms: TERMS, env: { FLOWS_PROSE_CHECK: 'off' } }), {
+  assert.deepEqual(main({ stdin, readFile, env: { FLOWS_PROSE_CHECK: 'off' } }), {
     code: 0,
     stderr: '',
   });
-  assert.equal(main({ stdin, readFile, terms: TERMS, env: {} }).code, 2);
+  assert.equal(main({ stdin, readFile, env: {} }).code, 2);
 });
 
-test('loadTerms reads terms and skips comments', () => {
-  const lf = '# header\nAPI\n  URL  # inline\n\nSQL\n';
-  const expected = new Set(['API', 'URL', 'SQL']);
-  assert.deepEqual(loadTerms(lf), expected);
-  assert.deepEqual(loadTerms(lf.replaceAll('\n', '\r\n')), expected);
-});

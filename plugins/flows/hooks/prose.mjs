@@ -1,17 +1,9 @@
-// Code check for new Markdown prose: conversation shorthand and abbreviations used before they are defined.
+// Code check for new Markdown prose: conversation shorthand, labels only the conversation that wrote them explains.
 // Judges only the text a Write or Edit just put in the file, and never looks inside code, front matter, link
 // targets or block quotes. Plain Node: it runs as a PostToolUse command hook.
 
 const CLOSING = 'Fix what makes the prose worse for a reader. Leave a sentence as is when the finding is wrong.';
 const MAX_FINDINGS = 10;
-
-export const loadTerms = (text) =>
-  new Set(
-    text
-      .split('\n')
-      .map((line) => line.replace(/#.*/, '').trim())
-      .filter(Boolean),
-  );
 
 const blank = (s) => s.replace(/[^\r\n]/g, ' ');
 
@@ -47,17 +39,29 @@ function maskBlocks(text) {
 const INLINE_CODE =
   /(`+)(?!`)(?:(?!\n[ \t\r]*\n|\n {0,3}(?:[-*+][ \t]|\d+[.)][ \t]|#{1,6}[ \t]|[|>]))[\s\S])*?(?<!`)\1(?!`)/g;
 
-// `code` reads each inline code span as that word, padded with spaces to the span's length.
-export function mask(text, { code } = {}) {
+export function mask(text) {
   return maskBlocks(text)
-    .replace(INLINE_CODE, (m) => (code ? code.slice(0, m.length) + blank(m.slice(code.length)) : blank(m)))
+    .replace(INLINE_CODE, blank)
     .replace(/\]\([^)\n]*\)/g, (m) => `]${blank(m.slice(1))}`)
     .replace(/^( {0,3}\[[^\]\n]+\]:)([^\r\n]*)/gm, (_, label, target) => label + blank(target))
     .replace(/^ {0,3}>[^\r\n]*/gm, blank);
 }
 
-export function newRanges(fullText, { tool_name, tool_input }) {
-  if (tool_name === 'Write') return [[0, fullText.length]];
+// A Write over an existing file counts only the lines the old file didn't have, so rewriting a document doesn't report
+// what was already there.
+export function newRanges(fullText, { tool_name, tool_input, tool_response }) {
+  if (tool_name === 'Write') {
+    const old = tool_response?.originalFile;
+    if (typeof old !== 'string') return [[0, fullText.length]];
+    const had = new Set(old.split(/\r?\n/));
+    const ranges = [];
+    let at = 0;
+    for (const line of fullText.split('\n')) {
+      if (!had.has(line.replace(/\r$/, ''))) ranges.push([at, at + line.length]);
+      at += line.length + 1;
+    }
+    return ranges;
+  }
   const added = tool_input?.new_string;
   if (tool_name !== 'Edit' || typeof added !== 'string' || added === '') return [];
   const needle = fullText.includes('\r\n') ? added.replace(/\r\n/g, '\n').replaceAll('\n', '\r\n') : added;
@@ -69,37 +73,10 @@ export function newRanges(fullText, { tool_name, tool_input }) {
 
 const LABELS = /\b[QD]-?\d+\b/g;
 const PHRASES = /\bround \d+\b|\bmy call\b/gi;
-const ABBREVIATION = /\b[A-Z][A-Z0-9]{1,5}s?\b/g;
-
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const initial = (word) => word.replace(/^[^A-Za-z0-9]+/, '')[0]?.toUpperCase();
 
-// Where `abbr` is defined in `defs` (code font allowed), or -1: "ABBR (Words)", "Words (ABBR)" or a table row.
-function definedAt(defs, abbr) {
-  const a = escape(abbr);
-  const wrap = '[`*_]*';
-  const found = [];
-  const add = (re, ok) => {
-    for (const m of defs.matchAll(re)) if (ok(m)) found.push(m.indices.groups.a[0]);
-  };
-  add(new RegExp(`(?<![A-Za-z0-9])(?<a>${a})s?${wrap}[ \\t]*\\(([^)\\n]*)\\)`, 'gd'), (m) => {
-    const words = m[2].trim().split(/[\s-]+/);
-    return words.length >= 2 && initial(words[0]) === abbr[0];
-  });
-  add(new RegExp(`([^\\n(]*)\\(${wrap}(?<a>${a})s?${wrap}\\)`, 'gd'), (m) => {
-    const words = m[1]
-      .trim()
-      .split(/[\s-]+/)
-      .slice(-6);
-    return words.some((w, n) => words.length - n >= 2 && initial(w) === abbr[0]);
-  });
-  add(new RegExp(`^[ \\t]*\\|[ \\t]*${wrap}(?<a>${a})${wrap}[ \\t]*\\|[ \\t]*[A-Za-z]`, 'gdm'), () => true);
-  return found.length ? Math.min(...found) : -1;
-}
-
-export function check(fullText, ranges, { file, terms }) {
+export function check(fullText, ranges, { file }) {
   const masked = mask(fullText);
-  const defs = maskBlocks(fullText);
   const inRange = (at) => ranges.some(([from, to]) => at >= from && at < to);
   const hits = [];
 
@@ -121,23 +98,6 @@ export function check(fullText, ranges, { file, terms }) {
     }
   }
 
-  const seen = new Set();
-  for (const m of masked.matchAll(ABBREVIATION)) {
-    if (!inRange(m.index)) continue;
-    const abbr = m[0].replace(/s$/, '');
-    if ((abbr.match(/[A-Z]/g) || []).length < 2 || terms.has(abbr) || terms.has(m[0]) || seen.has(abbr)) continue;
-    if (/^\.[a-z]{1,4}\b/.test(masked.slice(m.index + m[0].length))) continue;
-    seen.add(abbr);
-    const at = definedAt(defs, abbr);
-    if (at !== -1 && at <= m.index) continue;
-    hits.push({
-      at: m.index,
-      rule: 'undefined',
-      match: m[0],
-      message: `spell it out at first use: <words> (${abbr})`,
-    });
-  }
-
   return hits
     .sort((a, b) => a.at - b.at)
     .map(({ at, ...finding }) => {
@@ -154,7 +114,7 @@ export function report(file, findings) {
   return [...lines, CLOSING].join('\n');
 }
 
-export function main({ stdin, readFile, terms, env = process.env }) {
+export function main({ stdin, readFile, env = process.env }) {
   const ok = { code: 0, stderr: '' };
   if (env.FLOWS_PROSE_CHECK === 'off') return ok;
   try {
@@ -162,7 +122,7 @@ export function main({ stdin, readFile, terms, env = process.env }) {
     const file = input.tool_input?.file_path;
     if (typeof file !== 'string' || !/\.md$/i.test(file)) return ok;
     const text = readFile(file);
-    const findings = check(text, newRanges(text, input), { file, terms });
+    const findings = check(text, newRanges(text, input), { file });
     return findings.length ? { code: 2, stderr: report(file, findings) } : ok;
   } catch {
     return ok;

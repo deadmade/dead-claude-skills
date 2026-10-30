@@ -38,6 +38,10 @@ Started 2026-10-27 on branch `claude/relaxed-newton-cr62u9` (from `main` 753ba2c
   3b. Execution: mixed. A subagent writes the code tasks (3, 7, 9, 10, 11, 12), I write the tasks that are mostly
   `.md` (4, 5, 6, 8; subagents here can't write `.md` files), and every task gets a review. I run Task 13. One
   commit per task on `claude/relaxed-newton-cr62u9`.
+- Gate 1, reopened 2026-10-30 at Verify: the user wasn't happy with the built branch and, after a review, asked to
+  "first verify the status against the actual book? then cut the rest and salvage what is worth using. Also can we
+  edit the skill to something more meaningfull?". The spec was cut back the same day (see Deviations); it hasn't been
+  re-approved yet.
 
 ## Skipped
 
@@ -512,16 +516,39 @@ state.chosen)` runs first (`install.ts:225`); the marker would never be written.
   measurable. No version lost any of the 304 claims. Decided by the user ("Revised guide, no labels (Recommended)"):
   ship the revised guide, keep the prompt's label rule, and record criterion 4 as parity with plain rather than a win.
 
+- 2026-10-30, Verify: review of the built branch, then the cut the user asked for.
+  - **Review findings.** `/copyedit` with the guide and spaCy candidates only matched a plain Opus prompt
+    (criterion 4 missed and was then recorded as parity), at the cost of a 1.7 GB environment on by default for every
+    flows user. Its acceptance edits made the sample longer (2,467 to 2,614 words) and kept every label. compare.mjs
+    let a dropped HTML comment (the `uses:start` and `overrides` markers check-repo reads), link definition,
+    autolink, bare URL or setext heading through. The abbreviation rule flagged 650 places in 94 of the repo's 130 own
+    docs, mostly Roman numerals, HTTP verbs, DNS record types and words in capitals. `sparseClone`'s new test failed
+    on Windows with `core.autocrlf`. The shorthand rule and the skill held up.
+  - **Book check.** Three agents read Lessons 1, 3–10 and 12 of the 12th edition (the user's copy) against the skill.
+    It had the main principles right but attributed several to the wrong lesson (the seven-word check to Lesson 4, the
+    list rule to Lesson 10, calibrating claims to Lesson 12), listed seven concision cuts where the book gives six,
+    contradicted the book on negatives ("must not include" → "omit" is the book's own example; its exception is a
+    negative you mean to stress), invented a hedge rule, and left out most of the book's procedures: the
+    context-problem-point introduction with its "so what?" test, the point at the end of a short opening, the outline
+    test, the order of discovery turned into the reader's order, the relevance test, topic strings, faked connectives,
+    the five shapes of hidden actions, where hidden characters sit, the three questions for a passive, noun strings,
+    the four fixes for sprawl, metadiscourse's two cuttable kinds, intensifiers, and "concise, not terse".
+  - **Cut:** the installer's prose step and toggle, `installer/assets/prose/`, ADR 0005, `measure.mjs`,
+    `measure.py`, `phrases.mjs` and `phrases.tsv`, the editing guide `references/edit.md`, the abbreviation rule and
+    `common-terms.txt`, and `editor-test/` (74 files, 837 KB; the spec's Evidence section keeps the results).
+  - **Kept and fixed:** the shorthand check, which now reports only the lines a rewrite added; `/copyedit` with
+    the plain prompt and the skill as its standard, and compare.mjs tracking comments, link definitions, URLs and setext
+    headings; `sparseClone`'s test reads past CRLF; the pstack retirement and `flows-uses.mjs`'s non-conductor
+    skills as built.
+  - **Rewritten:** the writing skill, as top-down revision passes built on the book check, with the repo's own rules
+    in a separate section marked as not from the book. The spec was rewritten for the smaller scope.
+
 ## Walkthrough
 
-| spec goal                                                       | plan task  | file:line                                                                                                                                                                                                                                                                                    | test                                                                                                                                                                                                                               |
-| --------------------------------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1 One rule, stated first                                        | 4          | `plugins/flows/skills/writing/SKILL.md:8`                                                                                                                                                                                                                                                    | `scripts/writing-skill.test.mjs:14` (the rule verbatim in the first paragraph)                                                                                                                                                     |
-| 2 One writing skill, replacing `technical-writing` and `unslop` | 4, 6, 7    | `plugins/flows/skills/writing/SKILL.md:1`; `scripts/flows-uses.mjs:16` (non-conductor skills); `doc-audit/uses.json:5`, `integrate/uses.json:3`; `scripts/sync-pstack.mjs:29-32,75-77`                                                                                                       | `scripts/flows-uses.test.mjs:81,93`; `scripts/sync-lib.test.mjs:68`; check-repo (`checkUses`); source checks recorded under Rulings                                                                                                |
-| 3 A check on every write                                        | 1–3        | `plugins/flows/hooks/hooks.json:10,16`; `plugins/flows/hooks/prose.mjs:51,100,157`                                                                                                                                                                                                           | `plugins/flows/hooks/prose.test.mjs:14,19,26,199`; acceptance criterion 5                                                                                                                                                          |
-| 4 An editor that applies the book                               | 5, 6, 9–12 | `plugins/flows/skills/copyedit/SKILL.md:27,40,62`; `references/edit.md:14`; `scripts/compare.mjs:79`; `scripts/phrases.mjs:35`; `scripts/measure.mjs:54`; `scripts/measure.py:208`; `plugins/flows/references/flow-rules.md:38`; `installer/core/prose.ts:52`, `installer/steps/prose.ts:12` | `scripts/copyedit.test.mjs:44-115,217-253,322,533,574`; `scripts/writing-skill.test.mjs` (copyedit is a conductor; flow-rules runs it); `installer/core/prose.test.ts:8`; `installer/steps/prose.test.ts`; acceptance criteria 3–4 |
-
-Every goal has code and tests; no code lacks a goal (the installer's prose step and the pstack `--ref` serve goals 4
-and 2).
+| spec goal                    | file:line                                                                                                                                                          | test                                                                                       |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| 1 One writing skill          | `plugins/flows/skills/writing/SKILL.md:21,55,85,145,178,185`; `scripts/flows-uses.mjs:16`; `doc-audit/uses.json:5`, `integrate/uses.json:3`; `scripts/sync-pstack.mjs:29-32,75-77` | `scripts/writing-skill.test.mjs:14`; `scripts/flows-uses.test.mjs:81,93`; the book check above |
+| 2 A shorthand check on every write | `plugins/flows/hooks/hooks.json:10,16`; `plugins/flows/hooks/prose.mjs:52,78,117`                                                                                 | `plugins/flows/hooks/prose.test.mjs:14,19,31` and "a rewrite checks only the lines the old file lacked" |
+| 3 A copyedit before each gate | `plugins/flows/skills/copyedit/SKILL.md:27,47`; `scripts/compare.mjs:44,133`; `plugins/flows/references/flow-rules.md:38`                                              | `scripts/copyedit.test.mjs:50,314`; `scripts/writing-skill.test.mjs` (flow-rules runs it) |
 
 ## Run verdict

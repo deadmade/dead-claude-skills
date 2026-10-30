@@ -1,152 +1,210 @@
 ---
 name: writing
-description: "How to write prose a person will read: write for a smart reader who wasn't there, and omit needless words. Williams and Bizup's Style: Lessons in Clarity and Grace in our own words, plus the rules that keep a technical document exact. Use when writing or revising specs, plans, reports, READMEs, PR descriptions, commit messages, or any answer longer than a few sentences."
+description: "How to write and revise prose a person will read, by the method of Williams and Bizup's Style: Lessons in Clarity and Grace: a problem and a point up front, an order the reader needs, sentences about characters doing things, and nothing needless. Use when writing or revising specs, plans, reports, READMEs, PR descriptions, commit messages, or any answer longer than a few sentences."
 ---
 
 # Writing
 
-The rule: _write for a smart reader who wasn't there, and omit needless words._ The reader knows the field but not
-the conversation, the code you just read or the options you turned down. Everything below serves that rule.
+The rule: _write for a smart reader who wasn't there, and omit needless words._ The reader knows the field but not the
+conversation, the code you just read or the options you turned down. You can't judge your own draft by how it reads to
+you, because you fill every gap with what you already know. So judge it by checks you can run on the page.
 
-The method comes from Joseph Williams and Joseph Bizup's _Style: Lessons in Clarity and Grace_ (12th edition, 2016),
-stated here in our own words and checked against free sources: George Gopen and Judith Swan's "The Science of
-Scientific Writing" (1990), William Strunk's _The Elements of Style_ (1920) and Steven Pinker's "The Source of Bad
-Writing" (2014). These are a reader's expectations, not laws. Change a sentence when the change helps the reader, and
-leave it when it doesn't.
+The method is Joseph Williams and Joseph Bizup's _Style: Lessons in Clarity and Grace_ (12th edition, 2016), in our
+own words. The book's principles describe what readers expect; they aren't laws. Change a sentence when the change
+helps the reader.
 
-Write first, then revise: read each sentence and paragraph against the diagnoses below, and fix what they find.
+**How to use it.** Draft first, without thinking about these checks; they get in the way of finishing. Then revise
+from the top down: the document, then its sections and paragraphs, then sentences, then words. Spend the most time on
+beginnings: the document's opening, each section's opening, each sentence's first words. A reader decides there
+whether the rest makes sense, and a fix at the top changes more than a fix at the bottom.
 
-## The reader decides what is clear (Lesson 1)
+## 1. The document: a problem, a point, and the order the reader needs
 
-Readers judge prose by how it feels to read, and writers are poor judges of their own: they already know what they
-meant. So the work of being understood falls on the writer, and the test of a sentence is the reader's experience of
-it, not the writer's.
+Most of what makes an agent's document hard to read is here, not in its sentences.
 
-## Clarity: tell a story of characters doing things (Lessons 3 to 6)
+**Open with the problem (Lesson 7).** An introduction has three parts:
 
-**Actions as verbs (Lesson 3).** Put the actions in verbs, not in nouns made from verbs: "decide", not "make a
-decision"; "remove", not "the removal of". Look for those nouns after weak verbs such as be, make, perform, have,
-provide and occur.
+1. **Shared context**: what the reader already accepts ("Search runs through SearXNG in Docker.").
+2. **The problem**, usually turned with _but_: a **condition** and its **cost**, the consequence the reader won't
+   accept ("But when the container isn't running, every search fails, and the user has to start Docker by hand.").
+   Ask "so what?" after the condition; the answer is the cost. Don't assume the cost is obvious: state it.
+3. **The point**: what the document decides, shows or asks, as the last sentence of the introduction.
 
-- Before: "The removal doesn't depend on the bench." (`docs/features/web-mcp-search/spec.md`, commit `8281c59`)
-- After: "We remove SearXNG whatever the search-quality benchmark shows."
+A spec, plan or fix has a practical problem (something costs us; the answer is an action). An audit or investigation
+has a conceptual one (we don't know something, so we can't know or decide something bigger; the answer is
+information). Skip the context when every reader has it; drop the cost when it really is obvious.
 
-Keep a noun when it names a thing the text keeps returning to ("the installation folder"), or when it sums up the
-previous sentence ("These failures…").
+**State the point at the end of a short opening (Lesson 8).** Every unit, the document, a section, a long paragraph,
+gets a short opening whose last sentence states its point and names the terms the rest develops. The body then uses
+those terms. The point is the verdict, not a promise of one: "The migration is safe to run; the one risk is lock time
+on `orders`.", not "This section describes the checks we ran."
 
-**Characters as subjects (Lesson 4).** Each sentence tells a story about someone or something: a person, a program, a
-component, the user. Make those characters the grammatical subjects. Read the first seven or eight words. If the
-subject is an abstraction ("the implementation of the check"), find the character and start with it. If it is empty
-("there is", "it is … that"), start with the character and its verb instead.
+**Run the outline test.** Read only the title, the headings and each section's point sentence. Together they should
+make the argument. If they don't, the reader can't skim the document, and the structure needs work before any
+sentence does. Headings should carry the section's key terms, not just a topic word.
 
-**Passive voice (Lesson 4).** Use the active voice when the reader needs to know who acts. Keep the passive when the
-actor is unknown, obvious or unimportant, or when it keeps the paragraph's topic first.
+**Turn the story of the work into the order the reader needs.** Writers fall back on the order they found things in:
+what was tried, what failed, what was learned. The reader needs the result first, then its reasons and evidence. A
+report that walks through each step before its verdict, or a spec that retells the conversation, is in discovery
+order. Rebuild it around the point.
 
-- Before: "The browser is set as `executablePath`, never the user's installed branded Chrome" (`docs/features/web-mcp-search/spec.md`,
-  commit `8281c59`). The bullet never says who sets it.
-- After: "web-mcp passes the browser it picked as `executablePath`, never the user's installed branded Chrome."
+**Cut what doesn't serve the point.** Every paragraph should do one of these for the point: give background the reader
+needs, state the point or a sub-point, give a reason, give evidence, explain a method, or answer another view. Text
+that does none of these is the first thing to cut, however true it is.
 
-**Old before new (Lesson 5).** Begin a sentence with something the reader already knows, from the sentence before or
-the paragraph's topic, and end it with what is new. Keep a paragraph's subjects on its few main characters, so the
-reader follows one thread instead of a new topic each sentence.
+## 2. Sections and paragraphs: a consistent topic, old before new
 
-**Emphasis at the end (Lesson 6).** The end of a sentence is where readers look for the point. Don't let a sentence
-trail off into a qualification, an afterthought or a weak phrase; move context to the front.
+**Old before new (Lesson 5).** Begin each sentence with something the reader already knows, from the sentence before
+or the paragraph's topic, and end it with what is new. When this conflicts with the sentence-level checks below, old
+before new wins.
 
-- Before: "running Helium without `exec`: nixpkgs' Helium dies 10 s after agent-browser starts it otherwise"
-  (`docs/features/web-mcp-search/spec.md`, commit `8281c59`)
-- After: "running Helium without `exec`. Started with `exec`, nixpkgs' Helium dies 10 s after agent-browser starts
-  it."
+**Keep a topic string.** Underline the first seven or eight words of each sentence in a paragraph, up to the verb.
+Read only the underlined words. They should name a small set of related characters or concepts, the paragraph's
+topics, and they should be familiar by the time they appear. If each sentence opens on something new, rebuild the
+paragraph around its few main characters.
 
-## The whole document: the problem, then the point (Lessons 7 and 8)
+- Before: "Retries are handled by the client. A 5xx triggers backoff. Configuration of the limit lives in
+  `retry.ts`."
+- After: "The client retries every 5xx. It backs off exponentially, and it reads its limit from `retry.ts`."
 
-**Motivation (Lesson 7).** Open with the problem: a condition and what it costs the reader. Then state what the
-document decides or shows. A reader should know from the opening why to read on.
+**Don't vary a name for variety.** Once something has a name, use that name every time; a synonym reads as a second
+thing.
 
-**Global coherence (Lesson 8).** State each section's and paragraph's point early, in a short plain sentence, and
-let the rest support it. A document's point comes at the end of its introduction, right after the problem. Use the
-key terms of that point in what follows, so a reader can skim the openings and get the argument. A paragraph without
-a point needs one or can go.
+**Don't fake coherence.** _Therefore_, _however_, _moreover_ and _also_ promise a logical link. Use them only when the
+link is real, and sparingly; deleting one that isn't shows whether the sentences connect on their own.
 
-## Concision: cut what does no work (Lesson 9)
+**Clear the throat less.** A sentence that piles a connector, an attitude ("importantly"), and a time or place before
+its subject makes the reader wait. Cut what doesn't help, and move the rest after the verb.
 
-Cut:
+**Put the new and the important at the end (Lesson 6).** The end of a sentence is where readers look for its weight.
+Read the last few words of each sentence: if they don't deserve that weight, move context to the front and the new
+information to the end. Unfamiliar terms and long, complex material belong there too, after a short subject and verb
+that give the reader momentum. In a section's opening sentence, the words at the end name the themes the section
+develops.
 
-- words that mean little or nothing: "basically", "actually", "really", "kind of";
-- modifiers that don't change the meaning: "extremely important" is "important";
-- redundant pairs: "each and every", "full and complete";
-- words implied by others: "final outcome", "future plans";
-- a phrase where a word will do: "in the event that" → "if", "due to the fact that" → "because";
-- negatives that have an affirmative form: "not many" → "few", "not the same" → "different" (only when the
-  meaning holds: "must not include" isn't "must omit");
-- comments about the writing itself: "in this section we will…", "it is important to note that".
+## 3. Sentences: characters as subjects, actions as verbs (Lessons 3, 4 and 10)
 
-Keep a hedge where a claim isn't always true; cut it where it only protects the writer.
+A clear sentence tells a story: its main characters are the subjects, and their important actions are the verbs.
 
-Before cutting, apply the density test, after [technical-writing-density](https://github.com/mlwelles/technical-writing-density):
-would a careful reader misread the topic without these words, because they carry a reason, a limit or a distinction
-that matters to it? Then they stay, and the sentence is longer for it. Keep the few that matter, not every caveat
-you can list. The aim is not short text; it is text with nothing needless in it.
+**The seven-word check.** Skip a short opening phrase and read the first seven or eight words of each sentence.
+Revise when the simple subject is an abstract noun, or when seven or eight words pass before the verb. Then:
 
-## Shape: reach the subject and verb fast (Lesson 10)
+1. Name the characters. A missing character often hides in a possessive ("the installer's check"), after _by_ or _of_
+   ("validation by the server"), in an adjective ("upstream changes"), or only in context.
+2. Find their actions. Actions hide in nouns made from verbs ("failure", "validation", "decision") and in adjectives
+   ("is dependent on" → "depends on").
+3. Rewrite: the character as subject, the action as verb, and the clauses joined by the word that states their logic:
+   _because_, _if_, _when_, _although_, _unless_.
 
-Reach the subject quickly and the verb right after it: no long opening clause, no long subject, no long interruption
-between subject and verb, or between the verb and its object. Break a sentence that sprawls clause after clause into two.
+- Before: "Failure of the hash verification results in termination of the download."
+- After: "If the hash doesn't match, the installer stops the download."
 
-**Lists for lists.** Four or more parallel items go into a list, or into a table when they share attributes.
+Hidden actions take a few common shapes:
 
-- Before: "Order _(…)_: `WEB_MCP_CHROME`; else the newest Chrome for Testing from `agent-browser install` if it starts
-  (…); else `helium`, then `chromium` on PATH." (`docs/features/web-mcp-search/spec.md`, commit `8281c59`)
-- After: a numbered list with one browser per item.
+- a verb-noun as the subject of an empty verb: "The intention of this change is the elimination of retry storms" →
+  "This change stops retry storms";
+- a verb-noun after an empty verb (make, perform, conduct, provide, have): "performs a validation of" → "validates";
+- two verb-nouns joined by "results in", "leads to", "is due to": rewrite as two clauses joined by _because_ or _if_;
+- "there is" plus a verb-noun: "There is a need for validation of the config" → "The installer must validate the
+  config";
+- a chain of verb-nouns joined by _of_: make the first a verb.
 
-## Write for the reader who wasn't there
+**Keep the noun** when it refers back to the previous sentence ("This omission explains the stale results."), when
+it replaces "the fact that", when it names the thing a verb produced ("the request"), or when it names a concept the
+reader knows so well it acts as a character ("the migration", "a rollback").
 
-You know things the reader doesn't, and it is hard to imagine not knowing them (Pinker calls this the curse of
-knowledge). The worst case in this repo is conversation shorthand.
+**Passive voice.** Ask three questions. Does the reader need to know who acted? If the actor is unknown, obvious or
+unimportant, the passive is fine. Does the passive put short, familiar information first and long, new information
+last? Does it keep one character as the subject across the paragraph? A yes to either of the last two also justifies
+it. Otherwise make it active. A spec full of "X is validated" without saying what validates it fails the first
+question.
 
-**No conversation shorthand.** A reader who wasn't there doesn't know what `Q11`, `round 2`, `D4`, `my call` or `the
-spike` means. Write what the label stands for. Record who decided what in one place, such as a **Decisions** section,
-not as a tag on every line, and quote the user only where the exact words matter. Logs of the conversation itself,
-such as a flow's `flow.md`, are where those numbers belong.
+**Unpack noun strings.** "plugin dependency resolution failure handling" → "how the installer handles a plugin whose
+dependencies don't resolve". Keep established technical terms whole.
 
-- Before: `Order _(D-1, user: "there is helium", "let's continue")_` (`docs/features/web-mcp-search/spec.md`, commit
-  `8281c59`)
-- After: "The browser order:", with the user's choice of Helium recorded once under **Decisions**.
+**Shape (Lesson 10).** Get to the subject quickly and the verb right after it.
 
-Spell out an abbreviation at first use unless every reader of this document knows it.
+- A long opening: move it to the end or make it its own sentence. A short _if_, _when_ or _because_ clause that
+  carries known information stays in front.
+- A long subject: turn its verb-noun into a verb, or its _which_ clause into an _if_ or _when_ clause.
+- Words between subject and verb, or verb and object: move them to the start or the end.
+- A sentence that sprawls, clause hung on clause: put the point first in a short main clause, then choose a fix.
+  Trim "which is" clauses to phrases, split the sentence, or coordinate its parts with the shorter ones first. A
+  summarizing noun can pick up what came before ("…, a cleanup that can remove unmerged work").
+- A bare _and_ between clauses often hides the real relation. Write _because_, _so_ or _but_ when that is what you
+  mean: "The migration locks the table, so it can't run in business hours."
+- A modifier that could attach to two things, or that dangles without its subject: move it, or make its subject the
+  sentence's subject.
 
-## Exact words: one reading per sentence
+Long sentences aren't the problem; sprawl is. A long sentence with its subject and verb up front reads easily. Don't
+chop everything into short sentences: that reads as choppy and drops the links between ideas.
 
-These keep a technical document from being read two ways.
+**Justify or revise.** For every passive and every verb-noun left in a finished draft, you should be able to say why
+it's there. If you can't, revise it.
 
-- **Use the code's own names.** Call files, functions, flags and commands what the code calls them; a synonym
-  sends the reader looking for something that doesn't exist.
-- **One name per thing.** Once something has a name, use that name every time.
+## 4. Words: cut what does no work (Lesson 9)
+
+The book's six cuts:
+
+1. Words that mean little: "basically", "actually", "really", "various", "certain", "particular".
+2. Doubled words: "each and every", "full and complete".
+3. Words implied by others: redundant modifiers ("final outcome", "future plans"), redundant categories ("large in
+   size", "temporary in nature", "in an accurate manner"), and spelled-out implications.
+4. A phrase where a word will do: "in the event that" → "if", "due to the fact that" → "because", "prior to" →
+   "before", "is in a position to" → "can".
+5. Negatives that have an affirmative form: "not many" → "few", "not the same" → "different". Implicit negatives
+   (_fail_, _prevent_, _lack_, _unless_, _except_) stacked with _not_ baffle readers; turn the verb-nouns into verbs
+   first, then make the conditions affirmative. Keep a negative you mean to stress: "must not" in a requirement.
+6. Adjectives and adverbs that add nothing: delete every adverb and every adjective before a noun, then put back
+   only the ones the reader needs.
+
+**Metadiscourse**, writing about the writing, is needed in small amounts ("first", "in short", "we decided").
+Cut the two kinds that bury ideas: announcing a topic ("This section outlines…", "It is important to note that…")
+and attributing a fact to an observer ("It has been observed that…"). Recaps that repeat a section are the same
+habit at document size.
+
+**Hedges and intensifiers: neither too many nor too few.** Too many hedges sound evasive; none at all sounds
+aggressive. Readers trust a claim stated as strongly as its evidence: "the heap dumps indicate the leak is in the
+pool", not "this might possibly suggest". Intensifiers ("key", "critical", "crucial", "essential", "fundamental",
+"robust", "comprehensive") mostly weaken what they touch; a sentence that opens with "clearly" or "obviously" invites
+doubt.
+
+**Concise, not terse.** Cutting can go too far. Prose stripped of its reasons, conditions and links reads like a
+telegram, and the reader loses what made it worth reading. Before cutting, apply the density test, after
+[technical-writing-density](https://github.com/mlwelles/technical-writing-density): would a careful reader misread
+the topic without these words, because they carry a reason, a limit or a distinction that matters to it? Then they
+stay, and the sentence is longer for it. The aim is not short text; it is text with nothing needless in it.
+
+## 5. Honesty: who did it (Lesson 12)
+
+Write to the reader as you would want to be written to. The subjects you choose decide whether a sentence is honest.
+"Errors occurred" and "some tests were not executed" hide who acted; "I skipped the four integration tests because
+they need a database" doesn't. Name who acted, especially for errors, costs and skipped work, and make the person
+affected a character. Prose should be as complex as its ideas, and no harder.
+
+## 6. Rules for technical documents (not from the book)
+
+These keep a technical document from being read two ways, or from reading as notes.
+
+- **No conversation shorthand.** A reader who wasn't there doesn't know what `Q11`, `round 2`, `D4`, `my call` or
+  `the spike` means. Write what the label stands for. Record who decided what once, in a **Decisions** section, not
+  as a tag on every line, and quote the user only where the exact words matter. A flow's `flow.md` is a log of the
+  conversation; numbers belong there. flows' prose check flags these labels after every Markdown write.
+- **Record a decision once.** Say what was decided and why, in its section; don't also log how the discussion went,
+  unless the document is that log.
+- **Use the code's own names**: files, functions, flags and commands as the code spells them, in code font.
 - **"This" and "it" point at one obvious thing.** If two things could be meant, name the one you mean.
-- **"Only" and "not" sit next to the word they change.** "The check runs only on Markdown" and "only the check
-  runs on Markdown" say different things.
-- **Code goes in code font.**
-- **Headings state the point**, not just the topic.
-- **A README or guide picks one mode:** a tutorial, a how-to, a reference or an explanation. Split and link instead
-  of mixing them.
-
-## Plain speech: say what happens
-
-- **Whole sentences.** Don't compress prose into notes: in prose, keep the articles and verbs, and write out
-  arrows and symbols. "Hash mismatch → abort" becomes "When the hash doesn't match, the installer stops." List items and table
-  cells may be fragments.
-- **Say what a thing does, not how it feels.** Name the mechanism or the number: not "a snappy search" but "a search
-  that answers in under 5 s".
-- **The plain word, not a metaphor noun.** "Base", not "substrate"; "add", not "wedge in"; "way", not "vector".
-- **No chatbot phrases or flattery.** No "I hope this helps", no "Great question".
-
-## The Ethics of Style (Lesson 12)
-
-Write as you would want to be written to. Don't make a claim stronger or weaker than the evidence, and don't hide
-what is uncertain or who decided.
+- **"Only" and "not" sit next to the word they change.**
+- **Whole sentences in prose.** Keep articles and verbs; write out arrows and symbols. "Hash mismatch → abort"
+  becomes "When the hash doesn't match, the installer stops." List items and table cells may be fragments.
+- **Lists for lists.** Four or more parallel items go into a list, or a table when they share attributes.
+- **Say what a thing does, with the mechanism or the number**: not "a snappy search" but "a search that answers in
+  under 5 s". Use the plain word, not a metaphor noun ("base", not "substrate").
+- **A README or guide picks one mode**: a tutorial, a how-to, a reference or an explanation.
+- **No chatbot phrases or flattery**: no "I hope this helps", no "Great question".
 
 ## What this standard leaves out
 
-Lessons 2 (correctness) and 11 (elegance) aren't part of this standard. There are no limits on length, no banned
-words and no rules against em dashes, semicolons or colons: a long document for a long feature is fine when every
-sentence earns its place.
+Lessons 2 (correctness) and 11 (elegance) aren't part of it. There are no length limits, no banned words and no
+rules against em dashes, semicolons or colons: a long document for a long feature is fine when every paragraph serves
+its point.

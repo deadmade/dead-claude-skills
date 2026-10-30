@@ -9,8 +9,8 @@ export interface AgentBrowserPin {
   sha256?: Record<string, string>;
 }
 
-// [binary, needed for (plugin names or installer toggles), NixOS command, Windows command]; one row per binary.
-const BINARIES: [string, string | string[], string, string][] = [
+// [binary, needed for (plugin name), NixOS command, Windows command]
+const BINARIES = [
   ['rust-analyzer', 'rust-analyzer-lsp', 'nix: rust-analyzer', 'rustup component add rust-analyzer'],
   ['csharp-ls', 'csharp-lsp', 'nix: csharp-ls dotnet-sdk', 'dotnet tool install --global csharp-ls'],
   [
@@ -23,20 +23,18 @@ const BINARIES: [string, string | string[], string, string][] = [
   ['nixd', 'nix-lsp', 'nix: nixd', 'not available on Windows, deselect nix-lsp'],
   ['jq', BUNDLE, 'nix: jq', 'winget install -e --id jqlang.jq'],
   ['python3', BUNDLE, 'nix: python3', 'winget install -e --id Python.Python.3.13'],
-  ['uv', ['graphify', 'prose'], 'nix: uv', 'winget install -e --id astral-sh.uv'],
+  ['uv', 'graphify', 'nix: uv', 'winget install -e --id astral-sh.uv'],
   ['graphify', 'graphify', 'uv tool install graphifyy', 'uv tool install graphifyy'],
   ['ccstatusline', 'ccstatusline', 'nix: ccstatusline', 'npm i -g ccstatusline'],
 ];
 
-// wanted: plugin names (plus the toggles that are on, such as 'ccstatusline'). onPath(binary) -> bool.
+// wanted: plugin names (plus 'ccstatusline' when that toggle is on). onPath(binary) -> bool.
 export function missingBinaries(platform: string, wanted: string[], onPath: (binary: string) => boolean) {
   const win = platform === 'win32';
-  return BINARIES.filter(([bin, for_]) => [for_].flat().some((f) => wanted.includes(f)) && !onPath(bin)).map(
-    ([binary, , nix, windows]) => {
-      const cmd = win ? windows : nix;
-      return { binary, command: cmd.startsWith('nix: ') ? `add to home.packages: ${cmd.slice(5)}` : cmd };
-    },
-  );
+  return BINARIES.filter(([bin, for_]) => wanted.includes(for_) && !onPath(bin)).map(([binary, , nix, windows]) => {
+    const cmd = win ? windows : nix;
+    return { binary, command: cmd.startsWith('nix: ') ? `add to home.packages: ${cmd.slice(5)}` : cmd };
+  });
 }
 
 // The binaries releases ship, built per platform by .github/workflows/build-{tui-review,web-mcp}.yml and attached to the
@@ -50,9 +48,6 @@ const BIN_TARGETS: Record<string, string> = {
   'win32-x64': 'x86_64-pc-windows-msvc',
   'linux-x64': 'x86_64-unknown-linux-musl',
 };
-
-// Whether releases build for this machine.
-export const hasBuild = (platform: string, arch: string) => Object.hasOwn(BIN_TARGETS, `${platform}-${arch}`);
 
 // The release archive of binary `name` ('tui-review' or 'web-mcp') at `version` for this machine, or undefined where none is built.
 export function binAsset(name: string, platform: string, arch: string, version: string) {

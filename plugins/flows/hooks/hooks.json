@@ -1,5 +1,5 @@
 {
-  "description": "Prose check after every Markdown write or edit: prose-check.mjs flags conversation shorthand and undefined abbreviations in the new text. FLOWS_PROSE_CHECK=off turns it off.",
+  "description": "Prose check after every Markdown write or edit: prose-check.mjs flags conversation shorthand (Q11, D2, round 2, my call) in the new text. FLOWS_PROSE_CHECK=off turns it off.",
   "hooks": {
     "PostToolUse": [
       {

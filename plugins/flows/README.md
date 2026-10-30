@@ -120,27 +120,24 @@ plugin that isn't there, for installs that skipped one.
 flows holds one standard for prose a person will read, and two ways to apply it.
 
 - **The `writing` skill** (`skills/writing/`) is Williams and Bizup's _Style: Lessons in Clarity and Grace_ in our own
-  words: characters as subjects and actions as verbs, old information before new, the point stated early, the
-  concision cuts limited by a density test, no conversation shorthand. Unlike the conductors, Claude may load it on
-  its own (`flows:writing`) whenever it writes a spec, a plan, a report, a README, a PR description or a commit
-  message. `/doc-audit` reads changed docs against it and `/integrate` revises PR text by it.
+  words, as checks to run on a draft from the top down: the problem and the point at the end of a short opening, the
+  order the reader needs rather than the order the work happened in, topic strings and old-before-new, characters as
+  subjects and actions as verbs, the book's six concision cuts limited by a density test, and naming who acted. A
+  short section adds rules for technical documents that the book doesn't cover, such as no conversation shorthand.
+  Unlike the conductors, Claude may load it on its own (`flows:writing`) whenever it writes a spec, a plan, a report,
+  a README, a PR description or a commit message. `/doc-audit` reads changed docs against it and `/integrate`
+  revises PR text by it.
 - **The prose check** (`hooks/prose-check.mjs`, a `PostToolUse` hook on every `Write` and `Edit` of a `*.md` file)
-  reports conversation shorthand (`Q4`, `D2`, `round 2`, `my call`) and abbreviations the file never defines, in the
-  new text only. It is Node code with no model call, so it costs nothing per write. Claude sees its findings and may
-  leave a sentence that a finding gets wrong. In `flow.md` files the shorthand rule is off, since flow.md is the log
-  where those labels belong. `FLOWS_PROSE_CHECK=off` in the environment turns the check off.
-- **`/copyedit <file.md>`** has a fresh Opus agent revise a document by _Style_'s method for a reader who wasn't in the
-  conversation, then lets the edit through only when code shows that no heading, code block, code span, link, number,
-  checkbox step or table row was lost. It shows the diff and commits nothing. Before a gate shows a spec, a plan or an
-  audit report, the conductors run it on that document; when it refuses an edit, the gate shows the unedited
-  document and what the edit lost.
-
-  Before the edit, code lists candidate problems for the editor to judge: wordy phrases, redundant pairs and
-  negatives from a phrase list, and, when the installer's prose environment exists, spaCy's measures (nominalizations,
-  passives, abstract subjects, sentences with no link to the one before, long openers and subjects, subject-verb gaps
-  and lists in a sentence). Without the environment, `/copyedit` says that spaCy's measures were skipped and why, and
-  the editor gets the phrase candidates alone. After the edit it measures again and shows both sets of figures in one
-  table.
+  reports conversation shorthand (`Q4`, `D2`, `round 2`, `my call`) in the new text only: an Edit's new string, or
+  the lines a Write added to the file. It is Node code with no model call, so it costs nothing per write. Claude sees
+  its findings and may leave a sentence that a finding gets wrong. In `flow.md` files it is off, since flow.md is the
+  log where those labels belong. `FLOWS_PROSE_CHECK=off` in the environment turns the check off.
+- **`/copyedit <file.md>`** has a fresh Opus agent revise a document by the `writing` skill for a reader who wasn't in
+  the conversation, then lets the edit through only when code shows that no heading, code block, code span, link, URL,
+  HTML comment, number, checkbox step or table row was lost. Code can't see meaning, so a dropped sentence or a
+  flipped negation still needs the diff it shows. It commits nothing. Before a gate shows a spec, a plan or an audit
+  report, the conductors run it on that document; when it refuses an edit, the gate shows the unedited document and
+  what the edit lost.
 
 ## Packs
 

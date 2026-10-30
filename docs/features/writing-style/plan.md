@@ -1,5 +1,9 @@
 # Writing style Implementation Plan
 
+> **Cut back 2026-10-30.** Tasks 9–12 (spaCy measures, the installer's prose step), the abbreviation rule and the
+> editing guide were removed after the branch review; the spec and flow.md (Deviations) say what remains. This plan is
+> kept as the record of what was built.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ship one writing skill based on Williams and Bizup's _Style_ inside flows, check every Markdown write for

@@ -120,35 +120,8 @@ skill (MIT License, Copyright Matt Pocock; `LICENSE-MIT`), unmodified apart from
 flows' `writing` skill (`plugins/flows/skills/writing/SKILL.md`) states the density test of
 [technical-writing-density](https://github.com/mlwelles/technical-writing-density) (MIT License, Copyright (c) 2026
 Michael Welles) in its own words and links to it; nothing is copied. The rest of the skill is our own wording of
-Williams and Bizup's _Style: Lessons in Clarity and Grace_, checked against free sources it credits; it quotes no
-passage of the book.
-
-## copyedit phrase list (flows)
-
-`plugins/flows/skills/copyedit/data/phrases.tsv` lists wordy phrases, redundant pairs and negatives with an affirmative
-form, each row naming its source:
-
-- [plainlanguage.gov](https://github.com/GSA/plainlanguage.gov) (US government work, CC0 / public domain): the multi-word
-  entries of "Use simple words and phrases" and the examples of "Avoid hidden verbs" and "Use positive language"
-  (`_pages/guidelines/`). Single-word substitutions are left out.
-- Strunk, _The Elements of Style_ (1920, public domain, [Project Gutenberg #37134](https://www.gutenberg.org/ebooks/37134)):
-  rules 11 and 13.
-
-## copyedit's spaCy environment (installer)
-
-`installer/assets/prose/` pins, in a uv project and its `uv.lock`, the Python environment that `/copyedit`'s
-`plugins/flows/skills/copyedit/scripts/measure.py` runs in. Nothing in it is vendored: uv downloads it at install time
-into the user's Claude config folder:
-
-- CPython 3.13, a uv-managed build ([python-build-standalone](https://github.com/astral-sh/python-build-standalone)),
-  under the Python Software Foundation License.
-- [spaCy](https://github.com/explosion/spaCy) 3.8 (MIT License, Copyright (C) 2016-2024 ExplosionAI GmbH, 2016 spaCy
-  GmbH, 2015 Matthew Honnibal).
-- [`en_core_web_trf`](https://github.com/explosion/spacy-models) 3.8.0, spaCy's English transformer pipeline (MIT
-  License, Copyright 2021 ExplosionAI GmbH; the wheel's `LICENSES_SOURCES` lists the training corpora it credits).
-- [PyTorch](https://github.com/pytorch/pytorch), CPU build (BSD-3-Clause, Copyright (c) Facebook, Inc. and its
-  contributors, with bundled third-party code under its own licenses).
-- Their dependencies, each under its own license.
+Williams and Bizup's _Style: Lessons in Clarity and Grace_ (12th edition, Pearson, 2016), checked lesson by lesson
+against the book; it quotes no passage of it.
 
 ## ponytail
 

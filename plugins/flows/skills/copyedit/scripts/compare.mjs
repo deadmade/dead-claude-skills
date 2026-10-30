@@ -13,7 +13,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
-import { check, loadTerms, report } from '../../../hooks/prose.mjs';
+import { check, report } from '../../../hooks/prose.mjs';
 
 const lf = (text) => text.replace(/\r\n/g, '\n');
 
@@ -67,8 +67,21 @@ function items(text) {
     });
   // Paragraphs and list items, one line each after the reflow: what isn't a heading, a table row or a quote.
   const paragraphs = prose.split('\n').filter((l) => l.trim() && !/^[ \t]*(?:#{1,6}[ \t]|\||>)/.test(l));
+  // Setext headings: a text line underlined with = or -.
+  const setext = lines.flatMap((l, i) =>
+    l.trim() && !/^[ \t]*(?:[-*+>|]|\d+[.)])/.test(l) && /^ {0,3}(?:=+|-+)[ \t]*$/.test(lines[i + 1] ?? '')
+      ? [l.trim()]
+      : [],
+  );
   return {
-    headings: lines.filter((l) => /^#{1,6} /.test(l)).map((l) => l.trim()),
+    headings: [...lines.filter((l) => /^#{1,6} /.test(l)).map((l) => l.trim()), ...setext],
+    // Comments carry machine markers (`<!-- uses:start -->`, `<!-- overrides … -->`): kept word for word.
+    comments: body.match(/<!--[\s\S]*?-->/g)?.map((m) => m.replace(/\s+/g, ' ')) ?? [],
+    // Reference definitions, autolinks and bare URLs, besides inline link targets.
+    refs: lines.flatMap((l) => /^ {0,3}\[[^\]\n]+\]:[ \t]*<?([^\s>]+)/.exec(l)?.[1] ?? []),
+    urls: (flat.replace(/`[^`\n]+`/g, ' ').match(/https?:\/\/[^\s<>()[\]`"']+/g) ?? []).map((u) =>
+      u.replace(/[.,;:!?]+$/, ''),
+    ),
     blocks,
     spans: flat.match(/`[^`\n]+`/g)?.map((s) => s.replace(/\s+/g, ' ')) ?? [],
     links: [...flat.matchAll(/\]\(([^)\s]+)/g)].map((m) => m[1]),
@@ -125,6 +138,9 @@ export function lost(saved, edited) {
     ...missing(a.blocks, b.blocks).map((c) => `code block: ${c.split('\n').slice(0, 2).join(' ')}`),
     ...missing(a.spans, b.spans).map((s) => `code span: ${s}`),
     ...missing(a.links, b.links).map((l) => `link target: ${l}`),
+    ...missing(a.refs, b.refs).map((l) => `link definition: ${l}`),
+    ...missing(a.urls, b.urls).map((u) => `URL: ${u}`),
+    ...missing(a.comments, b.comments).map((m) => `comment: ${m}`),
     ...missing(a.numbers, b.numbers).map((n) => `number: ${n}`),
     ...missing(a.quotes, b.quotes).map((q) => `quote: ${q}`),
   ];
@@ -141,8 +157,8 @@ export function lost(saved, edited) {
 }
 
 // The check's findings on the edited text that the saved copy didn't have as often.
-export function newFindings(saved, edited, { file, terms }) {
-  const all = (text) => check(text, [[0, text.length]], { file, terms });
+export function newFindings(saved, edited, { file }) {
+  const all = (text) => check(text, [[0, text.length]], { file });
   const had = new Map();
   for (const f of all(saved)) had.set(`${f.rule} ${f.match}`, (had.get(`${f.rule} ${f.match}`) ?? 0) + 1);
   return all(edited).filter((f) => {
@@ -157,7 +173,6 @@ if (import.meta.main ?? process.argv[1] === import.meta.filename) {
   try {
     const [savedPath, editedPath, docPath] = process.argv.slice(2);
     const saved = readFileSync(savedPath, 'utf8');
-    const terms = loadTerms(readFileSync(join(import.meta.dirname, '../../../hooks/common-terms.txt'), 'utf8'));
     let edited = existsSync(editedPath) ? lf(readFileSync(editedPath, 'utf8')) : '';
     const gone =
       readFileSync(docPath, 'utf8') !== saved
@@ -171,7 +186,7 @@ if (import.meta.main ?? process.argv[1] === import.meta.filename) {
     } else {
       // The saved copy's last newline, or its absence, stays.
       edited = edited.replace(/\n*$/, /\r?\n$/.test(saved) ? '\n' : '');
-      const text = report(docPath, newFindings(saved, edited, { file: docPath, terms }));
+      const text = report(docPath, newFindings(saved, edited, { file: docPath }));
       // Written next to the document and renamed over it, so a failed write leaves the document whole. A symlinked
       // document is edited where it points, and keeps its mode.
       const real = realpathSync(docPath);

@@ -15,10 +15,6 @@ suppressions:
     skills: [hallmark]
     paths: [scripts/capture.mjs, scripts/sloplint-render.mjs]
     reason: Runs `npm root -g` to find a global puppeteer.
-  - rule_id: COMMAND_INJECTION_JS_CHILD_PROCESS
-    skills: [copyedit]
-    paths: [scripts/measure.mjs]
-    reason: spawnSync, without a shell, of the prose environment's Python on the skill's own measure.py.
   - rule_id: COMPOUND_FETCH_EXECUTE
     skills: [system-text-json-net11, setup-local-sdk]
     paths: [SKILL.md]

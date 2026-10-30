@@ -13,8 +13,6 @@ excludes = [
   "plugins/opt-in/implementation/postgres/skills/**",
   "plugins/flows/skills/self-review/references/upstream/**",
   ".pre-commit-config.yaml",
-  # The editor test's documents are evidence, kept exactly as the editors and judges wrote them.
-  "docs/features/writing-style/editor-test/**",
   # npm writes it.
   "package-lock.json",
 ]
