@@ -96,6 +96,14 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
 - At Finish, ask the user for the **Run verdict** and record it in flow.md: worked as a whole, yes or no; clean, yes
   or no.
 
+## Agents
+
+Don't start agents by the dozen, under ultracode or in a Workflow either. Decide how many a step really needs: combine
+related tasks, checks and verifications into one agent where that works, do small things inline, and ask before a run
+grows large. Give every agent a model that fits its job instead of the session's default: `haiku` for mechanical work,
+`sonnet` for searching and most review, `opus` or `fable` where the judgment is hard (a subtle review, the final
+review).
+
 ## Homes and commits
 
 - Specs and plans live only in `docs/features/<slug>/` (`spec.md`, `plan.md`), next to flow.md, not where
@@ -112,8 +120,9 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
 
 - A conductor's `uses.json` lists the skills, agents and tools it runs (not other conductors). Change it with the
   SKILL.md, then run `node scripts/flows-uses.mjs`, which regenerates flows' dependencies and README tree.
-- **Packs** (superpowers, ponytail, mattpocock-picks, pstack-picks, tob-picks, paper-lookup) ship inside flows, in the
-  packs folder your SKILL.md names (below: `<packs>`). They aren't installed, so the Skill tool doesn't know them:
+- **Packs** (superpowers, ponytail, mattpocock-picks, pstack-picks, tob-picks, paper-lookup, security-audit) ship
+  inside flows, in the packs folder your SKILL.md names (below: `<packs>`). They aren't installed, so the Skill tool
+  doesn't know them:
   - A pack skill is read by path, `<packs>/<pack>/skills/<name>/SKILL.md`, and followed. Never through the Skill tool.
   - Inside a pack file, `<pack>:<name>` (`superpowers:writing-plans`) means `<packs>/<pack>/skills/<name>/SKILL.md`,
     and "invoke" or "use" it means read it there. `${CLAUDE_SKILL_DIR}` and relative paths (`./implementer-prompt.md`,

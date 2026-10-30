@@ -13,7 +13,7 @@ keeps a state file so the next session can resume. Claude proposes and recommend
 | `/upgrade <pkg>[@v]`        | bump a dependency                                 | changelogs via web-mcp and context7, `blast-radius`, bump, fix test-first                                                                          | `/verify`, `/learn`  |
 | `/test-audit [branch\|all]` | is the test suite appropriate?                    | run it, then mutation testing, property-based candidates, untested requirements, test smells                                                       | gaps you pick filled |
 | `/doc-audit [branch\|all]`  | do the docs tell the truth?                       | `spec-to-code-compliance` with the docs as spec, `claude-md-improver`, links/commands, prose                                                       | fixes you pick       |
-| `/harden [branch\|all]`     | security, footguns, bloat, architecture           | claude-security, tob `sharp-edges`, ponytail audit/review, `improve-codebase-architecture`                                                         | fixes you pick       |
+| `/harden [branch\|all]`     | security, footguns, bloat, architecture           | claude-security, cloudflare `security-audit` domain checklists, tob `sharp-edges`, ponytail audit/review, `improve-codebase-architecture`          | fixes you pick       |
 | `/self-review [base]`       | review your branch before a PR                    | bug pass, spec and standards pass, `security-review`, `claude-md-improver`, specialist agents (silent failures, tests, types, comments)            | fixes you pick       |
 | `/verify [base]`            | is this branch ready for a PR?                    | checks once, `/self-review`, `/doc-audit branch`, optional `/test-audit branch`, tui-review, a Decisions gate on the build's rulings and shortcuts | how to integrate     |
 | `/integrate [base]`         | commit, open the PR, watch CI                     | commits shown first, `blast-radius` + `writing` for the PR body, `!` lines for push and `gh` (never run), `Monitor` on the checks                  | PR open, CI green    |
@@ -50,6 +50,7 @@ fix-flow
 
 harden
 ├ claude-security@claude-plugins-official: claude-security
+├ security-audit: security-audit
 ├ tob-picks: sharp-edges
 ├ ponytail: ponytail-audit, ponytail-review
 ├ mattpocock-picks: improve-codebase-architecture, grilling
@@ -143,7 +144,7 @@ copyedit that revises a document by it before a gate.
 ## Packs
 
 flows carries the skill packs its conductors run, in `packs/`: superpowers, ponytail, mattpocock-picks, pstack-picks,
-tob-picks and paper-lookup, each written there by its `scripts/sync-*.mjs`. Claude Code scans only a plugin's root
+tob-picks, paper-lookup and security-audit, each written there by its `scripts/sync-*.mjs`. Claude Code scans only a plugin's root
 `skills/`, `agents/` and `hooks/hooks.json`, so nothing under `packs/` loads on its own; the conductors read a pack's
 skills by path (`${CLAUDE_PLUGIN_ROOT}/packs`). tob's spec checker is flows' own agent (`agents/spec-compliance-checker.md`),
 since a pack's agents don't load. `/self-review` vendors its passes too, from claude-plugins-official's code-review

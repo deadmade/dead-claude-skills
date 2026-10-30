@@ -35,3 +35,7 @@ suppressions:
     skills: [maui-theming]
     paths: [SKILL.md]
     reason: MAUI Preferences.Set storing the user's theme choice.
+  - rule_id: COMMAND_INJECTION_JS_CHILD_PROCESS
+    skills: [security-audit]
+    paths: [validate-coverage-ledger.test.cjs, validate-findings.test.cjs]
+    reason: Upstream's validator tests spawnSync node on the validator and mkfifo on a temp path, with argument arrays and no shell.

@@ -266,7 +266,6 @@ const webBuiltinsOff = webBuiltinsDecision({
 const toggles = {
   statusLine: on('ccstatusline'),
   dcg: on('dcg'),
-  version: VERSION,
   webBuiltinsOff,
 };
 await applySettings(toggles, { strip, reset: clean });

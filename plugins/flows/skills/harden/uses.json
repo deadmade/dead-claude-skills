@@ -1,5 +1,6 @@
 {
   "claude-security@claude-plugins-official": ["claude-security"],
+  "security-audit": ["security-audit"],
   "tob-picks": ["sharp-edges"],
   "ponytail": ["ponytail-audit", "ponytail-review"],
   "mattpocock-picks": ["improve-codebase-architecture", "grilling"],

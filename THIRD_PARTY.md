@@ -22,6 +22,14 @@ note under the title covers leftover mentions, the frontmatter `description` is 
 Agent Skills" section is removed.
 The synced upstream commit is in `skills/paper-lookup/UPSTREAM`.
 
+## security-audit
+
+`plugins/flows/packs/security-audit/skills/security-audit/` is vendored unchanged from
+[cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (MIT License, Copyright (c)
+2025-2026 Cloudflare, Inc.; full text in `plugins/flows/packs/security-audit/LICENSE`) by
+`scripts/sync-security-audit.mjs` (weekly via GitHub Actions). `/harden` reads its domain files and candidate-verifier
+prompt by path. The synced upstream commit is in `plugins/flows/packs/security-audit/UPSTREAM`.
+
 ## MCP servers (dead-skills, mcp-github, mcp-azure)
 
 - **Context7**: hosted service by Upstash (https://context7.com), used over HTTP; nothing vendored.
@@ -64,7 +72,7 @@ GitHub Actions; the synced upstream commit is in `plugins/flows/packs/tob-picks/
 `plugins/opt-in/implementation/rust-skills/` vendors the rust-best-practices skill from
 [apollographql/skills](https://github.com/apollographql/skills) (MIT License; `plugins/opt-in/implementation/rust-skills/LICENSE`).
 Modified by `scripts/sync-rust.mjs`: a `paths:` block (`**/*.rs`, `**/Cargo.toml`, `**/Cargo.lock`) is added to
-SKILL.md's frontmatter. Synced weekly via GitHub Actions (`sync-rust.yml`); the synced upstream commit is in
+SKILL.md's frontmatter. Synced weekly via GitHub Actions (`sync.yml`); the synced upstream commit is in
 `plugins/opt-in/implementation/rust-skills/UPSTREAM`.
 
 ## csharp-skills
@@ -77,7 +85,7 @@ left out of the indexes. csharp-expert gets a note that its specialists are alre
 install, restart and update blocks are rewritten, and it gets a fixed index summary. Upstream's agents, binlog MCP
 server, bundled LSP and dotnet-experimental plugin are not vendored, so neither is the troubleshoot-binlog-mcp skill, and
 the binlog skills' MCP workflows are cut down to their text-log replay ones. Synced weekly via GitHub Actions
-(`sync-csharp.yml`), which lists added, removed, skipped and unmapped skills and agent mentions in the PR body; the
+(`sync.yml`), whose PR body lists added, removed, skipped and unmapped skills and agent mentions; the
 synced upstream commit is in `plugins/opt-in/implementation/csharp-skills/UPSTREAM`.
 
 ## postgres
@@ -92,7 +100,7 @@ file with the synced commit:
 
 Modified by `scripts/sync-postgres.mjs`: a `paths:` block (`**/*.sql`, `**/migrations/**`, `**/migrate/**`,
 `**/*.prisma`, `**/alembic/**`) is added to each SKILL.md's frontmatter. Synced weekly via GitHub Actions
-(`sync-postgres.yml`).
+(`sync.yml`).
 
 ## graphify
 

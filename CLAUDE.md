@@ -53,6 +53,9 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   `/test-audit`, `/doc-audit`, `/harden`, `/self-review`, `/verify`, `/integrate`, `/understand`, `/learn`). Each runs other plugins' skills in order;
   the rules they share (state files, gates, loading `disable-model-invocation` skills by path, fallbacks per missing
   plugin, audit scope and report format) live once in `references/flow-rules.md`, so a SKILL.md only says what it runs.
+  Its short **Agents** section asks for few agents, combined where it makes sense, each on a model that fits its job
+  (ADR 0005). The installer's only part is `CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS=8` (`mergeSettings`); it never
+  writes `CLAUDE_CODE_SUBAGENT_MODEL`.
   Conductors call each other by reading the callee's SKILL.md (`/fix-flow` → `/verify` → `/doc-audit branch`). Each
   conductor's `uses.json` lists what it runs; `scripts/flows-uses.mjs` generates flows' `dependencies` and the README
   tree from them, and check-repo fails when a listed skill is gone or the generated parts are stale. `/self-review`
@@ -72,10 +75,10 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   share a binary cache format (`crates/tui-review/src/format.rs` ↔ `hooks/chunks.ts`) and a stdout line protocol; change both sides
   together.
 - `plugins/shared/web-mcp/`: a stdio MCP server (Rust, `crates/web-mcp/`) with `search`, `fetch`, `browser` and `lookup`, built for Windows and Linux
-  x64 only, like tui-review's binary (`build-web-mcp.yml`, `BIN_TARGETS` in `core/binaries.ts`; no macOS or ARM builds); the installer downloads it and sets `binPath`. Everything it pulls lands in
+  x64 only, like tui-review's binary (`crates-build.yml`, `BIN_TARGETS` in `core/binaries.ts`; no macOS or ARM builds); the installer downloads it and sets `binPath`. Everything it pulls lands in
   `$CLAUDE_PROJECT_DIR/.web/` before Claude sees it. Ranking is BM25 only: the H4 experiment (`examples/h4.rs`, `h4`
   feature) showed embeddings don't help, so none ship. `browser` drives `agent-browser` (upstream's Rust CLI), pinned with its
-  release binaries' sha256 in `installer/assets/agent-browser.json` (bumped by `sync-agent-browser.yml`, which imports
+  release binaries' sha256 in `installer/assets/agent-browser.json` (bumped by `scripts/sync-agent-browser.mjs`, which imports
   `AGENT_BROWSER_FILES` from `core/binaries.ts`). Unless a current one is on PATH, the installer keeps its own copy in
   `~/.claude/bin` (upstream's raw binary, checked against the pinned hash, downloaded when missing or older than the
   pin); either way it sets `agentBrowserPath` to the one in use (`agentBrowserPlan` in `core/binaries.ts`). Test-only hooks: `WEB_MCP_TEST_PUBLIC_IP`
@@ -88,16 +91,16 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   (`stillInstalled`). The folder list is the source of truth, not this file. pstack-picks leaves out pstack's
   `technical-writing` and `unslop` (flows' `writing` replaces them, and the sync rewrites the lines that named them);
   `sync-pstack.mjs --ref <hash>` syncs one commit, given as a full 40-character hash, instead of upstream's default
-  branch; `sync-pstack.yml` checks the number of vendored skills (16), so change that count whenever you change
-  `SKILLS`. pstack-picks' `UPSTREAM`
-  stays at `519d36a` on purpose: upstream's newer commits fail the sync's `GUARD`, so the weekly `sync-pstack.yml`
+  branch; its entry in `scripts/sync-sources.mjs` checks the number of vendored skills (16), so change that count
+  whenever you change `SKILLS`. pstack-picks' `UPSTREAM`
+  stays at `519d36a` on purpose: upstream's newer commits fail the sync's `GUARD`, so its weekly `sync.yml` job
   (no `--ref`) fails until a PR adapts the rewrites; don't hand-edit the pack to get past it. tob's spec checker ships as flows' own agent,
   `plugins/flows/agents/spec-compliance-checker.md` (vendored by `sync-tob`), because a pack's agents don't load.
   Where a conductor changes a pack's rule it quotes the sentence in an `<!-- overrides <pack>/<path>: "..." -->`
   marker in flows' own `.md` files; `checkOverrides` (`scripts/flows-uses.mjs`, run by check-repo and by every pack
   sync before its PR) fails when the quoted sentence is gone. `docs/vendor-a-pack.md` is the checklist for a new pack.
 - `plugins/flows/packs/ponytail/`, `plugins/flows/packs/superpowers/`: vendored unchanged from upstream's newest stable release
-  (`scripts/sync-release.mjs <name>`, `sync-release.yml`, ADR 0002): ponytail's skills and its
+  (`scripts/sync-release.mjs <name>`, ADR 0002): ponytail's skills and its
   SessionStart/SubagentStart/UserPromptSubmit hooks and band mod (the hooks and band don't load); superpowers' skills and SessionStart hook (its
   `run-hook.cmd` and `session-start` stay LF via `.gitattributes`). Other hosts' adapters are left out. The sync PR
   carries upstream's release notes, and the sync fails on a `plugin.json` component or default folder it doesn't know.
@@ -115,7 +118,8 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
 - `plugins/opt-in/implementation/postgres/`: a database plugin. It vendors
   Neon's and Timescale's Postgres skills from two upstreams (`sync-postgres.mjs`), so each skill folder carries its
   own LICENSE, NOTICE and UPSTREAM instead of one set at the plugin root.
-- `scripts/`: `check-repo.mjs` (marketplace/bundle/version consistency), `release.mjs`, `sync-*.mjs` (vendoring),
+- `scripts/`: `check-repo.mjs` (marketplace/bundle/version consistency), `release.mjs`, `sync-*.mjs` (vendoring; every one is
+  a `SOURCES` entry in `sync-sources.mjs`, with its PR paths, checks and PR/issue text, run by `sync.mjs`),
   `sync-release.mjs` (vendors ponytail and superpowers releases, writes the PR's release notes), `draw-mascot.mjs` (Onibi, Night City's pixel-art mascot, also notify's `icon.png`).
 
 Atlassian is the only url-sourced marketplace entry, deliberately unpinned. The installer would read a pinned url
@@ -123,7 +127,7 @@ entry's version from its `ref` (`shippedVersions`).
 
 ## Vendored content: don't edit
 
-These are copied from upstream by `scripts/sync-*.mjs` (weekly workflows open the PRs) and overwritten on every
+These are copied from upstream by `scripts/sync-*.mjs` (the weekly `sync.yml` opens the PRs) and overwritten on every
 sync: `plugins/opt-in/hallmark/`, `plugins/flows/packs/` (`tob-picks` is CC BY-SA 4.0; pstack-picks' `.claude-plugin/plugin.json` is hand-written), `plugins/flows/agents/`,
 `plugins/shared/graphify/skills/`, `plugins/opt-in/implementation/*-skills/{library,skills}/`, `plugins/opt-in/implementation/*-skills/LICENSE` and `UPSTREAM` (their `plugin.json` and `evals/` are hand-written), `plugins/opt-in/implementation/postgres/skills/` (their `plugin.json` is hand-written),
 `plugins/flows/skills/self-review/references/upstream/` with its `LICENSE` and `LICENSE-MIT`, and the `plugin.json` version of the ponytail and superpowers packs (set by the sync and bumped by `release.mjs`). To change them, change the sync script's transform.
@@ -133,13 +137,18 @@ When what's vendored or its license changes, update THIRD_PARTY.md.
 
 Everything ships as one version: `package.json` and `package-lock.json`, the marketplace's `metadata.version`, every
 plugin's `.claude-plugin/plugin.json`, both crates' `Cargo.toml`/`Cargo.lock` and the installer URL in README.md.
-`check-repo.mjs` fails on drift. Never bump by hand:
+`check-repo.mjs` fails on drift. Never bump by hand. Every merge to `main` that touches more than `docs/` or the root
+`*.md` files releases a patch on its own: `release.yml` runs `npm run release -- patch --detach`, which commits the
+bump off `main` and tags it, so `main`'s `package.json` lags behind the tags and the next version counts from the
+highest `vX.Y.Z` tag (`scripts/next-version.mjs`; fetch tags before a local release). A release you choose:
 
-    npm run release -- patch      # on main, clean tree; bumps, runs npm test, commits and tags
+    npm run release -- minor      # on main, clean tree; bumps, runs npm test, commits and tags
     git push --follow-tags origin main
 
-The `v*` tag runs `release.yml`, which packs the installer (`installer.tgz`), builds tui-review and web-mcp and
-publishes the GitHub release npx and the installer download from. Removing a plugin from the marketplace is enough to retire it: the installer uninstalls installed
+Either way the merge's run packs the installer (`installer.tgz`), builds tui-review and web-mcp from the tag and
+publishes the GitHub release npx and the installer download from, then moves the `release` branch to it (never back).
+The installer points the marketplace at that branch (`RELEASE_BRANCH`, `core/release.ts`), so Claude Code's
+marketplace auto-update brings plugin updates without a rerun; the binaries still come from the installer (ADR 0006). Removing a plugin from the marketplace is enough to retire it: the installer uninstalls installed
 plugins of ours that the manifest no longer lists.
 
 ## Checks
@@ -167,8 +176,20 @@ plugins of ours that the manifest no longer lists.
 - `nix fmt` formats everything per `treefmt.toml` (alejandra, prettier for js/ts/json/md/yaml, rustfmt).
 - `npm run scan-skills` (needs `pipx`): Cisco's skill-scanner, pinned in `package.json`, over every skill under `plugins/`;
   it fails on a high or critical finding. A finding judged benign gets a scoped suppression with its reason in
-  `.github/skill-scanner.yaml`. Every sync workflow runs it before opening its PR.
+  `.github/skill-scanner.yaml`. `sync.yml` runs it before opening each sync PR.
 
-CI: `test.yml` (npm test, the installer typecheck and the dead-skills and md-pane mod tests, Linux and Windows; the skill scan, Linux) on every PR and push to main; `tui-review.yml` on
-PRs touching tui-review; `web-mcp.yml` on PRs touching web-mcp; `build-tui-review.yml`/`build-web-mcp.yml` on PRs touching the workflow and from `release.yml`; `sync-*.yml`
-weekly.
+CI: `test.yml` (npm test, the installer typecheck and the dead-skills and md-pane mod tests, Linux and Windows; the skill scan, Linux) on every PR and push to main; `crates.yml` (clippy and tests,
+plus tui-review's budgets, benchmarks and mod tests) for each crate a PR touches; `crates-build.yml` (both binaries) on PRs
+touching it and from `release.yml`; `sync.yml` weekly, one job, PR and set of issues per `SOURCES` entry (new upstream
+skills, and a "Sync <name> failing" issue it closes on the next green run), and as a dry run (no PR, no issues) on PRs
+touching the sync code.
+
+The repo's rulesets live in its GitHub settings (Settings → Rules), not in the repo: main takes squash or rebase PRs
+once `test.yml`'s three jobs pass (admins bypass it, which `npm run release` pushed to main needs), and only admins move
+or delete a `v*` tag. Creating one stays open, since `release.yml` tags each merge with the workflow's token, but
+releases only come from a push to main: `release.yml` has no tag trigger, so a tag pushed any other way publishes
+nothing. Renaming a `test.yml` job or matrix entry changes its check name: update the main ruleset's required checks.
+
+`sync.yml` opens its PRs with the workflow's own token, which starts no other workflow, so `test.yml` doesn't
+run on a sync PR: each job runs check-repo and the skill scan itself, and their PRs are merged past the main ruleset's
+required checks with the admin bypass.
