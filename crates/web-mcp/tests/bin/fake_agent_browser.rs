@@ -2,7 +2,9 @@
 //! `$FAKE_AB_LOG` (unset: to `calls.jsonl` beside its `--config`, if any) and prints canned `--json` answers.
 //! An `open` of a URL containing "fail" fails; a batch's `wait` fails for a URL containing "wait-fail", and for
 //! one containing "wait-slow" only after `$AGENT_BROWSER_DEFAULT_TIMEOUT` ms. A batch opening a search engine's
-//! host answers from `$FAKE_AB_PAGES` when that is set (see `engine_page`).
+//! host answers from `$FAKE_AB_PAGES` when that is set (see `engine_page`). `get cdp-url` answers a url ending in
+//! the contents of `$FAKE_AB_STATE/chrome` (a changed one: Chrome relaunched); with `$FAKE_AB_OWNER_DELAY_MS`, an
+//! owner's (`*-window`) `open` sleeps that long first.
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -41,18 +43,13 @@ fn main() {
             .unwrap();
         f.write_all(format!("{line}\n").as_bytes()).unwrap(); // one write: parallel calls must not interleave
     }
-    // Skip the global flags: --session <s>, --config <path>, --json, --max-output <n>, --content-boundaries.
-    let mut rest = args.as_slice();
-    while let Some(first) = rest.first() {
-        let skip = match first.as_str() {
-            "--session" | "--config" | "--max-output" => 2,
-            "--json" | "--content-boundaries" => 1,
-            _ => break,
-        };
-        rest = &rest[skip..];
-    }
+    let rest = command(&args);
     let session = flag("--session");
+    if session.ends_with("-window") && rest.first().is_some_and(|c| c == "open") {
+        owner_delay();
+    }
     let out = match rest.first().map(String::as_str) {
+        Some("get") if rest.get(1).is_some_and(|a| a == "cdp-url") => cdp_url(config),
         Some("batch") => {
             let cmds: Vec<Vec<String>> = serde_json::from_str(&stdin).unwrap();
             if stdin.contains("/slow") {
@@ -111,6 +108,47 @@ fn main() {
         cmd => json!({"success": true, "data": {"command": cmd, "session": session}}),
     };
     println!("{out}");
+}
+
+/// The command after the global flags: --session <s>, --config <path>, --cdp <url>, --json, --max-output <n>,
+/// --content-boundaries, --pin-tab.
+fn command(args: &[String]) -> &[String] {
+    let mut rest = args;
+    while let Some(first) = rest.first() {
+        let skip = match first.as_str() {
+            "--session" | "--config" | "--cdp" | "--max-output" => 2,
+            "--json" | "--content-boundaries" | "--pin-tab" => 1,
+            _ => break,
+        };
+        rest = &rest[skip..];
+    }
+    rest
+}
+
+/// An owner's `open` waits `$FAKE_AB_OWNER_DELAY_MS`, if set.
+fn owner_delay() {
+    if let Some(ms) = std::env::var("FAKE_AB_OWNER_DELAY_MS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+    {
+        std::thread::sleep(Duration::from_millis(ms));
+    }
+}
+
+/// The window's cdp url, for the Chrome named in `$FAKE_AB_STATE/chrome` (unset: beside `config`), else 1.
+fn cdp_url(config: &str) -> Value {
+    let state = std::env::var_os("FAKE_AB_STATE").map_or_else(
+        || {
+            Path::new(config)
+                .parent()
+                .unwrap_or(Path::new(""))
+                .to_owned()
+        },
+        PathBuf::from,
+    );
+    let chrome = std::fs::read_to_string(state.join("chrome"))
+        .map_or_else(|_| "1".to_owned(), |c| c.trim().to_owned());
+    json!({"success": true, "data": {"cdpUrl": format!("ws://127.0.0.1:9222/devtools/browser/{chrome}")}})
 }
 
 /// Any page as a browser would render it.

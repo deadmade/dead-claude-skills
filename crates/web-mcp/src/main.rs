@@ -15,6 +15,7 @@ mod profile;
 mod rank;
 mod search;
 mod tools;
+mod window;
 
 use std::sync::Arc;
 
@@ -37,6 +38,7 @@ pub struct Ctx {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    window::tie_to_process();
     if std::env::args().nth(1).is_some_and(|a| a == "--version") {
         println!("web-mcp {}", env!("CARGO_PKG_VERSION"));
         return Ok(());

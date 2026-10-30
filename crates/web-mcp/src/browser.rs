@@ -88,12 +88,13 @@ pub struct SearchRun<'a> {
 #[derive(Clone, Copy)]
 struct Isolated<'a> {
     config: &'a Path,
-    /// `AGENT_BROWSER_DEFAULT_TIMEOUT`: bounds the daemon's own wait, which outlives a killed call.
-    timeout: Duration,
+    /// `AGENT_BROWSER_DEFAULT_TIMEOUT`: bounds the daemon's own wait, which outlives a killed call. `None`: the
+    /// owner's, which keeps agent-browser's default.
+    timeout: Option<Duration>,
 }
 
-/// Points `cmd` at the config with `--config`, runs it in the config's folder and drops every
-/// `AGENT_BROWSER_*` variable of `env` (web-mcp's), so nothing of the user's agent-browser setup applies.
+/// Points `cmd` at the config with `--config` and drops every `AGENT_BROWSER_*` variable of `env` (web-mcp's),
+/// so nothing of the user's agent-browser setup applies.
 fn isolate(
     cmd: &mut Command,
     iso: Isolated<'_>,
@@ -109,12 +110,8 @@ fn isolate(
             cmd.env_remove(k);
         }
     }
-    cmd.env(
-        "AGENT_BROWSER_DEFAULT_TIMEOUT",
-        iso.timeout.as_millis().to_string(),
-    );
-    if let Some(dir) = iso.config.parent() {
-        cmd.current_dir(dir);
+    if let Some(t) = iso.timeout {
+        cmd.env("AGENT_BROWSER_DEFAULT_TIMEOUT", t.as_millis().to_string());
     }
 }
 
@@ -164,7 +161,7 @@ impl Browser {
         futures::future::join_all(open.iter().map(|s| {
             tokio::time::timeout(
                 Duration::from_secs(5),
-                self.run_with(s, &close, None, false, None),
+                self.run_with(s, &close, None, false, None, None),
             )
         }))
         .await;
@@ -190,11 +187,35 @@ impl Browser {
     /// `Missing` when the binary can't be started; `Failed` when the call times out, answers
     /// `{"success": false}`, or answers no JSON.
     pub async fn run(&self, session: &str, args: &[String]) -> Result<Value, BrowserError> {
-        self.run_with(session, args, None, true, None).await
+        self.run_with(session, args, None, true, None, None).await
+    }
+
+    /// Runs `args` in the window's owner `session`, under its `config` (`<search dir>/profiles/<n>/agent-browser.json`),
+    /// in the search dir, with agent-browser's default timeout.
+    ///
+    /// # Errors
+    /// As `run`.
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "Browser takes the window in Task 5")
+    )]
+    pub(crate) async fn run_owner(
+        &self,
+        session: &str,
+        config: &Path,
+        args: &[String],
+    ) -> Result<Value, BrowserError> {
+        let iso = Isolated {
+            config,
+            timeout: None,
+        };
+        let search_dir = config.ancestors().nth(3);
+        self.run_with(session, args, None, false, Some(iso), search_dir)
+            .await
     }
 
     /// `limits`: cap and wrap the page output (for answers read as text; off where the output is data).
-    /// `iso`: a call to a search session.
+    /// `iso`: a call to a search session or the window's owner. `cwd`: the call's working directory.
     async fn run_with(
         &self,
         session: &str,
@@ -202,11 +223,15 @@ impl Browser {
         stdin: Option<&str>,
         limits: bool,
         iso: Option<Isolated<'_>>,
+        cwd: Option<&Path>,
     ) -> Result<Value, BrowserError> {
         let mut cmd = Command::new(&self.bin);
         cmd.args(["--session", session, "--json"]);
         if let Some(iso) = iso {
             isolate(&mut cmd, iso, std::env::vars_os());
+        }
+        if let Some(dir) = cwd {
+            cmd.current_dir(dir);
         }
         if limits {
             cmd.args(["--max-output", MAX_OUTPUT, "--content-boundaries"]);
@@ -283,7 +308,14 @@ impl Browser {
         let input = json!(commands).to_string();
         let args = ["batch".to_owned(), "--json".to_owned()];
         let answer = self
-            .run_with(session, &args, Some(&input), limits, iso)
+            .run_with(
+                session,
+                &args,
+                Some(&input),
+                limits,
+                iso,
+                iso.and_then(|i| i.config.parent()),
+            )
             .await?;
         // One entry per command: {"command", "success", "result"}.
         let entries = answer.as_array().ok_or_else(|| {
@@ -333,7 +365,7 @@ impl Browser {
         let iso = |timeout| {
             search.as_ref().map(|s| Isolated {
                 config: s.config,
-                timeout,
+                timeout: Some(timeout),
             })
         };
         // The HTML is data for the extractor: no output cap, no boundary markers.
@@ -359,7 +391,14 @@ impl Browser {
             let close = ["close".to_owned()];
             let _ = tokio::time::timeout(
                 CLOSE_TIMEOUT,
-                self.run_with(session, &close, None, false, iso(CLOSE_TIMEOUT)),
+                self.run_with(
+                    session,
+                    &close,
+                    None,
+                    false,
+                    iso(CLOSE_TIMEOUT),
+                    search.as_ref().and_then(|s| s.config.parent()),
+                ),
             )
             .await;
             if search.is_some() {
@@ -508,7 +547,7 @@ mod tests {
         let config = Path::new("/srv/search/brave/agent-browser.json");
         let iso = Isolated {
             config,
-            timeout: Duration::from_millis(4200),
+            timeout: Some(Duration::from_millis(4200)),
         };
         let env = [
             ("AGENT_BROWSER_PROXY", "http://127.0.0.1:9"),
@@ -534,9 +573,43 @@ mod tests {
             "{set:?}"
         );
         assert!(!set.iter().any(|(k, _)| *k == "PATH"), "{set:?}");
-        assert_eq!(cmd.as_std().get_current_dir(), config.parent());
+        // The cwd is `run_with`'s to set.
+        assert_eq!(cmd.as_std().get_current_dir(), None);
         let argv: Vec<_> = cmd.as_std().get_args().collect();
         assert_eq!(argv, [OsStr::new("--config"), config.as_os_str()]);
+    }
+
+    #[tokio::test]
+    async fn owner_calls_run_in_the_search_dir_without_timeout() {
+        let (dir, _) = engine_dir("owner");
+        let slot = dir.join("profiles/1");
+        std::fs::create_dir_all(&slot).unwrap();
+        let config = slot.join("agent-browser.json");
+        std::fs::write(&config, "{}").unwrap();
+        let b = fake();
+        b.run_owner(
+            "web-mcp-1-window",
+            &config,
+            &["open".into(), "about:blank".into()],
+        )
+        .await
+        .unwrap();
+        let c = calls(&slot);
+        assert_eq!(
+            args(&c[0]),
+            [
+                "--session",
+                "web-mcp-1-window",
+                "--json",
+                "--config",
+                config.to_str().unwrap(),
+                "open",
+                "about:blank"
+            ]
+        );
+        assert_eq!(c[0]["env"], json!({}));
+        let cwd = PathBuf::from(c[0]["cwd"].as_str().unwrap());
+        assert_eq!(cwd.canonicalize().unwrap(), dir.canonicalize().unwrap());
     }
 
     #[tokio::test]
