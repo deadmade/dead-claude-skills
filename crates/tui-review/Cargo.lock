@@ -1829,7 +1829,7 @@ dependencies = [
 
 [[package]]
 name = "tui-review"
-version = "0.6.0"
+version = "0.6.5"
 dependencies = [
  "anyhow",
  "divan",

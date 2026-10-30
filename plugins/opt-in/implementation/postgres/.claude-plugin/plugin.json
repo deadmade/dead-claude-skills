@@ -1,6 +1,6 @@
 {
   "name": "postgres",
-  "version": "0.6.0",
+  "version": "0.6.5",
   "description": "Postgres best practices (Neon's postgres-best-practices) and safe, non-blocking migrations (Timescale pg-aiguide's postgres-database-migration). Vendored, synced weekly. Opt-in.",
   "author": {
     "name": "deadmade",
