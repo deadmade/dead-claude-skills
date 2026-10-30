@@ -566,6 +566,9 @@ state.chosen)` runs first (`install.ts:225`); the marker would never be written.
 
 - 2026-10-30, /verify decisions gate: the 12 Rulings and 6 Deviations above, confirmed by the user ("Confirm all").
   The branch adds no `shortcut:` lines.
+- 2026-10-30, after /verify: `main` (`3390bee`) merged into the branch at the user's request ("pls merge main into this
+  branch!"). `main` folded `sync-pstack.yml` into `sync.yml`, so the pstack skill count (16) moved to
+  `scripts/sync-sources.mjs`. The user chose to push and open a PR ("Push and open PR").
 
 ## Walkthrough
 
@@ -573,6 +576,6 @@ state.chosen)` runs first (`install.ts:225`); the marker would never be written.
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
 | 1 One writing skill          | `plugins/flows/skills/writing/SKILL.md:21,55,85,145,178,185`; `scripts/flows-uses.mjs:16`; `doc-audit/uses.json:5`, `integrate/uses.json:3`; `scripts/sync-pstack.mjs:29-32,75-77` | `scripts/writing-skill.test.mjs:14`; `scripts/flows-uses.test.mjs:81,93`; the book check above |
 | 2 A shorthand check on every write | `plugins/flows/hooks/hooks.json:10,16`; `plugins/flows/hooks/prose.mjs:52,78,117`                                                                                 | `plugins/flows/hooks/prose.test.mjs:14,19,31` and "a rewrite checks only the lines the old file lacked" |
-| 3 A copyedit before each gate | `plugins/flows/skills/copyedit/SKILL.md:27,47`; `scripts/compare.mjs:44,133`; `plugins/flows/references/flow-rules.md:38`                                              | `scripts/copyedit.test.mjs:50,314`; `scripts/writing-skill.test.mjs` (flow-rules runs it) |
+| 3 A copyedit before each gate | `plugins/flows/skills/writing/references/copyedit.md`; `plugins/flows/skills/writing/scripts/compare.mjs`; `plugins/flows/references/flow-rules.md:38`                                              | `scripts/copyedit.test.mjs:50,314`; `scripts/writing-skill.test.mjs` (flow-rules runs it) |
 
 ## Run verdict
