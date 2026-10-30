@@ -79,9 +79,12 @@ by a separate explainer.
 - **Probe** (2026-10-30, Claude Code 2.1.292, Windows, `claude -p` with a plugin-dir http PostToolUse `*` hook, no
   `allowedHttpHookUrls`): the hook is dispatched for every tool and a same-shaped `updatedToolOutput` (strings of 20+
   characters replaced) is honoured for Bash, PowerShell, Grep, Glob and Read. Fixtures are in
-  `plugins/opt-in/headroom-trim/server/tests/fixtures/`. MCP not captured: headless, the tool could not be loaded
-  (ToolSearch returned "Tool references removed", with the hook replacing and with it passing through), so no MCP
-  result or image block was seen. ToolSearch also fires the hook.
+  `plugins/opt-in/headroom-trim/server/tests/fixtures/`. ToolSearch also fires the hook.
+  MCP (a stdio test server via `--mcp-config`, `ENABLE_TOOL_SEARCH=false`, fixtures `mcp_text.json` and
+  `mcp_image.json`): honoured. `tool_response` is a bare content-block array, not an object, and the image block is
+  `{"type":"image","source":{"type":"base64","media_type":"image/png","data":…}}`, followed by a text block
+  `[Image: source: <path>]`; the payload also carries `mcp_server`. Replacing the image's `data` string made Claude
+  Code report invalid base64, so image blocks must pass through untouched.
 
 ## Prior art
 
@@ -171,7 +174,7 @@ entry's `check` and `body`; `uv` in the dev shell; `uv.json` in the package chec
 
 ## Tasks
 
-- Task 1: base 888ac98, untracked at start: docs/adr/0007-python-through-installer-uv.md, docs/features/headroom-trim/{flow,plan,spec}.md
+- Task 1: base 888ac98, untracked at start: docs/adr/0007-python-through-installer-uv.md, docs/features/headroom-trim/{flow,plan,spec}.md — files clean (5 fixtures + flow.md, all listed; GLOSSARY.md was modified before the build)
 
 ## Rulings
 
@@ -182,6 +185,9 @@ entry's `check` and `body`; `uv` in the dev shell; `uv.json` in the package chec
 - 2026-10-30, pre-flight: `npm test` is red on origin/main (`claude plugin validate plugins/default`, register.tsx,
   Claude Code 2.1.292); tasks accept exactly that failure and also run the `node --test` parts directly — a new
   failure can't hide behind it.
+- 2026-10-30, Task 1: no MCP fixture — headless `claude -p` couldn't load an MCP tool (ToolSearch returned "Tool
+  references removed"); Task 2's image test uses a synthetic MCP image block, and MCP honouring is checked in Task 7 —
+  Bash, PowerShell and Grep, the gate, are honoured — if MCP isn't honoured, MCP results go untrimmed.
 - 2026-10-30, pre-flight: Task 7 runs after the merge's release, so the build ends after Task 6.
 
 ## Deviations
