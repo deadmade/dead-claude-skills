@@ -1,7 +1,7 @@
-// The flow run view, ported from the approved design (crates/flow-cockpit/design/run-view.html). Build: the phases and
-// tasks in the rail, the selected task as the one focal point. Decisions: deviations, decisions and the build's own
-// calls as master and detail. The run's other tabs (Docs, Activity) are views of their own, drawn by the runtime into
-// this view's `data-slot="run-tab"` element across the window's lower row.
+// The flow run view, ported from the approved design mockup. Build: the phases and tasks in the rail, the selected
+// task as the one focal point. Decisions: deviations, decisions and the build's own calls as master and detail. The
+// run's other tabs (Docs, Activity) are views of their own, drawn by the runtime into this view's
+// `data-slot="run-tab"` element across the window's lower row.
 import type {
   View,
   ViewContext,

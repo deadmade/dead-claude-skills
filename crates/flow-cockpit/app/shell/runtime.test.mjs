@@ -231,6 +231,14 @@ test('markdown_strips_script_and_handlers', () => {
   const areaClick = new window.MouseEvent('click', { bubbles: true, cancelable: true });
   map.querySelector('area').dispatchEvent(areaClick);
   assert.ok(areaClick.defaultPrevented, 'a click on an area is cancelled');
+  // MathML links survive the sanitiser, and WebKit follows them: their clicks are cancelled too.
+  const math = markdown('<math href="https://example.invalid/m"><mi href="https://example.invalid/mi">x</mi></math>');
+  for (const target of [math.querySelector('math'), math.querySelector('mi')]) {
+    assert.ok(target, math.outerHTML);
+    const mathClick = new window.MouseEvent('click', { bubbles: true, cancelable: true });
+    target.dispatchEvent(mathClick);
+    assert.ok(mathClick.defaultPrevented, `a click on ${target.localName} href is cancelled`);
+  }
 });
 
 test('mermaid_fences_become_diagram_nodes', async () => {

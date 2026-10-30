@@ -132,6 +132,6 @@ One of the four extensions that ship with the flow cockpit: `list`, `run`, `docs
 _Avoid_: built-in view, core view
 
 **Trusted repository**:
-A checkout named under `trusted` in the flow cockpit's `config.toml`; only then do the extensions in its
-`.flow-cockpit/extensions/` load.
+A checkout named under `trusted` in the flow cockpit's `config.toml`, and the worktrees git links to it; only then do
+the extensions in its `.flow-cockpit/extensions/` load.
 _Avoid_: allowed repository, safe repository

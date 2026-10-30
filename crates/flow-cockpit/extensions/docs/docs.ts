@@ -1,7 +1,7 @@
-// The run's Docs tab, as the approved design draws it (crates/flow-cockpit/design/run-view.html): the documents in the
-// rail, the text in the middle at a reading measure, its chapters on the right. flow.md goes through the enhancer: the
-// parts the core recognised as UI (Gates as a stepper, Options as decision cards, Deviations as folds), every other
-// section as Markdown. spec.md and plan.md are Markdown, Mermaid blocks drawn.
+// The run's Docs tab, as the approved design mockup drew it: the documents in the rail, the text in the middle at a
+// reading measure, its chapters on the right. flow.md goes through the enhancer: the parts the core recognised as UI
+// (Gates as a stepper, Options as decision cards, Deviations as folds), every other section as Markdown. spec.md and
+// plan.md are Markdown, Mermaid blocks drawn.
 //
 // A run-tab view: the run view draws the frame and this view's rail and content fill the window's lower row.
 import type { View, ViewContext, DocName, FlowDoc, Gate } from 'flow-cockpit';

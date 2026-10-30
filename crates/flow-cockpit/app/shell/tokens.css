@@ -3,9 +3,8 @@
  * nav: a window grid, a left column per tab (phases and tasks, deviations, the outline) and tabs on the content's edge · signature: the selected task, the one block at full contrast · states: empty, error, full
  * axes: dark/grotesk-sans/chromatic-pink · posture: calm reading · contrast: pass · v2.0.0 */
 /* Hallmark · pre-emit critique: P4 H5 E4 S4 R5 V4 · weakest: E, the left column changes per tab while the grid stays; each screen keeps one block of running text at full contrast and folds the rest */
-/* The flow cockpit's house stylesheet, ported unchanged from the approved design (crates/flow-cockpit/design/
- * run-view.html): the runtime, the shared blocks and the views all draw with these classes. The blocks' own rules
- * follow the design's, at the end. */
+/* The flow cockpit's house stylesheet, ported unchanged from the approved design mockup: the runtime, the shared
+ * blocks and the views all draw with these classes. The blocks' own rules follow the design's, at the end. */
 :root {
   /* One spacing scale; the window grid uses --gutter and --gap only. */
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px; --space-7: 48px;
