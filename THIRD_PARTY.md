@@ -151,8 +151,8 @@ synced upstream commit is in `UPSTREAM`.
 
 ## web-mcp
 
-- **Consent-O-Matic**: MIT, https://github.com/cavi-au/Consent-O-Matic. web-mcp downloads the pinned v1.1.5 zip on the
-  first search (sha256-checked) and loads it into its search browsers; not vendored.
+- **I still don't care about cookies**: GPL-3.0, https://github.com/OhMyGuus/I-Still-Dont-Care-About-Cookies. web-mcp
+  downloads the pinned v1.1.9 zip at runtime (sha256-checked) and loads it into its search browsers; not vendored.
 
 ## Night City (dead-skills)
 

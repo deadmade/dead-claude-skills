@@ -206,14 +206,14 @@ impl Mcp {
 
     /// In `project` (so a second server there sees the first one's `.web`), with extra environment.
     /// Unless `envs` says otherwise, agent-browser is the fake, the browser a dummy file, and the search
-    /// folder a fresh one; whichever it is gets Consent-O-Matic already unpacked: no test starts a browser or
+    /// folder a fresh one; whichever it is gets the cookie extension already unpacked: no test starts a browser or
     /// downloads.
     pub fn start_with(project: PathBuf, envs: &[(&str, String)]) -> Self {
         let search = envs
             .iter()
             .find(|(k, _)| *k == "WEB_MCP_SEARCH_DIR")
             .map_or_else(tempdir, |(_, v)| PathBuf::from(v));
-        let ext = search.join("extensions/consent-o-matic-37cec881");
+        let ext = search.join("extensions/idcac-8f70ab94");
         std::fs::create_dir_all(&ext).unwrap();
         std::fs::write(ext.join("manifest.json"), "{}").unwrap();
         std::fs::write(search.join("chrome"), "").unwrap();

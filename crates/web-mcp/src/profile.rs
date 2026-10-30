@@ -1,5 +1,5 @@
 //! The search profiles: one persistent, isolated browser profile per engine, each with its own agent-browser config
-//! file, Consent-O-Matic (except for Bing), a lock and a rest shared by every web-mcp process on the machine.
+//! file, the cookie extension (except for Bing), a lock and a rest shared by every web-mcp process on the machine.
 
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
@@ -17,23 +17,23 @@ use tokio::process::Command;
 use crate::browser::Browser;
 use crate::engines::Engine;
 
-pub const CONSENT_URL: &str = "https://github.com/cavi-au/Consent-O-Matic/releases/download/v1.1.5/consent-o-matic-v1.1.5-unpacked-release-chromium.zip";
-pub const CONSENT_SHA256: &str = "37cec881fc5f53c84419e39d6a01cb79ff0b06b8df556219ac5c74887ba1473a";
+pub const EXTENSION_URL: &str = "https://github.com/OhMyGuus/I-Still-Dont-Care-About-Cookies/releases/download/v1.1.9/ISDCAC-chrome-source.zip";
+pub const EXTENSION_SHA256: &str = "8f70ab947cb2d274f4022a970f5dd3cecd8ec02b060e05187bef9ee3cb18bbcb";
 
 /// How long a blocked engine sits out.
 pub const REST: Duration = Duration::from_mins(30);
 /// Each engine's whole budget in a search, lock wait included.
 pub const ENGINE_DEADLINE: Duration = Duration::from_secs(10);
-/// The Consent-O-Matic download's budget.
+/// The cookie extension download's budget.
 const DOWNLOAD: Duration = Duration::from_secs(20);
-/// The zip is 88 KB.
-const DOWNLOAD_MAX: usize = 1 << 20;
+/// The zip is under 2 MiB.
+const DOWNLOAD_MAX: usize = 2 << 20;
 
 /// The Chrome major the user agent names when the browser's version can't be read.
 // shortcut: Helium's Chromium at the spike (2026-10-23); raise it when engines start refusing user agents this old.
 const FALLBACK_MAJOR: u32 = 154;
 
-/// Unpacks the extension `zip` into `dir/consent-o-matic-<first 8 hex of its sha256>` and returns that folder.
+/// Unpacks the extension `zip` into `dir/idcac-<first 8 hex of its sha256>` and returns that folder.
 /// It goes through a temp folder and a rename, so the folder is whole or absent; one that exists is kept, unless it
 /// has no `manifest.json` (then it is replaced).
 ///
@@ -57,14 +57,14 @@ pub fn unpack(zip: &[u8], expected_sha256: &str, dir: &Path) -> Result<PathBuf, 
             _ => return Err(format!("unsafe zip entry {:?}", f.name())),
         }
     }
-    let target = dir.join(format!("consent-o-matic-{}", &sha[..8]));
+    let target = dir.join(format!("idcac-{}", &sha[..8]));
     let whole = || target.join("manifest.json").is_file();
     if target.exists() && !whole() {
         std::fs::remove_dir_all(&target)
             .map_err(|e| format!("could not replace {}: {e}", target.display()))?;
     }
     let tmp = dir.join(format!(
-        "consent-o-matic-{}.tmp-{}",
+        "idcac-{}.tmp-{}",
         &sha[..8],
         std::process::id()
     ));
@@ -100,7 +100,7 @@ pub fn unpack(zip: &[u8], expected_sha256: &str, dir: &Path) -> Result<PathBuf, 
 pub struct Ready {
     /// The browser agent-browser launches (`executablePath`).
     pub chrome: PathBuf,
-    /// The unpacked Consent-O-Matic.
+    /// The unpacked cookie extension.
     pub extension: PathBuf,
     /// A regular Chrome user agent for the browser's own major version.
     pub ua: String,
@@ -115,7 +115,7 @@ pub struct EngineLock {
 /// `extensions/` and, for Helium, `helium-wrap.sh`.
 pub struct Profiles {
     dir: PathBuf,
-    /// For the Consent-O-Matic download: https only, at most 5 redirects (GitHub redirects release assets).
+    /// For the cookie extension download: https only, at most 5 redirects (GitHub redirects release assets).
     http: reqwest::Client,
 }
 
@@ -137,7 +137,7 @@ impl Profiles {
         Ok(Self { dir, http })
     }
 
-    /// The browser (`WEB_MCP_CHROME`, read now, or the first one found) and Consent-O-Matic, downloaded on first
+    /// The browser (`WEB_MCP_CHROME`, read now, or the first one found) and the cookie extension, downloaded on first
     /// use.
     ///
     /// # Errors
@@ -211,12 +211,12 @@ impl Profiles {
 
     async fn extension(&self) -> Result<PathBuf, String> {
         let extensions = self.dir.join("extensions");
-        let ext = extensions.join(format!("consent-o-matic-{}", &CONSENT_SHA256[..8]));
+        let ext = extensions.join(format!("idcac-{}", &EXTENSION_SHA256[..8]));
         let have = || ext.join("manifest.json").is_file();
         if have() {
             return Ok(ext);
         }
-        let why = |e: &dyn std::fmt::Display| format!("could not download Consent-O-Matic: {e}");
+        let why = |e: &dyn std::fmt::Display| format!("could not download the cookie extension: {e}");
         let _lock = lock_file(&self.dir.join("extensions.lock"), Instant::now() + DOWNLOAD)
             .await
             .map_err(|e| why(&e))?
@@ -227,7 +227,7 @@ impl Profiles {
         let get = async {
             let resp = self
                 .http
-                .get(CONSENT_URL)
+                .get(EXTENSION_URL)
                 .send()
                 .await
                 .and_then(reqwest::Response::error_for_status)
@@ -235,13 +235,13 @@ impl Profiles {
             crate::fetch::read_capped(resp, DOWNLOAD_MAX)
                 .await
                 .map_err(|e| e.to_string())?
-                .ok_or_else(|| "it is over 1 MiB".to_owned())
+                .ok_or_else(|| "it is over 2 MiB".to_owned())
         };
         let zip = tokio::time::timeout(DOWNLOAD, get)
             .await
             .map_err(|_| why(&"no answer within 20 s"))?
             .map_err(|e| why(&e))?;
-        unpack(&zip, CONSENT_SHA256, &extensions).map_err(|e| why(&e))
+        unpack(&zip, EXTENSION_SHA256, &extensions).map_err(|e| why(&e))
     }
 
     /// Writes `<engine>/agent-browser.json` (unless it already says the same) and returns its path.
@@ -250,7 +250,7 @@ impl Profiles {
     /// When it can't be written.
     pub fn config(&self, e: Engine, r: &Ready) -> Result<PathBuf, String> {
         let dir = self.dir.join(e.name());
-        // Consent-O-Matic kills Bing's result page (findings.md, R7).
+        // The cookie extension kills Bing's result page (findings.md, R7).
         let extensions = if e == Engine::Bing {
             vec![]
         } else {
@@ -536,7 +536,7 @@ mod tests {
         let dir = tempdir("broken");
         let zip = zip_of(&[("manifest.json", "{}")], None);
         let sha = crate::archive::sha(&zip);
-        let target = dir.join(format!("consent-o-matic-{}", &sha[..8]));
+        let target = dir.join(format!("idcac-{}", &sha[..8]));
         std::fs::create_dir_all(target.join("half")).unwrap();
         assert_eq!(unpack(&zip, &sha, &dir).unwrap(), target);
         assert!(target.join("manifest.json").is_file());
@@ -582,7 +582,7 @@ mod tests {
     fn ready(dir: &Path) -> Ready {
         Ready {
             chrome: dir.join("chrome"),
-            extension: dir.join("extensions/consent-o-matic-37cec881"),
+            extension: dir.join("extensions/idcac-8f70ab94"),
             ua: "Mozilla/5.0 Chrome/154.0.0.0".into(),
         }
     }
@@ -620,7 +620,7 @@ mod tests {
         let zip = zip_of(&[("manifest.json", "{\"v\":1}"), ("sub/a.js", "a")], None);
         let sha = crate::archive::sha(&zip);
         let got = unpack(&zip, &sha, &dir).unwrap();
-        assert_eq!(got, dir.join(format!("consent-o-matic-{}", &sha[..8])));
+        assert_eq!(got, dir.join(format!("idcac-{}", &sha[..8])));
         assert_eq!(std::fs::read_to_string(got.join("sub/a.js")).unwrap(), "a");
         std::fs::write(got.join("manifest.json"), "mine").unwrap();
         assert_eq!(unpack(&zip, &sha, &dir).unwrap(), got);
@@ -628,7 +628,7 @@ mod tests {
             std::fs::read_to_string(got.join("manifest.json")).unwrap(),
             "mine"
         );
-        assert_eq!(files_in(&dir), [format!("consent-o-matic-{}", &sha[..8])]);
+        assert_eq!(files_in(&dir), [format!("idcac-{}", &sha[..8])]);
     }
 
     #[test]
@@ -747,13 +747,13 @@ mod tests {
         std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
     }
 
-    /// A search dir with Consent-O-Matic already unpacked, so `ready` never downloads.
+    /// A search dir with the cookie extension already unpacked, so `ready` never downloads.
     #[cfg(unix)]
     fn seeded(tag: &str) -> PathBuf {
         let dir = tempdir(tag);
         let ext = dir.join(format!(
-            "extensions/consent-o-matic-{}",
-            &CONSENT_SHA256[..8]
+            "extensions/idcac-{}",
+            &EXTENSION_SHA256[..8]
         ));
         std::fs::create_dir_all(&ext).unwrap();
         std::fs::write(ext.join("manifest.json"), "{}").unwrap();
