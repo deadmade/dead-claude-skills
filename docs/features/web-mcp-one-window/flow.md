@@ -401,4 +401,11 @@ Paths are under `crates/web-mcp/` unless they start with `installer/`.
 No goal is without code, and no code is without a goal: the docs (Task 7) and the spike (Task 1) carry no goal of
 their own.
 
+## Verify
+
+2026-10-30, on dacbf9a. The checks are green apart from the two failures that also occur on main (see Rulings).
+Self-review found no bugs and no security issues; its eight wording findings were fixed in dacbf9a. The test audit
+was skipped: no gap scored 7 or higher. The user did not read the branch in tui-review. The user confirmed all 28
+decisions (every Ruling, D-T1, D-T5, D-T6, D-T7 and the one `shortcut:` line): "Confirm all".
+
 ## Run verdict
