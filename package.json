@@ -1,6 +1,6 @@
 {
   "name": "dead-claude-skills",
-  "version": "0.6.0",
+  "version": "0.6.4",
   "private": true,
   "description": "Interactive installer for the dead-claude-skills Claude Code marketplace.",
   "type": "module",

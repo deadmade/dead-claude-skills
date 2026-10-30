@@ -1,6 +1,6 @@
 {
   "name": "dead-skills",
-  "version": "0.6.0",
+  "version": "0.6.4",
   "description": "Default bundle: global instructions, the Night City theme and mod, desktop notifications, Context7, plus core plugins from claude-plugins-official as dependencies.",
   "author": {
     "name": "deadmade",

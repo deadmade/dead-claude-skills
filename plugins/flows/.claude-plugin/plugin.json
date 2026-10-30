@@ -1,6 +1,6 @@
 {
   "name": "flows",
-  "version": "0.6.0",
+  "version": "0.6.4",
   "description": "Conductor skills: each runs the skills this marketplace ships, in order, with approval gates and a state file to resume from. Build (/feature-flow, /research-flow, /implement, /fix-flow, /upgrade), check (/test-audit, /doc-audit, /harden, /self-review, /verify), understand (/understand) and keep the lessons (/learn). Also the writing skill with its copyedit, and a code-only prose check on each Write or Edit of a Markdown file. Installing it installs every plugin its conductors use.",
   "author": {
     "name": "deadmade",
