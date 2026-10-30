@@ -378,7 +378,7 @@ impl Server {
     }
 
     #[tool(
-        description = "Drive a browser through agent-browser. Each `session` is its own browser; close it when done. Per action: open needs url; snapshot lists the page with @eN refs; click needs ref; fill and type need ref and text; press needs key; scroll takes text = <up|down|left|right> [px]; eval needs js; screenshot, console, network and close need nothing more. A ref is an @eN from the latest snapshot."
+        description = "Drive a tab of web-mcp's browser window through agent-browser. Each `session` is its own tab; close it when done. Per action: open needs url; snapshot lists the page with @eN refs; click needs ref; fill and type need ref and text; press needs key; scroll takes text = <up|down|left|right> [px]; eval needs js; screenshot, console, network and close need nothing more. A ref is an @eN from the latest snapshot."
     )]
     async fn browser(&self, Parameters(args): Parameters<BrowserArgs>) -> CallToolResult {
         browse(&self.ctx, args).await.unwrap_or_else(|e| e)

@@ -1,5 +1,6 @@
-// web-mcp's search browser: the newest Chrome for Testing agent-browser installed if it starts, else helium, else
-// chromium on PATH (the order web-mcp itself uses). On NixOS Chrome for Testing downloads but can't start.
+// web-mcp's search browser: the newest Chrome for Testing agent-browser installed if it starts (on Windows: if it
+// exists), else helium, else chromium on PATH (the order web-mcp itself uses). On NixOS Chrome for Testing downloads
+// but can't start.
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { newestChromeForTesting } from '../core/binaries.ts';
@@ -22,9 +23,11 @@ export function findChromeForTesting(home: string, platform: NodeJS.Platform) {
   return newest && binary(newest);
 }
 
-// Whether web-mcp will find a search browser that runs.
+// Whether web-mcp will find a search browser that runs. On Windows `chrome.exe --version` opens a window instead, so
+// there, like web-mcp, a found Chrome for Testing counts without being started.
 export function searchBrowserWorks(home: string, platform: NodeJS.Platform) {
   const cft = findChromeForTesting(home, platform);
+  if (cft && platform === 'win32') return true;
   if (cft && startSync(cft, ['--version'], { timeout: 10000 }).status === 0) return true;
   return !!(which('helium') || which('chromium'));
 }

@@ -1,6 +1,6 @@
 // web-mcp's `browser` tool drives agent-browser. A current one on PATH is used as is; otherwise upstream's release
 // binary for the version pinned in installer/assets/agent-browser.json goes to ~/.claude/bin. Either way its browser is
-// installed; installAgentBrowser says whether web-mcp will find a search browser that runs, configureAgentBrowser points
+// installed; installAgentBrowser says whether web-mcp's browser window can open, configureAgentBrowser points
 // web-mcp's agentBrowserPath at the copy in use. Asks before a download; every failure is a summary line.
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -10,6 +10,7 @@ import {
   agentBrowserAsset,
   agentBrowserPlan,
   agentBrowserVersion,
+  windowProblem,
 } from '../core/binaries.ts';
 import { ASSETS, ask, done, failures, readJson } from '../context.ts';
 import { searchBrowserWorks } from '../system/browser.ts';
@@ -42,6 +43,7 @@ export async function installAgentBrowser(): Promise<{ path?: string; works: boo
         ? `agent-browser: bad pin in installer/assets/agent-browser.json (${JSON.stringify(pin)})`
         : `agent-browser: no upstream build for ${key}`,
     );
+    windowWorks();
     return { works: false };
   }
   // --with-deps runs sudo, so it is offered only with a download, behind its own prompt (default no).
@@ -50,6 +52,7 @@ export async function installAgentBrowser(): Promise<{ path?: string; works: boo
     const what = plan.download === 'install' ? 'Download' : `Upgrade ${ours} to`;
     if (!(await ask(`${what} agent-browser ${pinned} (upstream's release binary) to ${bin}, then its browser?`, true))) {
       done.push('agent-browser: install skipped by you');
+      windowWorks();
       return { works: false };
     }
     deps =
@@ -61,6 +64,7 @@ export async function installAgentBrowser(): Promise<{ path?: string; works: boo
     });
     if (!r.ok) {
       failures.push(`agent-browser ${pinned}: ${r.err}`);
+      windowWorks();
       return { works: false };
     }
     done.push(`agent-browser: ${plan.download === 'install' ? 'installed' : 'upgraded to'} ${pinned} at ${bin}`);
@@ -69,7 +73,8 @@ export async function installAgentBrowser(): Promise<{ path?: string; works: boo
 }
 
 // Runs `agent-browser install` (the browser download) on the copy in use, every run, so a download that failed before
-// is retried. works: a search browser runs for web-mcp, whether or not the install succeeded (Helium on PATH is enough).
+// is retried. works: web-mcp's browser window can open (windowWorks), whether or not the install succeeded (Helium on
+// PATH is enough).
 // path: a full path, npm's .cmd shim on Windows included.
 function useAgentBrowser(path: string, deps: boolean) {
   const args = deps ? ['install', '--with-deps'] : ['install'];
@@ -79,7 +84,20 @@ function useAgentBrowser(path: string, deps: boolean) {
     failures.push(
       `agent-browser: \`${path} ${args.join(' ')}\` failed (${errCode(run.error) ?? `exit ${run.status}`})`,
     );
-  return { path, works: searchBrowserWorks(homedir(), process.platform) };
+  return { path, works: windowWorks() };
+}
+
+// Warns when web-mcp's one browser window can't open; returns whether it can.
+function windowWorks() {
+  const browserRuns = searchBrowserWorks(homedir(), process.platform);
+  const problem = windowProblem({
+    browserRuns,
+    platform: process.platform,
+    display: !!(process.env.DISPLAY || process.env.WAYLAND_DISPLAY),
+    xvfb: !!which('Xvfb'),
+  });
+  if (problem) log('warn', problem);
+  return browserRuns && !problem;
 }
 
 // Points web-mcp's agentBrowserPath at the agent-browser in use.
