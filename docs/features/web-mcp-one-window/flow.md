@@ -343,3 +343,18 @@ windows, tabs from CDP `/json/list`.
 | --------- | --------- | --------- | ---- |
 
 ## Run verdict
+
+### D-T7: Chrome for Testing is never found on Windows (2026-10-30, found in Task 7's live check)
+
+**What:** `pick` accepts Chrome for Testing only if `chrome.exe --version` answers within 5 s. On Windows that command
+opens a browser window instead of printing a version. So without `WEB_MCP_CHROME`, web-mcp finds no browser on
+Windows, and every attempt flashes a Chrome window. The installer has the same check. The bug predates this branch
+(#71).
+
+**Options:**
+
+- **Fix it here as Task 8 (recommended).**
+- **Fix it in a separate follow-up.**
+
+**The user's decision**, 2026-10-30 (AskUserQuestion): "Fix here as Task 8 (Recommended)". Task 8 is added to the
+plan.

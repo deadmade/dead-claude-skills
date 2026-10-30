@@ -447,3 +447,40 @@ in the session scratchpad.
     session.
   - Record the result in flow.md.
 - [ ] **Step 4:** Commit the named files: "Describe web-mcp's one browser window in the docs."
+
+### Task 8: Find Chrome for Testing on Windows without running it (deviation D-T7)
+
+Found in Task 7's live check. On Windows `chrome.exe --version` opens a browser window instead of printing a version,
+so `pick` (`crates/web-mcp/src/profile.rs`) never accepts Chrome for Testing there unless `WEB_MCP_CHROME` is set,
+and every `--version` attempt flashes a Chrome window. The installer's `searchBrowserWorks`
+(`installer/system/browser.ts`) does the same check.
+
+**Files:**
+
+- Modify: `crates/web-mcp/src/profile.rs`: `pick` and `version`, plus their tests.
+- Modify: `installer/system/browser.ts`.
+- Modify: `installer/system/browser.test.ts`.
+
+**Interfaces:** unchanged. `pick` keeps its signature, and so does `searchBrowserWorks`.
+
+**On Windows:**
+
+- web-mcp never runs a browser binary with `--version`.
+- Chrome for Testing counts as working when its binary exists (`newest_cft`), and its major comes from the folder name
+  (`chrome-<a.b.c.d>`, already parsed).
+- `WEB_MCP_CHROME`, `helium` and `chromium` take `FALLBACK_MAJOR`.
+- The installer's `searchBrowserWorks` accepts a found Chrome for Testing binary without starting it.
+
+**Elsewhere:** Linux is unchanged. `--version` there still checks that Chrome for Testing starts, because NixOS
+downloads it but can't run it.
+
+- [ ] **Step 1: Failing tests.**
+  - `profile.rs`, Windows only: a seeded `chrome-<ver>\chrome.exe` that exits non-zero on `--version` is still picked,
+    with the folder's major. A test hook should make "never run" observable: the seeded exe writes a marker file when
+    it runs, and the test asserts the marker is absent.
+  - `browser.test.ts`: on win32, a found Chrome for Testing binary counts as working without being started.
+- [ ] **Step 2:** They fail.
+- [ ] **Step 3:** Implement, with `cfg!(windows)` in Rust and `platform === 'win32'` in TypeScript.
+- [ ] **Step 4:** `cargo test` and clippy in `crates/web-mcp`, then `node --test installer/system/browser.test.ts` and
+      `npm run typecheck`.
+- [ ] **Step 5:** Commit the named files: "Find Chrome for Testing on Windows without starting it."
