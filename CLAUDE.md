@@ -114,9 +114,10 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   (`<CONFIG>/bin`, then an absolute PATH entry; never a bare name), starts `uv run --locked` detached with cwd = the data
   dir and returns within about 300 ms. A PostToolUse `http` hook posts to 127.0.0.1:47811; that port is written only in
   `hooks/hooks.json` and the installer reads it from there (`hookPort`). Every failure leaves Claude the original output.
-  The installer downloads the pinned uv (`installer/assets/uv.json`, `uvPlan` in `core/binaries.ts`, bumped by
-  `scripts/sync-uv.mjs`) into `~/.claude/bin`, runs `uv sync --locked` and fetches tiktoken's vocabulary
-  (`steps/uv.ts`). Why uv and not a bundled Python: `docs/adr/0007-python-through-installer-uv.md`. Dependabot's `uv`
+  The installer keeps the pinned uv (`installer/assets/uv.json`, bumped by `scripts/sync-uv.mjs`) in `~/.claude/bin`:
+  once ours exists it always wins and is upgraded when older than the pin, since the launcher looks there first; a
+  current uv on PATH is used only while ours is absent (`uvPlan` in `core/binaries.ts`). It then runs `uv sync --locked`
+  and fetches tiktoken's vocabulary (`steps/uv.ts`). Why uv and not a bundled Python: `docs/adr/0008-python-through-installer-uv.md`. Dependabot's `uv`
   entry keeps `uv.lock` current.
 - Notifications (`plugins/default/`, formerly the notify plugin): `hooks.json` entries (Stop, Notification, PreToolUse
   on AskUserQuestion) running one stdlib Node script, `hooks/notify.mjs`, async. Logic and tests in `hooks/lib.mjs`; Linux

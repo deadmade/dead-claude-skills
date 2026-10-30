@@ -1,6 +1,6 @@
 # headroom-trim
 
-Shrinks every tool result with [headroom](https://github.com/chopratejas/headroom)'s no-ML lossy compression before
+Shrinks every tool result with [headroom](https://github.com/headroomlabs-ai/headroom)'s no-ML lossy compression before
 Claude reads it. A `PostToolUse` http hook (matcher `*`) posts each tool call to a small Python server on
 `127.0.0.1:47811`; the server trims the result's text and answers with the replacement, or with nothing when it has
 nothing to change. Any failure leaves the original output untouched.
