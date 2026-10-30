@@ -1,6 +1,6 @@
 ---
 flow: feature
-phase: execute
+phase: finish
 ---
 
 # Headroom trim: flow
@@ -24,14 +24,18 @@ about 32 ms on Windows; a PEP 578 audit hook blocked every non-loopback connect 
 
 - Spec: [spec.md](spec.md)
 - Plan: [plan.md](plan.md)
-- ADRs: [0007 Python runs through an installer-managed uv](../../adr/0007-python-through-installer-uv.md)
+- ADRs: [0008 Python runs through an installer-managed uv](../../adr/0008-python-through-installer-uv.md)
 - Glossary: trim server, launcher, trim ([GLOSSARY.md](../../../GLOSSARY.md))
 
 ## Gates
 
 - Gate 1, spec approved: 2026-10-30. Reopened 2026-10-30: plan review changed the uv start (no `--offline`, no
   fallback), how the launcher finds uv (no `uvPath` setting) and the off switch (no header). Re-approved
-  2026-10-30.
+  2026-10-30. Reopened 2026-10-30: the Task 3 review found tiktoken's vocabulary outside plugin data and blocked on
+  a fresh machine; the user picked the installer fetching it into `<plugin data>/tiktoken`. Re-approved 2026-10-30.
+  Reopened 2026-10-30: the final review found server-only updates never replaced a running server and pre-update
+  sessions swapped it back; the user approved the fix (identity over code and lockfile, plugin version, no
+  downgrade) with eight smaller fixes. Re-approved 2026-10-30.
 - Gate 2, plan approved: 2026-10-30, execution: subagent-driven
 
 ## Skipped
@@ -174,7 +178,14 @@ entry's `check` and `body`; `uv` in the dev shell; `uv.json` in the package chec
 
 ## Tasks
 
-- Task 1: base 888ac98, untracked at start: docs/adr/0007-python-through-installer-uv.md, docs/features/headroom-trim/{flow,plan,spec}.md — files clean (5 fixtures + flow.md, all listed; GLOSSARY.md was modified before the build)
+- Task 1: base 888ac98, untracked at start: docs/adr/0008-python-through-installer-uv.md, docs/features/headroom-trim/{flow,plan,spec}.md — files clean (7 fixtures + flow.md, all listed; GLOSSARY.md was modified before the build); commits 16b657f, 0471f1a; review clean after 1 fix round
+- Task 2: base 0471f1a, untracked at start: docs/adr/0008-python-through-installer-uv.md, docs/features/headroom-trim/{plan,spec}.md — files clean (the 5 listed); commit b1e0fdd; review clean (4 minors, two handed to Task 3)
+- Task 3: base b1e0fdd, untracked at start: the same three docs — files clean (the 4 listed); commits 2cdb05b, 15d031a; review clean after 1 fix round (tiktoken vocabulary taken to the user, Gate 1 reopened)
+- Task 4: base 15d031a, untracked at start: the same three docs — files clean (the 11 listed); commit 28cc800; review clean
+- Task 5: base 28cc800, untracked at start: the same three docs — files: the 13 listed plus `system/net.ts`,
+  `net.test.ts` and `system/proc.ts` (see Rulings); commits a95169a, aa03913; review clean after 1 fix round
+- Task 6: base aa03913, untracked at start: the same three docs — files clean (the 11 listed); commits fca68d0,
+  c5b59dd (doc fixes from the review, by the controller); review clean
 
 ## Rulings
 
@@ -185,10 +196,26 @@ entry's `check` and `body`; `uv` in the dev shell; `uv.json` in the package chec
 - 2026-10-30, pre-flight: `npm test` is red on origin/main (`claude plugin validate plugins/default`, register.tsx,
   Claude Code 2.1.292); tasks accept exactly that failure and also run the `node --test` parts directly — a new
   failure can't hide behind it.
-- 2026-10-30, Task 1: no MCP fixture — headless `claude -p` couldn't load an MCP tool (ToolSearch returned "Tool
-  references removed"); Task 2's image test uses a synthetic MCP image block, and MCP honouring is checked in Task 7 —
-  Bash, PowerShell and Grep, the gate, are honoured — if MCP isn't honoured, MCP results go untrimmed.
+- 2026-10-30, Task 1: withdrawn — the review sent the missing MCP fixture into the fix loop, and round 1 captured it
+  (`mcp_text.json`, `mcp_image.json`).
 - 2026-10-30, pre-flight: Task 7 runs after the merge's release, so the build ends after Task 6.
+- 2026-10-30, Task 1: flow.md was committed whole with the fixtures — the plan's Task 1 lists it — its links to the
+  spec and plan dangled until those were committed.
+- 2026-10-30, Task 2: Task 3 measures the `/hook` latency per fixture, since every string, short ones included, runs
+  through a full `compress()` — latency is the user's constraint — a length guard would be a trim rule of ours, so
+  the user decides if it is needed.
+- 2026-10-30, Task 4: two installer tests fail until Task 5 puts headroom-trim on the Tools page — `options.ts` is
+  Task 5's file and both land in one PR — CI is red only between those commits.
+- 2026-10-30, Task 4: the launcher starts the server with the plugin data folder as its working folder — Windows
+  would otherwise hold the user's project folder open — one spawn option.
+- 2026-10-30, Task 4: the automated security review's port findings (no secret on `/hook`, a forgeable `/health`)
+  stay as they are — the user accepted no secret on the port and the README says so — a per-session secret would
+  be a design change after the build.
+- 2026-10-30, Task 5: `stopLocalServer` went into `system/net.ts` and the shared `versionOf` into `system/proc.ts`,
+  files the task didn't list — CLAUDE.md puts code that touches the OS in `system/` with a test — two helpers.
+- 2026-10-30, Task 6: the ADR is 0008, not 0007 — `0007-one-browser-window.md` landed on main first — a rename.
+- 2026-10-30, Task 6: the sync found agent-browser 0.41.0 upstream (pin 0.39.4); the pin stays — a bump is the weekly
+  sync's PR, not this one.
 
 ## Deviations
 
@@ -196,5 +223,14 @@ entry's `check` and `body`; `uv` in the dev shell; `uv.json` in the package chec
 
 | spec goal | plan task | file:line | test |
 | --------- | --------- | --------- | ---- |
+| Shrink tool output with headroom's no-ML lossy compression | 2, 3 | `plugins/opt-in/headroom-trim/server/trim.py:33`, `server/server.py:79` | `test_trim.py:58` `test_headroom_trims_a_long_log`, `test_server.py` `test_hook_trims` |
+| headroom decides, no rules of ours; Read stays exact; images untouched | 2 | `server/trim.py:11` | `test_trim.py:64` `test_headroom_keeps_read`, `test_trim.py:48` `test_mcp_image_left_alone` |
+| No noticeable slowdown; every failure keeps the original output | 3, 4, final fixes | `server/server.py:86` (4 s queue deadline), `hooks/launcher.mjs:101` (bounded `main`) | `test_server.py:153`, `:96`, `:103`; `launcher.test.mjs:185`, `:268`; measured p50 14–16 ms per call (Task 3 report) |
+| No network from the compression process | 3 | `server/guard.py:35`, `server/server.py` (env and telemetry before the headroom import) | `test_guard.py:62`, `test_server.py:257`, `:281` |
+| Works on Windows x64 and Linux x64 without Python or uv | 5, 6 | `installer/core/binaries.ts:148` `uvAsset`, `:158` `uvPlan`, `installer/steps/uv.ts:26`, `:74` | `binaries.test.ts:120`, `:148`; CI runs the server tests on both runners (`test.yml`) |
+| Updates like any other dependency; a newer server is never replaced by an older one | 4, 6, final fixes | `hooks/launcher.mjs:18` `decide`, `:28` `identityOf`; `.github/dependabot.yml` (uv); `scripts/sync-uv.mjs` | `launcher.test.mjs:11`, `:217`, `:239`; `sync-lib.test.mjs` |
+| Silent, with a log that explains an untrimmed session | 3, final fixes | `server/server.py` (`trim.log`), `hooks/launcher.mjs:74` `openServerLog` | `test_server.py` `test_log_line`; `launcher.test.mjs:127`, `:192` |
+
+No goal without code; no code without a goal. End-to-end on a released build (Task 7) is still open by plan.
 
 ## Run verdict

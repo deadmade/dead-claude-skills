@@ -110,3 +110,18 @@ A run of the `writing` skill's copyedit (`references/copyedit.md`) on a spec, pl
 wasn't in the conversation, by the `writing` skill (Williams and Bizup's _Style_), and code checks that nothing
 was lost. A refused edit leaves the document as it was, and the gate says so.
 _Avoid_: review, rewrite, polish
+
+## headroom-trim
+
+**Trim server**:
+The one local process per machine that shrinks tool results with headroom before Claude reads them, shared by every
+session and never connected to the network.
+_Avoid_: proxy, daemon, compression server
+
+**Launcher**:
+The script each session runs at its start to make sure a current trim server is running.
+_Avoid_: starter, bootstrap
+
+**Trim**:
+headroom's lossy shrinking of one tool result; what it cuts is gone for good.
+_Avoid_: compress (headroom's word for all of its modes), compact
