@@ -206,7 +206,15 @@ origin/main d1428c6.
 - Task 6: base ba5b9d8. Untracked at start: the same. Commit a3ce791 touches `core/binaries.ts`,
   `core/binaries.test.ts` and `steps/agent-browser.ts`, so the files are clean. The review found a plan-mandated
   Important, which went to the user as D-T6; fix a5e009e.
-- Task 7: base a5e009e. Untracked at start: the same.
+- Task 7: base a5e009e. Untracked at start: the same. Commit e3b040f (docs, ADR, feature docs). Its live check found
+  D-T7.
+- Task 8: base e3b040f. Commit d09fd2e touches `profile.rs`, `installer/system/browser.ts` and its test, so
+  the files are clean. The review was clean.
+- Final review (whole branch, d1428c6..8525c2a): "With fixes". No Critical. The one Important (GLOSSARY.md never
+  updated) was already done in the main checkout's uncommitted GLOSSARY.md, which the user commits. The doc Minors,
+  the `shortcut:` comment and the deferred minors' triage were applied in 51d2c96, which also renumbers the ADR to
+  0007 (0005 was taken by `0005-agent-limits-and-models.md`, which the review missed). The rest it judged fine to
+  leave.
 
 ## Rulings
 
@@ -244,6 +252,16 @@ origin/main d1428c6.
   a stuck owner call blocks papers' engines for up to 60 s (the call timeout).
 - 2026-10-30, Task 1: the spike gets no code review — it has no code, and the user ruled on its findings through
   D-T1 — none.
+- 2026-10-30, Task 6: the fix's re-review was the controller reading the 12-line diff — a trivial mechanical fix —
+  one missed regression, which the final review would catch.
+- 2026-10-30, final review: its GLOSSARY.md Important needs no fix on the branch — the terms are already in the main
+  checkout's uncommitted GLOSSARY.md, which the user commits — none.
+- 2026-10-30, final review: the controller applied the fix wave itself and re-reviewed it, with no fix subagent — 22
+  lines of doc text, one comment and a `cargo fmt` pass; `cargo test` and clippy are green — a wording slip in the docs.
+- 2026-10-30, final review: the ADR is renumbered 0005 → 0007 — 0005 was already `0005-agent-limits-and-models.md`
+  (#85), and CLAUDE.md cites ADR 0005 for flows' agents — none.
+- 2026-10-30, final review: a rebound tab answers with no note that its page was lost (review Minor 3) — the spec says
+  nothing errors — a Claude session may be puzzled by an empty snapshot.
 
 ## Deviations
 
@@ -315,6 +333,21 @@ built-in web tools, although web-mcp can't search without agent-browser.
 Task 6 Step 3. `window.rs` joins Task 5's file
 list for it.
 
+### D-T7: Chrome for Testing is never found on Windows (2026-10-30, found in Task 7's live check)
+
+**What:** `pick` accepts Chrome for Testing only if `chrome.exe --version` answers within 5 s. On Windows that command
+opens a browser window instead of printing a version. So without `WEB_MCP_CHROME`, web-mcp finds no browser on
+Windows, and every attempt flashes a Chrome window. The installer has the same check. The bug predates this branch
+(#71).
+
+**Options:**
+
+- **Fix it here as Task 8 (recommended).**
+- **Fix it in a separate follow-up.**
+
+**The user's decision**, 2026-10-30 (AskUserQuestion): "Fix here as Task 8 (Recommended)". Task 8 is added to the
+plan.
+
 ## Live check
 
 2026-10-30, Windows 11, the release build driven over stdio JSON-RPC (no Claude Code session), agent-browser 0.39.4,
@@ -339,22 +372,24 @@ windows, tabs from CDP `/json/list`.
 
 ## Walkthrough
 
+Paths are under `crates/web-mcp/` unless they start with `installer/`.
+
 | spec goal | plan task | file:line | test |
 | --------- | --------- | --------- | ---- |
+| One window per web-mcp process | 4, 5 | `src/window.rs:58` (`live`), `src/browser.rs:276` (`warm`) | `window.rs:206` `live_starts_once_for_parallel_callers` |
+| Opens on the first call that needs a browser, never at startup | 4, 5 | `src/browser.rs:276`, `src/search.rs:265`, `src/papers.rs:647`, `src/browser.rs:631` | `tests/browser.rs:252` `browser_starts_no_window_until_used` |
+| Stays open until shutdown, then closes | 4, 5 | `src/main.rs:70` (`close_all`), `src/browser.rs:430`, `src/window.rs:110` (`tie_to_process`, `main.rs:41`) | `tests/browser.rs:126` `opened_sessions_are_closed_on_shutdown_unless_closed`, `window.rs:281` `tie_to_process_kills_children` |
+| Every engine is a tab | 5 | `src/browser.rs:268` (`engine_session`), `src/browser.rs:339` (`attached`) | `tests/search.rs:128` `search_fuses_all_four_engines`, `:221` `engine_tab_stays_between_searches` |
+| Every `browser` session is a tab | 5 | `src/browser.rs:156` (`name`), `src/browser.rs:339` | `tests/browser.rs:162` `gone_tab_is_rebound_once` |
+| Every fetch fallback is a tab | 5 | `src/browser.rs:631` | `tests/browser.rs:340` `parallel_fallbacks_use_separate_sessions`, `:559` `slow_fallback_still_closes_its_session` |
+| One window per Claude Code session, never shared | 3 | `src/profile.rs:164` (`slot`) | `tests/search.rs:309` `two_servers_take_two_slots` |
+| Searches stay as fast: engines in parallel, each in its own tab | 5 | `src/search.rs:265` (warm before the deadline) | `tests/search.rs:328` `window_start_is_outside_the_engine_deadline` |
+| A closed window or dead Chrome recovers | 4, 5 | `src/window.rs:58`, `src/browser.rs:304` (`retire`), `:339` | `tests/search.rs:252` `dead_chrome_is_replaced`, `:289` `closed_window_rebinds_every_engine`, `tests/browser.rs:187` `dead_chrome_is_replaced_mid_call`, `window.rs:244` `changed_url_starts_next_generation` |
+| I still don't care about cookies for every engine | 2 | `src/profile.rs:21`, `:324` | `profile.rs:681` `bad_extension_hash_is_refused`, `tests/search.rs:378` `consent_clears_by_the_next_search` |
+| Installer warns when the window can't open | 6 | `installer/core/binaries.ts:107` (`windowProblem`), `installer/steps/agent-browser.ts` (`windowWorks`) | `installer/core/binaries.test.ts:156` |
+| Chrome for Testing is found on Windows (D-T7) | 8 | `src/profile.rs` (`version`, `pick`), `installer/system/browser.ts` | `installer/system/browser.test.ts`, profile.rs's `pick` tests |
+
+No goal is without code, and no code is without a goal: the docs (Task 7) and the spike (Task 1) carry no goal of
+their own.
 
 ## Run verdict
-
-### D-T7: Chrome for Testing is never found on Windows (2026-10-30, found in Task 7's live check)
-
-**What:** `pick` accepts Chrome for Testing only if `chrome.exe --version` answers within 5 s. On Windows that command
-opens a browser window instead of printing a version. So without `WEB_MCP_CHROME`, web-mcp finds no browser on
-Windows, and every attempt flashes a Chrome window. The installer has the same check. The bug predates this branch
-(#71).
-
-**Options:**
-
-- **Fix it here as Task 8 (recommended).**
-- **Fix it in a separate follow-up.**
-
-**The user's decision**, 2026-10-30 (AskUserQuestion): "Fix here as Task 8 (Recommended)". Task 8 is added to the
-plan.
