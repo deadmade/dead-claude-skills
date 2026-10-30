@@ -31,8 +31,8 @@ pub struct Ctx {
     pub archive: archive::Archive,
     pub inflight: fetch::Inflight,
     pub lookup: lookup::Cache,
-    /// `Err` without a search folder: then only `search` fails.
-    pub profiles: Result<profile::Profiles, String>,
+    /// `Err` without a search folder: then `search`, `browser` and the fetch fallback fail.
+    pub profiles: Result<Arc<profile::Profiles>, String>,
     pub browser: browser::Browser,
 }
 
@@ -48,10 +48,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = rustls::crypto::ring::default_provider().install_default();
     let archive = archive::Archive::open(&cfg.project, &jiff::Zoned::now())?;
     let http = fetch::client(false)?;
+    let profiles = profile::Profiles::new(cfg.search_dir.clone()).map(Arc::new);
     let ctx = Ctx {
-        profiles: profile::Profiles::new(cfg.search_dir.clone()),
+        browser: browser_from(&cfg, profiles.clone()),
+        profiles,
         archive,
-        browser: browser_from(&cfg),
         http,
         http_public: fetch::client(true)?,
         limits: limits::HostLimits::default(),
@@ -71,9 +72,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// `WEB_MCP_FALLBACK_MS` shortens the fetch fallback's deadline (for tests).
-fn browser_from(cfg: &config::Config) -> browser::Browser {
-    let mut b = browser::Browser::new(&cfg.agent_browser);
+/// The browser over the window of `profiles`. `WEB_MCP_FALLBACK_MS` shortens the fetch fallback's deadline (for
+/// tests).
+fn browser_from(
+    cfg: &config::Config,
+    profiles: Result<Arc<profile::Profiles>, String>,
+) -> browser::Browser {
+    let mut b = browser::Browser::new(&cfg.agent_browser, window::Window::new(profiles));
     if let Some(ms) = std::env::var("WEB_MCP_FALLBACK_MS")
         .ok()
         .and_then(|v| v.parse().ok())

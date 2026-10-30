@@ -9,30 +9,18 @@ use crate::browser::Browser;
 use crate::profile::Profiles;
 
 /// The window as it is now: its generation (from 1, one more each time Chrome came back on a new url) and its url.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "Browser takes the window in Task 5")
-)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Live {
     pub r#gen: u32,
     pub url: String,
 }
 
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "Browser takes the window in Task 5")
-)]
 pub struct Window {
     profiles: Result<Arc<Profiles>, String>,
     /// The owner's config and the last answer; `None` until the first `live`.
     state: tokio::sync::Mutex<Option<(PathBuf, Live)>>,
 }
 
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "Browser takes the window in Task 5")
-)]
 impl Window {
     #[must_use]
     pub fn new(profiles: Result<Arc<Profiles>, String>) -> Self {
@@ -50,6 +38,17 @@ impl Window {
     )]
     pub fn owner(&self) -> String {
         format!("web-mcp-{}-window", std::process::id())
+    }
+
+    /// The config of every call attached to the window (`<search dir>/attach.json`), written if it changed.
+    ///
+    /// # Errors
+    /// When there is no search folder, or the file can't be written.
+    pub fn attach_config(&self) -> Result<PathBuf, String> {
+        self.profiles
+            .as_ref()
+            .map_err(Clone::clone)?
+            .attach_config()
     }
 
     /// The window's generation and cdp url, starting it on the first call.
@@ -152,6 +151,7 @@ pub fn tie_to_process() {
 mod tests {
     use super::*;
 
+    /// The fake agent-browser, with a window of its own that these tests never start.
     fn fake() -> Browser {
         let exe = std::env::current_exe().unwrap();
         let fake = exe.parent().and_then(Path::parent).unwrap().join(format!(
@@ -159,7 +159,7 @@ mod tests {
             std::env::consts::EXE_SUFFIX
         ));
         assert!(fake.is_file(), "build the fake first: cargo build --bins");
-        Browser::new(&fake.to_string_lossy())
+        Browser::new(&fake.to_string_lossy(), Window::new(Err("unused".into())))
     }
 
     /// A search dir with the extension unpacked and a dummy browser, and its window.

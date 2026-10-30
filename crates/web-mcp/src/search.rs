@@ -17,7 +17,7 @@ use crate::browser::{BrowserError, READ_MARGIN, SearchRun};
 use crate::engines::{Block, Engine, Found, Parsed};
 use crate::fetch::{self, GetOpts, slash};
 use crate::fuse::{final_order, fuse, normalise};
-use crate::profile::{ENGINE_DEADLINE, REST, Ready};
+use crate::profile::{ENGINE_DEADLINE, REST};
 use crate::rank::{Hit, MemIndex, PassageDoc};
 
 pub use crate::engines::Since;
@@ -115,18 +115,18 @@ impl Filter {
     }
 }
 
-/// One engine's result page for `query`, read in its own profile before `deadline`.
+/// One engine's result page for `query`, read in its tab of the window before `deadline`; the caller warmed the
+/// window first.
 ///
 /// A consent page waits a search out first (R16): a wall never satisfies `ready_js`, so it takes the whole
-/// deadline, and Consent-O-Matic needs ~23 s on a fresh profile while the browser stays up 120 s, so its click
-/// lands for the next search. Only a consent page met twice in a row rests the engine.
+/// deadline, and the cookie extension's click in the tab, which stays open, lands for the next search. Only a
+/// consent page met twice in a row rests the engine.
 ///
 /// # Errors
 /// Why the engine is skipped: resting, busy, a first consent page, blocked (it then rests), an unrecognised page,
 /// the browser's error or the deadline.
 pub async fn run_engine(
     ctx: &Ctx,
-    r: &Ready,
     e: Engine,
     query: &str,
     since: Option<Since>,
@@ -141,26 +141,23 @@ pub async fn run_engine(
     if let Some(why) = resting() {
         return Err(why);
     }
-    let _lock = profiles.lock(e, deadline).await.ok_or("busy")?;
+    let _turn = profiles.turn(e, deadline).await.ok_or("busy")?;
     // Another process may have rested it while we waited.
     if let Some(why) = resting() {
         return Err(why);
     }
-    let config = profiles.config(e, r)?;
     let left = deadline.saturating_duration_since(Instant::now());
-    // Too little left to read a page that never gets ready (a lock won late).
+    // Too little left to read a page that never gets ready (a turn won late).
     if left < READ_MARGIN {
         return Err("timed out".into());
     }
     let run = SearchRun {
-        config: &config,
         ready_js: e.ready_js(),
-        close_after: cfg!(windows),
     };
     let url = e.url(query, since);
     let (html, landed) = match ctx
         .browser
-        .render(&url, &profiles.session(e), Some(run), left)
+        .render(&url, &ctx.browser.engine_session(e), Some(run), left)
         .await
     {
         Ok(page) => page,
@@ -263,16 +260,16 @@ pub async fn web(
     }
     let mut lists = Vec::new();
     if !run.is_empty() {
-        let profiles = ctx
-            .profiles
-            .as_ref()
-            .map_err(|e| SearchError::Failed(e.clone()))?;
-        let ready = profiles.ready().await.map_err(SearchError::Failed)?;
+        // The window starts (and takes its profile slot) before the engines' deadline.
+        ctx.browser
+            .warm()
+            .await
+            .map_err(|e| SearchError::Failed(e.to_string()))?;
         let deadline = Instant::now() + ENGINE_DEADLINE;
-        let ready = &ready;
-        let outcomes = join_all(run.iter().map(|&e| async move {
-            (e, run_engine(ctx, ready, e, query, f.since, deadline).await)
-        }))
+        let outcomes = join_all(
+            run.iter()
+                .map(|&e| async move { (e, run_engine(ctx, e, query, f.since, deadline).await) }),
+        )
         .await;
         for (e, got) in outcomes {
             match got {

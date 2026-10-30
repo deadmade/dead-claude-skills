@@ -643,24 +643,18 @@ async fn engines(ctx: &Ctx, query: &str, f: &Filter) -> Engines {
     if run.is_empty() {
         return out;
     }
-    let deadline = std::time::Instant::now() + ctx.cfg.papers_deadline;
-    let ready = match &ctx.profiles {
-        Ok(p) => tokio::time::timeout(ctx.cfg.papers_deadline, p.ready())
-            .await
-            .unwrap_or_else(|_| Err("timed out".into())),
-        Err(e) => Err(e.clone()),
-    };
-    match ready {
-        Ok(ready) => {
-            let ready = &ready;
+    // The window starts before the engines' deadline; the API sources don't wait for it.
+    match ctx.browser.warm().await {
+        Ok(()) => {
+            let deadline = std::time::Instant::now() + ctx.cfg.papers_deadline;
             out.extend(
                 futures::future::join_all(run.into_iter().map(|e| async move {
-                    (e, run_engine(ctx, ready, e, query, f.since, deadline).await)
+                    (e, run_engine(ctx, e, query, f.since, deadline).await)
                 }))
                 .await,
             );
         }
-        Err(why) => out.extend(run.into_iter().map(|e| (e, Err(why.clone())))),
+        Err(why) => out.extend(run.into_iter().map(|e| (e, Err(why.to_string())))),
     }
     out
 }

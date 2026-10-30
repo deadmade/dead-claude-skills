@@ -734,11 +734,29 @@ pub(crate) mod tests {
     }
 
     pub(crate) fn test_ctx() -> Arc<Ctx> {
-        test_ctx_with(crate::browser::Browser::new("agent-browser"))
+        test_ctx_with("agent-browser")
     }
 
-    fn test_ctx_with(browser: crate::browser::Browser) -> Arc<Ctx> {
+    /// A context whose browser runs `agent_browser`, over a temp search dir with the extension unpacked and a dummy
+    /// browser.
+    fn test_ctx_with(agent_browser: &str) -> Arc<Ctx> {
         let _ = rustls::crypto::ring::default_provider().install_default();
+        let search =
+            std::env::temp_dir().join(format!("web-mcp-fetch-search-{}-{}", std::process::id(), {
+                static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+                N.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            }));
+        let _ = std::fs::remove_dir_all(&search);
+        let ext = search.join("extensions/idcac-8f70ab94");
+        std::fs::create_dir_all(&ext).unwrap();
+        std::fs::write(ext.join("manifest.json"), "{}").unwrap();
+        std::fs::write(search.join("browser"), "").unwrap();
+        let profiles = crate::profile::Profiles::new(Some(search.clone()))
+            .map(|p| Arc::new(p.with_chrome(search.join("browser"))));
+        let browser = crate::browser::Browser::new(
+            agent_browser,
+            crate::window::Window::new(profiles.clone()),
+        );
         let project = std::env::temp_dir().join(format!(
             "web-mcp-fetch-unit-{}-{}-{}",
             std::process::id(),
@@ -777,9 +795,9 @@ pub(crate) mod tests {
                 lookup_deadline: None,
                 project,
                 agent_browser: "agent-browser".into(),
-                search_dir: None,
+                search_dir: Some(search),
             },
-            profiles: crate::profile::Profiles::new(None),
+            profiles,
             http: client(false).unwrap(),
             http_public: client(true).unwrap(),
             limits: crate::limits::HostLimits::default(),
@@ -863,7 +881,7 @@ pub(crate) mod tests {
             std::env::consts::EXE_SUFFIX
         ));
         assert!(fake.is_file(), "build the fake first: cargo build --bins");
-        let ctx = test_ctx_with(crate::browser::Browser::new(&fake.to_string_lossy()));
+        let ctx = test_ctx_with(&fake.to_string_lossy());
         let url = Url::parse("http://example.com/redirect-private").unwrap();
         let dropped = browser_page(&ctx, &url, false).await.unwrap_err();
         assert!(dropped.contains("http://127.0.0.1/admin"), "{dropped}");

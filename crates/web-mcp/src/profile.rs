@@ -1,5 +1,6 @@
-//! The search profiles: one persistent, isolated browser profile per engine, each with its own agent-browser config
-//! file, the cookie extension (except for Bing), a lock and a rest shared by every web-mcp process on the machine.
+//! The search folder: the browser, cookie extension and user agent the window runs with, the profile slots (one
+//! persistent browser profile per web-mcp process, held under a lock, with its own consent marks), the config files,
+//! the engines' turns, and their rests, shared by every web-mcp process on the machine.
 
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
@@ -92,7 +93,7 @@ pub fn unpack(zip: &[u8], expected_sha256: &str, dir: &Path) -> Result<PathBuf, 
     }
 }
 
-/// What every engine's config needs, found once per search.
+/// What the window's owner config needs, found when the window starts.
 #[derive(Debug)]
 pub struct Ready {
     /// The browser agent-browser launches (`executablePath`).
@@ -103,14 +104,9 @@ pub struct Ready {
     pub ua: String,
 }
 
-/// An engine's lock, held while its search runs; dropping it releases it.
-pub struct EngineLock {
-    _file: File,
-}
-
-/// The search folder: per engine `<engine>/agent-browser.json`, `profile/`, `lock` and `rest`, plus the shared
-/// `extensions/` and, for Helium, `helium-wrap.sh`; the profile slots `profiles/<n>/` (`lock`, `owner`,
-/// `agent-browser.json`, `profile/`, `<engine>/consent-seen`) and the attached calls' `attach.json`.
+/// The search folder: per engine `<engine>/rest`, plus the shared `extensions/` and, for Helium,
+/// `helium-wrap.sh`; the profile slots `profiles/<n>/` (`lock`, `owner`, `agent-browser.json`, `profile/`,
+/// `<engine>/consent-seen`) and the attached calls' `attach.json`.
 pub struct Profiles {
     dir: PathBuf,
     /// For the cookie extension download: https only, at most 5 redirects (GitHub redirects release assets).
@@ -361,53 +357,6 @@ impl Profiles {
         unpack(&zip, EXTENSION_SHA256, &extensions).map_err(|e| why(&e))
     }
 
-    /// Writes `<engine>/agent-browser.json` (unless it already says the same) and returns its path.
-    ///
-    /// # Errors
-    /// When it can't be written.
-    pub fn config(&self, e: Engine, r: &Ready) -> Result<PathBuf, String> {
-        let dir = self.dir.join(e.name());
-        // The cookie extension kills Bing's result page (findings.md, R7).
-        let extensions = if e == Engine::Bing {
-            vec![]
-        } else {
-            vec![utf8(&r.extension)?]
-        };
-        let json = serde_json::json!({
-            "profile": utf8(&dir.join("profile"))?,
-            "extensions": extensions,
-            "executablePath": utf8(&r.chrome)?,
-            "userAgent": r.ua,
-            "headed": e.headed(),
-            "idleTimeout": "120s",
-            // Newline-separated, no commas: agent-browser splits `args` on both.
-            "args": "--lang=en-US",
-        });
-        let path = dir.join("agent-browser.json");
-        let text = serde_json::to_string_pretty(&json).expect("a JSON value serializes");
-        write_if_changed(&path, text.as_bytes(), false)
-            .map_err(|err| format!("could not write {}: {err}", path.display()))?;
-        Ok(path)
-    }
-
-    /// The engine's agent-browser session: one per search folder, so two folders never share a browser.
-    pub fn session(&self, e: Engine) -> String {
-        let hash = crate::archive::sha(self.dir.as_os_str().as_encoded_bytes());
-        format!("web-mcp-search-{}-{}", &hash[..8], e.name())
-    }
-
-    /// The engine's lock, shared by every web-mcp process, retried every 100 ms until `until`.
-    pub async fn lock(&self, e: Engine, until: Instant) -> Option<EngineLock> {
-        let path = self.dir.join(e.name()).join("lock");
-        match lock_file(&path, until).await {
-            Ok(file) => Some(EngineLock { _file: file? }),
-            Err(err) => {
-                eprintln!("web-mcp: could not lock {}: {err}", path.display());
-                None
-            }
-        }
-    }
-
     /// When the engine's rest ends, if it is resting at `now`.
     pub fn resting(&self, e: Engine, now: Timestamp) -> Option<Timestamp> {
         let rest = std::fs::read_to_string(self.dir.join(e.name()).join("rest")).ok()?;
@@ -415,7 +364,7 @@ impl Profiles {
         (until > now).then_some(until)
     }
 
-    /// Rests the engine until `until`. The caller holds its lock.
+    /// Rests the engine until `until`, for every web-mcp process on the machine.
     pub fn rest(&self, e: Engine, until: Timestamp) {
         // Best effort: an engine that can't rest is only asked again.
         let path = self.dir.join(e.name()).join("rest");
@@ -427,7 +376,8 @@ impl Profiles {
         self.consent_mark(e).exists()
     }
 
-    /// Marks (or clears) that the engine met a consent page. The caller holds its lock.
+    /// Marks (or clears) that the engine met a consent page, in the mark `consent_seen` reads. The caller holds the
+    /// engine's turn.
     pub fn set_consent_seen(&self, e: Engine, seen: bool) {
         // Best effort, like `rest`: a lost mark costs one more `consent (clearing)`.
         let path = self.consent_mark(e);
@@ -764,45 +714,6 @@ mod tests {
     }
 
     #[test]
-    fn config_types_match_agent_browser_schema() {
-        let dir = tempdir("config");
-        let p = profiles(&dir);
-        let r = ready(&dir);
-        let path = p.config(Engine::Brave, &r).unwrap();
-        assert_eq!(path, dir.join("brave/agent-browser.json"));
-        let v: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
-        let s = |p: &Path| p.to_string_lossy().into_owned();
-        assert_eq!(v["profile"], s(&dir.join("brave/profile")));
-        assert_eq!(v["extensions"], serde_json::json!([s(&r.extension)]));
-        assert_eq!(v["executablePath"], s(&r.chrome));
-        assert_eq!(v["userAgent"], r.ua);
-        assert_eq!(v["headed"], false);
-        assert_eq!(v["idleTimeout"], "120s");
-        let args = v["args"].as_str().unwrap();
-        assert!(
-            args.contains("--lang=en-US") && !args.contains(','),
-            "{args}"
-        );
-        // Unchanged content is not rewritten.
-        let before = std::fs::metadata(&path).unwrap().modified().unwrap();
-        std::thread::sleep(Duration::from_millis(20));
-        p.config(Engine::Brave, &r).unwrap();
-        assert_eq!(
-            std::fs::metadata(&path).unwrap().modified().unwrap(),
-            before
-        );
-    }
-
-    #[test]
-    fn bing_config_has_no_extension() {
-        let dir = tempdir("bing");
-        let p = profiles(&dir);
-        let path = p.config(Engine::Bing, &ready(&dir)).unwrap();
-        let v: serde_json::Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
-        assert_eq!(v["extensions"], serde_json::json!([]));
-    }
-
-    #[test]
     fn rest_round_trips_and_expires() {
         let dir = tempdir("rest");
         let p = profiles(&dir);
@@ -822,42 +733,6 @@ mod tests {
         std::fs::create_dir_all(dir.join("google")).unwrap();
         std::fs::write(dir.join("google/rest"), "soon").unwrap();
         assert_eq!(p.resting(Engine::Google, Timestamp::now()), None);
-    }
-
-    #[tokio::test]
-    async fn lock_waits_then_gives_up() {
-        let dir = tempdir("lock");
-        let p = profiles(&dir);
-        let held = p.lock(Engine::Scholar, Instant::now()).await.unwrap();
-        let t = Instant::now();
-        assert!(
-            p.lock(Engine::Scholar, t + Duration::from_millis(300))
-                .await
-                .is_none()
-        );
-        assert!(t.elapsed() >= Duration::from_millis(300));
-        // Another engine's lock is its own.
-        assert!(p.lock(Engine::Brave, Instant::now()).await.is_some());
-        let release = std::thread::spawn(move || {
-            std::thread::sleep(Duration::from_millis(200));
-            drop(held);
-        });
-        let got = p
-            .lock(Engine::Scholar, Instant::now() + Duration::from_secs(3))
-            .await;
-        assert!(got.is_some());
-        release.join().unwrap();
-    }
-
-    #[test]
-    fn session_name_carries_dir_hash() {
-        let a = profiles(&tempdir("session-a"));
-        let b = profiles(&tempdir("session-b"));
-        let s = a.session(Engine::SemanticScholar);
-        let hash = &crate::archive::sha(a.dir.as_os_str().as_encoded_bytes())[..8];
-        assert_eq!(s, format!("web-mcp-search-{hash}-semanticscholar"));
-        assert_ne!(s, b.session(Engine::SemanticScholar));
-        assert!(crate::browser::check_session(&s).is_err());
     }
 
     #[test]
