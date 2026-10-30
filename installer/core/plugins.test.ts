@@ -21,6 +21,8 @@ import {
   pluginDataDir,
   hookPort,
   trimServerCommands,
+  trimServerEnv,
+  trimServerPort,
   BUNDLE,
   type Marketplace,
   type PluginJson,
@@ -233,7 +235,39 @@ test('trimServerCommands: the sync and tiktoken command lines and the env', () =
   assert.deepEqual(c.env, {
     UV_PROJECT_ENVIRONMENT: join('/data', 'venv'),
     TIKTOKEN_CACHE_DIR: join('/data', 'tiktoken'),
+    PYTHONDONTWRITEBYTECODE: '1',
   });
+});
+
+test('trimServerEnv drops UV_*, PYTHON* and VIRTUAL_ENV from the shell, then adds ours', () => {
+  const env = {
+    PATH: '/bin',
+    UV_PYTHON: '3.9',
+    uv_index_url: 'x',
+    UV_PROJECT_ENVIRONMENT: '/elsewhere',
+    PYTHONPATH: '/p',
+    PythonHome: '/ph',
+    VIRTUAL_ENV: '/v',
+    VIRTUAL_ENV_PROMPT: 'kept',
+    MYUV_X: 'kept',
+    UNSET: undefined,
+  };
+  assert.deepEqual(trimServerEnv(env, { UV_PROJECT_ENVIRONMENT: '/d/venv' }), {
+    PATH: '/bin',
+    VIRTUAL_ENV_PROMPT: 'kept',
+    MYUV_X: 'kept',
+    UNSET: undefined,
+    UV_PROJECT_ENVIRONMENT: '/d/venv',
+  });
+});
+
+test('trimServerPort: the hook port of the installed copy, undefined when not installed or unreadable', () => {
+  const installed = { plugins: { 'headroom-trim@m': [{ scope: 'user', installPath: '/ht' }] } };
+  const hooks = json('plugins/opt-in/headroom-trim/hooks/hooks.json');
+  const read = (p: string) => (p === join('/ht', 'hooks', 'hooks.json') ? hooks : undefined);
+  assert.equal(trimServerPort(installed, 'headroom-trim@m', read), 47811);
+  assert.equal(trimServerPort(installed, 'other@m', read), undefined);
+  assert.equal(trimServerPort(installed, 'headroom-trim@m', () => undefined), undefined);
 });
 
 test('pluginDataDir replaces @ with - in the id', () => {

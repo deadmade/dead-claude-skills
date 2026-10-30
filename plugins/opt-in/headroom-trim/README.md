@@ -10,16 +10,32 @@ Measured on real sessions, it saves 7.0% of tool-result tokens.
 ## How it runs
 
 - A `SessionStart` hook runs `hooks/launch.mjs`, which returns within about 300 ms. It starts the server with
-  `uv run --locked` (detached and hidden, so it outlives the session) when none answers `/health`, and replaces one
-  built from an older lockfile. The server exits after 30 minutes without a request.
-- The environment lives in `<plugin data>/venv`. The installer downloads a pinned uv to `~/.claude/bin` and builds the
-  environment ahead of time; without the installer the first session builds it, and a missing uv leaves one line in
-  `<plugin data>/launcher.log`.
+  `uv run --locked` (detached and hidden, so it outlives the session) when none answers `/health`. `/health` reports
+  the server's identity (a hash of its code and lockfile) and the plugin version it came from: a launcher replaces a
+  server of another identity, unless that server came from a newer version (a session started before a plugin update
+  leaves it alone). The server exits after 30 minutes without a request.
+- The launcher uses `~/.claude/bin/uv` when it exists, and a uv on PATH (absolute entries only) only while that one is
+  absent. The installer downloads that pinned uv and builds the environment ahead of time; without the installer the
+  first session builds it.
+- The environment lives in `<plugin data>/venv`, and the server writes only to the plugin data folder. uv keeps its
+  download cache and the Python it installs in its own folders (`uv cache dir`, `uv python dir`). The server is shared
+  by every session, so the launcher leaves out the session's `UV_*`, `PYTHON*` and `VIRTUAL_ENV` variables.
 - There is no network: the server sets headroom's offline and telemetry switches before importing it, and blocks
   outgoing connections. Without the installer (or if its fetch of tiktoken's vocabulary failed) headroom estimates
   token counts instead of using that vocabulary; trims still work.
-- `<plugin data>/trim.log` has one JSON line per changed result (time, tool, tokens before and after, no text), rotated
-  at 1 MB.
+- A result that waited more than about 4 s behind larger ones goes to Claude untrimmed, so no tool call outlives the
+  hook's 5 s timeout.
+- Cut results are final. headroom's `Retrieve more: hash=…` note is common on cut logs and can't be followed: re-run
+  the command for the full output.
+
+## When nothing is trimmed
+
+Look in the plugin data folder (`~/.claude/plugins/data/headroom-trim-dead-claude-skills/`):
+
+- `launcher.log`: one line per server start (uv path and process id), or why none started (no uv).
+- `server.log`: the server's own output: uv's errors, a failed import, the port already taken. Emptied once it passes
+  about 1 MB.
+- `trim.log`: one JSON line per changed result (time, tool, tokens before and after, no text), rotated at 1 MB.
 
 ## Switching it off
 

@@ -18,6 +18,7 @@ SERVER_DIR = Path(__file__).resolve().parent.parent
 SERVER_PY = SERVER_DIR / "server.py"
 FIXTURES = SERVER_DIR / "tests" / "fixtures"
 LOCK = "ab12"
+VERSION = "0.6.0"
 
 
 def payload(name="Bash"):
@@ -50,7 +51,7 @@ class Running:
     def __init__(self, trim_text=None, idle=1800):
         self.tmp = tempfile.TemporaryDirectory()
         self.data = Path(self.tmp.name) / "data"  # missing on purpose: the server creates it
-        self.server = server.make_server(0, self.data, LOCK, idle=idle, trim_text=trim_text)
+        self.server = server.make_server(0, self.data, LOCK, idle=idle, trim_text=trim_text, version=VERSION)
         self.port = self.server.server_address[1]
         self.thread = threading.Thread(target=self.server.run)
         self.thread.start()
@@ -144,10 +145,35 @@ class HookTest(unittest.TestCase):
         self.assertTrue(out.startswith(b"HTTP/1.0 200"), out)
         self.assertLess(time.monotonic() - start, 3)
 
-    def test_health_reports_lock(self):
+    def test_health_reports_identity_and_version(self):
         r = self.running()
         status, out = request(r.port, "/health")
-        self.assertEqual((status, json.loads(out)), (200, {"ok": True, "lock": LOCK}))
+        self.assertEqual((status, json.loads(out)), (200, {"ok": True, "lock": LOCK, "version": VERSION}))
+
+    def test_queued_past_the_deadline_is_empty(self):
+        def slow(tool, text):
+            time.sleep(0.6)
+            return text.upper(), 2, 1
+
+        r = self.running(slow)
+        r.server.queue_deadline = 0.3  # 4 s in use; a hook waiting longer would outlive Claude Code's 5 s
+        with concurrent.futures.ThreadPoolExecutor(2) as pool:
+            first = pool.submit(request, r.port, "/hook", payload())
+            time.sleep(0.1)
+            second = pool.submit(request, r.port, "/hook", payload())
+            results = [first.result(5), second.result(5)]
+        self.assertIn(b"updatedToolOutput", results[0][1])
+        self.assertEqual(results[1], (200, b""))
+
+    def test_queued_within_the_deadline_is_trimmed(self):
+        def slow(tool, text):
+            time.sleep(0.2)
+            return text.upper(), 2, 1
+
+        r = self.running(slow)
+        with concurrent.futures.ThreadPoolExecutor(2) as pool:
+            results = list(pool.map(lambda _: request(r.port, "/hook", payload()), range(2)))
+        self.assertTrue(all(b"updatedToolOutput" in out for _, out in results))
 
     def test_log_line(self):
         r = self.running()
@@ -198,7 +224,7 @@ class ShutdownTest(unittest.TestCase):
 
 def spawn(port, data, *extra, env=None):
     return subprocess.Popen(
-        [sys.executable, "-X", "utf8", str(SERVER_PY), "--port", str(port), "--data", str(data), "--lock-hash", LOCK, *extra],
+        [sys.executable, "-X", "utf8", str(SERVER_PY), "--port", str(port), "--data", str(data), "--lock-hash", LOCK, "--version", VERSION, *extra],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
         env=env,

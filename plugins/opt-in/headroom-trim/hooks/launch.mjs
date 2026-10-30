@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { readFileSync, statSync } from 'node:fs';
+import { statSync } from 'node:fs';
 import { main } from './launcher.mjs';
 
 const isFile = (p) => {
@@ -9,4 +9,4 @@ const isFile = (p) => {
     return false;
   }
 };
-await main({ argv: process.argv.slice(2), env: process.env, fetch, spawn, readFile: (p) => readFileSync(p, 'utf8'), isFile });
+await main({ argv: process.argv.slice(2), env: process.env, fetch, spawn, isFile });

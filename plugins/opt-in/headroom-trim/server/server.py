@@ -1,12 +1,12 @@
 """The trim server: POST /hook trims a PostToolUse tool_response, GET /health, POST /shutdown.
 
-python <abs>/server.py --port <int> --data <dir> --lock-hash <hex> [--idle <seconds>]
+python <abs>/server.py --port <int> --data <dir> --lock-hash <hex> --version <x.y.z> [--idle <seconds>]
 """
 
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # the cwd is the user's project, never ours
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # our modules, whatever the cwd
 
 import guard  # noqa: E402
 
@@ -72,17 +72,19 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.server.touch()
         if self.path == "/health":
-            self.reply(json.dumps({"ok": True, "lock": self.server.lock_hash}).encode())
+            self.reply(json.dumps({"ok": True, "lock": self.server.lock_hash, "version": self.server.version}).encode())
         else:
             self.send_error(404)
 
     def do_POST(self):
+        arrived = time.monotonic()
         self.server.touch()
         if self.path == "/hook":
             try:
                 body = self.read_body()
                 with self.server.compress_lock:  # one pipeline; also held until the answer is out, so a shutdown waits
-                    self.reply(self.server.trim(body))
+                    late = time.monotonic() - arrived > self.server.queue_deadline
+                    self.reply(b"" if late else self.server.trim(body))
             except Exception:  # every failure gives Claude the original output
                 try:
                     self.reply()
@@ -100,9 +102,12 @@ class TrimServer(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = sys.platform != "win32"  # on Windows it would let a second server share the port
 
-    def __init__(self, port, data, lock_hash, idle, trim_text):
+    queue_deadline = 4  # seconds a hook may wait for the pipeline; Claude Code gives up on it at 5
+
+    def __init__(self, port, data, lock_hash, idle, trim_text, version=None):
         super().__init__(("127.0.0.1", port), Handler, bind_and_activate=False)
         self.lock_hash = lock_hash
+        self.version = version
         self.idle = idle
         self.trim_text = trim_text or (lambda tool, text: trim.headroom_text(tool, text))
         self.compress_lock = threading.Lock()
@@ -174,8 +179,8 @@ class TrimServer(ThreadingHTTPServer):
                 self.log_handler.close()
 
 
-def make_server(port, data, lock_hash, idle=1800, trim_text=None):
-    return TrimServer(port, data, lock_hash, idle, trim_text)
+def make_server(port, data, lock_hash, idle=1800, trim_text=None, version=None):
+    return TrimServer(port, data, lock_hash, idle, trim_text, version)
 
 
 def main():
@@ -183,10 +188,11 @@ def main():
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--data", required=True)
     parser.add_argument("--lock-hash", required=True)
+    parser.add_argument("--version")
     parser.add_argument("--idle", type=float, default=1800)
     args = parser.parse_args()
     try:
-        srv = make_server(args.port, args.data, args.lock_hash, args.idle)
+        srv = make_server(args.port, args.data, args.lock_hash, args.idle, version=args.version)
     except PortTaken:
         sys.exit(PORT_TAKEN)
     srv.run()

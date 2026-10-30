@@ -5,7 +5,13 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { type UpstreamPin, uvAsset, uvPlan } from '../core/binaries.ts';
-import { hookPort, pluginDataDir, pluginInstallPath, trimServerCommands } from '../core/plugins.ts';
+import {
+  pluginDataDir,
+  pluginInstallPath,
+  trimServerCommands,
+  trimServerEnv,
+  trimServerPort,
+} from '../core/plugins.ts';
 import { MARKETPLACE } from '../core/release.ts';
 import { ASSETS, CONFIG, WIN, ask, done, failures, readJson, tryJson } from '../context.ts';
 import { downloadBin, stopLocalServer } from '../system/net.ts';
@@ -56,6 +62,13 @@ export async function installUv(): Promise<string | undefined> {
   return bin;
 }
 
+// Asks a running trim server to exit (port from the installed copy's hooks.json); a summary line when it stays up.
+export async function stopTrimServer(installed: any, then: string): Promise<void> {
+  const port = trimServerPort(installed, HEADROOM_TRIM, tryJson);
+  if (port !== undefined && !(await stopLocalServer(port)))
+    failures.push(`headroom-trim: the trim server on port ${port} did not stop; ${then}`);
+}
+
 // Builds the trim server's environment (uv sync) and fetches tiktoken's vocabulary. A running server is stopped first,
 // so the sync can replace its files.
 export async function prepareTrimServer(uv: string): Promise<void> {
@@ -69,10 +82,8 @@ export async function prepareTrimServer(uv: string): Promise<void> {
   }
   const data = pluginDataDir(CONFIG, HEADROOM_TRIM);
   const cmd = trimServerCommands(root, data);
-  const env = { ...process.env, ...cmd.env };
-  const port = hookPort(tryJson(join(root, 'hooks', 'hooks.json')));
-  if (port !== undefined && !(await stopLocalServer(port)))
-    failures.push(`headroom-trim: the trim server on port ${port} did not stop; the sync may fail while it runs`);
+  const env = trimServerEnv(process.env, cmd.env);
+  await stopTrimServer(installed, 'the sync may fail while it runs');
   // stdio 'inherit' is how dcg and agent-browser show their long commands too.
   log('info', 'Building the headroom-trim server environment (uv sync)');
   const sync = startSync(uv, cmd.sync, { env, stdio: 'inherit' });

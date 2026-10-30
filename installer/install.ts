@@ -50,7 +50,7 @@ import {
   tryJson,
 } from './context.ts';
 import { configureAgentBrowser, installAgentBrowser } from './steps/agent-browser.ts';
-import { HEADROOM_TRIM, installUv, prepareTrimServer } from './steps/uv.ts';
+import { HEADROOM_TRIM, installUv, prepareTrimServer, stopTrimServer } from './steps/uv.ts';
 import { TUI_REVIEW, WEB_MCP, applyBin } from './steps/binaries.ts';
 import { applyCcstatusline } from './steps/ccstatusline.ts';
 import { confirmClean } from './steps/clean.ts';
@@ -239,11 +239,14 @@ const plan = planPlugins(
   tokenPlugins,
 );
 // Opt-ins that were once bundle dependencies are still marked auto and would be pruned; installing clears that.
-const installedJson: Record<string, { auto?: boolean }[]> =
-  tryJson(join(CONFIG, 'plugins', 'installed_plugins.json'))?.plugins ?? {};
+const installedFile = tryJson(join(CONFIG, 'plugins', 'installed_plugins.json'));
+const installedJson: Record<string, { auto?: boolean }[]> = installedFile?.plugins ?? {};
 plan.install.push(...selected.filter((id) => opts.includes(id) && installedJson[id]?.some((e) => e.auto)));
 // The packs flows carries, one folder each beside its .claude-plugin/: none may stay installed as a plugin.
 const packs = readdirSync(join(PKG, manifestPath(manifest, FLOWS)!, '..', '..', 'packs'));
+// On Windows a running trim server holds files in the data folder Claude Code deletes on uninstall.
+if (plan.uninstall.includes(HEADROOM_TRIM))
+  await stopTrimServer(installedFile, 'Claude Code may leave part of its data folder behind');
 await applyPlugins({
   install: plan.install,
   remove: plan.uninstall,

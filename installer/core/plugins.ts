@@ -117,8 +117,24 @@ export function trimServerCommands(root: string, data: string) {
       '-c',
       "import tiktoken; tiktoken.get_encoding('o200k_base')",
     ],
-    env: { UV_PROJECT_ENVIRONMENT: join(data, 'venv'), TIKTOKEN_CACHE_DIR: join(data, 'tiktoken') },
+    env: {
+      UV_PROJECT_ENVIRONMENT: join(data, 'venv'),
+      TIKTOKEN_CACHE_DIR: join(data, 'tiktoken'),
+      PYTHONDONTWRITEBYTECODE: '1', // no __pycache__ in the plugin's install folder
+    },
   };
+}
+
+// The shell's environment minus what would point uv or Python elsewhere, plus ours (the launcher drops the same).
+export const trimServerEnv = (env: Record<string, string | undefined>, ours: Record<string, string>) => ({
+  ...Object.fromEntries(Object.entries(env).filter(([k]) => !/^(UV_|PYTHON|VIRTUAL_ENV$)/i.test(k))),
+  ...ours,
+});
+
+// The port of the installed headroom-trim's trim server (`id`'s hooks.json, read by readJson), or undefined.
+export function trimServerPort(installed: any, id: string, readJson: (file: string) => any): number | undefined {
+  const root = pluginInstallPath(installed, id);
+  return root === undefined ? undefined : hookPort(readJson(join(root, 'hooks', 'hooks.json')));
 }
 
 // The folder Claude Code keeps for a plugin's data (CLAUDE_PLUGIN_DATA): the id with @ replaced by -.
