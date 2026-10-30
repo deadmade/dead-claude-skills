@@ -184,6 +184,59 @@ fn gone_tab_is_rebound_once() {
 }
 
 #[test]
+fn dead_chrome_is_replaced_mid_call() {
+    let (mut mcp, log) = start(FAKE);
+    mcp.call("browser", json!({"action": "snapshot", "session": "s"}));
+    // Chrome died: the owner relaunched it on a new url, and the old one refuses every connect.
+    std::fs::write(mcp.state.join("chrome"), "2").unwrap();
+    std::fs::write(mcp.state.join("dead-g1"), "").unwrap();
+    let r = mcp.call("browser", json!({"action": "snapshot", "session": "s"}));
+    assert!(!is_error(&r), "{r}");
+    let pid = mcp.pid();
+    let (g1, g2) = (format!("web-mcp-{pid}-g1-s"), format!("web-mcp-{pid}-g2-s"));
+    assert!(text(&r).contains(&format!("session: {g2}")), "{r}");
+    let owner = format!("web-mcp-{pid}-window");
+    let cdp2 = "ws://127.0.0.1:9222/devtools/browser/2";
+    let expected = [
+        (g1.clone(), "snapshot".to_owned(), Some(CDP)),
+        (g1.clone(), "snapshot".to_owned(), Some(CDP)),
+        (owner, "get cdp-url".to_owned(), None),
+        (g2, "snapshot".to_owned(), Some(cdp2)),
+    ];
+    let cdp_of = |c: &Value| {
+        let a = args(c);
+        a.iter()
+            .position(|x| *x == "--cdp")
+            .map(|i| c["args"][i + 1].as_str().unwrap().to_owned())
+    };
+    // The background close may land anywhere among these; it is checked below.
+    let got: Vec<_> = tab_calls(&mcp, &log)
+        .iter()
+        .filter(|c| !command_of(c).ends_with("close"))
+        .map(|c| (session_of(c).to_owned(), command_of(c), cdp_of(c)))
+        .collect();
+    let expected: Vec<_> = expected
+        .into_iter()
+        .map(|(s, c, u)| (s, c, u.map(str::to_owned)))
+        .collect();
+    assert_eq!(got, expected);
+    // The old generation's session closes in the background, without `--cdp`.
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    let closed = loop {
+        let closed: Vec<_> = calls(&log)
+            .iter()
+            .filter(|c| command_of(c).ends_with("close"))
+            .map(|c| (session_of(c).to_owned(), command_of(c), attached(c)))
+            .collect();
+        if !closed.is_empty() || std::time::Instant::now() > until {
+            break closed;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    };
+    assert_eq!(closed, [(g1, "close".to_owned(), false)]);
+}
+
+#[test]
 fn closing_a_gone_tab_opens_none() {
     let (mut mcp, log) = start(FAKE);
     mcp.call("browser", json!({"action": "snapshot", "session": "s"}));
