@@ -10,6 +10,7 @@ import {
   agentBrowserAsset,
   agentBrowserPlan,
   agentBrowserVersion,
+  windowProblem,
 } from '../core/binaries.ts';
 import { ASSETS, ask, done, failures, readJson } from '../context.ts';
 import { searchBrowserWorks } from '../system/browser.ts';
@@ -42,7 +43,7 @@ export async function installAgentBrowser(): Promise<{ path?: string; works: boo
         ? `agent-browser: bad pin in installer/assets/agent-browser.json (${JSON.stringify(pin)})`
         : `agent-browser: no upstream build for ${key}`,
     );
-    return { works: false };
+    return { works: windowWorks() };
   }
   // --with-deps runs sudo, so it is offered only with a download, behind its own prompt (default no).
   let deps = false;
@@ -50,7 +51,7 @@ export async function installAgentBrowser(): Promise<{ path?: string; works: boo
     const what = plan.download === 'install' ? 'Download' : `Upgrade ${ours} to`;
     if (!(await ask(`${what} agent-browser ${pinned} (upstream's release binary) to ${bin}, then its browser?`, true))) {
       done.push('agent-browser: install skipped by you');
-      return { works: false };
+      return { works: windowWorks() };
     }
     deps =
       process.platform === 'linux' &&
@@ -61,7 +62,7 @@ export async function installAgentBrowser(): Promise<{ path?: string; works: boo
     });
     if (!r.ok) {
       failures.push(`agent-browser ${pinned}: ${r.err}`);
-      return { works: false };
+      return { works: windowWorks() };
     }
     done.push(`agent-browser: ${plan.download === 'install' ? 'installed' : 'upgraded to'} ${pinned} at ${bin}`);
   }
@@ -79,7 +80,20 @@ function useAgentBrowser(path: string, deps: boolean) {
     failures.push(
       `agent-browser: \`${path} ${args.join(' ')}\` failed (${errCode(run.error) ?? `exit ${run.status}`})`,
     );
-  return { path, works: searchBrowserWorks(homedir(), process.platform) };
+  return { path, works: windowWorks() };
+}
+
+// Warns when web-mcp's one browser window can't open; true when it can.
+function windowWorks() {
+  const browserRuns = searchBrowserWorks(homedir(), process.platform);
+  const problem = windowProblem({
+    browserRuns,
+    platform: process.platform,
+    display: !!(process.env.DISPLAY || process.env.WAYLAND_DISPLAY),
+    xvfb: !!which('Xvfb'),
+  });
+  if (problem) log('warn', problem);
+  return browserRuns && !problem;
 }
 
 // Points web-mcp's agentBrowserPath at the agent-browser in use.
