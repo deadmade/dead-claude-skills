@@ -1,6 +1,6 @@
 // web-mcp's `browser` tool drives agent-browser. A current one on PATH is used as is; otherwise upstream's release
 // binary for the version pinned in installer/assets/agent-browser.json goes to ~/.claude/bin. Either way its browser is
-// installed; installAgentBrowser says whether web-mcp will find a search browser that runs, configureAgentBrowser points
+// installed; installAgentBrowser says whether web-mcp's browser window can open, configureAgentBrowser points
 // web-mcp's agentBrowserPath at the copy in use. Asks before a download; every failure is a summary line.
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -73,7 +73,8 @@ export async function installAgentBrowser(): Promise<{ path?: string; works: boo
 }
 
 // Runs `agent-browser install` (the browser download) on the copy in use, every run, so a download that failed before
-// is retried. works: a search browser runs for web-mcp, whether or not the install succeeded (Helium on PATH is enough).
+// is retried. works: web-mcp's browser window can open (windowWorks), whether or not the install succeeded (Helium on
+// PATH is enough).
 // path: a full path, npm's .cmd shim on Windows included.
 function useAgentBrowser(path: string, deps: boolean) {
   const args = deps ? ['install', '--with-deps'] : ['install'];

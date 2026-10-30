@@ -27,6 +27,7 @@ that behaves like "a normal user", in "complete isolation" from their own.
   Fingerprint patching is not. An engine that keeps blocking is dropped or switched to headed, not disguised.
 - **Consent banners** are answered by the Consent-O-Matic extension. Normal Google Chrome ignores extensions loaded
   from a folder since version 137, so the search browser is Chrome for Testing, or Helium or Chromium where
-  Chrome for Testing can't start (NixOS).
+  Chrome for Testing can't start (NixOS). (ADR 0007 replaces Consent-O-Matic with I still don't care about cookies,
+  loaded for every tab, Bing's included.)
 - **Results are only as stable as the engines' pages.** The parsers test against captured result pages and need
   updating when an engine changes its markup.

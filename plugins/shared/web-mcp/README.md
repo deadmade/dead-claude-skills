@@ -77,8 +77,8 @@ The installer downloads the `web-mcp` binary from the release and sets `binPath`
 `cargo build --release --manifest-path crates/web-mcp/Cargo.toml` (or `nix build .#web-mcp`) and put it on PATH
 or set its path with `/plugin configure web-mcp`.
 
-- **A search browser**: found as described above; the installer needs no Docker. If you accept the `web-builtins-off`
-  toggle, WebSearch and WebFetch are denied, but only once a search browser starts.
+- **A browser**: found as described above; the installer needs no Docker. If you accept the `web-builtins-off`
+  toggle, WebSearch and WebFetch are denied, but only once the window can open (see above).
 - **agent-browser** (for `browser` and `fetch`'s fallback): a current one on PATH is used as is. Otherwise the
   installer keeps its own copy in `~/.claude/bin`: upstream's release binary for the version pinned in
   `installer/assets/agent-browser.json` (checked against the sha256 pinned there; the weekly `sync.yml` bumps both),

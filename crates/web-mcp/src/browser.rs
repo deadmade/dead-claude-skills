@@ -82,7 +82,7 @@ pub struct Browser {
     /// The window as last seen; `None` until a call needed it.
     live: Mutex<Option<Live>>,
     /// The attached sessions this process has run and not closed, with their generation. Only these are ever
-    /// closed: a `close` on a session without a daemon starts one and leaks a tab (findings.md).
+    /// closed: a `close` on a session without a daemon starts one and leaks a tab (web-mcp-one-window/findings.md).
     ran: Mutex<BTreeMap<String, u32>>,
     /// The owner's config, from its first call; shutdown closes the owner under it.
     owner_config: Mutex<Option<PathBuf>>,
@@ -147,9 +147,9 @@ fn isolate(cmd: &mut Command, via: Via<'_>, env: impl IntoIterator<Item = (OsStr
 
 /// How long a `close` may take.
 const CLOSE_TIMEOUT: Duration = Duration::from_secs(5);
-/// What a search batch keeps back from the daemon's wait for everything else: findings.md measured ~1 s of
-/// process start, `open` and reads beyond the wait (3000/8000 ms waits: 4.0/8.9 s calls) and up to 2 s for a
-/// whole warm batch, so 2 s lets a page that never gets ready still be read inside the deadline.
+/// What a search batch keeps back from the daemon's wait for everything else: web-mcp-search/findings.md measured ~1 s
+/// of process start, `open` and reads beyond the wait (3000/8000 ms waits: 4.0/8.9 s calls) and up to 2 s for a whole
+/// warm batch, so 2 s lets a page that never gets ready still be read inside the deadline.
 pub const READ_MARGIN: Duration = Duration::from_secs(2);
 
 /// The agent-browser session of `key` in generation `g`.
@@ -249,7 +249,8 @@ impl Browser {
 
     /// The key of the user's session `name`. Run, batch and close map it to the current generation's agent-browser
     /// session, `web-mcp-<pid>-g<n>-<name>`: the pid keeps two servers off the same tab. At most `web-mcp-` + 10 pid
-    /// digits + `-g99-` + 32 name characters = 55 bytes, which leaves room in agent-browser's ~103-byte socket path.
+    /// digits + `-g99-` (longer after 99 browser restarts) + 32 name characters = 55 bytes, which leaves room in
+    /// agent-browser's ~103-byte socket path.
     #[must_use]
     #[expect(
         clippy::unused_self,
@@ -608,8 +609,8 @@ impl Browser {
             .ok_or_else(|| BrowserError::Failed("agent-browser returned no HTML or URL".into()))
     }
 
-    /// Waits, at most 1 s, until agent-browser has removed `session`'s `.pid` and `.sock`: an `open` right
-    /// after a `close` fails otherwise (findings.md, "Daemon behaviour"). Where they live isn't known: 1 s.
+    /// Waits, at most 1 s, until agent-browser has removed `session`'s `.pid` and `.sock`: an `open` right after a
+    /// `close` fails otherwise (web-mcp-search/findings.md, "Daemon behaviour"). Where they live isn't known: 1 s.
     async fn session_gone(&self, session: &str) {
         let Some(dir) = &self.socket_dir else {
             return tokio::time::sleep(Duration::from_secs(1)).await;

@@ -83,7 +83,7 @@ impl Window {
         p.slot()?;
         let config = p.owner_config(&ready)?;
         // Linux: a Chrome a killed web-mcp left in this slot (Windows has the job for that). An owner with no
-        // daemon closes without starting one (findings.md).
+        // daemon closes without starting one (web-mcp-one-window/findings.md).
         if cfg!(target_os = "linux")
             && let Some(prev) = p.previous_owner().filter(|o| *o != owner)
         {

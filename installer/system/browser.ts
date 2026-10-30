@@ -1,5 +1,6 @@
-// web-mcp's search browser: the newest Chrome for Testing agent-browser installed if it starts, else helium, else
-// chromium on PATH (the order web-mcp itself uses). On NixOS Chrome for Testing downloads but can't start.
+// web-mcp's search browser: the newest Chrome for Testing agent-browser installed if it starts (on Windows: if it
+// exists), else helium, else chromium on PATH (the order web-mcp itself uses). On NixOS Chrome for Testing downloads
+// but can't start.
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { newestChromeForTesting } from '../core/binaries.ts';

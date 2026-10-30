@@ -126,7 +126,7 @@ impl Profiles {
     /// # Errors
     /// When there is no `dir` or the HTTP client can't be built.
     pub fn new(dir: Option<PathBuf>) -> Result<Self, String> {
-        let dir = dir.ok_or("no folder for the search profiles: set WEB_MCP_SEARCH_DIR")?;
+        let dir = dir.ok_or("no search folder: set WEB_MCP_SEARCH_DIR")?;
         let http = reqwest::Client::builder()
             .user_agent(concat!("web-mcp/", env!("CARGO_PKG_VERSION")))
             .https_only(true)
@@ -311,7 +311,7 @@ impl Profiles {
     }
 
     /// A `#!/bin/sh` script running `helium` without `exec`: nixpkgs' Helium runs in `bwrap --die-with-parent`,
-    /// which kills it 10 s after agent-browser starts it directly (findings.md, R9).
+    /// which kills it 10 s after agent-browser starts it directly (web-mcp-search/findings.md, R9).
     fn helium_wrapper(&self, helium: &Path) -> Result<PathBuf, String> {
         let quoted = utf8(helium)?.replace('\'', r"'\''");
         let path = self.dir.join("helium-wrap.sh");
@@ -395,9 +395,9 @@ fn utf8(p: &Path) -> Result<&str, String> {
         .ok_or_else(|| format!("{} is not valid UTF-8", p.display()))
 }
 
-/// The browser for search and its Chrome major (findings.md, "Order and version"): `WEB_MCP_CHROME`, the newest
-/// Chrome for Testing if it starts (on Windows: if it exists), `helium` or `chromium` on `path`. Never the user's branded Chrome: it ignores
-/// extensions loaded from a folder.
+/// The browser for search and its Chrome major (web-mcp-search/findings.md, "Order and version"): `WEB_MCP_CHROME`, the
+/// newest Chrome for Testing if it starts (on Windows: if it exists), `helium` or `chromium` on `path`. Never the
+/// user's branded Chrome: it ignores extensions loaded from a folder.
 async fn pick(
     chrome_env: Option<PathBuf>,
     home: Option<&Path>,
@@ -603,10 +603,7 @@ mod tests {
     #[test]
     fn no_search_dir_fails_search_only() {
         let err = Profiles::new(None).err().unwrap();
-        assert_eq!(
-            err,
-            "no folder for the search profiles: set WEB_MCP_SEARCH_DIR"
-        );
+        assert_eq!(err, "no search folder: set WEB_MCP_SEARCH_DIR");
     }
 
     #[cfg(unix)]

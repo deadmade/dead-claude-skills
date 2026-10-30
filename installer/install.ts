@@ -148,7 +148,7 @@ const chosen: Record<string, boolean> = {
   // keeps them.
   [FLOWS]: current[FLOWS] || has(`feature-flow@${MARKETPLACE}`) || has(`self-review@${MARKETPLACE}`),
   // On by default where offered, until web-mcp is installed; then it keeps the user's choice. It does nothing unless
-  // web-mcp is selected and its search browser works.
+  // web-mcp is selected and its browser window can open.
   'web-builtins-off': has(WEB_MCP)
     ? current['web-builtins-off']
     : unavailable('web-builtins-off', process.platform, process.arch, VERSION) === undefined,
@@ -254,7 +254,7 @@ await applyPlugins({
 if (selected.includes(TUI_REVIEW)) await applyBin('tui-review', TUI_REVIEW);
 if (selected.includes(WEB_MCP)) await applyBin('web-mcp', WEB_MCP);
 
-// The built-in web tools are denied only once web-mcp's search browser works.
+// The built-in web tools are denied only once web-mcp's browser window can open.
 const browser = selected.includes(WEB_MCP) ? await installAgentBrowser() : { works: false };
 const webBuiltinsOff = webBuiltinsDecision({
   toggle: selected.includes(WEB_MCP) && on('web-builtins-off'),

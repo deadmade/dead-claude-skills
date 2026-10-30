@@ -170,7 +170,7 @@ fn state_dir(config: &str) -> PathBuf {
     )
 }
 
-/// findings.md's `tab_gone` answer to a single call (a batch entry adds its `command`).
+/// web-mcp-one-window/findings.md's `tab_gone` answer to a single call (a batch entry adds its `command`).
 fn gone_json(session: &str) -> Value {
     let error = format!(
         "tab_gone: bound tab is gone (target T-{session}, last url about:blank). Run `agent-browser tab new <url>` to bind a new tab, or `agent-browser tab list` to pick an existing one"
@@ -178,7 +178,8 @@ fn gone_json(session: &str) -> Value {
     json!({"success": false, "data": {"lastUrl": "about:blank", "targetId": format!("T-{session}")}, "error": error, "code": "tab_gone"})
 }
 
-/// Exits with findings.md's dead-Chrome connect error, or a single call's `tab_gone`, when `state` says so.
+/// Exits with web-mcp-one-window/findings.md's dead-Chrome connect error, or a single call's `tab_gone`, when `state`
+/// says so.
 fn attached_failure(state: &Path, session: &str, rest: &[String]) {
     let generation = session
         .split('-')
