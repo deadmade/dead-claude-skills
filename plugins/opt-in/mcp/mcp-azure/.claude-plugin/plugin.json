@@ -1,6 +1,6 @@
 {
   "name": "mcp-azure",
-  "version": "0.6.0",
+  "version": "0.6.3",
   "description": "Azure DevOps Server MCP server (self-hosted, PAT auth). Opt-in per machine; configure with /plugin configure.",
   "author": {
     "name": "deadmade",
