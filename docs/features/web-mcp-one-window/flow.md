@@ -408,4 +408,14 @@ Self-review found no bugs and no security issues; its eight wording findings wer
 was skipped: no gap scored 7 or higher. The user did not read the branch in tui-review. The user confirmed all 28
 decisions (every Ruling, D-T1, D-T5, D-T6, D-T7 and the one `shortcut:` line): "Confirm all".
 
+## Learned
+
+2026-10-30, the user picked all three:
+
+- CLAUDE.md, Checks: on Windows, run cargo from PowerShell, because Git Bash's `/usr/bin/link` shadows MSVC's
+  `link.exe`.
+- `plugins/flows/skills/feature-flow/SKILL.md`: an ADR takes the next free number in `docs/adr/` on the base
+  branch, checked again when it is committed (this ADR was drafted as 0005, which #85 had taken).
+- `docs/solutions/chrome-version-opens-a-window-on-windows.md`: D-T7's symptom, cause, fix and how to spot it.
+
 ## Run verdict
