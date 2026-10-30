@@ -412,6 +412,7 @@ impl Browser {
         };
         let tab = match tab {
             Err(BrowserError::TabGone(_)) => Ok(Value::Null),
+            // shortcut: this text is assumed, not seen; the owner's blank tabs keep it from happening.
             Err(BrowserError::Failed(m)) if m.contains("Cannot close the last tab") => {
                 Ok(Value::Null)
             }

@@ -152,7 +152,7 @@ synced upstream commit is in `UPSTREAM`.
 ## web-mcp
 
 - **I still don't care about cookies**: GPL-3.0, https://github.com/OhMyGuus/I-Still-Dont-Care-About-Cookies. web-mcp
-  downloads the pinned v1.1.9 zip at runtime (sha256-checked) and loads it into its search browsers; not vendored.
+  downloads the pinned v1.1.9 zip at runtime (sha256-checked) and loads it into its browser window; not vendored.
 
 ## Night City (dead-skills)
 

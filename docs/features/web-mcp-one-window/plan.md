@@ -25,7 +25,7 @@ until it exits, and runs every search engine, `browser` session and fetch fallba
 - The installer: TypeScript on Node 26, standard library only.
 
 **Spec:** [spec.md](spec.md). Approved 2026-10-30; plan review reopened it (flow.md). ADR:
-[0005](../../adr/0005-one-browser-window.md).
+[0007](../../adr/0007-one-browser-window.md).
 
 ## Global Constraints
 
@@ -427,7 +427,7 @@ in the session scratchpad.
 - Modify: `plugins/shared/web-mcp/README.md`: line 17 and lines 40-55
 - Modify: `README.md`, wherever the search browser is described (grep "Consent-O-Matic", "search browser",
   "window")
-- Commit, already written: `docs/adr/0005-one-browser-window.md`, `docs/features/web-mcp-one-window/{flow,spec,plan,findings}.md`
+- Commit, already written: `docs/adr/0007-one-browser-window.md`, `docs/features/web-mcp-one-window/{flow,spec,plan,findings}.md`
 - Modify: `docs/features/web-mcp-one-window/flow.md` (the live check)
 
 - [ ] **Step 1:** Update CLAUDE.md:

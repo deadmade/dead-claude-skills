@@ -28,8 +28,9 @@ searches see.
 - **Chrome's lifetime:**
   - On Windows, web-mcp puts itself in a kill-on-close job, so its daemons, and through them Chrome, go when it goes.
   - On Linux, a hard-killed web-mcp leaves its owner session behind. The next server that takes the slot closes it.
-- **Session names carry a generation.** A window the user closed is replaced by a new owner, and no session keeps
-  pointing at the dead Chrome.
+- **Session names carry a generation.** When Chrome dies, the owner relaunches it under a new cdp url, the
+  generation goes up, and no session keeps pointing at the dead Chrome. A tab closed by hand comes back through
+  `tab new`.
 - **One extension for every tab.** A single Chrome can't load it for some engines and not others.
 - **The `browser` tool and the fetch fallback need the window too:** a search folder, a non-branded browser and,
   on Linux, a display or Xvfb. The installer warns when they are missing.

@@ -48,7 +48,7 @@ The window's profile lives under `WEB_MCP_SEARCH_DIR` (default `$XDG_DATA_HOME/w
 over from earlier sessions. Searches and pages Claude opens share that profile and its cookies. There is no temp
 fallback: without a home folder, search asks for `WEB_MCP_SEARCH_DIR`, and on Unix a folder owned by someone else is
 refused. The browser is the first of: `WEB_MCP_CHROME`, the newest Chrome for Testing from `agent-browser install` (if
-it starts), `helium`, `chromium` on PATH. Branded Chrome is never used, because it ignores folder extensions since
+it starts; on Windows, if it exists), `helium`, `chromium` on PATH. Branded Chrome is never used, because it ignores folder extensions since
 version 137. On Linux, Helium is started through a small wrapper web-mcp writes (nixpkgs' bwrap otherwise kills it
 after 10 s), and without a display the window needs Xvfb, which agent-browser starts by itself. Helium ships uBlock
 Origin.

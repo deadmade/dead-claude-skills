@@ -14,7 +14,7 @@ phase: execute
 
 - Spec: [spec.md](spec.md)
 - Plan: [plan.md](plan.md)
-- ADRs: [0005-one-browser-window.md](../../adr/0005-one-browser-window.md)
+- ADRs: [0007-one-browser-window.md](../../adr/0007-one-browser-window.md)
 - Glossary: GLOSSARY.md (Browser window, Session, Profile slot replaces Search profile)
 
 ## Gates
@@ -172,7 +172,7 @@ Round 2, 2026-10-30. The plan's shape changed in round 1, so the review was re-r
   - **Generations stay inside `Browser`:** `failed` returns the old owner, and `Browser` maps user names to the
     current generation. (F5, F6)
   - **Lists:** test lists, an owner delay in the fake, `Cargo.lock`, and the files missing from the tasks. (F3, F7, F8)
-  - **ADR 0005** is rewritten for the owner-session design and committed in Task 6. GLOSSARY.md is left for the user
+  - **ADR 0007** is rewritten for the owner-session design and committed in Task 6. GLOSSARY.md is left for the user
     to commit. (F11)
   - **Smaller items:** a sync `try_lock_file`; a dead previous owner's `close` is skipped when its socket is gone;
     `tie_to_process` is best effort. (F13, F14, C5, C6)
@@ -188,7 +188,7 @@ The build runs in worktree `.claude/worktrees/web-mcp-one-window`, branch `workt
 origin/main d1428c6.
 
 - Task 1: base d1428c6. Untracked at start: `docs/features/web-mcp-one-window/` and
-  `docs/adr/0005-one-browser-window.md`.
+  `docs/adr/0007-one-browser-window.md`.
   - Result: `findings.md` written. That is a file the task listed, so the files are clean. It led to deviation D-T1.
 - Task 2: base d1428c6. Untracked at start: the same, plus `findings.md`. Commit f5ebd63 touches `profile.rs`,
   `tests/common/mod.rs` and `THIRD_PARTY.md`, all on the task's list, so the files are clean. The review was clean.

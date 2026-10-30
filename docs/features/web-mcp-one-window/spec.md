@@ -152,7 +152,7 @@ The build's first task checks the rest on this machine:
 - **Engine tabs stay open and are reused**, so a window holds up to 4 engine tabs, 6 with papers.
 - **Linux behaves the same as Windows:** one visible window.
 - **The old per-engine `profile/` folders are left on disk untouched.** Slots start fresh, with no migration.
-- **ADR 0005** records the shared window and the end of search/browsing profile isolation.
+- **ADR 0007** records the shared window and the end of search/browsing profile isolation.
 
 ## What the other tools now need
 

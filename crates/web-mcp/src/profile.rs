@@ -979,7 +979,10 @@ mod tests {
         std::fs::create_dir_all(cft.parent().unwrap()).unwrap();
         std::fs::write(&cft, "not a program: it can't start").unwrap();
 
-        let r = p.ready_with(None, Some(&home), OsStr::new("")).await.unwrap();
+        let r = p
+            .ready_with(None, Some(&home), OsStr::new(""))
+            .await
+            .unwrap();
         assert_eq!(r.chrome, cft);
         assert!(r.ua.contains("Chrome/156.0.0.0"), "{}", r.ua);
 
@@ -997,7 +1000,10 @@ mod tests {
         );
         // `version` records every binary it ran.
         let ran = VERSIONS.lock().unwrap();
-        assert!(!ran.contains_key(&cft) && !ran.contains_key(&mine), "{ran:?}");
+        assert!(
+            !ran.contains_key(&cft) && !ran.contains_key(&mine),
+            "{ran:?}"
+        );
     }
 
     #[cfg(unix)]

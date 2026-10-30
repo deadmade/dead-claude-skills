@@ -22,7 +22,7 @@ that behaves like "a normal user", in "complete isolation" from their own.
 
 - **The search browser is not the user's.** It isn't the user's Chrome, profile or accounts, and never attaches to
   them. The `browser` tool and the fetch fallback keep throwaway sessions, so pages Claude opens can't change the
-  search profile.
+  search profile. (ADR 0007 replaces this: they are now tabs of the search window and share its profile.)
 - **No stealth.** Normal browser settings are allowed (a regular user agent, window size, `Accept-Language`).
   Fingerprint patching is not. An engine that keeps blocking is dropped or switched to headed, not disguised.
 - **Consent banners** are answered by the Consent-O-Matic extension. Normal Google Chrome ignores extensions loaded
