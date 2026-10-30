@@ -25,16 +25,23 @@ def _is_loopback(host):
         return False
 
 
+def _host(target):
+    # an address is (host, port, ...); the gethostbyname events wrap their arguments in a tuple again
+    while isinstance(target, (tuple, list)) and target:
+        target = target[0]
+    return target
+
+
 def _hook(event, args):
-    if event in ("socket.connect", "socket.sendto"):
+    if event in ("socket.connect", "socket.sendto", "socket.sendmsg"):
         sock, addr = args[0], args[1]
         if getattr(sock, "family", None) == getattr(socket, "AF_UNIX", object()):
             return
-        host = addr[0] if isinstance(addr, tuple) else addr
-        if not _is_loopback(host):
+        if not _is_loopback(_host(addr)):
             raise PermissionError(f"guard: {event} to {addr} blocked")
-    elif event == "socket.getaddrinfo" and not _is_loopback(args[0]):
-        raise PermissionError(f"guard: DNS lookup of {args[0]} blocked")
+    elif event in ("socket.getaddrinfo", "socket.gethostbyname", "socket.gethostbyaddr", "socket.getnameinfo"):
+        if not _is_loopback(_host(args[0])):
+            raise PermissionError(f"guard: DNS lookup of {args[0]} blocked")
 
 
 def install():

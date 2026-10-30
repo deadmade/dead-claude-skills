@@ -22,15 +22,20 @@ for _key, _value in {
     "HEADROOM_CCR_BACKEND": "memory",
 }.items():
     os.environ[_key] = _value
-if "--data" in sys.argv[:-1]:  # headroom reads its workspace folder at import
-    os.environ["HEADROOM_WORKSPACE_DIR"] = os.path.join(sys.argv[sys.argv.index("--data") + 1], "headroom")
+import argparse  # noqa: E402
+
+_early = argparse.ArgumentParser(add_help=False, allow_abbrev=False)
+_early.add_argument("--data")
+_data = _early.parse_known_args()[0].data
+if _data:  # headroom and tiktoken read their folders at import
+    os.environ["HEADROOM_WORKSPACE_DIR"] = os.path.join(_data, "headroom")
+    os.environ["TIKTOKEN_CACHE_DIR"] = os.path.join(_data, "tiktoken")
 
 import headroom.telemetry.session as _session  # noqa: E402
 
 _session.post_session_event = lambda *a, **k: None
 _session._post_blocking = lambda *a, **k: None
 
-import argparse  # noqa: E402
 import json  # noqa: E402
 import logging  # noqa: E402
 import logging.handlers  # noqa: E402
@@ -44,7 +49,13 @@ import trim  # noqa: E402
 PORT_TAKEN = 75
 
 
+class PortTaken(Exception):
+    pass
+
+
 class Handler(BaseHTTPRequestHandler):
+    timeout = 5  # the hook's own timeout: a stalled client must not hold a thread forever
+
     def log_message(self, *args):
         pass
 
@@ -68,9 +79,15 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         self.server.touch()
         if self.path == "/hook":
-            body = self.read_body()
-            with self.server.compress_lock:  # one pipeline; also held until the answer is out, so a shutdown waits
-                self.reply(self.server.trim(body))
+            try:
+                body = self.read_body()
+                with self.server.compress_lock:  # one pipeline; also held until the answer is out, so a shutdown waits
+                    self.reply(self.server.trim(body))
+            except Exception:  # every failure gives Claude the original output
+                try:
+                    self.reply()
+                except Exception:
+                    pass
         elif self.path == "/shutdown" and self.client_address[0] == "127.0.0.1":
             self.read_body()
             self.reply()
@@ -84,11 +101,12 @@ class TrimServer(ThreadingHTTPServer):
     allow_reuse_address = sys.platform != "win32"  # on Windows it would let a second server share the port
 
     def __init__(self, port, data, lock_hash, idle, trim_text):
-        super().__init__(("127.0.0.1", port), Handler)
+        super().__init__(("127.0.0.1", port), Handler, bind_and_activate=False)
         self.lock_hash = lock_hash
         self.idle = idle
         self.trim_text = trim_text or (lambda tool, text: trim.headroom_text(tool, text))
         self.compress_lock = threading.Lock()
+        self.timer_lock = threading.Lock()
         self.timer = None
         data = Path(data)
         data.mkdir(parents=True, exist_ok=True)
@@ -99,14 +117,21 @@ class TrimServer(ThreadingHTTPServer):
             data / "trim.log", maxBytes=1_000_000, backupCount=1, encoding="utf-8"
         )
         self.log.addHandler(self.log_handler)
+        try:  # only a failed bind means "port taken"; the folder and log above fail as themselves
+            self.server_bind()
+            self.server_activate()
+        except OSError as e:
+            self.server_close()
+            raise PortTaken from e
         self.touch()
 
     def touch(self):
-        if self.timer:
-            self.timer.cancel()
-        self.timer = threading.Timer(self.idle, self.shutdown)
-        self.timer.daemon = True
-        self.timer.start()
+        with self.timer_lock:  # parallel handlers must not orphan a timer that would shut the server down later
+            if self.timer:
+                self.timer.cancel()
+            self.timer = threading.Timer(self.idle, self.shutdown)
+            self.timer.daemon = True
+            self.timer.start()
 
     def trim(self, body):
         """The /hook answer for one request body; empty on any failure, so Claude keeps the original."""
@@ -141,7 +166,8 @@ class TrimServer(ThreadingHTTPServer):
         try:
             self.serve_forever()
         finally:
-            self.timer.cancel()
+            with self.timer_lock:
+                self.timer.cancel()
             with self.compress_lock:  # an in-flight trim finishes first
                 self.server_close()
                 self.log.removeHandler(self.log_handler)
@@ -161,7 +187,7 @@ def main():
     args = parser.parse_args()
     try:
         srv = make_server(args.port, args.data, args.lock_hash, args.idle)
-    except OSError:
+    except PortTaken:
         sys.exit(PORT_TAKEN)
     srv.run()
 

@@ -101,11 +101,48 @@ class HookTest(unittest.TestCase):
 
     def test_parallel_requests(self):
         r = self.running()
+        big = payload()
+        big["tool_response"]["stdout"] = long_log()
+        bodies = [big if i % 2 else payload() for i in range(8)]  # half really trim, so compress() calls contend
         start = time.monotonic()
         with concurrent.futures.ThreadPoolExecutor(8) as pool:
-            results = list(pool.map(lambda _: request(r.port, "/hook", payload(), timeout=5), range(8)))
+            results = list(pool.map(lambda b: request(r.port, "/hook", b, timeout=5), bodies))
         self.assertTrue(all(status == 200 for status, _ in results))
+        self.assertTrue(all(b"updatedToolOutput" in out for (_, out), b in zip(results, bodies) if b is big))
         self.assertLess(time.monotonic() - start, 5)
+
+    def test_touch_keeps_one_timer(self):
+        r = self.running()
+        before = sum(t.is_alive() for t in threading.enumerate() if isinstance(t, threading.Timer))
+        with concurrent.futures.ThreadPoolExecutor(16) as pool:
+            list(pool.map(lambda _: [r.server.touch() for _ in range(200)], range(16)))
+        time.sleep(0.2)  # cancelled timers have left by now; an orphan would still be waiting
+        alive = sum(t.is_alive() for t in threading.enumerate() if isinstance(t, threading.Timer))
+        self.assertEqual(alive, before)
+
+    def raw(self, port, head):
+        with socket.create_connection(("127.0.0.1", port), timeout=5) as s:
+            s.sendall(head)
+            s.settimeout(5)
+            data = b""
+            while chunk := s.recv(4096):
+                data += chunk
+        return data
+
+    def test_bad_content_length_is_empty(self):
+        r = self.running()
+        out = self.raw(r.port, b"POST /hook HTTP/1.0\r\ncontent-length: abc\r\n\r\n")
+        self.assertTrue(out.startswith(b"HTTP/1.0 200"), out)
+        self.assertTrue(out.endswith(b"\r\n\r\n"), out)
+
+    def test_stalled_client_gets_empty_answer(self):
+        server.Handler.timeout = 0.5
+        self.addCleanup(setattr, server.Handler, "timeout", 5)
+        r = self.running()
+        start = time.monotonic()
+        out = self.raw(r.port, b"POST /hook HTTP/1.0\r\ncontent-length: 100\r\n\r\n")  # body never comes
+        self.assertTrue(out.startswith(b"HTTP/1.0 200"), out)
+        self.assertLess(time.monotonic() - start, 3)
 
     def test_health_reports_lock(self):
         r = self.running()
@@ -192,9 +229,11 @@ class ProcessTest(unittest.TestCase):
         return proc
 
     def test_server_process_has_no_network(self):
+        data = str(self.data)
         code = (
             "import os, socket, sys\n"
             f"sys.path.insert(0, {str(SERVER_DIR)!r})\n"
+            f"sys.argv = ['server.py', {'--data=' + data!r}]\n"
             "import server\n"
             "for call in (lambda: socket.create_connection(('1.1.1.1', 443), timeout=1),\n"
             "             lambda: socket.getaddrinfo('example.com', 443)):\n"
@@ -202,6 +241,8 @@ class ProcessTest(unittest.TestCase):
             "    sys.exit('not blocked')\n"
             "want = {'HEADROOM_OFFLINE': '1', 'HEADROOM_BEACON': 'off', 'HEADROOM_TELEMETRY': 'off', 'DO_NOT_TRACK': '1',\n"
             "        'HEADROOM_UPDATE_CHECK': 'off', 'HF_HUB_OFFLINE': '1', 'HEADROOM_CCR_BACKEND': 'memory'}\n"
+            f"want['HEADROOM_WORKSPACE_DIR'] = os.path.join({data!r}, 'headroom')\n"
+            f"want['TIKTOKEN_CACHE_DIR'] = os.path.join({data!r}, 'tiktoken')\n"
             "assert all(os.environ.get(k) == v for k, v in want.items()), os.environ\n"
             "import headroom.telemetry.session as s\n"
             "assert s.post_session_event({}) is None and s._post_blocking({}) is None\n"
@@ -210,6 +251,36 @@ class ProcessTest(unittest.TestCase):
         env = {k: v for k, v in os.environ.items() if not k.startswith(("HEADROOM_", "HF_"))}
         r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=60, env=env)
         self.assertEqual((r.returncode, r.stdout.strip()), (0, "ok"), r.stderr)
+
+    def test_real_token_counter_from_data_cache(self):
+        empty_temp = str(Path(self.tmp.name) / "temp")  # so tiktoken's default %TEMP% cache can't stand in for ours
+        Path(empty_temp).mkdir()
+        env = {k: v for k, v in os.environ.items() if not k.startswith(("HEADROOM_", "TIKTOKEN_"))}
+        env.update(TEMP=empty_temp, TMP=empty_temp, TMPDIR=empty_temp)
+        cache = self.data / "tiktoken"
+        # Fill the cache the way the installer will: a plain process with network access, outside the guard.
+        fill = subprocess.run(
+            [sys.executable, "-c", "import tiktoken; tiktoken.get_encoding('o200k_base')"],
+            capture_output=True, text=True, timeout=120, env={**env, "TIKTOKEN_CACHE_DIR": str(cache)},
+        )
+        self.assertEqual(fill.returncode, 0, fill.stderr)
+        code = (
+            "import sys\n"
+            f"sys.path.insert(0, {str(SERVER_DIR)!r})\n"
+            f"sys.argv = ['server.py', '--data', {str(self.data)!r}]\n"
+            "import server, trim\n"
+            "from headroom.tokenizers import get_tokenizer\n"
+            "print(type(get_tokenizer(trim.MODEL)).__name__)\n"
+        )
+        r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=60, env=env)
+        self.assertEqual(r.stdout.strip(), "TiktokenCounter", r.stderr)
+
+    def test_unusable_data_dir_is_not_exit_75(self):
+        self.data.parent.mkdir(parents=True, exist_ok=True)
+        self.data.write_text("a file, not a folder")
+        proc = self.start(free_port())
+        proc.wait(30)
+        self.assertNotIn(proc.returncode, (0, 75))
 
     def test_idle_exit(self):
         port = free_port()
