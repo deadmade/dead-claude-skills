@@ -15,7 +15,7 @@ they pull is archived in `.web/` in the project before Claude sees it.
   content images come back downscaled. A page that is empty without JavaScript is re-fetched through the browser. A URL
   fetched earlier in the run comes from the archive, except localhost and private-network addresses.
 - `browser { action, session, url?, ref?, text?, key?, js? }`: drives agent-browser. `session` is required, and each
-  session is its own browser (named per server process, and closed again when the server exits). Actions: `open`, `snapshot`, `click`, `fill`, `type`, `press`, `scroll`, `screenshot`,
+  session is a tab of web-mcp's browser window (named per server process, and closed again when the server exits). Actions: `open`, `snapshot`, `click`, `fill`, `type`, `press`, `scroll`, `screenshot`,
   `console`, `network`, `eval`, `close`.
 - `lookup { kind, target, record?, at?, ecosystem? }`: one record about a target from public sources, each reply kept
   as the source sent it. `dns`: Cloudflare DNS over HTTPS (`record` such as MX or TXT; default A, AAAA, CNAME, MX, NS and
@@ -37,17 +37,25 @@ you are researching. Shodan InternetDB is free for non-commercial use only.
 
 ## How search reads engines
 
-Each engine has its own browser profile under `WEB_MCP_SEARCH_DIR` (default `$XDG_DATA_HOME/web-mcp`,
-`~/.local/share/web-mcp`, or `%LOCALAPPDATA%\web-mcp`). There is no temp fallback: without a home folder, search asks
-for `WEB_MCP_SEARCH_DIR`, and on Unix a folder owned by someone else is refused. The browser is the first of:
-`WEB_MCP_CHROME`, the newest Chrome for Testing from `agent-browser install` (if it starts), `helium`, `chromium` on PATH.
-Branded Chrome is never used, because it ignores folder extensions since version 137. On Linux, Helium is started
-through a small wrapper web-mcp writes (nixpkgs' bwrap otherwise kills it after 10 s). Helium ships uBlock Origin. On
-Windows each search browser is closed after its search, because extensions force a visible window there.
+Each web-mcp server (one per Claude Code session) opens one visible browser window, on the first `search`, `browser`
+call or fetch fallback, and closes it when it exits. Everything runs as a tab of that window: one tab per engine, kept
+and reused by later searches, one per `browser` session, and one per fetch fallback, closed after it. Engines still run
+in parallel. If you close the window, the next call opens a new one; if the browser crashes, it is restarted. On
+Windows the browser also goes when web-mcp is killed.
 
-[Consent-O-Matic](https://github.com/cavi-au/Consent-O-Matic) (MIT, pinned v1.1.5, checked against a sha256) answers
-cookie banners with "reject". web-mcp downloads it on the first search; it is not loaded for Bing. A first consent
-page is skipped as "consent (clearing)"; only a second one rests the engine.
+The window's profile lives under `WEB_MCP_SEARCH_DIR` (default `$XDG_DATA_HOME/web-mcp`, `~/.local/share/web-mcp`, or
+`%LOCALAPPDATA%\web-mcp`), in `profiles/<n>/`: each server takes the first one no other server holds, so cookies carry
+over from earlier sessions. Searches and pages Claude opens share that profile and its cookies. There is no temp
+fallback: without a home folder, search asks for `WEB_MCP_SEARCH_DIR`, and on Unix a folder owned by someone else is
+refused. The browser is the first of: `WEB_MCP_CHROME`, the newest Chrome for Testing from `agent-browser install` (if
+it starts), `helium`, `chromium` on PATH. Branded Chrome is never used, because it ignores folder extensions since
+version 137. On Linux, Helium is started through a small wrapper web-mcp writes (nixpkgs' bwrap otherwise kills it
+after 10 s), and without a display the window needs Xvfb, which agent-browser starts by itself. Helium ships uBlock
+Origin.
+
+[I still don't care about cookies](https://github.com/OhMyGuus/I-Still-Dont-Care-About-Cookies) (GPL-3.0, pinned
+v1.1.9, checked against a sha256) hides cookie banners in every tab, Bing's included. web-mcp downloads it the first time
+the window opens. A first consent page is skipped as "consent (clearing)"; only a second one rests the engine.
 
 An engine that is blocked (CAPTCHA, or consent twice) rests for 30 minutes, shared by every web-mcp process on the
 machine. A busy, slow, offline or unrecognised engine is skipped without a rest. Google and Semantic Scholar
@@ -77,7 +85,10 @@ or set its path with `/plugin configure web-mcp`.
   downloaded when missing or older (on Linux a download also offers `--with-deps`, which runs sudo). Either way it runs
   `agent-browser install` for the browser on every run, so a failed browser download is retried, and `agentBrowserPath`
   names the one in use. No Node or npm needed. Without it, `browser` and the fallback fail with an install hint; plain
-  `fetch` and `search` still work.
+  `fetch` still works.
+- **The window**: `search`, `browser` and the fetch fallback all need it, so they need a search folder, a browser from
+  the list above, the cookie extension and, on Linux, a display or Xvfb. The installer warns when the window can't open
+  (no usable browser, or Linux without a display and Xvfb) and then leaves WebSearch and WebFetch allowed.
 
 ## Configuration
 
