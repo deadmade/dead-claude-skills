@@ -1,0 +1,16 @@
+{
+  "description": "Starts headroom-trim's local trim server at session start and posts every tool result to it. HEADROOM_TRIM=off stops this session's launcher.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/launch.mjs", "47811"] }]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [{ "type": "http", "url": "http://127.0.0.1:47811/hook", "timeout": 5 }]
+      }
+    ]
+  }
+}

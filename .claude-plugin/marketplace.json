@@ -97,6 +97,12 @@
       "description": "Click a .md path in Claude's reply to read it, rendered, in a pane beside the chat (fullscreen terminal). Opt-in.",
       "source": "./plugins/opt-in/md-pane",
       "category": "productivity"
+    },
+    {
+      "name": "headroom-trim",
+      "description": "Shrinks every tool result with headroom's no-ML lossy compression before Claude reads it, through a local trim server that runs offline. Needs uv, which the installer downloads. Opt-in.",
+      "source": "./plugins/opt-in/headroom-trim",
+      "category": "productivity"
     }
   ]
 }

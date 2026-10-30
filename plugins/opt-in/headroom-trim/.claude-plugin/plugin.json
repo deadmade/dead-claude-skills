@@ -1,0 +1,10 @@
+{
+  "name": "headroom-trim",
+  "version": "0.6.0",
+  "description": "Shrinks every tool result with headroom's no-ML lossy compression before Claude reads it, through a local trim server that runs offline. Needs uv, which the installer downloads.",
+  "author": {
+    "name": "deadmade",
+    "url": "https://github.com/deadmade"
+  },
+  "repository": "https://github.com/deadmade/dead-claude-skills"
+}

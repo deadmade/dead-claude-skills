@@ -13,7 +13,8 @@ servers, language and database skills (rust, csharp, postgres), integrations (Gi
 like hallmark and graphify, and tools such as
 [tui-review](plugins/shared/tui-review/README.md), [md-pane](plugins/opt-in/md-pane/README.md) for reading the `.md` files
 Claude names in a pane beside the chat, [web-mcp](plugins/shared/web-mcp/README.md) for web search read in one browser window of its own, page fetching,
-passive lookups and a browser with an archive of everything it pulled.
+passive lookups and a browser with an archive of everything it pulled, and
+[headroom-trim](plugins/opt-in/headroom-trim/README.md), which shrinks every tool result with headroom's offline compression before Claude reads it.
 
 The opt-in [flows](plugins/flows/README.md) plugin ties the rest together: conductor skills (`/feature-flow`,
 `/fix-flow`, `/test-audit`, `/doc-audit`, `/self-review`, `/verify`, `/learn` and more) that run the other plugins' skills in order,
