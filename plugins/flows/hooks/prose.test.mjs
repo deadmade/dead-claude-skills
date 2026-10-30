@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,6 +18,7 @@ test('shorthand flags conversation labels', () => {
 
 test('shorthand skips quarters, defined labels and flow.md', () => {
   assert.deepEqual(run('It ships in Q1 2027.'), []);
+  assert.deepEqual(rules(run('Settled in Q11 2026 and D4 2027.'), 'shorthand'), ['Q11', 'D4']);
   assert.deepEqual(run('- Q1 (reliability): the first goal.\n\nQ1 comes first.'), []);
   const text = 'Decided in grill Q11 and round 2 (D4, my call).';
   assert.deepEqual(run(text, 'docs/features/x/flow.md'), []);
@@ -220,3 +221,12 @@ test('FLOWS_PROSE_CHECK=off turns the check off', () => {
   assert.equal(main({ stdin, readFile, env: {} }).code, 2);
 });
 
+
+test('prose-check exits 0 silently when prose.mjs fails to load', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'prose-'));
+  copyFileSync(new URL('./prose-check.mjs', import.meta.url), join(dir, 'prose-check.mjs'));
+  writeFileSync(join(dir, 'prose.mjs'), 'export const main = (;\n');
+  const stdin = JSON.stringify({ tool_name: 'Write', tool_input: { file_path: join(dir, 'a.md'), content: 'Q4' } });
+  const ran = spawnSync(process.execPath, [join(dir, 'prose-check.mjs')], { input: stdin, encoding: 'utf8' });
+  assert.deepEqual([ran.status, ran.stdout, ran.stderr], [0, '', '']);
+});

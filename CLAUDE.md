@@ -59,12 +59,15 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   was a plugin of its own until 0.5.0; its skill and its five agents (`agents/`, next to tob's checker) now ship in
   flows, so its agents are `flows:pr-test-analyzer` and so on, and the installer keeps flows on a machine that had it.
   flows also owns the prose standard: `skills/writing/` is the one skill in it Claude may load on its own
-  (`flows:writing`; `flows-uses.mjs` treats only `disable-model-invocation: true` skills as conductors, and a
-  `uses.json` may list it under `flows`); `hooks/prose-check.mjs` (logic in `prose.mjs`) is a code-only `PostToolUse`
+  (`flows:writing`). `flows-uses.mjs` treats only `disable-model-invocation: true` skills as conductors, so a
+  `uses.json` may list `writing` under `flows`. `hooks/prose-check.mjs` (logic in `prose.mjs`) is a code-only `PostToolUse`
   check on `*.md` writes for conversation shorthand, off with `FLOWS_PROSE_CHECK=off`. The writing skill also holds the copyedit
   (`references/copyedit.md`, run as `/flows:writing copyedit <file>`): a fresh Opus `general-purpose` agent edits a
-  document by the skill, then `scripts/compare.mjs` replaces it only when no heading, code, link, URL, comment, number,
-  checkbox step or table row was lost. flow-rules runs it before a gate shows a spec, plan or audit report.
+  document by the skill, then `scripts/compare.mjs` replaces it only when nothing code can check was lost (the list is
+  in `references/copyedit.md`). The conductors run it, per flow-rules, before a gate shows a spec, plan or audit report. `compare.mjs`
+  imports `check` and `report` from `hooks/prose.mjs`, so a change there can break the copyedit; their tests are
+  `scripts/copyedit.test.mjs` and `plugins/flows/hooks/prose.test.mjs`. `SKILL.md` and `references/` state _Style_ in
+  our own words: never quote the book or reuse its examples (THIRD_PARTY.md).
 - `plugins/shared/tui-review/`: a Claude Code mod (TypeScript, `hooks/`) driving the Rust binary `tui-review` (`crates/tui-review/`). The two
   share a binary cache format (`crates/tui-review/src/format.rs` ↔ `hooks/chunks.ts`) and a stdout line protocol; change both sides
   together.
@@ -84,7 +87,9 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   (`${CLAUDE_PLUGIN_ROOT}/packs`), and the installer retires old installs of them and checks none remains
   (`stillInstalled`). The folder list is the source of truth, not this file. pstack-picks leaves out pstack's
   `technical-writing` and `unslop` (flows' `writing` replaces them, and the sync rewrites the lines that named them);
-  `sync-pstack.mjs --ref <commit>` syncs one commit instead of upstream's default branch. pstack-picks' `UPSTREAM`
+  `sync-pstack.mjs --ref <hash>` syncs one commit, given as a full 40-character hash, instead of upstream's default
+  branch; `sync-pstack.yml` checks the number of vendored skills (16), so change that count whenever you change
+  `SKILLS`. pstack-picks' `UPSTREAM`
   stays at `519d36a` on purpose: upstream's newer commits fail the sync's `GUARD`, so the weekly `sync-pstack.yml`
   (no `--ref`) fails until a PR adapts the rewrites; don't hand-edit the pack to get past it. tob's spec checker ships as flows' own agent,
   `plugins/flows/agents/spec-compliance-checker.md` (vendored by `sync-tob`), because a pack's agents don't load.

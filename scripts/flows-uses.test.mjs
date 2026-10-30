@@ -109,6 +109,11 @@ test('a uses.json beside a skill that is not a conductor is reported', () => {
   ]);
 });
 
+test('a skill folder without SKILL.md is reported', () => {
+  const files = { 'plugins/flows/skills/gone/uses.json': '{"picks":["how"]}' };
+  assert.deepEqual(fixture({ picks: ['how'] }, conductor('how'), files), ['plugins/flows/skills/gone: no SKILL.md']);
+});
+
 test('expectedDeps: every plugin once, sorted, builtins and packs left out', () => {
   const all = { a: { z: ['x'], 'claude-code': ['y'], superpowers: ['p'] }, b: { m: ['x'], z: ['q'] } };
   assert.deepEqual(expectedDeps(all, ['superpowers']), ['m', 'z']);

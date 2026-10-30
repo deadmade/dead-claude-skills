@@ -53,6 +53,10 @@ export function checkUses(root, marketplace) {
   const problems = [];
   const packNames = packs(root);
   const skills = flowsSkills(root);
+  const dir = join(root, FLOWS, 'skills');
+  for (const d of readdirSync(dir, { withFileTypes: true }))
+    if (d.isDirectory() && !d.name.startsWith('.') && !existsSync(join(dir, d.name, 'SKILL.md')))
+      problems.push(`${FLOWS}/skills/${d.name}: no SKILL.md`);
   for (const { name, conductor } of skills)
     if (!conductor && existsSync(join(root, FLOWS, 'skills', name, 'uses.json')))
       problems.push(`${FLOWS}/skills/${name}/uses.json: ${name} isn't a conductor (no disable-model-invocation: true)`);

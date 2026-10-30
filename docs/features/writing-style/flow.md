@@ -40,8 +40,8 @@ Started 2026-10-27 on branch `claude/relaxed-newton-cr62u9` (from `main` 753ba2c
   commit per task on `claude/relaxed-newton-cr62u9`.
 - Gate 1, reopened 2026-10-30 at Verify: the user wasn't happy with the built branch and, after a review, asked to
   "first verify the status against the actual book? then cut the rest and salvage what is worth using. Also can we
-  edit the skill to something more meaningfull?". The spec was cut back the same day (see Deviations); it hasn't been
-  re-approved yet.
+  edit the skill to something more meaningfull?". The spec was cut back the same day (see Deviations), then extended with
+  one skill folder and the whole book. Re-approved 2026-10-30 ("I approve :)").
 
 ## Skipped
 
@@ -554,6 +554,15 @@ state.chosen)` runs first (`install.ts:225`); the marker would never be written.
     introduces a topic, active metadiscourse, the book's intensifier list, softening bad news); `SKILL.md` now states
     the book's position and says where it chooses otherwise for technical documents. The copyedit editor may read the
     references.
+
+- 2026-10-30, /verify: /self-review (bugs, spec, standards, security, CLAUDE.md, silent failures, tests, comments) found
+  no bug at 80 or more and no security issue, and 8 to fix before the PR; the user picked all ("All fix-before-PR"):
+  the hook's year exemption now covers only Q1 to Q4, the hook wrapper fails open when `prose.mjs` won't load,
+  check-repo reports a skill folder without SKILL.md, and the docs were aligned. Left as Consider: a weekly sync that
+  fails red, a debug switch for hook errors, fence-length handling in `compare.mjs`, two misleading compare messages,
+  more mask edge-case tests, and the hook's known false hits. /doc-audit branch:
+  [2026-10-30-doc-audit-branch.md](../../audits/2026-10-30-doc-audit-branch.md), 13 findings, all fixed in the docs
+  ("All 13"). The report was copyedited before its gate; compare.mjs accepted the edit.
 
 ## Walkthrough
 

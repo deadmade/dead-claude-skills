@@ -114,7 +114,8 @@ plugin that isn't there, for installs that skipped one.
 
 ## Writing
 
-flows holds one standard for prose a person will read, in one skill, plus a check that runs on every write.
+flows holds one standard for prose a person will read: a skill that states it, a check on every Markdown write, and a
+copyedit that revises a document by it before a gate.
 
 - **The `writing` skill** (`skills/writing/`) is Williams and Bizup's _Style: Lessons in Clarity and Grace_ in our own
   words, as checks to run on a draft from the top down: the problem and the point at the end of a short opening, the
@@ -126,16 +127,18 @@ flows holds one standard for prose a person will read, in one skill, plus a chec
   a README, a PR description or a commit message. `/doc-audit` reads changed docs against it and `/integrate`
   revises PR text by it.
 - **The prose check** (`hooks/prose-check.mjs`, a `PostToolUse` hook on every `Write` and `Edit` of a `*.md` file)
-  reports conversation shorthand (`Q4`, `D2`, `round 2`, `my call`) in the new text only: an Edit's new string, or
-  the lines a Write added to the file. It is Node code with no model call, so it costs nothing per write. Claude sees
-  its findings and may leave a sentence that a finding gets wrong. In `flow.md` files it is off, since flow.md is the
-  log where those labels belong. `FLOWS_PROSE_CHECK=off` in the environment turns the check off.
+  reports conversation shorthand (`Q4`, `D2`, `round 2`, `my call`) in the new text only: an Edit's new string, or the
+  lines a Write added to the file, unless the file defines the label. It is Node code with no model call, so it costs no
+  tokens. Claude sees its findings and may leave a sentence that a finding gets wrong. In `flow.md` files it is off,
+  since flow.md is the log where those labels belong. `FLOWS_PROSE_CHECK=off` in the environment turns the check off.
 - **The copyedit** (`skills/writing/references/copyedit.md`, `/flows:writing copyedit <file.md>`) has a fresh Opus
-  agent revise a document by the skill for a reader who wasn't in the conversation, then lets the edit through only when code shows that no heading, code block, code span, link, URL,
-  HTML comment, number, checkbox step or table row was lost. Code can't see meaning, so a dropped sentence or a
-  flipped negation still needs the diff it shows. It commits nothing. Before a gate shows a spec, a plan or an audit
-  report, the conductors run it on that document; when it refuses an edit, the gate shows the unedited document and
-  what the edit lost.
+  agent revise a document by the skill for a reader who wasn't in the conversation, then lets the edit through only when
+  code finds nothing lost that it can check. It refuses the edit when a heading or its order, a code block, a code span,
+  a link target or link definition, a URL, an HTML comment, a number, a checkbox step, a table's shape or a quote is
+  lost, when the edit has under 60% as many prose words as the original, when the editor wrote nothing, or when the
+  document changed since it was saved. Code can't see meaning, so a dropped sentence or a flipped negation still needs
+  the diff it shows. It commits nothing. Before a gate shows a spec, a plan or an audit report, the conductors run it on
+  that document; when it refuses an edit, the gate shows the unedited document and what the edit lost.
 
 ## Packs
 

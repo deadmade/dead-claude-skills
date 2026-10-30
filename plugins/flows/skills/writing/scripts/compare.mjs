@@ -1,6 +1,6 @@
 // The copyedit's last step (references/copyedit.md): compare the editor's document with the saved copy, and replace the document only when
 // nothing was lost. `node compare.mjs <saved> <edited> <document>`: prints the lost items and exits 1 (so too when the
-// document no longer matches the saved copy), or copies the edited text over the document in the saved copy's line
+// edited file is missing or empty, or the document no longer matches the saved copy), or copies the edited text over the document in the saved copy's line
 // endings, prints the check's new findings and exits 0. Any other failure exits 2 and leaves the document as it was.
 import {
   chmodSync,

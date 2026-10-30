@@ -1,6 +1,6 @@
 // Code check for new Markdown prose: conversation shorthand, labels only the conversation that wrote them explains.
-// Judges only the text a Write or Edit just put in the file, and never looks inside code, front matter, link
-// targets or block quotes. Plain Node: it runs as a PostToolUse command hook.
+// Judges only the text a Write or Edit just put in the file, and never looks inside fenced or inline code, front
+// matter, link targets or block quotes. Plain Node: it runs as a PostToolUse command hook.
 
 const CLOSING = 'Fix what makes the prose worse for a reader. Leave a sentence as is when the finding is wrong.';
 const MAX_FINDINGS = 10;
@@ -83,7 +83,8 @@ export function check(fullText, ranges, { file }) {
   if (file.split(/[\\/]/).pop() !== 'flow.md') {
     for (const m of [...masked.matchAll(LABELS), ...masked.matchAll(PHRASES)]) {
       if (!inRange(m.index)) continue;
-      if (/^Q/.test(m[0]) && /^ \d{4}\b/.test(masked.slice(m.index + m[0].length))) continue;
+      // A quarter followed by a year ("Q1 2027") is a date, not a label.
+      if (/^Q[1-4]$/.test(m[0]) && /^ \d{4}\b/.test(masked.slice(m.index + m[0].length))) continue;
       const word = escape(m[0]);
       const label = new RegExp(
         [

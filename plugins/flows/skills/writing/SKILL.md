@@ -1,6 +1,6 @@
 ---
 name: writing
-description: "How to write and revise prose a person will read, by the method of Williams and Bizup's Style: Lessons in Clarity and Grace: a problem and a point up front, an order the reader needs, sentences about characters doing things, and nothing needless. Use when writing or revising specs, plans, reports, READMEs, PR descriptions, commit messages, or any answer longer than a few sentences, and for `copyedit <file.md>`: a fresh editor revises a document by this standard and code checks nothing was lost."
+description: "How to write and revise prose a person will read, by the method of Williams and Bizup's Style: Lessons in Clarity and Grace: a problem and a point up front, an order the reader needs, sentences about characters doing things, and nothing needless. Use when writing or revising specs, plans, reports, READMEs, PR descriptions, commit messages, or any answer longer than a few sentences, and for `copyedit <file.md>`: a fresh editor revises a document by this standard, and code checks that nothing it can see was lost."
 argument-hint: '[copyedit <file.md>]'
 ---
 
@@ -217,7 +217,9 @@ These keep a technical document from being read two ways, or from reading as not
 - **No conversation shorthand.** A reader who wasn't there doesn't know what `Q11`, `round 2`, `D4`, `my call` or
   `the spike` means. Write what the label stands for. Record who decided what once, in a **Decisions** section, not
   as a tag on every line, and quote the user only where the exact words matter. A flow's `flow.md` is a log of the
-  conversation; numbers belong there. flows' prose check flags these labels after every Markdown write.
+  conversation; numbers belong there. After every Markdown write, flows' prose check flags `Q` and `D` numbers,
+  `round` with a number and "my call" in the new text, unless the document defines the label (a quarter with a year,
+  "Q1 2027", is a date).
 - **Record a decision once.** Say what was decided and why, in its section; don't also log how the discussion went,
   unless the document is that log.
 - **Use the code's own names**: files, functions, flags and commands as the code spells them, in code font.
@@ -233,10 +235,10 @@ These keep a technical document from being read two ways, or from reading as not
 
 ## Copyedit a finished document
 
-You can't see your own draft as a reader who wasn't there would. When asked to copyedit a file, or when a flow reaches
-a gate with a spec, a plan or an audit report, follow [references/copyedit.md](references/copyedit.md): a fresh
-Opus agent revises the document by this standard, and `scripts/compare.mjs` replaces it only when nothing was lost.
-It commits nothing.
+You can't see your own draft as a reader who wasn't there would. When asked to copyedit a file, or when a flow reaches a
+gate with a spec, a plan or an audit report, follow [references/copyedit.md](references/copyedit.md): a fresh Opus agent
+revises the document by this standard, and `scripts/compare.mjs` writes the edit over the document only when nothing
+code can check was lost. It commits nothing.
 
 ## Length, correctness and punctuation
 

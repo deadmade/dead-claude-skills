@@ -18,10 +18,10 @@ passive lookups and a browser with an archive of everything it pulled.
 The opt-in [flows](plugins/flows/README.md) plugin ties the rest together: conductor skills (`/feature-flow`,
 `/fix-flow`, `/test-audit`, `/doc-audit`, `/self-review`, `/verify`, `/learn` and more) that run the other plugins' skills in order,
 with approval gates and a state file to resume from. Picking flows installs every plugin its conductors use.
-flows also sets the house standard for prose: a `writing` skill (Williams and Bizup's _Style_ in our own words), a
-code-only check on each Write or Edit of a Markdown file that flags conversation shorthand such as `Q11` or
-`round 2` (`FLOWS_PROSE_CHECK=off` turns it off), and a copyedit, in which an Opus editor revises a spec, plan or report before
-its gate and keeps the edit only when nothing was lost (otherwise the gate shows the original and says why).
+flows also sets the house standard for prose. A `writing` skill states Williams and Bizup's _Style_ in our own words.
+A code-only check on each Write or Edit of a Markdown file flags conversation shorthand such as `Q11` or `round 2`
+(`FLOWS_PROSE_CHECK=off` turns it off). Before a gate, an Opus editor copyedits the spec, plan or report by the skill;
+when code finds something lost, the gate shows the unedited document and what was lost.
 flows also carries the skill packs they read by path from `plugins/flows/packs/` (superpowers, ponytail, paper-lookup
 and the mattpocock, pstack and Trail of Bits picks). The packs are not plugins: nothing in them loads on its own, so
 their skills, hooks and ponytail's band stay out of your sessions outside the conductors, and the installer removes

@@ -1,12 +1,13 @@
 # Copyedit a document
 
-A document written during a conversation reads well to the people who were there. This procedure has a fresh editor,
-who wasn't, revise it, and lets the edit through only when code shows that nothing the document says was lost. It
-commits nothing, so it works the same on any branch and inside the other flows.
+A document written during a conversation reads well to the people who were there. This procedure has a fresh editor, who
+wasn't, revise it, and lets the edit through only when code finds nothing lost that it can check. It commits nothing, so
+it works the same on any branch and inside the other flows.
 
-The `writing` skill runs it when asked to copyedit a file (`/flows:writing copyedit <file.md>`), and the flows run it
-by reading this file before a gate. Its paths go through `"${CLAUDE_SKILL_DIR}/../writing/"`, so they resolve from
-whichever skill read it.
+The `writing` skill runs it when asked to copyedit a file (`/flows:writing copyedit <file.md>`), and the flows run it by
+reading this file before a gate. Its paths go through `"${CLAUDE_SKILL_DIR}/../writing/"`, so they resolve from
+whichever skill read it. When the variable isn't set in your shell, replace `${CLAUDE_SKILL_DIR}/../writing/` with the
+absolute path of flows' `skills/writing/` folder.
 
 ## 1. Save the document
 
@@ -29,7 +30,7 @@ You are a copy editor. Edit the Markdown document <doc> so it reads clearly to a
 
 The standard is <standard>, with the lesson references it links (read the ones a revision needs). Revise where it shows a problem and the change helps the reader.
 
-Keep every fact, decision, number, name, date, version, quote, code span, code block, link, URL, HTML comment and link target: nothing the document says may be lost or change meaning, and no requirement may flip (a "must not" stays a "must not"). Keep every heading and the order of sections. Keep every checkbox step, numbered item and table as it is (rows, columns and order); edit only the prose inside them. Elsewhere in a section you may rewrite, reorder, merge or split sentences, and turn prose into a list or a list into prose. Don't add content the original doesn't support, and don't add a summary, an introduction or a conclusion it lacks. Leave conversation labels (question numbers, round numbers, decision IDs) as they are unless the document itself says what they stand for: you weren't there.
+Keep every fact, decision, number, name, date, version, quote, code span, code block, link, URL, HTML comment and link target: nothing the document says may be lost or change meaning, and no requirement may flip (a "must not" stays a "must not"). Keep every heading and the order of sections. Keep every checkbox step and table as it is (rows, columns and order); edit only the prose inside them. Elsewhere in a section you may rewrite, reorder, merge or split sentences, and turn prose into a list or a list into prose. Don't add content the original doesn't support, and don't add a summary, an introduction or a conclusion it lacks. Leave conversation labels (question numbers, round numbers, decision IDs) as they are unless the document itself says what they stand for: you weren't there.
 
 Read only the files named here and those references. Write the whole edited document to <out> and write nothing else anywhere. Then reply with one line starting "Removed:" that lists anything you removed rather than reworded, or "Removed: nothing".
 ```
@@ -42,7 +43,8 @@ The editor writes a `.txt` file because subagents may not be allowed to write Ma
 node "${CLAUDE_SKILL_DIR}/../writing/scripts/compare.mjs" "<run folder>/saved.md" "<run folder>/edited.txt" "<document>"
 ```
 
-- **Exit 1:** it printed what the edit lost, one item per line, or that the document changed since step 1 saved it.
+- **Exit 1:** it printed what the edit lost, one item per line, that the editor wrote no document, or that the
+  document changed since step 1 saved it.
   Show those lines and stop. The document is unchanged.
 - **Exit 2:** it failed for another reason and printed it. Show that line and stop. The document is unchanged.
 - **Exit 0:** it copied the edit over the document, in the document's own line endings, and printed the prose
@@ -52,9 +54,14 @@ node "${CLAUDE_SKILL_DIR}/../writing/scripts/compare.mjs" "<run folder>/saved.md
   - the editor's `Removed:` line;
   - the new findings, if any, for whoever owns the document to fix.
 
-`compare.mjs` checks what code can see: headings, code, links, URLs, comments, numbers, checkbox steps, table shapes,
-quotes, and that at least 60% of the prose words remain. It can't see meaning: a dropped sentence without a number in
-it, or a negation that flipped, passes. Read the diff before you accept the edit.
+`compare.mjs` checks what code can see. It refuses the edit when a heading or its order, a code block, a code span, a
+link target or link definition, a URL, an HTML comment, a number, a checkbox step, a table's shape or a quote is lost,
+when the edit has under 60% as many prose words as the original, when the editor wrote nothing, or when the document
+changed since it was saved. Headings, quotes and comments must stay word for word, no heading may be added, and
+checkboxes and tables keep their state and shape. It can't see meaning: a dropped sentence without a number in it, or a
+negation that flipped, passes. Nor does it see an indented code block, a fence closed by a longer one, a table without a
+leading pipe, or a number written like an enumerator, such as "(30)". On exit 0 the edit is already in the document:
+read the diff, and restore anything it lost from `saved.md`.
 
 Don't commit. Whoever asked for the copyedit decides what to keep; the saved copy stays in the run folder until the next run
 on the same document.

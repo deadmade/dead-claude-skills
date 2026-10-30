@@ -70,7 +70,7 @@ In the scoped docs, check what can be checked by running something:
 
 ## Phase 5: Prose
 
-Docs the diff changed (branch) or that Phase 2 flagged (all), read against `flows:writing` (the Skill tool). Findings
+Docs the diff changed (branch) or that Phase 2 flagged (all), read against `flows:writing`, loaded with the Skill tool. Findings
 only, severity low unless the wording misleads.
 
 ## Phase 6: Report
