@@ -153,8 +153,25 @@ export function uvAsset(platform: string, arch: string, pin: UpstreamPin) {
   return { file: entry.file, url, digest, exe: entry.inner };
 }
 
-// `agent-browser --version` may print a name prefix ("agent-browser 0.39.1"); undefined when no version is in it.
-export const agentBrowserVersion = (out: string | undefined) => /(\d+\.\d+\.\d+)/.exec(out ?? '')?.[1];
+// Which uv runs: ours in ~/.claude/bin whenever it exists (the plugin's launcher looks there first, so it must stay
+// current), else a PATH uv at or above the pin, else a download. ours: its version, undefined when it can't report one.
+export const uvPlan = ({
+  oursExists,
+  ours,
+  theirs,
+  pinned,
+}: {
+  oursExists: boolean;
+  ours: string | undefined;
+  theirs: string | undefined;
+  pinned: string;
+}) =>
+  oursExists
+    ? { use: 'ours', download: ours ? upstreamAction({ installed: ours, pinned }) : 'upgrade' }
+    : upstreamPlan({ theirs, ours: undefined, pinned });
+
+// `<tool> --version` may print a name prefix ("agent-browser 0.39.1", "uv 0.13.6 (…)"); undefined when no version is in it.
+export const versionIn = (out: string | undefined) => /(\d+\.\d+\.\d+)/.exec(out ?? '')?.[1];
 
 // The newest `chrome-<a>.<b>.<c>.<d>` among a browsers folder's entries, compared numerically (upstream sorts the names
 // as strings, where chrome-99 beats chrome-156).

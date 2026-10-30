@@ -7,8 +7,9 @@ import {
   upstreamAction,
   agentBrowserAsset,
   upstreamPlan,
-  agentBrowserVersion,
+  versionIn,
   uvAsset,
+  uvPlan,
   windowProblem,
   BIN_PLUGINS,
   binAsset,
@@ -111,8 +112,22 @@ test('agent-browser: install when missing, upgrade when older, keep when equal o
   assert.equal(upstreamAction({ installed: '0.38.0', pinned }), 'upgrade');
   assert.equal(upstreamAction({ installed: '0.39.1', pinned }), 'skip');
   assert.equal(upstreamAction({ installed: '0.40.0', pinned }), 'skip');
-  assert.equal(agentBrowserVersion('agent-browser 0.39.1\n'), '0.39.1');
-  assert.equal(agentBrowserVersion('nope'), undefined);
+  assert.equal(versionIn('agent-browser 0.39.1\n'), '0.39.1');
+  assert.equal(versionIn('uv 0.13.6 (abc 2026-01-01)'), '0.13.6');
+  assert.equal(versionIn('nope'), undefined);
+});
+
+test('uvPlan: ours wins whenever it exists, else a current PATH uv, else download', () => {
+  const pinned = '0.13.6';
+  const plan = (oursExists: boolean, ours?: string, theirs?: string) => uvPlan({ oursExists, ours, theirs, pinned });
+  assert.deepEqual(plan(true, '0.13.6', '0.14.0'), { use: 'ours', download: 'skip' });
+  assert.deepEqual(plan(true, '0.13.6'), { use: 'ours', download: 'skip' });
+  assert.deepEqual(plan(true, '0.12.0', '0.14.0'), { use: 'ours', download: 'upgrade' });
+  assert.deepEqual(plan(true, undefined, '0.14.0'), { use: 'ours', download: 'upgrade' }, 'ours is there but broken');
+  assert.deepEqual(plan(false, undefined, '0.13.6'), { use: 'path' });
+  assert.deepEqual(plan(false, undefined, '0.14.0'), { use: 'path' });
+  assert.deepEqual(plan(false, undefined, '0.12.0'), { use: 'ours', download: 'install' });
+  assert.deepEqual(plan(false), { use: 'ours', download: 'install' });
 });
 
 test('agent-browser: the pinned upstream binary, only with a pinned hash', () => {
@@ -153,7 +168,7 @@ test('uv: the pinned upstream archive, only with a valid pin', () => {
   assert.ok(uvAsset('win32', 'x64', shipped) && uvAsset('linux', 'x64', shipped));
 });
 
-test('agent-browser plan:a current PATH copy wins, else ours, downloaded only when missing or older', () => {
+test('agent-browser plan: a current PATH copy wins, else ours, downloaded only when missing or older', () => {
   const pinned = '0.39.1';
   assert.deepEqual(upstreamPlan({ theirs: '0.39.1', ours: undefined, pinned }), { use: 'path' });
   assert.deepEqual(upstreamPlan({ theirs: '0.40.0', ours: '0.38.0', pinned }), { use: 'path' });

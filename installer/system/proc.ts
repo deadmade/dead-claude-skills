@@ -3,6 +3,7 @@ import { type SpawnOptions, type SpawnSyncOptions, spawn, spawnSync } from 'node
 import { statSync } from 'node:fs';
 import { delimiter, isAbsolute, join } from 'node:path';
 import { WIN, record } from '../context.ts';
+import { versionIn } from '../core/binaries.ts';
 import { log, progress } from '../ui/ui.ts';
 
 export function safeArg(s: string) {
@@ -46,6 +47,12 @@ export const startSync = (file: string, args: string[], opts: Omit<SpawnSyncOpti
   const o = { ...opts, encoding: 'utf8' as const };
   return viaCmd(file) ? spawnSync(commandLine(file, args), { ...o, shell: true }) : spawnSync(file, args, o);
 };
+
+// The version `file --version` reports, or undefined when it doesn't run or prints none.
+export function versionOf(file: string) {
+  const r = startSync(file, ['--version']);
+  return r.status === 0 ? versionIn(r.stdout) : undefined;
+}
 
 // input: what the command reads on stdin, or undefined.
 type Result = { ok: boolean; out: string; err: string };

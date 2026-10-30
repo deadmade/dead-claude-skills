@@ -1,14 +1,15 @@
-// headroom-trim's trim server is a uv project. A current uv on PATH is used as is; otherwise upstream's release for the
-// version pinned in installer/assets/uv.json goes to ~/.claude/bin (where the plugin's launcher looks first). Then the
+// headroom-trim's trim server is a uv project. Our copy in ~/.claude/bin (where the plugin's launcher looks first) is kept
+// at the version pinned in installer/assets/uv.json; with none there, a PATH uv at or above the pin is used. Then the
 // server's environment and tiktoken's vocabulary are built into the plugin's data folder, so the first session starts
 // at once. Asks before a download; every failure is a summary line.
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { type UpstreamPin, agentBrowserVersion, uvAsset, upstreamPlan } from '../core/binaries.ts';
-import { hookPort, pluginDataDir, pluginInstallPath } from '../core/plugins.ts';
+import { type UpstreamPin, uvAsset, uvPlan } from '../core/binaries.ts';
+import { hookPort, pluginDataDir, pluginInstallPath, trimServerCommands } from '../core/plugins.ts';
 import { MARKETPLACE } from '../core/release.ts';
 import { ASSETS, CONFIG, WIN, ask, done, failures, readJson, tryJson } from '../context.ts';
 import { downloadBin, stopLocalServer } from '../system/net.ts';
-import { errCode, startSync, which } from '../system/proc.ts';
+import { errCode, startSync, versionOf, which } from '../system/proc.ts';
 import { log, progress } from '../ui/ui.ts';
 import { BIN_DIR } from './binaries.ts';
 
@@ -26,13 +27,17 @@ export async function installUv(): Promise<string | undefined> {
     return undefined;
   }
   const bin = join(BIN_DIR, WIN ? 'uv.exe' : 'uv');
-  const versionOf = (file: string) => {
-    const r = startSync(file, ['--version']);
-    return r.status === 0 ? agentBrowserVersion(r.stdout) : undefined;
-  };
   const theirs = which('uv');
-  const plan = upstreamPlan({ theirs: theirs && versionOf(theirs), ours: versionOf(bin), pinned });
-  if (plan.use === 'path') return theirs;
+  const plan = uvPlan({
+    oursExists: existsSync(bin),
+    ours: versionOf(bin),
+    theirs: theirs && versionOf(theirs),
+    pinned,
+  });
+  if (plan.use === 'path') {
+    done.push(`uv: using the one on PATH (${theirs})`);
+    return theirs;
+  }
   if (plan.download === 'skip') return bin;
   const what = plan.download === 'install' ? 'Download' : 'Upgrade';
   if (!(await ask(`${what} uv ${pinned} (Astral's release binary) to ${bin} for headroom-trim?`, true))) {
@@ -63,18 +68,14 @@ export async function prepareTrimServer(uv: string): Promise<void> {
     return;
   }
   const data = pluginDataDir(CONFIG, HEADROOM_TRIM);
-  const server = join(root, 'server');
-  const env = {
-    ...process.env,
-    UV_PROJECT_ENVIRONMENT: join(data, 'venv'),
-    TIKTOKEN_CACHE_DIR: join(data, 'tiktoken'),
-  };
+  const cmd = trimServerCommands(root, data);
+  const env = { ...process.env, ...cmd.env };
   const port = hookPort(tryJson(join(root, 'hooks', 'hooks.json')));
   if (port !== undefined && !(await stopLocalServer(port)))
     failures.push(`headroom-trim: the trim server on port ${port} did not stop; the sync may fail while it runs`);
-  const run = (args: string[]) => startSync(uv, [...args, '--project', server], { env, stdio: 'inherit' });
+  // stdio 'inherit' is how dcg and agent-browser show their long commands too.
   log('info', 'Building the headroom-trim server environment (uv sync)');
-  const sync = run(['sync', '--locked']);
+  const sync = startSync(uv, cmd.sync, { env, stdio: 'inherit' });
   if (sync.status !== 0) {
     failures.push(
       `headroom-trim: uv sync failed (${errCode(sync.error) ?? `exit ${sync.status}`}); the first session will retry it`,
@@ -82,11 +83,7 @@ export async function prepareTrimServer(uv: string): Promise<void> {
     return;
   }
   done.push('headroom-trim: server environment built');
-  const fetched = startSync(
-    uv,
-    ['run', '--locked', '--project', server, 'python', '-c', "import tiktoken; tiktoken.get_encoding('o200k_base')"],
-    { env, stdio: 'inherit' },
-  );
+  const fetched = startSync(uv, cmd.tiktoken, { env, stdio: 'inherit' });
   if (fetched.status !== 0)
     failures.push(
       `headroom-trim: token counts are estimated until the installer fetches tiktoken's vocabulary (${errCode(fetched.error) ?? `exit ${fetched.status}`})`,

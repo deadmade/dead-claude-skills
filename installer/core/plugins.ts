@@ -96,8 +96,30 @@ export const stillInstalled = (rows: PluginRow[], packs: string[]) => [
 ];
 
 // Where Claude Code installed plugin `id`, from its installed_plugins.json; undefined when it isn't installed.
-export const pluginInstallPath = (installed: any, id: string): string | undefined =>
-  installed?.plugins?.[id]?.[0]?.installPath;
+// The user-scope install wins, else the first.
+export function pluginInstallPath(installed: any, id: string): string | undefined {
+  const entries: any[] = installed?.plugins?.[id] ?? [];
+  return (entries.find((e) => e?.scope === 'user') ?? entries[0])?.installPath;
+}
+
+// The uv arguments and environment that build headroom-trim's server (root: the plugin's install path, data: its data
+// folder): `sync` and the tiktoken vocabulary fetch (no headroom import, so no telemetry). env is added to the process's.
+export function trimServerCommands(root: string, data: string) {
+  const server = join(root, 'server');
+  return {
+    sync: ['sync', '--locked', '--project', server],
+    tiktoken: [
+      'run',
+      '--locked',
+      '--project',
+      server,
+      'python',
+      '-c',
+      "import tiktoken; tiktoken.get_encoding('o200k_base')",
+    ],
+    env: { UV_PROJECT_ENVIRONMENT: join(data, 'venv'), TIKTOKEN_CACHE_DIR: join(data, 'tiktoken') },
+  };
+}
 
 // The folder Claude Code keeps for a plugin's data (CLAUDE_PLUGIN_DATA): the id with @ replaced by -.
 export const pluginDataDir = (config: string, id: string) => join(config, 'plugins', 'data', id.replace('@', '-'));

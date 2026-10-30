@@ -20,6 +20,7 @@ import {
   pluginInstallPath,
   pluginDataDir,
   hookPort,
+  trimServerCommands,
   BUNDLE,
   type Marketplace,
   type PluginJson,
@@ -211,6 +212,28 @@ test('pluginInstallPath reads Claude Code installed_plugins.json', () => {
   assert.equal(pluginInstallPath(installed, 'headroom-trim@dead-claude-skills'), undefined);
   assert.equal(pluginInstallPath({}, 'flows@dead-claude-skills'), undefined);
   assert.equal(pluginInstallPath({ plugins: { 'a@b': [] } }, 'a@b'), undefined);
+  const scoped = {
+    plugins: {
+      'a@b': [
+        { scope: 'project', installPath: '/p' },
+        { scope: 'user', installPath: '/u' },
+      ],
+    },
+  };
+  assert.equal(pluginInstallPath(scoped, 'a@b'), '/u');
+  assert.equal(pluginInstallPath({ plugins: { 'a@b': [{ scope: 'local', installPath: '/l' }] } }, 'a@b'), '/l');
+});
+
+test('trimServerCommands: the sync and tiktoken command lines and the env', () => {
+  const c = trimServerCommands('/root', '/data');
+  const server = join('/root', 'server');
+  assert.deepEqual(c.sync, ['sync', '--locked', '--project', server]);
+  assert.deepEqual(c.tiktoken.slice(0, 7), ['run', '--locked', '--project', server, 'python', '-c', c.tiktoken[6]]);
+  assert.match(c.tiktoken[6], /^import tiktoken; tiktoken\.get_encoding\('o200k_base'\)$/);
+  assert.deepEqual(c.env, {
+    UV_PROJECT_ENVIRONMENT: join('/data', 'venv'),
+    TIKTOKEN_CACHE_DIR: join('/data', 'tiktoken'),
+  });
 });
 
 test('pluginDataDir replaces @ with - in the id', () => {
