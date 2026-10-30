@@ -14,8 +14,6 @@ const SKILLS = [
   'interrogate',
   'blast-radius',
   'no-comments',
-  'unslop',
-  'technical-writing',
   'architect',
   'arena',
   'show-me-your-work',
@@ -29,6 +27,9 @@ const SKILLS = [
 const AGENTS = ['comment-sicko'];
 // Upstream skills deliberately not vendored. Anything in neither list is reported as new.
 const SKIPPED = [
+  // flows' own `writing` skill replaces these two; the REWRITES below point their references at it
+  'unslop',
+  'technical-writing',
   'automate-me',
   'create-verification-skill',
   'figure-it-out',
@@ -58,15 +59,28 @@ const SKIPPED = [
   'principle-sequence-verifiable-units',
   'principle-subtract-before-you-add',
   'principle-test-behavior-not-implementation',
+  'benchmark-checklist',
+  'correct',
+  'create-formal-verification-skill',
+  'in-your-own-words',
+  'ketchup',
+  'ketchup-video',
+  'maintain-formal-verification-skill',
+  'poteto-help',
+  'principle-explain-the-number',
+  'sharpen',
+  'statechart',
 ];
 // Cursor-isms that must not survive the rewrite, checked per line (case-sensitive; "cursor location" in prose is fine).
+// `unslop` and `technical-writing` are retired names: a new reference to either needs a rewrite to flows' `writing` skill.
 const GUARD =
-  /\.cursor|Cursor|\bTask\b|AskQuestion|generalPurpose|[Rr]eadonly|environment: "|cloud_base_branch|agent-transcripts|mcps\/|todolist|grok-|gpt-5|sol-max|-thinking-|pstack-models|subagent_type: "Comment Sicko"|^name: Comment Sicko/;
+  /\bunslop\b|\btechnical-writing\b|\.cursor|Cursor|\bTask\b|AskQuestion|generalPurpose|[Rr]eadonly|environment: "|cloud_base_branch|agent-transcripts|mcps\/|todolist|grok-|gpt-5|sol-max|-thinking-|pstack-models|poteto-mode|subagent_type: "Comment Sicko"|^name: Comment Sicko/;
 
 // --- Cursor -> Claude Code rewrites -------------------------------------------------------------
 // Applied in order to each whole .md file. Rules match content, never line numbers. Anything they miss is caught by GUARD.
 const CLAUDE_MODELS = '`fable`, `opus`, `sonnet`, `haiku`';
 const CURSOR_PANEL = String.raw`\`claude-fable-5-1-thinking-max\`, \`gpt-5\.6-sol-max\`, \`grok-4\.6-fast-xhigh\`, \`claude-opus-5-thinking-xhigh\``;
+const WRITING = "flows' **writing** skill (`flows:writing`, loaded through the Skill tool)";
 const re = (src, flags = 'g') => new RegExp(src, flags);
 const REWRITES = [
   // --- subagent config (how, why, interrogate) ---
@@ -114,6 +128,9 @@ const REWRITES = [
     `Valid \`model\` values for the Agent tool are ${CLAUDE_MODELS}.\n`,
   ],
 
+  // poteto-mode (not vendored) tunes Cursor model slugs per spawn; the Agent tool's models carry no level or speed
+  [/ ?Pick each subagent's reasoning level and fast or standard speed[^\n]*?\*\*poteto-mode\*\* skill\./g, ''],
+
   // --- tool names ---
   [/Open a todolist/g, 'Open a todo list (`TodoWrite`)'],
   [/\btodolist\b/g, 'todo list'],
@@ -137,12 +154,20 @@ const REWRITES = [
     "Read this run's transcript in this workspace's transcript directory, `~/.claude/projects/<slug>/` (the newest `.jsonl`). Don't glob across `~/.claude/projects/*/`.",
   ],
 
+  // --- the retired unslop skill (blast-radius, recall, show-me-your-work) -> flows' writing skill ---
+  [/Write the brief through the \*\*unslop\*\* skill/g, `Write the brief through ${WRITING}`],
+  [/Write it through `unslop`/g, `Write it through ${WRITING}`],
+  [
+    /\(the \*\*unslop\*\* skill applies to log text too\)/g,
+    "(flows' **writing** skill, `flows:writing` loaded through the Skill tool, applies to log text too)",
+  ],
+
   // --- Comment Sicko agent ---
   [/subagent_type: "Comment Sicko"/g, 'subagent_type: "pstack-picks:comment-sicko"'],
   [/^name: Comment Sicko$/gm, 'name: comment-sicko'],
 ];
 // Sibling-skill note, inserted right after the frontmatter of each SKILL.md and each agent.
-const SKILL_NOTE = `\n> **Claude Code port:** skills this file names (for example **how**, **why**, **unslop**, **arena**, or a **...** principle skill) are sibling skills in this plugin. They are user-invoked, so the Skill tool can't load them. To use one, read \`\${CLAUDE_SKILL_DIR}/../<name>/SKILL.md\` (principle skills: \`\${CLAUDE_SKILL_DIR}/../principle-<name>/SKILL.md\`) and follow it. Subagents use the Agent tool; valid \`model\` values are ${CLAUDE_MODELS}.\n`;
+const SKILL_NOTE = `\n> **Claude Code port:** skills this file names (for example **how**, **why**, **recall**, **arena**, or a **...** principle skill) are sibling skills in this plugin. They are user-invoked, so the Skill tool can't load them. To use one, read \`\${CLAUDE_SKILL_DIR}/../<name>/SKILL.md\` (principle skills: \`\${CLAUDE_SKILL_DIR}/../principle-<name>/SKILL.md\`) and follow it. Subagents use the Agent tool; valid \`model\` values are ${CLAUDE_MODELS}.\n`;
 const AGENT_NOTE =
   "\n> **Claude Code port:** to run the **how** or **why** skill, read its `SKILL.md` from the pstack-picks plugin (glob `~/.claude/plugins/**/pstack-picks/**/skills/<name>/SKILL.md`) and follow it. They are user-invoked, so the Skill tool can't load them.\n";
 
@@ -165,10 +190,15 @@ const files = (dir) =>
 
 const PLUGIN = join(ROOT, 'plugins', 'flows', 'packs', 'pstack-picks');
 
+// `--ref <commit|tag|branch>` syncs that revision instead of upstream's default branch (the weekly workflow passes none).
+const refAt = process.argv.indexOf('--ref');
+const ref = refAt < 0 ? undefined : process.argv[refAt + 1];
+if (refAt >= 0 && !ref) fail('--ref needs a commit, tag or branch');
+
 const up = sparseClone(
   UPSTREAM_URL,
   ['/pstack/LICENSE', ...SKILLS.map((s) => `/pstack/skills/${s}/`), ...AGENTS.map((a) => `/pstack/agents/${a}.md`)],
-  { noCone: true },
+  { noCone: true, ref },
 );
 const UP = join(up, 'pstack');
 

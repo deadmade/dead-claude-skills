@@ -1,23 +1,76 @@
 name: Release
 
 # One release for the whole repo: scripts/release.mjs bumps package.json, the marketplace and every plugin to the
-# same version and tags vX.Y.Z; pushing that tag checks the repo, builds tui-review and web-mcp and
-# publishes the release.
+# same version and tags vX.Y.Z. Only a push to main releases, and main only takes merged PRs (admins aside), so a tag
+# pushed any other way publishes nothing. Each merge cuts a patch here (stamped on a commit off main, so main is never
+# pushed to); a release you choose is `npm run release -- minor` pushed to main with its tag, which this run then
+# releases. The run checks the repo, builds tui-review and web-mcp from the tag and publishes the release. Docs-only
+# merges don't release.
 on:
   push:
-    tags: ['v*']
+    branches: [main]
+    paths-ignore: ['docs/**', '*.md']
 
 permissions:
   contents: read
 
+# Merges release one at a time, so each counts from the tag before it; a queued run is replaced by a newer one, which
+# carries its changes too.
+concurrency:
+  group: release
+
 jobs:
-  check:
+  # The tag to release: the one already on HEAD (a release commit pushed with its tag), or a patch cut from the merge.
+  version:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+
+      - name: Tag
+        id: tag
+        run: |
+          tag=$(git tag --points-at HEAD --list 'v*' | sort -V | tail -n1)
+          if [ -z "$tag" ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898283+github-actions[bot]@users.noreply.github.com'
+            npm run release -- patch --detach
+            tag="v$(jq -r .version package.json)"
+            echo "cut=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      # The token only reaches this step, not the tests npm run release runs.
+      - name: Push the tag
+        if: steps.tag.outputs.cut
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          TOKEN: ${{ github.token }}
+        run: git push "https://x-access-token:$TOKEN@github.com/$GITHUB_REPOSITORY" "$TAG"
+
+  check:
+    needs: version
+    if: needs.version.outputs.tag
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ needs.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAG }}
 
       - name: Tag matches package.json
-        run: test "$GITHUB_REF_NAME" = "v$(jq -r .version package.json)"
+        run: test "$TAG" = "v$(jq -r .version package.json)"
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -26,19 +79,25 @@ jobs:
       - name: Repo checks and tests
         run: npm test
 
-  tui-review:
-    uses: ./.github/workflows/build-tui-review.yml
-
-  web-mcp:
-    uses: ./.github/workflows/build-web-mcp.yml
+  binaries:
+    needs: version
+    if: needs.version.outputs.tag
+    uses: ./.github/workflows/crates-build.yml
+    with:
+      ref: ${{ needs.version.outputs.tag }}
 
   publish:
-    needs: [check, tui-review, web-mcp]
+    needs: [version, check, binaries]
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      TAG: ${{ needs.version.outputs.tag }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAG }}
+          persist-credentials: false
 
       # Every artifact of this run: the tui-review and web-mcp archives, each with its .sha256.
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -61,10 +120,38 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes \
-            --notes "Install or update with \`npx --allow-remote=root https://github.com/deadmade/dead-claude-skills/releases/download/$GITHUB_REF_NAME/installer.tgz\`, which pins the marketplace to this release, or with \`/plugin update\` if you added the marketplace by hand.
+          gh release create "$TAG" dist/* --title "$TAG" --generate-notes \
+            --notes "Install or update with \`npx --allow-remote=root https://github.com/deadmade/dead-claude-skills/releases/download/$TAG/installer.tgz\`, which points the marketplace at the release branch (Claude Code then updates the plugins on its own) and installs this release's binaries, or with \`/plugin update\` if you added the marketplace by hand.
 
           installer.tgz: the installer, built to JS.
 
           tui-review-*: the binary behind tui-review, for each platform; the installer downloads yours.
           web-mcp-*: the binary behind the web-mcp plugin, for Windows and Linux x64; the installer downloads yours."
+
+  # The branch the installer points the marketplace at (RELEASE_BRANCH in installer/core/release.ts): Claude Code's
+  # marketplace auto-update follows it, so plugins update without rerunning the installer. Moved once the release exists,
+  # and never back to an older one (a re-run of an old merge's run). A job of its own, so its write token never shares a
+  # runner with publish's npm ci.
+  release-branch:
+    needs: [version, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Move the release branch
+        run: |
+          if git fetch --depth=1 origin release 2>/dev/null; then
+            have=$(git show FETCH_HEAD:package.json | jq -r .version)
+            newest=$(printf '%s\n' "$have" "${TAG#v}" | sort -V | tail -n1)
+            if [ "$newest" != "${TAG#v}" ]; then
+              echo "release is at v$have, past $TAG"
+              exit 0
+            fi
+          fi
+          git push --force origin HEAD:refs/heads/release

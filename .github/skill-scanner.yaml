@@ -1,0 +1,41 @@
+# Policy for Cisco's skill-scanner (`npm run scan-skills`), merged over its balanced preset. Each suppression is a
+# finding someone read and judged benign; scope new ones to one skill and file, with the reason.
+preset_base: balanced
+
+suppressions:
+  - rule_id: COMMAND_INJECTION_JS_CHILD_PROCESS
+    skills: [brainstorming]
+    paths: [scripts/server.cjs]
+    reason: Opens the companion URL in the user's browser (or BRAINSTORM_OPEN_CMD).
+  - rule_id: COMMAND_INJECTION_JS_CHILD_PROCESS
+    skills: [writing-skills]
+    paths: [render-graphs.js]
+    reason: execFileSync of graphviz `dot` to render diagrams.
+  - rule_id: COMMAND_INJECTION_JS_CHILD_PROCESS
+    skills: [hallmark]
+    paths: [scripts/capture.mjs, scripts/sloplint-render.mjs]
+    reason: Runs `npm root -g` to find a global puppeteer.
+  - rule_id: COMPOUND_FETCH_EXECUTE
+    skills: [system-text-json-net11, setup-local-sdk]
+    paths: [SKILL.md]
+    reason: Microsoft's dotnet-install script from dot.net into a local .dotnet folder.
+  - rule_id: ACTIVE_REMOTE_ACQUIRE_EXECUTE
+    skills: [setup-local-sdk]
+    paths: [SKILL.md]
+    reason: Microsoft's dotnet-install script from dot.net into a local .dotnet folder.
+  - rule_id: ACTIVE_REMOTE_ACQUIRE_EXECUTE
+    skills: [android-tombstone-symbolication]
+    paths: [SKILL.md]
+    reason: Suggests installing llvm from brew or apt, and tells the agent not to.
+  - rule_id: COMPOUND_FETCH_EXECUTE
+    skills: [android-tombstone-symbolication, apple-crash-symbolication]
+    paths: [scripts/*.ps1]
+    reason: Downloads debug symbols and checks their ELF or Mach-O magic; nothing downloaded is run.
+  - rule_id: ACTIVE_OS_PERSISTENCE_DIRECTIVE
+    skills: [maui-theming]
+    paths: [SKILL.md]
+    reason: MAUI Preferences.Set storing the user's theme choice.
+  - rule_id: COMMAND_INJECTION_JS_CHILD_PROCESS
+    skills: [security-audit]
+    paths: [validate-coverage-ledger.test.cjs, validate-findings.test.cjs]
+    reason: Upstream's validator tests spawnSync node on the validator and mkfifo on a temp path, with argument arrays and no shell.

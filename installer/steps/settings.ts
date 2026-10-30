@@ -1,6 +1,6 @@
 // settings.json: the merged keys, shown as a diff and written after a yes, and the marketplace pin.
 import { existsSync, lstatSync, readFileSync } from 'node:fs';
-import { MARKETPLACE, pinMarketplace } from '../core/release.ts';
+import { MARKETPLACE, RELEASE_BRANCH, pinMarketplace } from '../core/release.ts';
 import {
   type Settings,
   type Toggles,
@@ -10,7 +10,7 @@ import {
   settingsText,
   stripDefaults,
 } from '../core/settings.ts';
-import { SETTINGS, VERSION, ask, done, failures, green, red, tryJson } from '../context.ts';
+import { SETTINGS, ask, done, failures, green, red, tryJson } from '../context.ts';
 import { writeAtomic } from '../system/files.ts';
 import { note } from '../ui/ui.ts';
 
@@ -52,9 +52,9 @@ export function pinSettingsEntry() {
   if (!existsSync(SETTINGS) || lstatSync(SETTINGS).isSymbolicLink()) return undefined;
   const raw = readFileSync(SETTINGS, 'utf8');
   const before = tryJson(SETTINGS);
-  const after = before && pinMarketplace(before, VERSION);
+  const after = before && pinMarketplace(before);
   if (!after || after === before) return undefined;
   writeAtomic(SETTINGS, settingsText(raw, after));
-  done.push(`settings.json: pinned the ${MARKETPLACE} marketplace to v${VERSION}`);
+  done.push(`settings.json: pinned the ${MARKETPLACE} marketplace to its ${RELEASE_BRANCH} branch`);
   return raw;
 }

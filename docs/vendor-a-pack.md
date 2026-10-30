@@ -6,7 +6,9 @@ A checklist of the places a new vendored source touches. Tick each or say why no
 
 - [ ] `scripts/sync-<name>.mjs` using `scripts/sync-lib.mjs`; the transform is where upstream is changed, never the
       copied files. Add a `sync-<name>.test.mjs` when the transform has logic.
-- [ ] `.github/workflows/sync-<name>.yml`, weekly. It runs `check-repo` before opening its PR.
+- [ ] An entry in `SOURCES` (`scripts/sync-sources.mjs`): the script, the paths its PR adds, its checks (skill
+      counts and the like) and its PR text. The weekly `.github/workflows/sync.yml` runs it with check-repo and the
+      skill scan before opening its PR; a script that reports new upstream skills (`reportNew`) gets `newSkills`.
 
 ## Where it lives
 

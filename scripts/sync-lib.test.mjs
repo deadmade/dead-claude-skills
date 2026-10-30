@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
-import { addPaths, frontmatterDescription, stableTags, summary } from './sync-lib.mjs';
+import { pathToFileURL } from 'node:url';
+import { addPaths, frontmatterDescription, sparseClone, stableTags, summary } from './sync-lib.mjs';
 
 test('frontmatterDescription', () => {
   assert.equal(
@@ -58,4 +63,43 @@ test('stableTags lists stable tags oldest first, each with its peeled commit', (
 test('stableTags is empty without a stable tag', () => {
   assert.deepEqual(stableTags(lsRemote([[sha('c'), 'refs/tags/v8.0.0-rc.1']])), []);
   assert.deepEqual(stableTags(''), []);
+});
+
+test('sparseClone checks out a commit', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sparse-clone-test-'));
+  try {
+    const repo = join(dir, 'repo');
+    mkdirSync(repo);
+    const git = (...args) =>
+      execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', '-C', repo, ...args], {
+        encoding: 'utf8',
+      }).trim();
+    git('init', '--quiet');
+    git('config', 'uploadpack.allowFilter', 'true');
+    git('config', 'uploadpack.allowAnySHA1InWant', 'true');
+    mkdirSync(join(repo, 'sub'));
+    writeFileSync(join(repo, 'sub', 'a.txt'), 'zeroth\n');
+    git('add', 'sub/a.txt');
+    git('commit', '--quiet', '-m', 'zeroth');
+    writeFileSync(join(repo, 'sub', 'a.txt'), 'first\n');
+    git('commit', '--quiet', '-am', 'first');
+    const first = git('rev-parse', 'HEAD');
+    writeFileSync(join(repo, 'sub', 'a.txt'), 'second\n');
+    git('commit', '--quiet', '-am', 'second');
+
+    const url = pathToFileURL(repo).href;
+    // A Windows git with core.autocrlf checks files out in CRLF.
+    const read = (path) => readFileSync(path, 'utf8').replace(/\r\n/g, '\n');
+    const old = sparseClone(url, ['sub'], { ref: first });
+    assert.equal(read(join(old, 'sub', 'a.txt')), 'first\n');
+    const inOld = (...args) => execFileSync('git', ['-C', old, ...args], { encoding: 'utf8' }).trim();
+    assert.equal(inOld('rev-parse', 'HEAD'), first);
+    assert.equal(inOld('rev-list', '--count', 'HEAD'), '1'); // depth applies: `first` has a parent, yet the clone is shallow
+    const full = sparseClone(url, ['sub'], { ref: first, depth: 0 });
+    assert.equal(execFileSync('git', ['-C', full, 'rev-list', '--count', 'HEAD'], { encoding: 'utf8' }).trim(), '2');
+    const head = sparseClone(url, ['sub']);
+    assert.equal(read(join(head, 'sub', 'a.txt')), 'second\n');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

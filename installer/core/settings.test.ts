@@ -20,56 +20,51 @@ import {
 import { missingBinaries } from './binaries.ts';
 import { TOGGLES, HINTS } from './options.ts';
 
-const V = { version: '1.0.0' };
 const M = 'dead-claude-skills';
 const O = 'claude-plugins-official';
 const shippedText = (f: string) => readFileSync(new URL(f, import.meta.url), 'utf8');
 
 test('merge adds owned keys and keeps foreign ones', () => {
-  const out = mergeSettings(
-    { model: 'x', permissions: { allow: ['Bash(ls)'] } },
-    { statusLine: true, version: '1.2.3' },
-  );
+  const out = mergeSettings({ model: 'x', permissions: { allow: ['Bash(ls)'] } }, { statusLine: true });
   assert.equal(out.model, 'x');
   assert.deepEqual(out.permissions!.allow, ['Bash(ls)', 'Read(~/.claude/plugins/**)']);
   assert.equal(out.extraKnownMarketplaces![M].autoUpdate, true);
-  assert.equal(out.extraKnownMarketplaces![M].source!.ref, 'v1.2.3');
+  assert.equal(out.extraKnownMarketplaces![M].source!.ref, 'release');
   assert.match(out.statusLine!.command!, /ccstatusline/);
   assert.equal(out.cleanupPeriodDays, 36500);
-  assert.equal(mergeSettings({ cleanupPeriodDays: 7 }, V).cleanupPeriodDays, 7);
+  assert.equal(mergeSettings({ cleanupPeriodDays: 7 }, {}).cleanupPeriodDays, 7);
 });
 
 test('merge is idempotent', () => {
-  const once = mergeSettings({}, { ...V, statusLine: true });
-  assert.deepEqual(mergeSettings(once, { ...V, statusLine: true }), once);
+  const once = mergeSettings({}, { statusLine: true });
+  assert.deepEqual(mergeSettings(once, { statusLine: true }), once);
 });
 
 test('statusLine off removes ours, keeps a foreign one', () => {
   assert.equal(
-    mergeSettings({ ...V, statusLine: { type: 'command', command: 'ccstatusline' } }, { ...V, statusLine: false })
-      .statusLine,
+    mergeSettings({ statusLine: { type: 'command', command: 'ccstatusline' } }, { statusLine: false }).statusLine,
     undefined,
   );
   const foreign = { type: 'command', command: 'my-line.sh' };
-  assert.deepEqual(mergeSettings({ ...V, statusLine: foreign }, { ...V, statusLine: false }).statusLine, foreign);
+  assert.deepEqual(mergeSettings({ statusLine: foreign }, { statusLine: false }).statusLine, foreign);
 });
 
 test('secret denies are added once and keep existing ones', () => {
-  const out = mergeSettings({ permissions: { deny: ['Bash(sudo:*)', 'Read(~/.ssh/**)'] } }, V);
+  const out = mergeSettings({ permissions: { deny: ['Bash(sudo:*)', 'Read(~/.ssh/**)'] } }, {});
   assert.deepEqual(out.permissions!.deny, [
     'Bash(sudo:*)',
     'Read(~/.ssh/**)',
     ...SECRET_DENIES.filter((d) => d !== 'Read(~/.ssh/**)'),
   ]);
-  assert.deepEqual(mergeSettings(out, V), out);
+  assert.deepEqual(mergeSettings(out, {}), out);
 });
 
 test("the sandbox keys an older installer turned on are removed, the user's stay", () => {
   const old = { enabled: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: false };
-  const out = mergeSettings({ sandbox: { ...old, excludedCommands: ['make'] } }, V);
+  const out = mergeSettings({ sandbox: { ...old, excludedCommands: ['make'] } }, {});
   assert.deepEqual(out.sandbox, { excludedCommands: ['make'] });
-  assert.equal(mergeSettings({ sandbox: old }, V).sandbox, undefined);
-  assert.equal(mergeSettings({}, V).sandbox, undefined);
+  assert.equal(mergeSettings({ sandbox: old }, {}).sandbox, undefined);
+  assert.equal(mergeSettings({}, {}).sandbox, undefined);
 });
 
 test('dcg hook detection', () => {
@@ -90,7 +85,7 @@ test('dcg hook detection reads every hook dcg writes, and a clean slate keeps it
   for (const [os, settings] of Object.entries(dcgHooks)) {
     if (typeof settings === 'string') continue;
     assert.ok(hasDcgHook(settings), os);
-    assert.deepEqual(resetSettings(settings, { ...V, dcg: true }).hooks, settings.hooks, os);
+    assert.deepEqual(resetSettings(settings, { dcg: true }).hooks, settings.hooks, os);
   }
 });
 
@@ -125,8 +120,9 @@ test('reset keeps only our settings plus the dcg hook while dcg stays on', () =>
       other: {},
     },
   };
-  const out = resetSettings(before, { ...V, statusLine: true, dcg: true });
+  const out = resetSettings(before, { statusLine: true, dcg: true });
   assert.equal(out.model, undefined);
+  assert.equal(out.env?.CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS, '8');
   assert.deepEqual(out.permissions!.allow, ['Read(~/.claude/plugins/**)']);
   assert.deepEqual(out.hooks, { PreToolUse: [dcgEntry] });
   assert.equal(out.enabledPlugins![`dead-skills@${M}`], true);
@@ -134,8 +130,8 @@ test('reset keeps only our settings plus the dcg hook while dcg stays on', () =>
   assert.deepEqual(Object.keys(out.extraKnownMarketplaces!), [M, O]);
   assert.equal(out.enabledPlugins!['x@other'], undefined);
   assert.ok(isStripped(out));
-  assert.equal(resetSettings(before, { ...V, dcg: false }).hooks, undefined);
-  assert.deepEqual(resetSettings(out, { ...V, statusLine: true, dcg: true }), out);
+  assert.equal(resetSettings(before, { dcg: false }).hooks, undefined);
+  assert.deepEqual(resetSettings(out, { statusLine: true, dcg: true }), out);
 });
 
 test('settings changes: invalid JSON is never written, unchanged is null, line endings are kept', () => {
@@ -183,29 +179,43 @@ test('Night City ccstatusline keeps the stock widgets in order', () => {
 });
 
 test('Night City settings are always on, next to other env, and leave the theme alone', () => {
-  const out = mergeSettings({ env: { FOO: 'x' }, theme: 'dark' }, V);
-  assert.deepEqual(out.env, { FOO: 'x', CLAUDE_CODE_TMUX_TRUECOLOR: '1' });
+  const out = mergeSettings({ env: { FOO: 'x' }, theme: 'dark' }, {});
+  assert.deepEqual(out.env, {
+    CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS: '8',
+    FOO: 'x',
+    CLAUDE_CODE_TMUX_TRUECOLOR: '1',
+  });
   assert.equal(out.syntaxHighlightingDisabled, true);
   assert.equal(out.theme, 'dark');
 });
 
+test('workflow concurrency defaults to 8, keeps a number the user set, and no subagent model is ever written', () => {
+  assert.equal(mergeSettings({}, {}).env?.CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS, '8');
+  const own = mergeSettings({ env: { CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS: '3' } }, {});
+  assert.equal(own.env?.CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS, '3');
+  assert.deepEqual(
+    Object.keys(own.env ?? {}).filter((k) => k.startsWith('CLAUDE_CODE_SUBAGENT_MODEL')),
+    [],
+  );
+});
+
 test('Night City picked while it was its own plugin stays picked now that dead-skills ships it', () => {
-  assert.equal(mergeSettings({ theme: 'custom:night-city:night-city' }, V).theme, 'custom:dead-skills:night-city');
+  assert.equal(mergeSettings({ theme: 'custom:night-city:night-city' }, {}).theme, 'custom:dead-skills:night-city');
 });
 
 test('the built-in notification is always off, since dead-skills raises its own', () => {
-  assert.equal(mergeSettings({}, V).preferredNotifChannel, 'notifications_disabled');
-  assert.equal(mergeSettings({ preferredNotifChannel: 'kitty' }, V).preferredNotifChannel, 'notifications_disabled');
+  assert.equal(mergeSettings({}, {}).preferredNotifChannel, 'notifications_disabled');
+  assert.equal(mergeSettings({ preferredNotifChannel: 'kitty' }, {}).preferredNotifChannel, 'notifications_disabled');
 });
 
 test('web builtins: tri-state merge keeps other denies, toggle reads deny', () => {
   const base: Settings = { permissions: { deny: ['Bash(sudo:*)'] } };
-  const off = mergeSettings(base, { ...V, webBuiltinsOff: true });
+  const off = mergeSettings(base, { webBuiltinsOff: true });
   assert.ok(['Bash(sudo:*)', 'WebFetch', 'WebSearch'].every((d) => off.permissions!.deny!.includes(d)));
   assert.ok(isWebBuiltinsOff(off));
-  assert.deepEqual(mergeSettings(off, { ...V, webBuiltinsOff: true }), off);
-  assert.deepEqual(mergeSettings(off, V).permissions!.deny, off.permissions!.deny);
-  const back = mergeSettings(off, { ...V, webBuiltinsOff: false });
+  assert.deepEqual(mergeSettings(off, { webBuiltinsOff: true }), off);
+  assert.deepEqual(mergeSettings(off, {}).permissions!.deny, off.permissions!.deny);
+  const back = mergeSettings(off, { webBuiltinsOff: false });
   const denied = back.permissions!.deny!;
   assert.ok(!denied.includes('WebFetch') && !denied.includes('WebSearch'));
   assert.ok(denied.includes('Bash(sudo:*)'));

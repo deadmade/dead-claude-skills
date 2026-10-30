@@ -7,8 +7,8 @@ silently edited plan.
 ## Reviewers
 
 Spawn 2–3 `general-purpose` subagents in one message. Each gets: the spec, the plan, the grounding and prior-art
-sections of flow.md, the ADRs, its angle below, and the rubric. Spread the angles over models from pstack
-`interrogate`'s table, one angle per model; every angle below still runs, Simpler included.
+sections of flow.md, the ADRs, its angle below, and the rubric. Spread the angles over `fable`, `opus` and
+`sonnet`, one angle per model; every angle below still runs, Simpler included.
 
 | Angle           | Looks for                                                                                                                                                                                                                                                                                  |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

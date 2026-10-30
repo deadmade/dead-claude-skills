@@ -24,7 +24,6 @@ interface HookEntry {
 // statusLine: missing reads as off.
 export interface Toggles {
   statusLine?: boolean;
-  version: string;
   webBuiltinsOff?: boolean;
 }
 
@@ -107,14 +106,16 @@ export const webBuiltinsDecision = ({
   installed?: boolean;
 }) => (toggle ? healthy || undefined : was && installed ? false : undefined);
 
-export function mergeSettings(settings: Settings, { statusLine, version, webBuiltinsOff }: Toggles) {
+export function mergeSettings(settings: Settings, { statusLine, webBuiltinsOff }: Toggles) {
   const out = structuredClone(settings);
   // Night City ships with the bundle. Claude Code colours code in a fixed Monokai a theme can't change; off, diffs take
   // Night City's own diff colours.
   out.syntaxHighlightingDisabled = true;
   // Inside tmux Claude Code draws in 256 colours unless told otherwise, which turns the theme's indigos grey. Outside
   // tmux (and on Windows, which has none) the variable does nothing.
-  out.env = { ...out.env, CLAUDE_CODE_TMUX_TRUECOLOR: '1' };
+  // At most 8 workflow agents run at once (flows' **Agents** rule), unless the user set their own number. Claude Code
+  // before 2.1.269 ignores the variable.
+  out.env = { CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS: '8', ...out.env, CLAUDE_CODE_TMUX_TRUECOLOR: '1' };
   // The theme's id carries its plugin's name, and night-city became part of dead-skills.
   if (out.theme === 'custom:night-city:night-city') out.theme = 'custom:dead-skills:night-city';
   // dead-skills raises its own popups; Claude Code's built-in one would double them.
@@ -133,7 +134,7 @@ export function mergeSettings(settings: Settings, { statusLine, version, webBuil
   };
   out.extraKnownMarketplaces = {
     ...out.extraKnownMarketplaces,
-    [MARKETPLACE]: { source: marketplaceSource(version), autoUpdate: true },
+    [MARKETPLACE]: { source: marketplaceSource(), autoUpdate: true },
   };
   // Claude Code deletes session transcripts after 30 days by default; a value set by hand wins.
   out.cleanupPeriodDays ??= KEEP_SESSIONS_DAYS;

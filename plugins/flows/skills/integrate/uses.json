@@ -1,5 +1,6 @@
 {
   "claude-code": ["Monitor"],
-  "pstack-picks": ["blast-radius", "unslop"],
+  "flows": ["writing"],
+  "pstack-picks": ["blast-radius"],
   "superpowers": ["verification-before-completion", "systematic-debugging"]
 }

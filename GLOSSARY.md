@@ -91,3 +91,22 @@ _Avoid_: passage, summary
 **Search profile**:
 The browser profile web-mcp's searches run in, with cookies and settings of its own and never the user's.
 _Avoid_: session (one browser), user profile
+
+**Writing skill**:
+The one standard for prose Claude writes for a person, based on Williams and Bizup's _Style_; flows' `writing` skill.
+_Avoid_: style guide, unslop
+
+**Conversation shorthand**:
+A label only the session that coined it understands, such as a grill question number or a review round number.
+_Avoid_: tag, reference
+
+**Prose check**:
+flows' code-only `PostToolUse` hook on each Write or Edit of a Markdown file: it flags conversation shorthand in the
+new text, with no model call. `FLOWS_PROSE_CHECK=off` turns it off.
+_Avoid_: linter, lint, model check
+
+**Copyedit pass**:
+A run of the `writing` skill's copyedit (`references/copyedit.md`) on a spec, plan or audit report before its gate: a fresh Opus editor revises it for a reader who
+wasn't in the conversation, by the `writing` skill (Williams and Bizup's _Style_), and code checks that nothing
+was lost. A refused edit leaves the document as it was, and the gate says so.
+_Avoid_: review, rewrite, polish

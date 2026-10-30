@@ -19,7 +19,7 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
 - **Audits** (`/test-audit`, `/doc-audit`, `/harden`) write `docs/audits/<YYYY-MM-DD>-<flow>-<scope>.md`: the scope
   line, the findings table, the user's pick per finding, and what was fixed.
 - `/verify`, `/understand` and `/learn` keep no state file of their own; called from a build flow, they write their
-  result into its flow.md.
+  result into its flow.md. The copyedit keeps no state either; its diff is against the saved copy in its run folder.
 
 ## Running a flow
 
@@ -35,6 +35,11 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
   <!-- overrides superpowers/skills/subagent-driven-development/references/final-review.md: "Use superpowers:finishing-a-development-branch." -->
 - **Gates:** a gate passes only on the user's explicit approval of the artifact it names, recorded with the date in
   the state file. "Sounds good" to an idea isn't approval of a document. Nothing past a gate starts before it passes.
+- **Copyedit pass:** before a gate shows the user a `spec.md`, a `plan.md` or an audit report, copyedit it
+  (read `${CLAUDE_SKILL_DIR}/../writing/references/copyedit.md`), each time the document goes to a gate, and say in the gate message
+  that it was copyedited. When the copyedit refuses the edit (it lost something, or failed), the flow goes on: the gate
+  shows the unedited document and the lines `compare.mjs` printed, and says the copyedit was refused. flow.md is never
+  copyedited, and the prose check skips it: it changes after every phase.
 - The user may skip a phase by saying so ("skip grilling"); record it. Never skip one on your own, and never skip a
   gate.
 - Options always come with a recommendation and its reason.
@@ -91,6 +96,14 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
 - At Finish, ask the user for the **Run verdict** and record it in flow.md: worked as a whole, yes or no; clean, yes
   or no.
 
+## Agents
+
+Don't start agents by the dozen, under ultracode or in a Workflow either. Decide how many a step really needs: combine
+related tasks, checks and verifications into one agent where that works, do small things inline, and ask before a run
+grows large. Give every agent a model that fits its job instead of the session's default: `haiku` for mechanical work,
+`sonnet` for searching and most review, `opus` or `fable` where the judgment is hard (a subtle review, the final
+review).
+
 ## Homes and commits
 
 - Specs and plans live only in `docs/features/<slug>/` (`spec.md`, `plan.md`), next to flow.md, not where
@@ -107,8 +120,9 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
 
 - A conductor's `uses.json` lists the skills, agents and tools it runs (not other conductors). Change it with the
   SKILL.md, then run `node scripts/flows-uses.mjs`, which regenerates flows' dependencies and README tree.
-- **Packs** (superpowers, ponytail, mattpocock-picks, pstack-picks, tob-picks, paper-lookup) ship inside flows, in the
-  packs folder your SKILL.md names (below: `<packs>`). They aren't installed, so the Skill tool doesn't know them:
+- **Packs** (superpowers, ponytail, mattpocock-picks, pstack-picks, tob-picks, paper-lookup, security-audit) ship
+  inside flows, in the packs folder your SKILL.md names (below: `<packs>`). They aren't installed, so the Skill tool
+  doesn't know them:
   - A pack skill is read by path, `<packs>/<pack>/skills/<name>/SKILL.md`, and followed. Never through the Skill tool.
   - Inside a pack file, `<pack>:<name>` (`superpowers:writing-plans`) means `<packs>/<pack>/skills/<name>/SKILL.md`,
     and "invoke" or "use" it means read it there. `${CLAUDE_SKILL_DIR}` and relative paths (`./implementer-prompt.md`,
@@ -123,7 +137,8 @@ upgrade`) and the `phase:`; a conductor only resumes its own flow. Update it aft
     `Workflow({scriptPath: "<packs>/tob-picks/workflows/spec-compliance.js", args: {path, spec, limit}})`, with
     `args` as a JSON object (or just the path as a string).
     <!-- overrides tob-picks/skills/spec-to-code-compliance/SKILL.md: "Run `/tob-picks:spec-compliance <path>`." -->
-- **Installed plugins:** a skill the model may invoke, use the Skill tool. A skill with
+- **Installed plugins:** a skill the model may invoke, use the Skill tool. flows' own `writing` skill is one:
+  `flows:writing` loads through the Skill tool. A skill with
   `disable-model-invocation: true` can't be loaded that way (every conductor here, `/self-review` too): read its SKILL.md
   and follow it:
   - another plugin: `${CLAUDE_SKILL_DIR}/../../../../<plugin>/*/skills/<name>/SKILL.md` (in a checkout of this
@@ -155,6 +170,7 @@ verbatim at these steps, never the whole skill:
 
 In a build flow TDD wins over ponytail's no-test-for-trivial rule. Wherever **The smallest complete change** is pasted
 into a brief, this line goes with it: "TDD wins here: every change, trivial ones too, gets its failing test first."
+
 <!-- overrides ponytail/skills/ponytail/SKILL.md: "Lazy code without its check is unfinished: new non-trivial logic (a branch, a loop, a parser, money or security, or a whole new script or app) leaves one small test or an assert-based self-check. Trivial changes need none." -->
 
 ## Stack packs
