@@ -7,8 +7,8 @@ use std::fs::{File, TryLockError};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use jiff::Timestamp;
@@ -18,7 +18,8 @@ use crate::browser::Browser;
 use crate::engines::Engine;
 
 pub const EXTENSION_URL: &str = "https://github.com/OhMyGuus/I-Still-Dont-Care-About-Cookies/releases/download/v1.1.9/ISDCAC-chrome-source.zip";
-pub const EXTENSION_SHA256: &str = "8f70ab947cb2d274f4022a970f5dd3cecd8ec02b060e05187bef9ee3cb18bbcb";
+pub const EXTENSION_SHA256: &str =
+    "8f70ab947cb2d274f4022a970f5dd3cecd8ec02b060e05187bef9ee3cb18bbcb";
 
 /// How long a blocked engine sits out.
 pub const REST: Duration = Duration::from_mins(30);
@@ -63,11 +64,7 @@ pub fn unpack(zip: &[u8], expected_sha256: &str, dir: &Path) -> Result<PathBuf, 
         std::fs::remove_dir_all(&target)
             .map_err(|e| format!("could not replace {}: {e}", target.display()))?;
     }
-    let tmp = dir.join(format!(
-        "idcac-{}.tmp-{}",
-        &sha[..8],
-        std::process::id()
-    ));
+    let tmp = dir.join(format!("idcac-{}.tmp-{}", &sha[..8], std::process::id()));
     let _ = std::fs::remove_dir_all(&tmp);
     let mut write = || -> io::Result<()> {
         std::fs::create_dir_all(&tmp)?;
@@ -112,11 +109,19 @@ pub struct EngineLock {
 }
 
 /// The search folder: per engine `<engine>/agent-browser.json`, `profile/`, `lock` and `rest`, plus the shared
-/// `extensions/` and, for Helium, `helium-wrap.sh`.
+/// `extensions/` and, for Helium, `helium-wrap.sh`; the profile slots `profiles/<n>/` (`lock`, `owner`,
+/// `agent-browser.json`, `profile/`, `<engine>/consent-seen`) and the attached calls' `attach.json`.
 pub struct Profiles {
     dir: PathBuf,
     /// For the cookie extension download: https only, at most 5 redirects (GitHub redirects release assets).
     http: reqwest::Client,
+    /// `profiles/<n>` and its held lock, taken on the first `slot()` and kept until exit.
+    slot: OnceLock<(PathBuf, File)>,
+    /// One turn per engine, indexed by its discriminant: an engine's tab serves one search at a time.
+    turns: [tokio::sync::Mutex<()>; Engine::ALL.len()],
+    /// The browser `ready()` uses in tests instead of looking for one.
+    #[cfg(test)]
+    chrome: Option<PathBuf>,
 }
 
 impl Profiles {
@@ -134,7 +139,112 @@ impl Profiles {
             .map_err(|e| e.to_string())?;
         // Absolute: the config files name paths in it, and agent-browser runs elsewhere.
         let dir = std::path::absolute(&dir).unwrap_or(dir);
-        Ok(Self { dir, http })
+        Ok(Self {
+            dir,
+            http,
+            slot: OnceLock::new(),
+            turns: std::array::from_fn(|_| tokio::sync::Mutex::new(())),
+            #[cfg(test)]
+            chrome: None,
+        })
+    }
+
+    /// `ready()` then uses `chrome` instead of `WEB_MCP_CHROME`, HOME and PATH.
+    #[cfg(test)]
+    pub fn with_chrome(mut self, chrome: PathBuf) -> Self {
+        self.chrome = Some(chrome);
+        self
+    }
+
+    /// The search folder.
+    pub fn dir(&self) -> &Path {
+        &self.dir
+    }
+
+    /// This process's profile slot: the first `profiles/<n>` (n = 1, 2, …) whose lock is free, held until exit.
+    ///
+    /// # Errors
+    /// When a lock can't be opened.
+    pub fn slot(&self) -> Result<&Path, String> {
+        if let Some((slot, _)) = self.slot.get() {
+            return Ok(slot);
+        }
+        let profiles = self.dir.join("profiles");
+        let held = (1u32..)
+            .find_map(|n| {
+                let slot = profiles.join(n.to_string());
+                try_lock_file(&slot.join("lock"))
+                    .map(|f| f.map(|f| (slot, f)))
+                    .transpose()
+            })
+            .expect("the slots never run out")
+            .map_err(|e| {
+                format!(
+                    "could not lock a profile slot in {}: {e}",
+                    profiles.display()
+                )
+            })?;
+        // A racing call in this process may have set it first; ours is dropped, freeing its lock.
+        let _ = self.slot.set(held);
+        Ok(&self.slot.get().expect("just set").0)
+    }
+
+    /// The owner session named in `<slot>/owner`, left by the slot's last holder.
+    pub fn previous_owner(&self) -> Option<String> {
+        let owner = std::fs::read_to_string(self.slot().ok()?.join("owner")).ok()?;
+        Some(owner.trim().to_owned()).filter(|o| !o.is_empty())
+    }
+
+    /// Names `session` in `<slot>/owner`. Best effort: a lost name only leaves an old owner's Chrome running.
+    pub fn set_owner(&self, session: &str) {
+        if let Ok(slot) = self.slot() {
+            let _ = write_if_changed(&slot.join("owner"), session.as_bytes(), false);
+        }
+    }
+
+    /// Writes the owner's `<slot>/agent-browser.json` (unless it already says the same) and returns its path.
+    ///
+    /// # Errors
+    /// When there is no slot, a path isn't UTF-8 or it can't be written.
+    pub fn owner_config(&self, r: &Ready) -> Result<PathBuf, String> {
+        let slot = self.slot()?;
+        let json = serde_json::json!({
+            "profile": utf8(&slot.join("profile"))?,
+            "extensions": [utf8(&r.extension)?],
+            "executablePath": utf8(&r.chrome)?,
+            "userAgent": r.ua,
+            "headed": true,
+            // Newline-separated, no commas: agent-browser splits `args` on both.
+            "args": "--lang=en-US\n--disable-background-timer-throttling\n--disable-renderer-backgrounding",
+        });
+        write_json(&slot.join("agent-browser.json"), &json)
+    }
+
+    /// Writes `<dir>/attach.json`, the config of every call attached to the window, and returns its path.
+    ///
+    /// # Errors
+    /// When it can't be written.
+    pub fn attach_config(&self) -> Result<PathBuf, String> {
+        write_json(
+            &self.dir.join("attach.json"),
+            &serde_json::json!({"idleTimeout": "3600s"}),
+        )
+    }
+
+    /// The engine's turn in this process, waited for until `until`; dropping it ends the turn.
+    pub async fn turn(&self, e: Engine, until: Instant) -> Option<tokio::sync::MutexGuard<'_, ()>> {
+        tokio::time::timeout_at(until.into(), self.turns[e as usize].lock())
+            .await
+            .ok()
+    }
+
+    /// The engine's consent mark: per slot once one is held (each has its own cookies), machine-wide before.
+    fn consent_mark(&self, e: Engine) -> PathBuf {
+        self.slot
+            .get()
+            .map_or(self.dir.as_path(), |(slot, _)| slot)
+            .join(e.name())
+            .join("consent-seen")
     }
 
     /// The browser (`WEB_MCP_CHROME`, read now, or the first one found) and the cookie extension, downloaded on first
@@ -143,6 +253,12 @@ impl Profiles {
     /// # Errors
     /// When the search folder isn't the user's, no browser is found or the extension can't be had.
     pub async fn ready(&self) -> Result<Ready, String> {
+        #[cfg(test)]
+        if let Some(chrome) = &self.chrome {
+            return self
+                .ready_with(Some(chrome.clone()), None, OsStr::new(""))
+                .await;
+        }
         let var = |k: &str| std::env::var_os(k).filter(|v| !v.is_empty());
         let home = var(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(PathBuf::from);
         self.ready_with(
@@ -216,7 +332,8 @@ impl Profiles {
         if have() {
             return Ok(ext);
         }
-        let why = |e: &dyn std::fmt::Display| format!("could not download the cookie extension: {e}");
+        let why =
+            |e: &dyn std::fmt::Display| format!("could not download the cookie extension: {e}");
         let _lock = lock_file(&self.dir.join("extensions.lock"), Instant::now() + DOWNLOAD)
             .await
             .map_err(|e| why(&e))?
@@ -307,13 +424,13 @@ impl Profiles {
 
     /// Whether the last search of the engine met a consent page.
     pub fn consent_seen(&self, e: Engine) -> bool {
-        self.dir.join(e.name()).join("consent-seen").exists()
+        self.consent_mark(e).exists()
     }
 
     /// Marks (or clears) that the engine met a consent page. The caller holds its lock.
     pub fn set_consent_seen(&self, e: Engine, seen: bool) {
         // Best effort, like `rest`: a lost mark costs one more `consent (clearing)`.
-        let path = self.dir.join(e.name()).join("consent-seen");
+        let path = self.consent_mark(e);
         if seen {
             let _ = write_if_changed(&path, b"", false);
         } else {
@@ -470,6 +587,20 @@ fn write_if_changed(path: &Path, content: &[u8], executable: bool) -> io::Result
 
 /// Locks `path` (created if missing), retrying every 100 ms; `Ok(None)` once `until` has passed.
 async fn lock_file(path: &Path, until: Instant) -> io::Result<Option<File>> {
+    loop {
+        if let Some(f) = try_lock_file(path)? {
+            return Ok(Some(f));
+        }
+        let left = until.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return Ok(None);
+        }
+        tokio::time::sleep(left.min(Duration::from_millis(100))).await;
+    }
+}
+
+/// Locks `path` (created if missing) without waiting; `Ok(None)` when another holder has it.
+fn try_lock_file(path: &Path) -> io::Result<Option<File>> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
     }
@@ -478,18 +609,19 @@ async fn lock_file(path: &Path, until: Instant) -> io::Result<Option<File>> {
         .truncate(false)
         .write(true)
         .open(path)?;
-    loop {
-        match f.try_lock() {
-            Ok(()) => return Ok(Some(f)),
-            Err(TryLockError::Error(e)) => return Err(e),
-            Err(TryLockError::WouldBlock) => {}
-        }
-        let left = until.saturating_duration_since(Instant::now());
-        if left.is_zero() {
-            return Ok(None);
-        }
-        tokio::time::sleep(left.min(Duration::from_millis(100))).await;
+    match f.try_lock() {
+        Ok(()) => Ok(Some(f)),
+        Err(TryLockError::Error(e)) => Err(e),
+        Err(TryLockError::WouldBlock) => Ok(None),
     }
+}
+
+/// Writes `json` to `path` (unless it already says the same) and returns the path.
+fn write_json(path: &Path, json: &serde_json::Value) -> Result<PathBuf, String> {
+    let text = serde_json::to_string_pretty(json).expect("a JSON value serializes");
+    write_if_changed(path, text.as_bytes(), false)
+        .map_err(|e| format!("could not write {}: {e}", path.display()))?;
+    Ok(path.to_owned())
 }
 
 #[cfg(test)]
@@ -551,7 +683,7 @@ mod tests {
         let p = profiles(&dir);
         let mut r = ready(&dir);
         r.chrome = dir.join(OsStr::from_bytes(b"chr\xffme"));
-        let err = p.config(Engine::Brave, &r).unwrap_err();
+        let err = p.owner_config(&r).unwrap_err();
         assert!(err.contains("not valid UTF-8"), "{err}");
         assert!(p.helium_wrapper(&r.chrome).is_err());
     }
@@ -729,6 +861,136 @@ mod tests {
     }
 
     #[test]
+    fn first_free_slot_is_one() {
+        let dir = tempdir("slot1");
+        let p = profiles(&dir);
+        let slot = dir.join("profiles").join("1");
+        assert_eq!(p.slot().unwrap(), slot);
+        assert_eq!(p.slot().unwrap(), slot);
+        assert!(slot.join("lock").is_file());
+    }
+
+    #[test]
+    fn second_holder_gets_next_slot() {
+        let dir = tempdir("slot2");
+        let a = profiles(&dir);
+        let b = profiles(&dir);
+        assert_eq!(a.slot().unwrap(), dir.join("profiles").join("1"));
+        assert_eq!(b.slot().unwrap(), dir.join("profiles").join("2"));
+        drop(a);
+        let c = profiles(&dir);
+        assert_eq!(c.slot().unwrap(), dir.join("profiles").join("1"));
+    }
+
+    #[tokio::test]
+    async fn turn_waits_then_gives_up() {
+        let dir = tempdir("turn");
+        let p = profiles(&dir);
+        let held = p.turn(Engine::Scholar, Instant::now()).await.unwrap();
+        let t = Instant::now();
+        assert!(
+            p.turn(Engine::Scholar, t + Duration::from_millis(300))
+                .await
+                .is_none()
+        );
+        assert!(t.elapsed() >= Duration::from_millis(300));
+        // Another engine's turn is its own.
+        assert!(p.turn(Engine::Brave, Instant::now()).await.is_some());
+        let release = async {
+            tokio::time::sleep(Duration::from_millis(200)).await;
+            drop(held);
+        };
+        let (got, ()) = tokio::join!(
+            p.turn(Engine::Scholar, Instant::now() + Duration::from_secs(3)),
+            release
+        );
+        assert!(got.is_some());
+    }
+
+    #[test]
+    fn consent_mark_is_per_slot() {
+        let dir = tempdir("consent");
+        let a = profiles(&dir);
+        let b = profiles(&dir);
+        // Before a slot is held: the old machine-wide mark.
+        a.set_consent_seen(Engine::Google, true);
+        assert!(dir.join("google").join("consent-seen").is_file());
+        assert!(a.consent_seen(Engine::Google));
+        let slot = a.slot().unwrap().to_owned();
+        assert!(!a.consent_seen(Engine::Google));
+        a.set_consent_seen(Engine::Google, true);
+        assert!(slot.join("google").join("consent-seen").is_file());
+        assert!(a.consent_seen(Engine::Google));
+        b.slot().unwrap();
+        assert!(!b.consent_seen(Engine::Google));
+        a.set_consent_seen(Engine::Google, false);
+        assert!(!a.consent_seen(Engine::Google));
+        assert!(dir.join("google").join("consent-seen").is_file());
+    }
+
+    #[test]
+    fn owner_round_trips() {
+        let dir = tempdir("owner");
+        let a = profiles(&dir);
+        assert_eq!(a.previous_owner(), None);
+        a.set_owner("web-mcp-7-window");
+        assert_eq!(a.previous_owner().as_deref(), Some("web-mcp-7-window"));
+        let slot = a.slot().unwrap().to_owned();
+        assert_eq!(
+            std::fs::read_to_string(slot.join("owner")).unwrap(),
+            "web-mcp-7-window"
+        );
+        drop(a);
+        let b = profiles(&dir);
+        assert_eq!(b.slot().unwrap(), slot);
+        assert_eq!(b.previous_owner().as_deref(), Some("web-mcp-7-window"));
+    }
+
+    #[test]
+    fn owner_config_is_exact() {
+        let dir = tempdir("ownercfg");
+        let p = profiles(&dir);
+        let r = ready(&dir);
+        let path = p.owner_config(&r).unwrap();
+        let slot = dir.join("profiles").join("1");
+        assert_eq!(path, slot.join("agent-browser.json"));
+        let v: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        let s = |p: &Path| p.to_str().unwrap().to_owned();
+        assert_eq!(
+            v,
+            serde_json::json!({
+                "profile": s(&slot.join("profile")),
+                "extensions": [s(&r.extension)],
+                "executablePath": s(&r.chrome),
+                "userAgent": r.ua,
+                "headed": true,
+                "args": "--lang=en-US\n--disable-background-timer-throttling\n--disable-renderer-backgrounding",
+            })
+        );
+    }
+
+    #[test]
+    fn attach_config_is_exact() {
+        let dir = tempdir("attach");
+        let p = profiles(&dir);
+        let path = p.attach_config().unwrap();
+        assert_eq!(path, dir.join("attach.json"));
+        let v: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        assert_eq!(v, serde_json::json!({"idleTimeout": "3600s"}));
+    }
+
+    #[tokio::test]
+    async fn with_chrome_is_the_browser() {
+        let dir = seeded("withchrome");
+        let chrome = dir.join("chrome");
+        std::fs::write(&chrome, "").unwrap();
+        let p = profiles(&dir).with_chrome(chrome.clone());
+        let r = p.ready().await.unwrap();
+        assert_eq!(r.chrome, chrome);
+        assert_eq!(p.dir(), dir);
+    }
+
+    #[test]
     fn version_majors_are_read() {
         assert_eq!(major("Helium 0.18.1.1 (Chromium 154.0.8037.57)"), Some(154));
         assert_eq!(major("Chromium 153.0.7000.1 built on NixOS"), Some(153));
@@ -748,13 +1010,9 @@ mod tests {
     }
 
     /// A search dir with the cookie extension already unpacked, so `ready` never downloads.
-    #[cfg(unix)]
     fn seeded(tag: &str) -> PathBuf {
         let dir = tempdir(tag);
-        let ext = dir.join(format!(
-            "extensions/idcac-{}",
-            &EXTENSION_SHA256[..8]
-        ));
+        let ext = dir.join(format!("extensions/idcac-{}", &EXTENSION_SHA256[..8]));
         std::fs::create_dir_all(&ext).unwrap();
         std::fs::write(ext.join("manifest.json"), "{}").unwrap();
         dir
