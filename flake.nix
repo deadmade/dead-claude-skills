@@ -121,7 +121,7 @@
         inherit (pre-commit) shellHook;
         buildInputs = pre-commit.enabledPackages;
         # What scripts/sync-*.mjs and the workflows use besides stdenv, and the Rust toolchain for tui-review's binary.
-        packages = with pkgs; [git gh nodejs_26 cargo rustc clippy rustfmt rust-analyzer];
+        packages = with pkgs; [git gh nodejs_26 uv cargo rustc clippy rustfmt rust-analyzer];
         RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
       };
     });

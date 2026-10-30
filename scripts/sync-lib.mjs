@@ -126,3 +126,31 @@ export function addPaths(text, globs) {
   }
   return null;
 }
+
+// The pin for a GitHub release: the version `tagPattern` captures from its tag and the sha256 digest GitHub lists for
+// each of `files` (key -> asset name).
+export function pinFrom(release, files, tagPattern) {
+  const upstream = tagPattern.exec(release.tag_name)?.[1];
+  if (!upstream) throw new Error(`unexpected tag ${release.tag_name}`);
+  const sha256 = Object.fromEntries(
+    Object.entries(files).map(([key, file]) => {
+      const digest = /^sha256:([0-9a-f]{64})$/.exec(release.assets.find((a) => a.name === file)?.digest ?? '')?.[1];
+      if (!digest) throw new Error(`no sha256 digest for ${file}`);
+      return [key, digest];
+    }),
+  );
+  return { upstream, sha256 };
+}
+
+// Pin `out` (a path under ROOT) to `repo`'s newest release. Needs `gh`.
+export function syncPin({ repo, files, out, tagPattern }) {
+  const release = JSON.parse(execFileSync('gh', ['api', `repos/${repo}/releases/latest`], { encoding: 'utf8' }));
+  let pin;
+  try {
+    pin = pinFrom(release, files, tagPattern);
+  } catch (e) {
+    fail(e.message);
+  }
+  writeFileSync(join(ROOT, out), JSON.stringify(pin, null, 2) + '\n');
+  console.log(`${repo} pinned to ${pin.upstream}`);
+}

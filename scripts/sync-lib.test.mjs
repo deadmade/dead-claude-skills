@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
-import { addPaths, frontmatterDescription, sparseClone, stableTags, summary } from './sync-lib.mjs';
+import { addPaths, frontmatterDescription, pinFrom, sparseClone, stableTags, summary } from './sync-lib.mjs';
 
 test('frontmatterDescription', () => {
   assert.equal(
@@ -102,4 +102,25 @@ test('sparseClone checks out a commit', () => {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('pinFrom takes the tag and each file sha256 from a release', () => {
+  const [a, b] = ['a'.repeat(64), 'b'.repeat(64)];
+  const assets = [
+    { name: 'x.zip', digest: `sha256:${a}` },
+    { name: 'y.gz', digest: `sha256:${b}` },
+  ];
+  const files = { win: 'x.zip', linux: 'y.gz' };
+  assert.deepEqual(pinFrom({ tag_name: '0.13.6', assets }, files, /^(\d+\.\d+\.\d+)$/), {
+    upstream: '0.13.6',
+    sha256: { win: a, linux: b },
+  });
+  assert.equal(pinFrom({ tag_name: 'v1.2.3', assets }, files, /^v(\d+\.\d+\.\d+)$/).upstream, '1.2.3');
+});
+
+test('pinFrom throws on an unexpected tag or a missing digest', () => {
+  const tagPattern = /^(\d+\.\d+\.\d+)$/;
+  const assets = [{ name: 'x.zip' }];
+  assert.throws(() => pinFrom({ tag_name: 'nightly', assets }, { win: 'x.zip' }, tagPattern), /unexpected tag nightly/);
+  assert.throws(() => pinFrom({ tag_name: '1.0.0', assets }, { win: 'x.zip' }, tagPattern), /no sha256 digest for x.zip/);
 });

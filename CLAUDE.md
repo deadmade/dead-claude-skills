@@ -81,7 +81,7 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
   release binaries' sha256 in `installer/assets/agent-browser.json` (bumped by `scripts/sync-agent-browser.mjs`, which imports
   `AGENT_BROWSER_FILES` from `core/binaries.ts`). Unless a current one is on PATH, the installer keeps its own copy in
   `~/.claude/bin` (upstream's raw binary, checked against the pinned hash, downloaded when missing or older than the
-  pin); either way it sets `agentBrowserPath` to the one in use (`agentBrowserPlan` in `core/binaries.ts`). Test-only hooks: `WEB_MCP_TEST_PUBLIC_IP`
+  pin); either way it sets `agentBrowserPath` to the one in use (`upstreamPlan` in `core/binaries.ts`). Test-only hooks: `WEB_MCP_TEST_PUBLIC_IP`
   (debug builds or the `test-hooks` feature) treats a comma-separated list of IPs as public; `WEB_MCP_FALLBACK_MS` shortens the fetch browser fallback's deadline, `WEB_MCP_PAPERS_MS` each paper source's (8 s), `WEB_MCP_LOOKUP_MS` each lookup source's.
   `search` reads Google, Bing, DuckDuckGo and Brave (papers: Google Scholar and Semantic Scholar too) as tabs of one browser window per server (ADR 0007, `window.rs`): an owner session `web-mcp-<pid>-window` launches it on the first call that needs a browser and keeps it until exit; every engine, `browser` session and fetch fallback attaches as a tab (`--cdp <owner's cdp url> --pin-tab`, `attach.json`, idle 3600 s). Attached session names carry a generation `g<n>`, bumped when the owner reports a new cdp url (it relaunches a dead Chrome itself); a window closed by hand comes back through `tab_gone` → `tab new`. Browser first found of `WEB_MCP_CHROME`, Chrome for Testing from `agent-browser install`, `helium`, `chromium`; never branded Chrome. Under `WEB_MCP_SEARCH_DIR` (default the data dir, no temp fallback) each server holds the first free profile slot `profiles/<n>/` (its consent marks too); rests stay machine-wide. agent-browser's attach behaviour (`tab_gone`, `close` without a daemon, a dead Chrome's error) is recorded in `docs/features/web-mcp-one-window/findings.md`, the engine and daemon timings in `docs/features/web-mcp-search/findings.md`; tests drive a fake agent-browser (`tests/bin/fake_agent_browser.rs`, a `[[bin]]`, so `cargo build --bins` before the unit tests), which changes with any agent-browser answer web-mcp reads. I still don't care about cookies (downloaded on first use, not vendored; THIRD_PARTY.md) loads for every engine, Bing included. On Windows web-mcp puts itself in a kill-on-close job, so Chrome dies with it. `browser` and the fetch fallback need what search needs; the installer warns when the window can't open (no usable browser, or Linux without a display and Xvfb) and then counts web-mcp unhealthy. A blocked engine rests 30 min. No passage index: ranking is BM25 over each search's own pages. Engine parsers test against captured result pages in `crates/web-mcp/tests/fixtures/engines/`; Google's and Semantic Scholar's aren't captured yet, so their tests are `#[ignore]`d until they are.
 - `plugins/flows/packs/`: the skill packs the conductors run, one folder per upstream, each written by its
@@ -107,6 +107,17 @@ The default branch is `main`. Feature branches and PRs target `main`; releases a
 - `plugins/opt-in/md-pane/`: a mod. Pure path logic in `hooks/paths.ts`; `register.tsx` redraws replies that name an existing
   `.md` file as its own `Markdown` (only a plugin-drawn `Markdown` with `onLinkPress` receives plain link clicks, and
   only in the fullscreen terminal) and shows the clicked file in a pane, refreshed by a 1 s stat while open.
+- `plugins/opt-in/headroom-trim/`: trims tool results before Claude reads them. `server/` is a uv project (Python 3.13,
+  `headroom-ai` pinned in `pyproject.toml` and `uv.lock`, no ML extras); `server.py` blocks every non-loopback socket
+  (`guard.py`) and sets telemetry off before importing headroom, and writes everything (venv, log, headroom's workspace,
+  `TIKTOKEN_CACHE_DIR`) under the plugin data dir, never `~`. A SessionStart launcher (`hooks/launcher.mjs`) finds uv
+  (`<CONFIG>/bin`, then an absolute PATH entry; never a bare name), starts `uv run --locked` detached with cwd = the data
+  dir and returns within about 300 ms. A PostToolUse `http` hook posts to 127.0.0.1:47811; that port is written only in
+  `hooks/hooks.json` and the installer reads it from there (`hookPort`). Every failure leaves Claude the original output.
+  The installer downloads the pinned uv (`installer/assets/uv.json`, `uvPlan` in `core/binaries.ts`, bumped by
+  `scripts/sync-uv.mjs`) into `~/.claude/bin`, runs `uv sync --locked` and fetches tiktoken's vocabulary
+  (`steps/uv.ts`). Why uv and not a bundled Python: `docs/adr/0007-python-through-installer-uv.md`. Dependabot's `uv`
+  entry keeps `uv.lock` current.
 - Notifications (`plugins/default/`, formerly the notify plugin): `hooks.json` entries (Stop, Notification, PreToolUse
   on AskUserQuestion) running one stdlib Node script, `hooks/notify.mjs`, async. Logic and tests in `hooks/lib.mjs`; Linux
   talks D-Bus via `busctl`, Windows runs an inline PowerShell WinRT toast, focus comes from tmux. The installer always
@@ -153,7 +164,7 @@ plugins of ours that the manifest no longer lists.
 
 ## Checks
 
-- `npm test`: repo checks plus all `installer/**/*.test.ts`, `scripts/*.test.mjs`, `plugins/default/hooks/*.test.mjs` and `plugins/flows/hooks/*.test.mjs`
+- `npm test`: repo checks plus all `installer/**/*.test.ts`, `scripts/*.test.mjs`, `plugins/default/hooks/*.test.mjs`, `plugins/flows/hooks/*.test.mjs` and `plugins/opt-in/headroom-trim/hooks/*.test.mjs`
   (`claude plugin validate` is skipped when `claude` isn't on PATH). The installer tests run with a line-coverage floor
   (`--test-coverage-lines` in `package.json` and `flake.nix`; raise it, never lower it), and `installer/modules.test.ts`
   loads every module so none hides from it. `system/` tests use the real OS: Windows-only cases skip elsewhere. Parsers of what other tools write test against captured output in `core/fixtures/`,
@@ -166,6 +177,9 @@ plugins of ours that the manifest no longer lists.
 - tui-review mod tests need a generated fixture first, from `crates/tui-review`:
   `cargo run --release -- gen --out <dir> && node ../../plugins/shared/tui-review/tests/make-fixture.mjs <dir>`, then `claude plugin test .` in
   `plugins/shared/tui-review`.
+- headroom-trim server: `uv run --locked python -m unittest discover -s tests` in `plugins/opt-in/headroom-trim/server`,
+  with `UV_PROJECT_ENVIRONMENT` set to a folder outside the repo (the default `.venv` lands in the tree). One test fills a
+  tiktoken cache over the network.
 - mod tests: `claude plugin test .` in `plugins/default` and `plugins/opt-in/md-pane`.
   `tsc -p .` there needs the engine's typings in `.claude-plugin/types/` (gitignored; the engine
   writes them when it loads the mod).
@@ -180,7 +194,7 @@ plugins of ours that the manifest no longer lists.
   it fails on a high or critical finding. A finding judged benign gets a scoped suppression with its reason in
   `.github/skill-scanner.yaml`. `sync.yml` runs it before opening each sync PR.
 
-CI: `test.yml` (npm test, the installer typecheck and the dead-skills and md-pane mod tests, Linux and Windows; the skill scan, Linux) on every PR and push to main; `crates.yml` (clippy and tests,
+CI: `test.yml` (npm test, the installer typecheck, the dead-skills and md-pane mod tests and the headroom-trim server tests, Linux and Windows; the skill scan, Linux) on every PR and push to main; `crates.yml` (clippy and tests,
 plus tui-review's budgets, benchmarks and mod tests) for each crate a PR touches; `crates-build.yml` (both binaries) on PRs
 touching it and from `release.yml`; `sync.yml` weekly, one job, PR and set of issues per `SOURCES` entry (new upstream
 skills, and a "Sync <name> failing" issue it closes on the next green run), and as a dry run (no PR, no issues) on PRs

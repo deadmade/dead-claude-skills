@@ -30,6 +30,12 @@ test('every source passes its checks on the tree as committed', () => {
   for (const s of SOURCES) s.check({ tag: 'v1.2.3' });
 });
 
+test('uv is a source, titled by the pinned tag', () => {
+  const uv = SOURCES.find((s) => s.name === 'uv');
+  assert.equal(uv.script, 'sync-uv.mjs');
+  assert.match(uv.title(uv.check()), /^Pin uv to \d+\.\d+\.\d+$/);
+});
+
 test('names narrows to one source', () => {
   assert.deepEqual(names('ponytail'), ['ponytail']);
   assert.equal(names().length, SOURCES.length);

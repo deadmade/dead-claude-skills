@@ -75,6 +75,23 @@ export const SOURCES = [
       `and pins its Windows and Linux binaries' sha256. The installer downloads this version for web-mcp users.\n${CC}`,
   },
   {
+    name: 'uv',
+    script: 'sync-uv.mjs',
+    paths: ['installer/assets/uv.json'],
+    scan: false,
+    check: () => {
+      const { upstream: tag, sha256 } = JSON.parse(read('installer/assets/uv.json'));
+      assert(/^\d+\.\d+\.\d+$/.test(tag), `uv.json pins no semver upstream: ${tag}`);
+      for (const key of ['win32-x64', 'linux-x64'])
+        assert(/^[0-9a-f]{64}$/.test(sha256?.[key] ?? ''), `uv.json has no sha256 for ${key}`);
+      return { tag };
+    },
+    title: ({ tag }) => `Pin uv to ${tag}`,
+    body: ({ tag }) =>
+      `Bumps installer/assets/uv.json to https://github.com/astral-sh/uv/releases/tag/${tag}\n` +
+      `and pins its Windows and Linux archives' sha256. The installer downloads this uv for headroom-trim users.\n${CC}`,
+  },
+  {
     name: 'csharp-skills',
     script: 'sync-csharp.mjs',
     paths: ['plugins/opt-in/implementation/csharp-skills'],

@@ -16,3 +16,11 @@ updates:
     groups:
       cargo:
         patterns: ['*']
+  - package-ecosystem: uv
+    directory: /plugins/opt-in/headroom-trim/server
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      uv:
+        patterns: ['*']

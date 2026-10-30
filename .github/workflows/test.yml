@@ -27,6 +27,10 @@ jobs:
         with:
           node-version: 26
 
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+
       - name: Claude Code, for plugin validate and plugin test
         run: npm install -g @anthropic-ai/claude-code
 
@@ -46,6 +50,7 @@ jobs:
           tar -tzf dead-claude-skills-*.tgz > packed.txt
           grep -qx package/installer/install.js packed.txt
           grep -qx package/installer/assets/agent-browser.json packed.txt
+          grep -qx package/installer/assets/uv.json packed.txt
           grep -qx package/installer/system/proc.js packed.txt
           ! grep -q '\.test\.js$' packed.txt
           set +e
@@ -62,6 +67,12 @@ jobs:
       - name: md-pane mod tests
         working-directory: plugins/opt-in/md-pane
         run: claude plugin test .
+
+      - name: headroom-trim server tests
+        working-directory: plugins/opt-in/headroom-trim/server
+        env:
+          UV_PROJECT_ENVIRONMENT: ${{ runner.temp }}/trim-venv
+        run: uv run --locked python -m unittest discover -s tests
 
   # Cisco's skill-scanner over every skill under plugins/ (policy: .github/skill-scanner.yaml); fails on high or critical.
   skills:
