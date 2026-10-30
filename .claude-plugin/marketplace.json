@@ -3,7 +3,7 @@
   "name": "dead-claude-skills",
   "description": "deadmade's personal Claude Code setup: own skills plus the third-party plugins used on every machine.",
   "metadata": {
-    "version": "0.6.0"
+    "version": "0.6.2"
   },
   "owner": {
     "name": "deadmade",

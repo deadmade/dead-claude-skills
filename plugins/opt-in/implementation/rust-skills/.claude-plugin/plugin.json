@@ -1,6 +1,6 @@
 {
   "name": "rust-skills",
-  "version": "0.6.0",
+  "version": "0.6.2",
   "description": "Apollo GraphQL's Rust best practices handbook as a skill. Vendored from apollographql/skills, synced weekly.",
   "author": {
     "name": "deadmade",

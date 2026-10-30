@@ -1,6 +1,6 @@
 {
   "name": "paper-lookup",
-  "version": "0.6.0",
+  "version": "0.6.2",
   "description": "Paper lookup: search arXiv, Semantic Scholar, OpenAlex, Crossref, Unpaywall, CORE and other scholarly APIs, trimmed to the sources useful for computer science for papers, citations and open-access full text. Vendored from K-Dense-AI/scientific-agent-skills, synced weekly.",
   "author": {
     "name": "deadmade",
