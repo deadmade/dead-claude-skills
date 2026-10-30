@@ -234,3 +234,15 @@ entry's `check` and `body`; `uv` in the dev shell; `uv.json` in the package chec
 No goal without code; no code without a goal. End-to-end on a released build (Task 7) is still open by plan.
 
 ## Run verdict
+
+/verify, 2026-10-30, on fa2c450 (tree clean):
+
+| Part        | State |
+| ----------- | ----- |
+| Checks      | green except the known `claude plugin validate plugins/default` failure (on main too) and the Windows clean-slate symlink EPERM; headroom-trim validates; installer coverage 79.83%; server tests 30 OK |
+| Review      | per-task reviews, a whole-branch review and its fix wave (9 findings fixed, re-review clean); `/self-review` skipped by the user |
+| Docs        | doc audit skipped by the user; the reviews checked README, CLAUDE.md, THIRD_PARTY.md and the marketplace entry |
+| Tests       | not audited (skipped with self-review) |
+| Read        | skipped |
+| Decisions   | the 12 rulings above confirmed by the user, none reopened |
+| Not checked | a real session on a released build (Task 7, with Step 4b); Linux runs of the server tests until CI |
